@@ -36,7 +36,8 @@
                   model: deepseek-v4-flash
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
+              hold:
+                minSteps: 3
               difficultyToEffort:
                 scoreThreshold: 4
                 reasoningEffort: high
@@ -46,6 +47,6 @@
             name: './tests/fixtures/model-router-snapshot-fixture.ts'
             config:
               route: candidate
-              difficultyScore: 2
+              difficultyScore: 1
               fitStateMaxChars: 180
               trailingContext: Workspace context follows the user request.

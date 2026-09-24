@@ -280,7 +280,7 @@ async function loadSpine(endpoint: string, provider: ProviderKind): Promise<Cont
     `        model: ${CANDIDATE_MODEL}`,
     '    downgradeThreshold: 0.7',
     '    downgradeMargin: 0.5',
-    '    minTurnsDowngraded: 0',
+    '    hold: { minSteps: 0 }',
     '    routeInstructions: Choose a cheaper model only when it is suitable for this turn.',
     '    difficultyInstructions: Rate how much reasoning this turn needs.',
     '',
@@ -366,9 +366,9 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
   it('sends keep-current with one candidate and honors manual/high-difficulty decisions', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     modelServer = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
     judgmentServer = new LoopbackJudgmentServer([
-      { choice: KEEP_CURRENT_OPTION_ID, score: 2 },
+      { choice: KEEP_CURRENT_OPTION_ID, score: 1 },
       { choice: CANDIDATE_ID, score: 4 },
-      { choice: CANDIDATE_ID, score: 2 },
+      { choice: CANDIDATE_ID, score: 1 },
     ], provider)
     const judgmentURL = await judgmentServer.start()
     const loaded = await loadSpine(judgmentURL, provider)
@@ -405,7 +405,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
       reason: 'gate-passed',
       selection: { candidateId: CANDIDATE_ID, model: CANDIDATE_MODEL },
       route: { choice: CANDIDATE_ID, confidence: ROUTE_CONFIDENCE },
-      difficulty: { score: 2 },
+      difficulty: { score: 1 },
     })
     expect(requestedModel(2)).toBe(CANDIDATE_MODEL)
 
@@ -419,7 +419,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
 
   it('a 500 from the candidate completes the turn on the manual model', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     modelServer = await startMockLlmServer({ sequence: ['server_error', 'success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
-    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 2 }], provider)
+    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 1 }], provider)
     const loaded = await loadSpine(await judgmentServer.start(), provider)
     const agent = createAgent(loaded, 'provider-candidate-500')
 
@@ -434,7 +434,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
     expect(decisions[1]).toMatchObject({
       outcome: 'kept-strong',
       failure: { provider: PROVIDER, model: CANDIDATE_MODEL },
-      failedChunkSeq: expect.any(Number),
+      failedChunkSeq: expect.any(Number) as unknown,
       sticky: { active: false, brokenBy: 'route-failed', entryBase: { provider: PROVIDER, model: MANUAL_MODEL } },
     })
     const headers = eventsOfType(log, 'request/header').map(event => event.data.header.config.model)

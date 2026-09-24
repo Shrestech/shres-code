@@ -2304,18 +2304,23 @@ export interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -2378,6 +2383,36 @@ export interface ModelRoutingCandidateConfig {
   description?: string
 }
 
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
 /** The escalation operating point. */
 export interface ModelRoutingEscalateBackConfig {
   /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
@@ -2415,7 +2450,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:55`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:85`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

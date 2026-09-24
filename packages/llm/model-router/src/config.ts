@@ -37,6 +37,36 @@ export interface ModelRoutingEscalateBackConfig {
   scoreThreshold?: number
 }
 
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
 /** The advisory-hint operating point. */
 export interface ModelRoutingHardHintConfig {
   /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
@@ -64,18 +94,23 @@ export interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -137,8 +172,12 @@ export interface ResolvedModelRouterConfig {
   readonly downgradeThreshold: number
   /** Top-two margin floor. */
   readonly downgradeMargin: number
-  /** Streak horizon; `0` disables stickiness. */
-  readonly minTurnsDowngraded: number
+  /** Streak horizon and cap, in model steps. */
+  readonly hold: { readonly minSteps: number; readonly maxSteps: number }
+  /** Difficulty at or above which a streak is not entered. */
+  readonly entryScoreCeiling: number
+  /** Turns after a quality exit that keep the manual route without judgment. */
+  readonly reentryCooldownTurns: number
   /** Choice question text. */
   readonly routeInstructions: string
   /** Difficulty question text; absent when no configured feature reads difficulty. */
@@ -172,8 +211,25 @@ export const DEFAULT_STATE_MAX_CHARS = 12_000
 /** Default number of complete input alternatives for exact token fitting. */
 export const DEFAULT_STATE_MAX_FIT_CANDIDATES = 8
 
-/** Default streak horizon. */
-export const DEFAULT_MIN_TURNS_DOWNGRADED = 5
+/**
+ * Default streak horizon, in steps. At a 200k-token prefix with a five-minute
+ * manual-route cache, a return after expiry breaks even after about 20 steps on
+ * a DeepSeek-class candidate.
+ */
+export const DEFAULT_HOLD_MIN_STEPS = 20
+
+/**
+ * Default streak cap, in steps: about the number of steps at 7.8 s each that fit
+ * a five-minute manual-route cache lifetime, and the bound on a hold inside the
+ * turn that entered it.
+ */
+export const DEFAULT_HOLD_MAX_STEPS = 40
+
+/** Default entry ceiling: the third level (index 2) of the five-level rubric. */
+export const DEFAULT_ENTRY_SCORE_CEILING = 2
+
+/** Default number of turns after a quality exit that keep the manual route without judgment. */
+export const DEFAULT_REENTRY_COOLDOWN_TURNS = 2
 
 /** Default escalate-back difficulty threshold: the fourth level (index 3) of the five-level rubric. */
 export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
@@ -200,7 +256,9 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'candidates',
   'downgradeThreshold',
   'downgradeMargin',
-  'minTurnsDowngraded',
+  'hold',
+  'difficulty',
+  'reentryCooldownTurns',
   'routeInstructions',
   'difficultyInstructions',
   'difficultyLevels',
@@ -287,17 +345,28 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
       ...candidate.description === undefined ? {} : { description: candidate.description },
     })
   })
-  const minTurnsDowngraded = config.minTurnsDowngraded ?? DEFAULT_MIN_TURNS_DOWNGRADED
-  if (!Number.isInteger(minTurnsDowngraded) || minTurnsDowngraded < 0) {
-    throw new Error('ModelRouterConfig.minTurnsDowngraded must be a non-negative integer')
+  const minSteps = config.hold?.minSteps ?? DEFAULT_HOLD_MIN_STEPS
+  if (!Number.isInteger(minSteps) || minSteps < 0) {
+    throw new Error('ModelRouterConfig.hold.minSteps must be a non-negative integer')
+  }
+  const maxSteps = config.hold?.maxSteps ?? DEFAULT_HOLD_MAX_STEPS
+  if (!Number.isInteger(maxSteps) || maxSteps < 1) {
+    throw new Error('ModelRouterConfig.hold.maxSteps must be a positive integer')
+  }
+  if (minSteps > maxSteps) {
+    throw new Error('ModelRouterConfig.hold.minSteps must not exceed hold.maxSteps')
+  }
+  const reentryCooldownTurns = config.reentryCooldownTurns ?? DEFAULT_REENTRY_COOLDOWN_TURNS
+  if (!Number.isInteger(reentryCooldownTurns) || reentryCooldownTurns < 0) {
+    throw new Error('ModelRouterConfig.reentryCooldownTurns must be a non-negative integer')
   }
   const difficultyInstructions = config.difficultyInstructions
-  const needsDifficulty = minTurnsDowngraded > 0
+  const needsDifficulty = minSteps > 0
     || (config.hardHint ?? undefined) !== undefined
     || (config.difficultyToEffort ?? undefined) !== undefined
   if (needsDifficulty && (difficultyInstructions === undefined || difficultyInstructions.trim() === '')) {
     throw new Error(
-      'ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint or difficultyToEffort'
+      'ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint or difficultyToEffort'
       + ' is set: these features require a difficulty answer',
     )
   }
@@ -314,6 +383,11 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   const maxDifficultyScore = difficultyLevels.length - 1
   const scoreThreshold = config.escalateBack?.scoreThreshold ?? DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD
   assertScoreThreshold('ModelRouterConfig.escalateBack.scoreThreshold', scoreThreshold, maxDifficultyScore)
+  const entryScoreCeiling = config.difficulty?.entryScoreCeiling ?? DEFAULT_ENTRY_SCORE_CEILING
+  assertScoreThreshold('ModelRouterConfig.difficulty.entryScoreCeiling', entryScoreCeiling, maxDifficultyScore)
+  if (entryScoreCeiling > scoreThreshold) {
+    throw new Error('ModelRouterConfig.difficulty.entryScoreCeiling must not exceed escalateBack.scoreThreshold')
+  }
   const maxRouteErrors = config.maxRouteErrors ?? DEFAULT_MAX_ROUTE_ERRORS
   if (!Number.isInteger(maxRouteErrors) || maxRouteErrors < 1) {
     throw new Error('ModelRouterConfig.maxRouteErrors must be a positive integer')
@@ -356,7 +430,9 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     candidates: Object.freeze(candidates),
     downgradeThreshold: config.downgradeThreshold,
     downgradeMargin: config.downgradeMargin,
-    minTurnsDowngraded,
+    hold: Object.freeze({ minSteps, maxSteps }),
+    entryScoreCeiling,
+    reentryCooldownTurns,
     routeInstructions: config.routeInstructions,
     ...difficultyInstructions === undefined ? {} : { difficultyInstructions },
     difficultyLevels: Object.freeze([...difficultyLevels]),

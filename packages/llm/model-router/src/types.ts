@@ -178,6 +178,10 @@ export type ModelRoutingReason =
   | 'difficulty-too-high'
   /** The turn failed the gate after the streak reached its horizon. */
   | 'gate-failed'
+  /** The held streak reached `hold.maxSteps`, so the manual route returns without judgment. */
+  | 'hold-cap'
+  /** A quality exit ended a streak within `reentryCooldownTurns`, so no judgment runs. */
+  | 'reentry-cooldown'
   /** The difficulty answer reached `escalateBack.scoreThreshold`. */
   | 'escalated'
   /** The manual provider/model changed away from the streak's entry route. */
@@ -202,6 +206,7 @@ export type ModelRoutingBreakReason =
   | 'mode-off'
   | 'route-errors'
   | 'route-failed'
+  | 'hold-cap'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -223,10 +228,15 @@ export interface ModelRoutingEntryBaseView {
 export interface ModelRoutingActiveStickyView {
   /** A downgraded streak is in force after this decision. */
   active: true
-  /** Turns elapsed since the streak was entered. */
-  turnsElapsed: number
+  /**
+   * Model steps logged since the streak was entered, counting every
+   * `step/start` after the entering decision; 0 on the entering step.
+   */
+  stepsElapsed: number
   /** Turn the streak was entered; absent only for malformed external records. */
   enteredTurn?: number
+  /** Step of {@link enteredTurn} the streak was entered on; absent only for records that predate it. */
+  enteredStep?: number
   /**
    * Manual route the streak was entered on. The consult records it because the
    * manual route is only in the log while the state is strong.
@@ -241,7 +251,7 @@ export interface ModelRoutingInactiveStickyView {
   /** No downgraded streak is in force after this decision. */
   active: false
   /** Zero while strong. */
-  turnsElapsed: number
+  stepsElapsed: number
   /** Why the streak ended, when this decision ended one. */
   brokenBy?: ModelRoutingBreakReason
   /**
@@ -370,12 +380,12 @@ export interface ModelRoutingLastDecision {
   hint?: 'consider-stronger'
 }
 
-/** The sticky state a UI renders: `auto: <model>, turn 3 of >=5` (PR5). */
+/** The sticky state a UI renders. */
 export interface ModelRoutingStickyViewForUi {
   /** Whether a downgraded streak is in force. */
   active: boolean
-  /** Turns elapsed since the streak was entered. */
-  turnsElapsed: number
+  /** Model steps logged since the streak was entered. */
+  stepsElapsed: number
   /** Route the streak holds, when active. */
   selection?: ModelRoutingSelectionView
 }

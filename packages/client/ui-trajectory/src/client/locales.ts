@@ -47,6 +47,8 @@ export type TrajectoryKey =
   | 'routing.reason.currentPreferred'
   | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
+  | 'routing.reason.holdCap'
+  | 'routing.reason.reentryCooldown'
   | 'routing.reason.escalated'
   | 'routing.reason.manualDeviation'
   | 'routing.reason.routeErrors'
@@ -105,6 +107,8 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.currentPreferred': 'current model preferred',
   'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
+  'routing.reason.holdCap': 'streak reached its step cap',
+  'routing.reason.reentryCooldown': 'cooling down after a streak exit',
   'routing.reason.escalated': 'escalated to the stronger model',
   'routing.reason.manualDeviation': 'model switched manually',
   'routing.reason.routeErrors': 'route failures',
@@ -145,6 +149,8 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'current-preferred': 'routing.reason.currentPreferred',
   'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',
+  'hold-cap': 'routing.reason.holdCap',
+  'reentry-cooldown': 'routing.reason.reentryCooldown',
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
   'route-errors': 'routing.reason.routeErrors',
@@ -157,6 +163,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
 export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> = {
   'candidate-ineligible': 'routing.reason.candidateIneligible',
   'gate-failed': 'routing.reason.gateFailed',
+  'hold-cap': 'routing.reason.holdCap',
   'current-preferred': 'routing.reason.currentPreferred',
   'unknown-candidate': 'routing.reason.unknownCandidate',
   escalated: 'routing.reason.escalated',

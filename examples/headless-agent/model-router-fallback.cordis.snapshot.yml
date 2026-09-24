@@ -42,7 +42,11 @@
                   model: deepseek-v4-flash
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
+              hold:
+                minSteps: 3
+              # Each turn may enter again after a fallback, so the second fallback
+              # reaches the error limit; model-router-cooldown covers the cooldown.
+              reentryCooldownTurns: 0
               # Deployment choice: the lift's threshold sits above the scripted
               # difficulty, so no turn in either arm is lifted.
               difficultyToEffort:

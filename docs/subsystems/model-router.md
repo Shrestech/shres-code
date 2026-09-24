@@ -151,6 +151,10 @@ type ModelRoutingReason =
   | 'difficulty-too-high'
   /** The turn failed the gate after the streak reached its horizon. */
   | 'gate-failed'
+  /** The held streak reached `hold.maxSteps`, so the manual route returns without judgment. */
+  | 'hold-cap'
+  /** A quality exit ended a streak within `reentryCooldownTurns`, so no judgment runs. */
+  | 'reentry-cooldown'
   /** The difficulty answer reached `escalateBack.scoreThreshold`. */
   | 'escalated'
   /** The manual provider/model changed away from the streak's entry route. */
@@ -247,7 +251,7 @@ The router listens on the `agent/request-error` waterfall. Its listener calls `n
 
 ## The sticky streak
 
-A held downgrade survives a failed gate until `minTurnsDowngraded` turns have elapsed; the documented horizon is 5, and `0` disables stickiness so every turn is judged on its own. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 3). The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, when a downgraded request fails and the in-turn fallback retries its step on the manual route (`route-failed`), and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). That streak counts terminal failures of a held route, and `route-failed` decisions for one candidate across streaks; a completed turn on that candidate or a route-error break resets the latter count. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. The horizon counts turns, not steps.
+A streak is entered only when the difficulty score is below `difficulty.entryScoreCeiling` (documented 2), and a held downgrade survives a failed gate or a different candidate until `hold.minSteps` model steps have elapsed; the documented horizon is 20, and `0` disables stickiness so every step is judged on its own. Every `step/start` logged while the streak holds counts, including later steps of the entering turn, and the entering decision records its turn and step. When `hold.maxSteps` (documented 40) steps have elapsed, the next consult ends the streak with `hold-cap` without a judgment call. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 3). A score between the entry ceiling and that threshold holds the streak but does not enter one, so in that band a different candidate never replaces the held selection. The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, when a downgraded request fails and the in-turn fallback retries its step on the manual route (`route-failed`), and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). That streak counts terminal failures of a held route, and `route-failed` decisions for one candidate across streaks; a completed turn on that candidate or a route-error break resets the latter count. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. An `escalated`, `current-preferred`, or `route-failed` exit starts the re-entry cooldown: the next `reentryCooldownTurns` turns (documented 2) keep the manual route with `reentry-cooldown` and no judgment call. The fold records the ending decision's turn, so the cooldown is a function of the log. The horizon and the cap count steps, not turns.
 
 These judgments use the latest bounded surface and establish routing mechanics only; they do not establish real-model task quality, completion, or security.
 
@@ -265,6 +269,7 @@ type ModelRoutingBreakReason =
   | 'mode-off'
   | 'route-errors'
   | 'route-failed'
+  | 'hold-cap'
 ```
 
 ```ts type-equiv
@@ -272,10 +277,15 @@ type ModelRoutingBreakReason =
 interface ModelRoutingActiveStickyView {
   /** A downgraded streak is in force after this decision. */
   active: true
-  /** Turns elapsed since the streak was entered. */
-  turnsElapsed: number
+  /**
+   * Model steps logged since the streak was entered, counting every
+   * `step/start` after the entering decision; 0 on the entering step.
+   */
+  stepsElapsed: number
   /** Turn the streak was entered; absent only for malformed external records. */
   enteredTurn?: number
+  /** Step of {@link enteredTurn} the streak was entered on; absent only for records that predate it. */
+  enteredStep?: number
   /**
    * Manual route the streak was entered on. The consult records it because the
    * manual route is only in the log while the state is strong.
@@ -292,7 +302,7 @@ interface ModelRoutingInactiveStickyView {
   /** No downgraded streak is in force after this decision. */
   active: false
   /** Zero while strong. */
-  turnsElapsed: number
+  stepsElapsed: number
   /** Why the streak ended, when this decision ended one. */
   brokenBy?: ModelRoutingBreakReason
   /**
@@ -316,10 +326,12 @@ Every decision records the discriminated sticky facts as of itself. Active recor
 interface ModelRoutingStickyState {
   /** Whether a downgraded streak is in force. */
   readonly active: boolean
-  /** Turns elapsed since the streak was entered; 0 while strong. */
-  readonly turnsElapsed: number
+  /** Model steps logged since the streak was entered; 0 while strong. */
+  readonly stepsElapsed: number
   /** Turn the streak was entered; absent while strong. */
   readonly enteredTurn?: number
+  /** Step the streak was entered on; absent while strong or when the entering record omitted it. */
+  readonly enteredStep?: number
   /** Allowlisted route the streak holds; absent while strong. */
   readonly candidate?: ModelRoutingSelection
   /**
@@ -335,10 +347,12 @@ interface ModelRoutingStickyState {
   readonly needsStrongTurn?: true
   /** Turn whose matching manual request is the recovery proof. */
   readonly recoveryTurn?: number
+  /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
+  readonly cooldownTurn?: number
 }
 ```
 
-`stickyState(events, end?)` folds that state from `model-routing/decision`, `model-routing/mode`, `model-routing/configuration`, `turn/start`, `request/header`, and `turn/end`. Decisions are replayed rather than re-derived, so the fold is a pure function of the log: nothing survives in live memory, a restart or a fork inherits a held streak exactly as the consult left it, and a bench replays a run. The controller also retains pending mode changes and a current-step judgment pin. Uncommitted changes do not alter replay.
+`stickyState(events, end?)` folds that state from `model-routing/decision`, `model-routing/mode`, `model-routing/configuration`, `turn/start`, `step/start`, `request/header`, and `turn/end`. Decisions are replayed rather than re-derived, so the fold is a pure function of the log: nothing survives in live memory, a restart or a fork inherits a held streak exactly as the consult left it, and a bench replays a run. The controller also retains pending mode changes and a current-step judgment pin. Uncommitted changes do not alter replay.
 
 ## Settings and the `/route` command
 
@@ -357,6 +371,40 @@ interface ModelRoutingStateConfig {
 ```
 
 ```ts type-equiv
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+```
+
+```ts type-equiv
+/** The entry side of the difficulty band. */
+interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+```
+
+```ts type-equiv
 /** Composition config of the model router; also the `model-router` settings section. */
 interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
@@ -370,18 +418,23 @@ interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -424,7 +477,7 @@ interface ModelRouterConfig {
 }
 ```
 
-`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, and model, and no two candidates may share an id; an unknown key fails by name; and `difficultyInstructions` is required while `minTurnsDowngraded` is above zero or `hardHint` is set, because a held downgrade re-judges every turn and the hint reads the difficulty answer. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
+`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, and model, and no two candidates may share an id; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; and `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
 
 `/route` reports the mode in force and any held streak; `/route on` and `/route off` select a persistent user mode. A same-valued choice records user authority immediately. A changed value during an open turn waits for the next accepted pre-step; rejection or cancellation does not commit it. Deployment defaults use `model-routing/configuration` and stop affecting a session after its first explicit `model-routing/mode`. Cold sessions retain their log-derived mode until they acquire a live routing owner. Status and invalid commands never create a pending mode indication.
 
@@ -527,5 +580,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:331`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:351`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

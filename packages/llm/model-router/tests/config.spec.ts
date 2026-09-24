@@ -10,9 +10,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_DIFFICULTY_LEVELS,
+  DEFAULT_ENTRY_SCORE_CEILING,
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
+  DEFAULT_HOLD_MAX_STEPS,
+  DEFAULT_HOLD_MIN_STEPS,
   DEFAULT_MAX_ROUTE_ERRORS,
-  DEFAULT_MIN_TURNS_DOWNGRADED,
+  DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
@@ -49,7 +52,7 @@ function withoutDifficultyQuestion(overrides: Partial<ModelRouterConfig> = {}): 
     downgradeThreshold: 0.8,
     downgradeMargin: 0.1,
     routeInstructions: 'Which route should handle this turn?',
-    minTurnsDowngraded: 0,
+    hold: { minSteps: 0 },
     ...overrides,
   }
 }
@@ -139,9 +142,9 @@ describe('resolveConfig allowlist', () => {
 describe('resolveConfig the difficulty question', () => {
   it('is required while a downgrade is held, including when the key is simply absent', () => {
     expect(() => resolveConfig(raw({ difficultyInstructions: undefined })))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0')
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0')
     // The interface makes the question texts independent, but the defaulted
-    // horizon (5) keeps this one required: the smallest shape a deployment might
+    // horizon (20 steps) keeps this one required: the smallest shape a deployment might
     // write still fails load until it configures the question or sets the
     // horizon to 0.
     const questions: ModelRouterConfig = {
@@ -151,18 +154,18 @@ describe('resolveConfig the difficulty question', () => {
       routeInstructions: 'Which route should handle this turn?',
     }
     expect(() => resolveConfig(questions))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint')
-    expect(resolveConfig({ ...questions, minTurnsDowngraded: 0 }).minTurnsDowngraded).toBe(0)
-    expect(resolveConfig({ ...questions, difficultyInstructions: 'How hard is this turn?' }).minTurnsDowngraded).toBe(5)
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint')
+    expect(resolveConfig({ ...questions, hold: { minSteps: 0 } }).hold.minSteps).toBe(0)
+    expect(resolveConfig({ ...questions, difficultyInstructions: 'How hard is this turn?' }).hold.minSteps).toBe(20)
   })
 
   it('is required while the advisory hint is configured', () => {
     const config = withoutDifficultyQuestion({ hardHint: { scoreThreshold: 4 } })
     expect(() => resolveConfig(config))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0')
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0')
     // A blank question text is not a configured question either.
     expect(() => resolveConfig({ ...config, difficultyInstructions: '  ' }))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0')
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0')
     expect(resolveConfig({ ...config, difficultyInstructions: 'How hard?' }).hardHintScoreThreshold).toBe(4)
   })
 
@@ -171,14 +174,14 @@ describe('resolveConfig the difficulty question', () => {
       difficultyToEffort: { scoreThreshold: 0, reasoningEffort: 'high' },
     })
     expect(() => resolveConfig(config))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint or difficultyToEffort')
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint or difficultyToEffort')
     expect(resolveConfig({ ...config, difficultyInstructions: 'How hard?' }).difficultyToEffort)
       .toEqual({ scoreThreshold: 0, reasoningEffort: 'high' })
   })
 
   it('is optional for a non-sticky router with no hint', () => {
     const resolved = resolveConfig(withoutDifficultyQuestion())
-    expect(resolved.minTurnsDowngraded).toBe(0)
+    expect(resolved.hold).toEqual({ minSteps: 0, maxSteps: 40 })
     expect('difficultyInstructions' in resolved).toBe(false)
   })
 
@@ -212,7 +215,8 @@ describe('resolveConfig bounds', () => {
   })
 
   it('uses the zero-based difficulty level scale, including score zero', () => {
-    expect(resolveConfig(valid({ escalateBack: { scoreThreshold: 0 } })).escalateBackScoreThreshold).toBe(0)
+    expect(resolveConfig(valid({ escalateBack: { scoreThreshold: 0 }, difficulty: { entryScoreCeiling: 0 } })).escalateBackScoreThreshold)
+      .toBe(0)
     expect(resolveConfig(valid({ hardHint: { scoreThreshold: 0 } })).hardHintScoreThreshold).toBe(0)
     expect(resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 0, reasoningEffort: 'high' } })).difficultyToEffort)
       .toEqual({ scoreThreshold: 0, reasoningEffort: 'high' })
@@ -234,16 +238,33 @@ describe('resolveConfig bounds', () => {
     const short = valid({
       difficultyLevels: ['easy', 'hard'],
       escalateBack: { scoreThreshold: 1 },
+      difficulty: { entryScoreCeiling: 1 },
       hardHint: { scoreThreshold: 0 },
       difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
     })
     expect(resolveConfig(short)).toMatchObject({
       escalateBackScoreThreshold: 1,
+      entryScoreCeiling: 1,
       hardHintScoreThreshold: 0,
       difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
     })
     expect(() => resolveConfig(valid({ difficultyLevels: ['easy', 'hard'], escalateBack: { scoreThreshold: 2 } })))
       .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 1')
+    // The entry ceiling's default is not clamped to a short rubric either.
+    expect(() => resolveConfig(valid({ difficultyLevels: ['easy', 'hard'], escalateBack: { scoreThreshold: 1 } })))
+      .toThrow('ModelRouterConfig.difficulty.entryScoreCeiling must be a number from 0 through 1')
+  })
+
+  it('rejects entryScoreCeiling above escalateBack.scoreThreshold', () => {
+    expect(() => resolveConfig(valid({ difficulty: { entryScoreCeiling: 3.5 } })))
+      .toThrow('ModelRouterConfig.difficulty.entryScoreCeiling must not exceed escalateBack.scoreThreshold')
+    // The default ceiling is not lowered to fit a lower exit threshold.
+    expect(() => resolveConfig(valid({ escalateBack: { scoreThreshold: 1 } })))
+      .toThrow('ModelRouterConfig.difficulty.entryScoreCeiling must not exceed escalateBack.scoreThreshold')
+    expect(() => resolveConfig(valid({ difficulty: { entryScoreCeiling: -1 } })))
+      .toThrow('ModelRouterConfig.difficulty.entryScoreCeiling must be a number from 0 through 4')
+    // An empty band is valid: entry and exit then share one threshold.
+    expect(resolveConfig(valid({ difficulty: { entryScoreCeiling: 3 } })).entryScoreCeiling).toBe(3)
   })
 
   it('requires the effort lift to name an effort', () => {
@@ -258,11 +279,31 @@ describe('resolveConfig bounds', () => {
       .toEqual({ scoreThreshold: 4, reasoningEffort: 'high' })
   })
 
-  it('requires a non-negative integer streak horizon', () => {
-    expect(() => resolveConfig(valid({ minTurnsDowngraded: -1 })))
-      .toThrow('ModelRouterConfig.minTurnsDowngraded must be a non-negative integer')
-    expect(() => resolveConfig(valid({ minTurnsDowngraded: 1.5 })))
-      .toThrow('ModelRouterConfig.minTurnsDowngraded must be a non-negative integer')
+  it('requires a non-negative integer streak horizon below a positive integer cap', () => {
+    expect(() => resolveConfig(valid({ hold: { minSteps: -1 } })))
+      .toThrow('ModelRouterConfig.hold.minSteps must be a non-negative integer')
+    expect(() => resolveConfig(valid({ hold: { minSteps: 1.5 } })))
+      .toThrow('ModelRouterConfig.hold.minSteps must be a non-negative integer')
+    expect(() => resolveConfig(valid({ hold: { maxSteps: 0 } })))
+      .toThrow('ModelRouterConfig.hold.maxSteps must be a positive integer')
+    expect(() => resolveConfig(valid({ hold: { maxSteps: 2.5 } })))
+      .toThrow('ModelRouterConfig.hold.maxSteps must be a positive integer')
+    expect(() => resolveConfig(valid({ hold: { minSteps: 5, maxSteps: 4 } })))
+      .toThrow('ModelRouterConfig.hold.minSteps must not exceed hold.maxSteps')
+    expect(resolveConfig(valid({ hold: { minSteps: 4, maxSteps: 4 } })).hold).toEqual({ minSteps: 4, maxSteps: 4 })
+  })
+
+  it('requires a non-negative integer re-entry cooldown', () => {
+    expect(() => resolveConfig(valid({ reentryCooldownTurns: -1 })))
+      .toThrow('ModelRouterConfig.reentryCooldownTurns must be a non-negative integer')
+    expect(() => resolveConfig(valid({ reentryCooldownTurns: 0.5 })))
+      .toThrow('ModelRouterConfig.reentryCooldownTurns must be a non-negative integer')
+    expect(resolveConfig(valid({ reentryCooldownTurns: 0 })).reentryCooldownTurns).toBe(0)
+  })
+
+  it('rejects the removed turn-counted horizon key by name', () => {
+    expect(() => resolveConfig(raw({ minTurnsDowngraded: 5 })))
+      .toThrow('ModelRouterConfig: unknown key "minTurnsDowngraded"')
   })
 
   it('requires a positive integer route-failure streak', () => {
@@ -308,7 +349,7 @@ describe('the composition schema', () => {
   /** The row a deployment writes when it wants a non-sticky router. */
   const bare = (): Record<string, unknown> => ({
     initialMode: 'off',
-    minTurnsDowngraded: 0,
+    hold: { minSteps: 0 },
     downgradeThreshold: 0.8,
     downgradeMargin: 0.1,
     routeInstructions: 'Which route should handle this turn?',
@@ -324,7 +365,9 @@ describe('the composition schema', () => {
     expect('hardHint' in normalized).toBe(false)
 
     const resolved = resolveConfig(normalized as unknown as ModelRouterConfig)
-    expect(resolved.minTurnsDowngraded).toBe(0)
+    expect(resolved.hold).toEqual({ minSteps: 0, maxSteps: 40 })
+    expect(normalized.difficulty).toEqual({ entryScoreCeiling: 2 })
+    expect(normalized.reentryCooldownTurns).toBe(2)
     expect('difficultyInstructions' in resolved).toBe(false)
     expect(resolved.difficultyToEffort).toBeUndefined()
     expect(resolved.hardHintScoreThreshold).toBeUndefined()
@@ -364,20 +407,24 @@ describe('the composition schema', () => {
     const hinted = throughSchema({ ...bare(), hardHint: {} })
     expect(hinted.hardHint).toEqual({ scoreThreshold: 3 })
     expect(() => resolveConfig(hinted as unknown as ModelRouterConfig))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint')
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint')
     expect(resolveConfig({ ...hinted, difficultyInstructions: 'How hard is this turn?' } as unknown as ModelRouterConfig).hardHintScoreThreshold).toBe(3)
 
     // A held downgrade requires it on its own, with no hint in the row at all.
-    expect(() => resolveConfig(throughSchema({ ...bare(), minTurnsDowngraded: 5 }) as unknown as ModelRouterConfig))
-      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint')
+    expect(() => resolveConfig(throughSchema({ ...bare(), hold: { minSteps: 5 } }) as unknown as ModelRouterConfig))
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint')
   })
 })
 
 describe('resolveConfig defaults and detachment', () => {
   it('resolves every documented default', () => {
     const resolved = resolveConfig(valid())
-    expect(resolved.minTurnsDowngraded).toBe(DEFAULT_MIN_TURNS_DOWNGRADED)
-    expect(resolved.minTurnsDowngraded).toBe(5)
+    expect(resolved.hold).toEqual({ minSteps: DEFAULT_HOLD_MIN_STEPS, maxSteps: DEFAULT_HOLD_MAX_STEPS })
+    expect(resolved.hold).toEqual({ minSteps: 20, maxSteps: 40 })
+    expect(resolved.entryScoreCeiling).toBe(DEFAULT_ENTRY_SCORE_CEILING)
+    expect(resolved.entryScoreCeiling).toBe(2)
+    expect(resolved.reentryCooldownTurns).toBe(DEFAULT_REENTRY_COOLDOWN_TURNS)
+    expect(resolved.reentryCooldownTurns).toBe(2)
     expect(resolved.escalateBackScoreThreshold).toBe(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD)
     expect(resolved.escalateBackScoreThreshold).toBe(3)
     expect(resolved.maxRouteErrors).toBe(DEFAULT_MAX_ROUTE_ERRORS)
@@ -395,7 +442,7 @@ describe('resolveConfig defaults and detachment', () => {
     expect(resolved.difficultyToEffort).toBeUndefined()
     expect(resolveConfig(valid({ state: { contextTurns: 0, maxChars: 1 } })).state)
       .toEqual({ contextTurns: 0, maxChars: 1, maxFitCandidates: 8 })
-    expect(resolveConfig(valid({ difficultyLevels: ['a', 'b'], escalateBack: { scoreThreshold: 1 } })).difficultyLevels)
+    expect(resolveConfig(valid({ difficultyLevels: ['a', 'b'], escalateBack: { scoreThreshold: 1 }, difficulty: { entryScoreCeiling: 1 } })).difficultyLevels)
       .toEqual(['a', 'b'])
   })
 
@@ -412,6 +459,7 @@ describe('resolveConfig defaults and detachment', () => {
     expect(Object.isFrozen(resolved.candidates[0])).toBe(true)
     expect(Object.isFrozen(resolved.difficultyLevels)).toBe(true)
     expect(Object.isFrozen(resolved.state)).toBe(true)
+    expect(Object.isFrozen(resolved.hold)).toBe(true)
     expect(Object.isFrozen(resolved.difficultyToEffort)).toBe(true)
     // resolveConfig's own default levels are detached from the shared constant.
     expect(resolveConfig(valid()).difficultyLevels).not.toBe(DEFAULT_DIFFICULTY_LEVELS)
@@ -423,7 +471,9 @@ describe('resolveConfig defaults and detachment', () => {
   it('detaches the result from the caller\u2019s arrays', () => {
     const candidates = [{ ...CANDIDATE }]
     const levels = ['one', 'two']
-    const resolved = resolveConfig(valid({ candidates, difficultyLevels: levels, escalateBack: { scoreThreshold: 1 } }))
+    const resolved = resolveConfig(valid({
+      candidates, difficultyLevels: levels, escalateBack: { scoreThreshold: 1 }, difficulty: { entryScoreCeiling: 1 },
+    }))
 
     candidates.push({ id: 'mid', provider: 'mid-provider', model: 'mid-model' })
     candidates[0]!.model = 'mutated-model'

@@ -38,7 +38,7 @@ function running(overrides: Partial<ModelRoutingProjection> = {}): ModelRoutingP
     active: true,
     pending: false,
     last: { outcome: 'downgraded', reason: 'gate-passed', selection: CHEAP, confidence: 0.9111 },
-    sticky: { active: true, turnsElapsed: 3, selection: CHEAP },
+    sticky: { active: true, stepsElapsed: 3, selection: CHEAP },
     ...overrides,
   }
 }
@@ -168,7 +168,7 @@ describe('RoutingChip', () => {
   })
 
   it('renders the on mode with no decision and no held streak yet as the mode alone', () => {
-    const { view } = setup({ routing: { active: true, pending: false, sticky: { active: false, turnsElapsed: 0 } } })
+    const { view } = setup({ routing: { active: true, pending: false, sticky: { active: false, stepsElapsed: 0 } } })
 
     expect(onChip().textContent).toBe('auto')
     expect(view.container.textContent).toBe('auto')

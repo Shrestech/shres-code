@@ -44,7 +44,9 @@
         candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
         downgradeThreshold: 0.8
         downgradeMargin: 0.1
-        minTurnsDowngraded: 5
+        hold: {"minSteps":20,"maxSteps":40}
+        difficulty: {"entryScoreCeiling":2}
+        reentryCooldownTurns: 2
         escalateBack: {"scoreThreshold":4}
         maxRouteErrors: 2
         onUnavailable: "fallback"

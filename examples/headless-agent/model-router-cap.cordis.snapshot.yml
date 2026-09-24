@@ -1,0 +1,53 @@
+# Keyless model-routing composition for the step cap: the first model call
+# enters a downgrade and emits a bash tool call, and the next step reaches
+# `hold.maxSteps: 1`, so it runs on the manual model without a judgment call.
+
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        config:
+          baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are headless-agent, a coding assistant.
+
+            Verify your work by running the code or tests. Keep answers brief and
+            factual.
+      - insert:
+          - id: agent-default-model
+            name: '@shres-code/shres-code-agent-default-model'
+            config:
+              provider: deepseek-official
+              model: deepseek-v4-pro
+          - id: model-router
+            name: '@shres-code/shres-code-model-router'
+            config:
+              initialMode: on
+              candidates:
+                - id: flash
+                  provider: deepseek-official
+                  model: deepseek-v4-flash
+              downgradeThreshold: 0.7
+              downgradeMargin: 0.5
+              hold:
+                minSteps: 1
+                maxSteps: 1
+              difficultyToEffort:
+                scoreThreshold: 4
+                reasoningEffort: high
+              routeInstructions: Pick the cheapest route that can finish this turn.
+              difficultyInstructions: Rate how much reasoning this turn needs.
+          - id: model-router-snapshot-fixture
+            name: './tests/fixtures/model-router-snapshot-fixture.ts'
+            config: {}

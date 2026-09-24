@@ -2,8 +2,8 @@
  * The two pure folds over the session log. \`foldModelRouting\` reads the mode in
  * force; \`stickyState\` replays the documented transitions of a downgraded
  * streak (entry, hold, gate-failed, escalate, manual deviation, mode-off,
- * route-errors) from \`model-routing/decision\`, \`model-routing/mode\`,
- * \`request/header\`, and turn events. Both are pure functions of the log, which
+ * route-errors, hold-cap, re-entry cooldown) from \`model-routing/decision\`,
+ * \`model-routing/mode\`, \`request/header\`, and turn and step events. Both are pure functions of the log, which
  * is what lets resume, fork, compaction, and a bench replay continue a streak:
  * the last case below folds a prefix and gets exactly the state that prefix
  * produced before the later events were appended.
@@ -77,6 +77,11 @@ function close(session: Session, turn: number, reason: TurnEndReason = { kind: '
   session.append('turn/end', { turn, reason })
 }
 
+/** One model step's opening event; a held streak counts each one. */
+function step(session: Session, turn: number, index: number): void {
+  session.append('step/start', { turn, step: index })
+}
+
 /** One failed turn; a missing \`code\` stands for a failure the harness recorded none on. */
 function fail(session: Session, turn: number, code: string | undefined): void {
   const error: LlmFailure = code === undefined
@@ -127,32 +132,71 @@ describe('foldModelRouting', () => {
 
 describe('stickyState entry', () => {
   it('is strong over an empty log', () => {
-    expect(stickyState(scripted('sticky-empty').events)).toEqual({ active: false, turnsElapsed: 0 })
+    expect(stickyState(scripted('sticky-empty').events)).toEqual({ active: false, stepsElapsed: 0 })
   })
 
-  it('derives enteredTurn, entryBase, and elapsed turns from a downgraded decision', () => {
+  it('derives enteredTurn, enteredStep, entryBase, and elapsed steps from a downgraded decision', () => {
     const session = scripted('sticky-entry')
     open(session, 1)
     open(session, 1)
+    step(session, 1, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
     user(session, 'a small change')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 }))
     close(session, 1)
     open(session, 2)
+    step(session, 2, 1)
 
     expect(stickyState(session.events)).toEqual({
       active: true,
-      turnsElapsed: 1,
+      stepsElapsed: 1,
       enteredTurn: 1,
+      enteredStep: 1,
       candidate: CHEAP,
       entryBase: STRONG_BASE,
       routeErrorLimit: ROUTE_ERROR_LIMIT,
     })
   })
 
+  it('stepsElapsed advances within the entry turn', () => {
+    const session = scripted('sticky-entry-steps')
+    open(session, 1)
+    // Steps before the entering decision belong to the manual route.
+    step(session, 1, 1)
+    step(session, 1, 2)
+    header(session, STRONG_BASE.provider, STRONG_BASE.model)
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 2 }))
+    expect(stickyState(session.events)).toMatchObject({ stepsElapsed: 0, enteredTurn: 1, enteredStep: 2 })
+    step(session, 1, 3)
+    step(session, 1, 4)
+    expect(stickyState(session.events)).toMatchObject({ active: true, stepsElapsed: 2, enteredTurn: 1, enteredStep: 2 })
+  })
+
+  it('restarts the step count on a candidate change and keeps it on a continuing decision', () => {
+    const session = scripted('sticky-entry-restart')
+    open(session, 1)
+    step(session, 1, 1)
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 }))
+    step(session, 1, 2)
+    // A continuing record without its own entry step keeps the fold's.
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 1, enteredTurn: 1 }))
+    expect(stickyState(session.events)).toMatchObject({ stepsElapsed: 1, enteredStep: 1 })
+    step(session, 1, 3)
+    session.append('model-routing/decision', decision(
+      { active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 3 },
+      { selection: MID },
+    ))
+    expect(stickyState(session.events)).toMatchObject({ stepsElapsed: 0, enteredStep: 3, candidate: MID })
+    // A changed candidate whose record names no entry step has none.
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
+    const restarted = stickyState(session.events)
+    expect(restarted).toMatchObject({ stepsElapsed: 0, candidate: CHEAP })
+    expect('enteredStep' in restarted).toBe(false)
+  })
+
   it('prefers the recorded entry base over the last request header', () => {
     const recordedBase = { provider: 'manual-provider', model: 'manual-model' }
-    const view = { active: true, turnsElapsed: 0, enteredTurn: 1, entryBase: recordedBase, routeErrorLimit: ROUTE_ERROR_LIMIT }
+    const view = { active: true, stepsElapsed: 0, enteredTurn: 1, entryBase: recordedBase, routeErrorLimit: ROUTE_ERROR_LIMIT }
 
     // A header the fold saw before the entering decision does not win: the record
     // is what the consult wrote for this streak.
@@ -166,7 +210,7 @@ describe('stickyState entry', () => {
     headerless.append('model-routing/decision', decision(view))
     expect(stickyState(headerless.events)).toEqual({
       active: true,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       enteredTurn: 1,
       candidate: CHEAP,
       entryBase: recordedBase,
@@ -186,7 +230,7 @@ describe('stickyState entry', () => {
       },
       reason: 'initial',
     })
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
 
     expect(stickyState(session.events).entryBase).toEqual({ ...STRONG_BASE, reasoningEffort: 'high' })
   })
@@ -194,10 +238,10 @@ describe('stickyState entry', () => {
   it('takes the turn in force when the logged decision names none', () => {
     const session = scripted('sticky-entry-unnumbered')
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0 }))
     expect(stickyState(session.events)).toEqual({
       active: true,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       enteredTurn: 0,
       candidate: CHEAP,
       entryBase: STRONG_BASE,
@@ -211,11 +255,13 @@ describe('stickyState holds', () => {
   function entered(id: string): Session {
     const session = scripted(id)
     open(session, 1)
+    step(session, 1, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
     user(session, 'a small change')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 }))
     close(session, 1)
     open(session, 2)
+    step(session, 2, 1)
     return session
   }
 
@@ -224,14 +270,16 @@ describe('stickyState holds', () => {
     // The loop rewrote the header to the candidate while the streak holds; that
     // must not move the entry base.
     header(session, CHEAP.provider, CHEAP.model, 'plan mode is on')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 1, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 1, enteredTurn: 1, enteredStep: 1 }))
     close(session, 2)
     open(session, 3)
+    step(session, 3, 1)
 
     expect(stickyState(session.events)).toEqual({
       active: true,
-      turnsElapsed: 2,
+      stepsElapsed: 2,
       enteredTurn: 1,
+      enteredStep: 1,
       candidate: CHEAP,
       entryBase: STRONG_BASE,
       routeErrorLimit: ROUTE_ERROR_LIMIT,
@@ -245,7 +293,7 @@ describe('stickyState holds', () => {
       reason: 'sticky-hold',
       stateHash: '00000000',
       stateSeqs: [0],
-      sticky: { active: true, turnsElapsed: 1, enteredTurn: 1, routeErrorLimit: ROUTE_ERROR_LIMIT },
+      sticky: { active: true, stepsElapsed: 1, enteredTurn: 1, routeErrorLimit: ROUTE_ERROR_LIMIT },
     })
     expect(stickyState(session.events).candidate).toEqual(CHEAP)
   })
@@ -260,9 +308,9 @@ describe('stickyState holds', () => {
       reason: 'sticky-hold',
       stateHash: '00000000',
       stateSeqs: [0],
-      sticky: { active: true, turnsElapsed: 0, enteredTurn: 1, routeErrorLimit: ROUTE_ERROR_LIMIT },
+      sticky: { active: true, stepsElapsed: 0, enteredTurn: 1, routeErrorLimit: ROUTE_ERROR_LIMIT },
     })
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
 
     expect(stickyState(session.events).candidate).toEqual(CHEAP)
   })
@@ -273,46 +321,46 @@ describe('stickyState break reasons', () => {
     const session = scripted(id)
     open(session, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
     open(session, 2)
     return session
   }
 
   it('reports the brokenBy of a decision that ends the streak', () => {
     const session = entered('break-decision')
-    session.append('model-routing/decision', decision({ active: false, turnsElapsed: 0, brokenBy: 'gate-failed' }))
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'gate-failed' })
+    session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'gate-failed' }))
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'gate-failed' })
   })
 
   it('reports no brokenBy for a decision that never held a streak', () => {
     const session = scripted('break-none')
-    session.append('model-routing/decision', decision({ active: false, turnsElapsed: 0 }))
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+    session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0 }))
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0 })
     // A brokenBy on a decision the fold saw while already strong is not a break.
-    session.append('model-routing/decision', decision({ active: false, turnsElapsed: 0, brokenBy: 'escalated' }))
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+    session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'escalated' }))
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0 })
   })
 
   it('clears the streak when the mode turns off', () => {
     const session = entered('break-mode-off')
     session.append('model-routing/mode', { active: false })
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'mode-off' })
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
   })
 
   it('records nothing for a mode event the fold saw while already strong', () => {
     const session = scripted('break-mode-noop')
     session.append('model-routing/mode', { active: false })
     session.append('model-routing/mode', { active: true })
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0 })
   })
 
   it('clears the streak at the route-failure horizon', () => {
     const session = entered('break-route-errors')
     fail(session, 2, 'RATE_LIMIT')
     // One failure is below the two-failure horizon: the streak survives.
-    expect(stickyState(session.events)).toMatchObject({ active: true, turnsElapsed: 1, candidate: CHEAP })
+    expect(stickyState(session.events)).toMatchObject({ active: true, candidate: CHEAP })
     fail(session, 3, 'RATE_LIMIT')
-    expect(stickyState(session.events)).toMatchObject({ active: false, turnsElapsed: 0, brokenBy: 'route-errors', needsStrongTurn: true })
+    expect(stickyState(session.events)).toMatchObject({ active: false, stepsElapsed: 0, brokenBy: 'route-errors', needsStrongTurn: true })
   })
 
   it('starts a fresh failure streak after route errors break the old one', () => {
@@ -320,12 +368,12 @@ describe('stickyState break reasons', () => {
     fail(session, 2, 'RATE_LIMIT')
     fail(session, 3, 'RATE_LIMIT')
     open(session, 4)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 4 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 4 }))
     fail(session, 4, 'RATE_LIMIT')
 
     expect(stickyState(session.events)).toMatchObject({
       active: true,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       candidate: CHEAP,
     })
   })
@@ -334,9 +382,9 @@ describe('stickyState break reasons', () => {
     /** Enter a fresh streak on `selection` at `turn` and record its in-turn fallback. */
     function enterAndFall(session: Session, turn: number, selection: ModelRoutingSelection = CHEAP): void {
       open(session, turn)
-      session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: turn, entryBase: STRONG_BASE }, { selection }))
+      session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: turn, entryBase: STRONG_BASE }, { selection }))
       session.append('model-routing/decision', decision(
-        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { active: false, stepsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
         { reason: 'route-failed', failure: { code: 'AUTH', provider: selection.provider, model: selection.model } },
       ))
       close(session, turn)
@@ -346,7 +394,7 @@ describe('stickyState break reasons', () => {
       const session = scripted('route-failed-across-streaks')
       enterAndFall(session, 1)
       // One fallback ends its streak without reaching the two-failure limit.
-      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+      expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'route-failed', cooldownTurn: 1 })
       enterAndFall(session, 2)
       expect(stickyState(session.events)).toMatchObject({
         active: false,
@@ -360,34 +408,34 @@ describe('stickyState break reasons', () => {
       const other = scripted('route-failed-other-candidate')
       enterAndFall(other, 1)
       enterAndFall(other, 2, MID)
-      expect(stickyState(other.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+      expect(stickyState(other.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'route-failed', cooldownTurn: 2 })
 
       const recovered = scripted('route-failed-recovered')
       enterAndFall(recovered, 1)
       open(recovered, 2)
-      recovered.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 2, entryBase: STRONG_BASE }))
+      recovered.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 2, entryBase: STRONG_BASE }))
       close(recovered, 2)
       enterAndFall(recovered, 3)
-      expect(stickyState(recovered.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+      expect(stickyState(recovered.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'route-failed', cooldownTurn: 3 })
     })
 
     it('ends a streak that holds no candidate without counting a failure', () => {
       const session = scripted('route-failed-no-candidate')
-      rawDecision(session, { active: true, routeErrorLimit: ROUTE_ERROR_LIMIT, turnsElapsed: 0, enteredTurn: 1 })
+      rawDecision(session, { active: true, routeErrorLimit: ROUTE_ERROR_LIMIT, stepsElapsed: 0, enteredTurn: 1 })
       session.append('model-routing/decision', decision(
-        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { active: false, stepsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
         { reason: 'route-failed', failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model } },
       ))
-      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+      expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'route-failed', cooldownTurn: 0 })
     })
 
     it('ignores a route-failed decision the fold saw while strong', () => {
       const session = scripted('route-failed-while-strong')
       session.append('model-routing/decision', decision(
-        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { active: false, stepsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
         { reason: 'route-failed', failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model } },
       ))
-      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+      expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0 })
     })
   })
 
@@ -395,7 +443,7 @@ describe('stickyState break reasons', () => {
     const session = entered('break-route-candidate-transition')
     fail(session, 2, 'RATE_LIMIT')
     session.append('model-routing/decision', decision(
-      { active: true, turnsElapsed: 1, enteredTurn: 1 },
+      { active: true, stepsElapsed: 1, enteredTurn: 1 },
       { selection: MID },
     ))
     fail(session, 3, 'RATE_LIMIT')
@@ -411,26 +459,26 @@ describe('stickyState break reasons', () => {
     fail(completed, 2, 'RATE_LIMIT')
     close(completed, 3)
     fail(completed, 4, 'RATE_LIMIT')
-    expect(stickyState(completed.events)).toMatchObject({ active: true, turnsElapsed: 1 })
+    expect(stickyState(completed.events)).toMatchObject({ active: true, candidate: CHEAP })
 
     const aborted = entered('break-route-aborted')
     fail(aborted, 2, 'RATE_LIMIT')
     close(aborted, 3, { kind: 'aborted', reason: { kind: 'user' } })
     fail(aborted, 4, 'RATE_LIMIT')
-    expect(stickyState(aborted.events)).toMatchObject({ active: true, turnsElapsed: 1 })
+    expect(stickyState(aborted.events)).toMatchObject({ active: true, candidate: CHEAP })
 
     for (const [id, code] of [['break-route-unknown', 'UNKNOWN'], ['break-route-aborted-code', 'ABORTED'], ['break-route-no-code', undefined]] as const) {
       const session = entered(id)
       fail(session, 2, code)
       fail(session, 3, code)
-      expect(stickyState(session.events)).toMatchObject({ active: true, turnsElapsed: 1 })
+      expect(stickyState(session.events)).toMatchObject({ active: true, candidate: CHEAP })
     }
   })
 
   it('does not count failures while the fold is strong', () => {
     const session = scripted('break-route-strong')
     fail(session, 1, 'RATE_LIMIT')
-    expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0 })
   })
 
   it('uses the latest recorded error limit without replaying an earlier failure', () => {
@@ -439,7 +487,7 @@ describe('stickyState break reasons', () => {
     open(session, 3)
     session.append('model-routing/decision', decision({
       active: true,
-      turnsElapsed: 1,
+      stepsElapsed: 1,
       enteredTurn: 1,
       routeErrorLimit: 3,
     }))
@@ -460,25 +508,25 @@ describe('stickyState break reasons', () => {
 
   it('rejects active records without a valid recorded error limit', () => {
     const missing = scripted('malformed-route-limit-missing')
-    rawDecision(missing, { active: true, turnsElapsed: 0, enteredTurn: 1 })
+    rawDecision(missing, { active: true, stepsElapsed: 0, enteredTurn: 1 })
     expect(() => stickyState(missing.events)).toThrow(/routeErrorLimit/)
 
     const zero = scripted('malformed-route-limit-zero')
-    rawDecision(zero, { active: true, turnsElapsed: 0, routeErrorLimit: 0 })
+    rawDecision(zero, { active: true, stepsElapsed: 0, routeErrorLimit: 0 })
     expect(() => stickyState(zero.events)).toThrow(/routeErrorLimit/)
 
     const fractional = scripted('malformed-route-limit-fractional')
-    rawDecision(fractional, { active: true, turnsElapsed: 0, routeErrorLimit: 1.5 })
+    rawDecision(fractional, { active: true, stepsElapsed: 0, routeErrorLimit: 1.5 })
     expect(() => stickyState(fractional.events)).toThrow(/routeErrorLimit/)
 
     const missingRecoveryBase = scripted('malformed-route-recovery-base')
-    rawDecision(missingRecoveryBase, { active: false, turnsElapsed: 0, brokenBy: 'route-errors' })
+    rawDecision(missingRecoveryBase, { active: false, stepsElapsed: 0, brokenBy: 'route-errors' })
     expect(() => stickyState(missingRecoveryBase.events)).toThrow(/entryBase/)
 
     const invalidRecoveryBase = scripted('malformed-route-recovery-base-fields')
     rawDecision(invalidRecoveryBase, {
       active: false,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       brokenBy: 'route-errors',
       entryBase: { provider: '', model: 'strong-model' },
     })
@@ -487,7 +535,7 @@ describe('stickyState break reasons', () => {
     const nullRecoveryBase = scripted('malformed-route-recovery-base-null')
     rawDecision(nullRecoveryBase, {
       active: false,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       brokenBy: 'route-errors',
       entryBase: null,
     })
@@ -500,6 +548,7 @@ describe('stickyState break reasons', () => {
     const state: ModelRoutingStickyFoldState = {
       active: true,
       currentTurn: 1,
+      stepsElapsed: 0,
       routeFailures: 0,
       routeErrorLimit: 1,
       needsStrongTurn: true,
@@ -515,7 +564,7 @@ describe('stickyState break reasons', () => {
 
   it('can record a route-error break before an entry base is available', () => {
     const session = scripted('break-route-no-entry-base')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
     fail(session, 1, 'RATE_LIMIT')
     fail(session, 2, 'RATE_LIMIT')
     expect(stickyState(session.events)).toMatchObject({
@@ -533,7 +582,7 @@ describe('stickyState route-error recovery', () => {
     open(session, 4)
     session.append('model-routing/decision', decision({
       active: false,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       brokenBy: 'route-errors',
       entryBase: STRONG_BASE,
     }))
@@ -545,7 +594,7 @@ describe('stickyState route-error recovery', () => {
     const session = scripted(id)
     open(session, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
     open(session, 2)
     header(session, CHEAP.provider, CHEAP.model)
     fail(session, 2, 'RATE_LIMIT')
@@ -603,7 +652,7 @@ describe('stickyState route-error recovery', () => {
     const session = pendingRecovery('recovery-active-decision')
     session.append('model-routing/decision', decision({
       active: true,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       enteredTurn: 4,
       entryBase: STRONG_BASE,
     }))
@@ -614,27 +663,89 @@ describe('stickyState route-error recovery', () => {
   })
 })
 
+describe('stickyState hold cap and re-entry cooldown', () => {
+  /** A streak entered at turn 1 and held into turn `turn`. */
+  function heldInto(id: string, turn: number): Session {
+    const session = scripted(id)
+    open(session, 1)
+    step(session, 1, 1)
+    header(session, STRONG_BASE.provider, STRONG_BASE.model)
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 }))
+    close(session, 1)
+    for (let current = 2; current <= turn; current += 1) {
+      open(session, current)
+      step(session, current, 1)
+      if (current < turn) close(session, current)
+    }
+    return session
+  }
+
+  it('hold-cap breaks at maxSteps and starts no cooldown', () => {
+    const session = heldInto('hold-cap', 3)
+    expect(stickyState(session.events)).toMatchObject({ active: true, stepsElapsed: 2 })
+    session.append('model-routing/decision', decision(
+      { active: false, stepsElapsed: 0, brokenBy: 'hold-cap' },
+      { reason: 'hold-cap' },
+    ))
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'hold-cap' })
+    // Steps while strong count nothing.
+    step(session, 3, 2)
+    expect(stickyState(session.events).stepsElapsed).toBe(0)
+  })
+
+  it('reentry cooldown derives from the break decision turn', () => {
+    for (const brokenBy of ['escalated', 'current-preferred'] as const) {
+      const session = heldInto(`cooldown-${brokenBy}`, 3)
+      session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy }, { reason: brokenBy }))
+      expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy, cooldownTurn: 3 })
+      // The cooldown turn is a log fact: later turns do not move it.
+      close(session, 3)
+      open(session, 4)
+      expect(stickyState(session.events).cooldownTurn).toBe(3)
+    }
+  })
+
+  it('starts no cooldown for a non-quality break or a strong decision, and clears it on entry', () => {
+    const gateFailed = heldInto('cooldown-gate-failed', 2)
+    gateFailed.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'gate-failed' }))
+    expect(stickyState(gateFailed.events).cooldownTurn).toBeUndefined()
+
+    // A quality reason the fold sees while already strong ended no streak.
+    gateFailed.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'escalated' }))
+    expect(stickyState(gateFailed.events).cooldownTurn).toBeUndefined()
+
+    const reentered = heldInto('cooldown-cleared', 2)
+    reentered.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'escalated' }))
+    expect(stickyState(reentered.events).cooldownTurn).toBe(2)
+    close(reentered, 2)
+    open(reentered, 5)
+    reentered.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 5, enteredStep: 1 }))
+    expect('cooldownTurn' in stickyState(reentered.events)).toBe(false)
+  })
+})
+
 describe('stickyState purity', () => {
   it('reproduces an earlier state from the same log prefix', () => {
     const session = scripted('sticky-purity')
     open(session, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
     user(session, 'a small change')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1 }))
     const entryEnd = session.events.length
     const enteredState = stickyState(session.events)
     open(session, 2)
-
+    step(session, 2, 1)
     close(session, 2)
     open(session, 3)
+    step(session, 3, 1)
     header(session, CHEAP.provider, CHEAP.model)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 1, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 1, enteredTurn: 1 }))
 
     expect(stickyState(session.events, entryEnd)).toEqual(enteredState)
     expect(stickyState(session.events)).toEqual(stickyState(session.events))
     expect(stickyState(session.events)).toEqual({
       active: true,
-      turnsElapsed: 2,
+      stepsElapsed: 2,
       enteredTurn: 1,
       candidate: CHEAP,
       entryBase: STRONG_BASE,
@@ -647,15 +758,22 @@ describe('stickyState purity', () => {
     open(session, 1)
     header(session, STRONG_BASE.provider, STRONG_BASE.model)
     user(session, 'a small change')
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 }))
     close(session, 1)
     open(session, 2)
+    step(session, 2, 1)
     close(session, 2, { kind: 'completed' })
     open(session, 3)
+    step(session, 3, 1)
     header(session, CHEAP.provider, CHEAP.model)
-    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 1, enteredTurn: 1 }))
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 1, enteredTurn: 1 }))
     fail(session, 3, 'RATE_LIMIT')
     open(session, 4)
+    step(session, 4, 1)
+    session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0, brokenBy: 'escalated' }))
+    open(session, 5)
+    step(session, 5, 1)
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 5, enteredStep: 1 }))
     session.append('model-routing/mode', { active: false })
 
     let state = createStickyFoldState()

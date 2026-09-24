@@ -46,7 +46,8 @@
                   reasoningEffort: high
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
+              hold:
+                minSteps: 3
               difficultyToEffort:
                 scoreThreshold: 4
                 reasoningEffort: high

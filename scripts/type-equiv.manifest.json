@@ -2492,6 +2492,16 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingHoldConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingDifficultyConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRouterConfig",
       "source": "packages/llm/model-router/src/config.ts"
     }

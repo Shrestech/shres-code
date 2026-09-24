@@ -40,7 +40,8 @@
                   model: deepseek-v4-flash
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
+              hold:
+                minSteps: 3
               # Candidate failures stay terminal here, so the recovery arm pins the
               # route-error breaker; model-router-fallback covers the in-turn fallback.
               inTurnFallback: off

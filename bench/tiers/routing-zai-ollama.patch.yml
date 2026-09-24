@@ -48,7 +48,12 @@
         description: "a routine, bounded task with a known safe fit"
     downgradeThreshold: 0.8
     downgradeMargin: 0.1
-    minTurnsDowngraded: 5
+    hold:
+      minSteps: 20
+      maxSteps: 40
+    difficulty:
+      entryScoreCeiling: 2
+    reentryCooldownTurns: 2
     escalateBack:
       scoreThreshold: 3
     maxRouteErrors: 2

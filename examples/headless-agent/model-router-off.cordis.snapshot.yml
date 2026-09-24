@@ -40,7 +40,8 @@
                   model: deepseek-v4-flash
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
+              hold:
+                minSteps: 3
               # Deployment choice: the lift's threshold sits above the scripted
               # difficulty, so no turn in either arm is lifted.
               difficultyToEffort:

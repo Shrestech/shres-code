@@ -58,8 +58,11 @@ import type {} from '@shres-code/shres-code-commands'
 import type {} from '@shres-code/shres-code-session-projection'
 import {
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
+  DEFAULT_ENTRY_SCORE_CEILING,
+  DEFAULT_HOLD_MAX_STEPS,
+  DEFAULT_HOLD_MIN_STEPS,
   DEFAULT_MAX_ROUTE_ERRORS,
-  DEFAULT_MIN_TURNS_DOWNGRADED,
+  DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
@@ -96,9 +99,12 @@ import type {
 export type * from './types.ts'
 export {
   DEFAULT_DIFFICULTY_LEVELS,
+  DEFAULT_ENTRY_SCORE_CEILING,
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
+  DEFAULT_HOLD_MAX_STEPS,
+  DEFAULT_HOLD_MIN_STEPS,
   DEFAULT_MAX_ROUTE_ERRORS,
-  DEFAULT_MIN_TURNS_DOWNGRADED,
+  DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
@@ -244,6 +250,20 @@ function entryBaseOf(sticky: ModelRoutingStickyState, base: ModelSelection): Mod
   }
 }
 
+/**
+ * The entry position a decision continuing a held streak records: the turn and
+ * step the fold carries for it, each omitted when the entering record lacked it.
+ * @param sticky - the sticky state of the held streak.
+ * @returns the entered turn and step to record.
+ */
+function heldEntry(sticky: ModelRoutingStickyState): { enteredTurn?: number; enteredStep?: number } {
+  return {
+    /* v8 ignore next -- stickyState assigns enteredTurn whenever a held candidate exists */
+    ...sticky.enteredTurn === undefined ? {} : { enteredTurn: sticky.enteredTurn },
+    ...sticky.enteredStep === undefined ? {} : { enteredStep: sticky.enteredStep },
+  }
+}
+
 /** Wire payload schema of the `modelRouting` projection. */
 const modelRoutingProjectionSchema = zod.object({
   active: zod.boolean(),
@@ -262,7 +282,7 @@ const modelRoutingProjectionSchema = zod.object({
   }).partial({ selection: true, confidence: true, hint: true }).optional(),
   sticky: zod.object({
     active: zod.boolean(),
-    turnsElapsed: zod.number(),
+    stepsElapsed: zod.number(),
     selection: zod.object({
       candidateId: zod.string(),
       provider: zod.string(),
@@ -344,10 +364,17 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })).default([]),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
-    minTurnsDowngraded: z.number().step(1).min(0).default(DEFAULT_MIN_TURNS_DOWNGRADED),
+    hold: z.object({
+      minSteps: z.number().step(1).min(0).default(DEFAULT_HOLD_MIN_STEPS),
+      maxSteps: z.number().step(1).min(1).default(DEFAULT_HOLD_MAX_STEPS),
+    }),
+    reentryCooldownTurns: z.number().step(1).min(0).default(DEFAULT_REENTRY_COOLDOWN_TURNS),
     routeInstructions: z.string().required(),
     difficultyInstructions: z.string(),
     difficultyLevels: z.array(z.string()).default([...DEFAULT_DIFFICULTY_LEVELS]),
+    difficulty: z.object({
+      entryScoreCeiling: z.number().min(0).default(DEFAULT_ENTRY_SCORE_CEILING),
+    }),
     escalateBack: z.object({
       scoreThreshold: z.number().min(0).default(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD),
     }),
@@ -414,7 +441,6 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // callback only delegates.
     let recoveryLive = true
     ctx.on('agent/request-error', async (payload, next): Promise<RequestErrorAction> => {
-      if (!recoveryLive) return next()
       const downstream = await next()
       if (!recoveryLive || downstream?.kind === 'retry') return downstream
       return this.fallBackToManual(payload)
@@ -472,13 +498,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
             sticky: {
               active: sticky.active,
-              turnsElapsed: sticky.turnsElapsed,
+              stepsElapsed: sticky.stepsElapsed,
               ...sticky.candidate === undefined ? {} : { selection: selectionView(sticky.candidate) },
             },
           }
         },
-        // Route-failed decisions count against their candidate across streaks.
-        stateVersion: 6,
+        // The accumulator counts held steps and records the re-entry cooldown turn.
+        stateVersion: 7,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -676,7 +702,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           reason: 'mode-off',
           stateHash: pinned.decision.stateHash,
           stateSeqs: pinned.decision.stateSeqs,
-          sticky: { active: false, turnsElapsed: 0 },
+          sticky: { active: false, stepsElapsed: 0 },
         })
         return undefined
       }
@@ -707,7 +733,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const config = this.config()
     state ??= this.buildState(session, config)
     const sticky = stickyState(session.events)
-    const resolved = await this.decide(config, state, sticky, base, turn, signal, request)
+    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request)
     const decision = {
       ...resolved,
       stateProjection: resolved.stateProjection ?? {
@@ -765,7 +791,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ...failedChunk === undefined ? {} : { failedChunkSeq: failedChunk.seq },
       sticky: {
         active: false,
-        turnsElapsed: 0,
+        stepsElapsed: 0,
         brokenBy: 'route-failed',
         entryBase,
       },
@@ -827,7 +853,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         omittedSeqs: state.omittedSeqs,
       },
       ...candidateEligibility === undefined ? {} : { candidateEligibility },
-      sticky: { active: false, turnsElapsed: 0, brokenBy: reason },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: reason },
     }
     this.log(agent.session, decision)
     this.pins.set(agent.session, { turn, step, inputKey: state.inputKey, decision })
@@ -867,6 +893,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * @param sticky - the sticky state before this decision.
    * @param base - the manual route in force.
    * @param turn - the turn being judged.
+   * @param step - the step being judged; an entered streak records it.
    * @param signal - cancellation signal forwarded to the judgment call.
    * @param request - content and call configuration whose requirements candidates must preserve.
    * @returns the decision to log.
@@ -877,6 +904,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     sticky: ModelRoutingStickyState,
     base: ModelSelection,
     turn: number,
+    step: number,
     signal: AbortSignal,
     request: ModelRoutingRequest,
   ): Promise<ModelRoutingDecision> {
@@ -892,16 +920,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       stateHash: observed.hash,
       stateSeqs: observed.seqs,
       ...facts,
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     })
     if (sticky.needsStrongTurn === true) {
       return {
         ...keep('route-errors'),
         sticky: {
           active: false,
-          turnsElapsed: 0,
+          stepsElapsed: 0,
           brokenBy: 'route-errors',
-          entryBase: entryBaseOf({ active: false, turnsElapsed: 0 }, base),
+          entryBase: entryBaseOf({ active: false, stepsElapsed: 0 }, base),
         },
       }
     }
@@ -911,7 +939,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (state.oversizedCurrent) return keep('state-too-large')
     if (held !== undefined && !config.candidates.some(candidate => candidate.id === held.candidateId
       && candidate.provider === held.provider && candidate.model === held.model)) {
-      return { ...keep('unknown-candidate'), sticky: { active: false, turnsElapsed: 0, brokenBy: 'unknown-candidate' } }
+      return { ...keep('unknown-candidate'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'unknown-candidate' } }
     }
     if (held !== undefined && sticky.entryBase !== undefined
       && (sticky.entryBase.provider !== base.provider || sticky.entryBase.model !== base.model)) {
@@ -922,8 +950,17 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         reason: 'manual-deviation',
         stateHash: observed.hash,
         stateSeqs: observed.seqs,
-        sticky: { active: false, turnsElapsed: 0, brokenBy: 'manual-deviation' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'manual-deviation' },
       }
+    }
+    // The cap bounds every hold, including one inside its entering turn, and
+    // returns to the manual route while its cache is still warm.
+    if (held !== undefined && sticky.stepsElapsed >= config.hold.maxSteps) {
+      return { ...keep('hold-cap'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'hold-cap' } }
+    }
+    if (held === undefined && sticky.cooldownTurn !== undefined && config.reentryCooldownTurns > 0
+      && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
+      return keep('reentry-cooldown')
     }
     const engine = this.ctx.get('judgment')
     if (engine === undefined) return keep('engine-absent')
@@ -944,7 +981,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
       return {
         ...keep('candidate-ineligible'),
-        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
+        sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
       }
     }
     const difficultyInstructions = config.difficultyInstructions
@@ -995,7 +1032,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           stateHash: observed.hash,
           stateSeqs: observed.seqs,
           ...facts,
-          sticky: { active: false, turnsElapsed: 0 },
+          sticky: { active: false, stepsElapsed: 0 },
         }
       }
       return keep(code === 'INVALID_ANSWER' ? 'invalid-answer' : 'engine-unavailable')
@@ -1015,7 +1052,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       model: result.model,
       latencyMs: result.latencyMs,
     }
-    if (difficulty !== undefined && difficulty.score >= config.escalateBackScoreThreshold) {
+    // Entry and exit use different thresholds: a score in between holds a
+    // streak but does not enter one.
+    const ceiling = held === undefined ? config.entryScoreCeiling : config.escalateBackScoreThreshold
+    if (difficulty !== undefined && difficulty.score >= ceiling) {
       return {
         outcome: 'kept-strong',
         reason: held === undefined ? 'difficulty-too-high' : 'escalated',
@@ -1023,7 +1063,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         stateSeqs: observed.seqs,
         ...answered,
         ...hintFor(config, difficulty),
-        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'escalated' } },
+        sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'escalated' } },
       }
     }
     // The question omits the manual route's own allowlist entries, so an answer
@@ -1039,7 +1079,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         stateSeqs: observed.seqs,
         ...answered,
         ...hintFor(config, difficulty),
-        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'current-preferred' } },
+        sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'current-preferred' } },
       }
     }
     const verdict = gate(eligibleConfig, routeAnswer)
@@ -1047,9 +1087,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ? { ok: true as const, selection: candidateSelection(verdict.candidate, config, difficulty, held) }
       : verdict
     // A different candidate or a different effort is a candidate change: below
-    // the horizon the held selection stands.
+    // the horizon the held selection stands, and inside the difficulty band a
+    // change is an entry the band refuses.
     const continuing = held !== undefined && picked.ok && sameSelection(held, picked.selection)
-    if (held !== undefined && sticky.turnsElapsed < config.minTurnsDowngraded && !continuing) {
+    const bandRefused = picked.ok && !continuing && difficulty !== undefined
+      && difficulty.score >= config.entryScoreCeiling
+    if (held !== undefined && (bandRefused || (sticky.stepsElapsed < config.hold.minSteps && !continuing))) {
       return {
         outcome: 'downgraded',
         reason: 'sticky-hold',
@@ -1060,9 +1103,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: {
           active: true,
           routeErrorLimit: config.maxRouteErrors,
-          turnsElapsed: sticky.turnsElapsed,
-          /* v8 ignore next -- stickyState assigns enteredTurn whenever a held candidate exists */
-          ...sticky.enteredTurn === undefined ? {} : { enteredTurn: sticky.enteredTurn },
+          stepsElapsed: sticky.stepsElapsed,
+          ...heldEntry(sticky),
           entryBase: entryBaseOf(sticky, base),
         },
       }
@@ -1078,8 +1120,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: {
           active: true,
           routeErrorLimit: config.maxRouteErrors,
-          turnsElapsed: continuing ? sticky.turnsElapsed : 0,
-          enteredTurn: continuing && sticky.enteredTurn !== undefined ? sticky.enteredTurn : turn,
+          stepsElapsed: continuing ? sticky.stepsElapsed : 0,
+          ...continuing ? heldEntry(sticky) : { enteredTurn: turn, enteredStep: step },
           entryBase: entryBaseOf(sticky, base),
         },
       }
@@ -1091,7 +1133,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         stateHash: observed.hash,
         stateSeqs: observed.seqs,
         ...answered,
-        sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
       }
     }
     return {
@@ -1101,7 +1143,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       stateSeqs: observed.seqs,
       ...answered,
       ...hintFor(config, difficulty),
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }
   }
 
@@ -1132,7 +1174,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       const state = active ? 'Routing is on.' : 'Routing is off.'
       const queued = pending === undefined ? '' : ' A change applies from the next step.'
       const held = sticky.active && sticky.candidate !== undefined
-        ? ` Holding ${sticky.candidate.provider}/${sticky.candidate.model} for turn ${sticky.turnsElapsed + 1} of at least ${config.minTurnsDowngraded}.`
+        ? ` Holding ${sticky.candidate.provider}/${sticky.candidate.model} for step ${sticky.stepsElapsed + 1} of at least ${config.hold.minSteps} and at most ${config.hold.maxSteps}.`
         : ''
       return { kind: 'success', text: `${state}${queued}${held}` }
     }

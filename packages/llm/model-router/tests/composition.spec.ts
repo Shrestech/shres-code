@@ -64,7 +64,7 @@ const ROUTER_CONFIG: readonly string[] = [
   `        model: ${SECOND_CANDIDATE_MODEL}`,
   '    downgradeThreshold: 0.7',
   '    downgradeMargin: 0.5',
-  '    minTurnsDowngraded: 3',
+  '    hold: { minSteps: 3 }',
   // Deployment choice: the lift's threshold sits above the scripted difficulty.
   '    difficultyToEffort:',
   '      scoreThreshold: 4',
@@ -292,13 +292,13 @@ describe('real Loader composition', () => {
       engine: SCRIPTED_ENGINE,
       sticky: {
         active: true,
-        turnsElapsed: 0,
+        stepsElapsed: 0,
         enteredTurn: 1,
         entryBase: { provider: PROVIDER, model: MANUAL_MODEL },
       },
     })
     expect(decision?.data.route).toMatchObject({ choice: SCRIPTED_CANDIDATE, confidence: 0.9 })
-    expect(decision?.data.difficulty).toMatchObject({ score: 2 })
+    expect(decision?.data.difficulty).toMatchObject({ score: 1 })
 
     // The decision is written before the turn's request header, and the header
     // the stub server consumed carries exactly the selected route.
@@ -339,7 +339,7 @@ describe('real Loader composition', () => {
       active: true,
       pending: false,
       last: { outcome: 'downgraded', selection: { model: CANDIDATE_MODEL } },
-      sticky: { active: true, turnsElapsed: 0, selection: { model: CANDIDATE_MODEL } },
+      sticky: { active: true, stepsElapsed: 0, selection: { model: CANDIDATE_MODEL } },
     })
   })
 
@@ -356,7 +356,7 @@ describe('real Loader composition', () => {
     expect(decisions[0]?.data).toMatchObject({
       outcome: 'downgraded',
       reason: 'gate-passed',
-      sticky: { active: true, turnsElapsed: 0, enteredTurn: 1 },
+      sticky: { active: true, stepsElapsed: 0, enteredTurn: 1 },
     })
     // The second turn re-judges the same state, and the streak keeps the route
     // it entered on instead of returning to the manual route.
@@ -366,7 +366,7 @@ describe('real Loader composition', () => {
       selection: { candidateId: SCRIPTED_CANDIDATE, provider: PROVIDER, model: CANDIDATE_MODEL },
       sticky: {
         active: true,
-        turnsElapsed: 1,
+        stepsElapsed: 1,
         enteredTurn: 1,
         entryBase: { provider: PROVIDER, model: MANUAL_MODEL },
       },
@@ -425,7 +425,7 @@ describe('real Loader composition', () => {
       route: { choice: SCRIPTED_OTHER_CANDIDATE, confidence: 0.5 },
       sticky: {
         active: true,
-        turnsElapsed: 1,
+        stepsElapsed: 1,
         enteredTurn: 1,
         entryBase: { provider: PROVIDER, model: MANUAL_MODEL },
       },
@@ -518,7 +518,7 @@ describe('real Loader composition', () => {
       reason: 'gate-passed',
       sticky: {
         active: true,
-        turnsElapsed: 1,
+        stepsElapsed: 1,
         enteredTurn: 1,
         entryBase: { provider: PROVIDER, model: MANUAL_MODEL },
       },
@@ -538,7 +538,7 @@ describe('real Loader composition', () => {
     expect(eventsOfType(agent.session.events, 'model-routing/decision')[2]?.data).toMatchObject({
       outcome: 'kept-strong',
       reason: 'manual-deviation',
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'manual-deviation' },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'manual-deviation' },
     })
     expect(requestedModel(2)).toBe(SECOND_CANDIDATE_MODEL)
   })
