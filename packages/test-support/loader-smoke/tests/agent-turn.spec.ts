@@ -120,11 +120,11 @@ describe('runFixtureTurn', () => {
       type: 'result',
       sessionId: 'fixture-session',
       output: 'final answer',
+      // One step reported reads and the other writes, so neither count is
+      // reported for the whole turn: both fold into the input total.
       usage: {
-        inputTokens: 5,
+        inputTokens: 18,
         outputTokens: 7,
-        cacheReadTokens: 6,
-        cacheWriteTokens: 7,
         reasoningTokens: 2,
       },
     })

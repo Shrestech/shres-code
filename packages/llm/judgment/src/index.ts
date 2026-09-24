@@ -273,7 +273,10 @@ export abstract class JudgmentService extends Service implements JudgmentEngine 
 
   /**
    * Answer one set of typed questions about one state. Answers come back in
-   * the order the questions were asked, each carrying its question's id.
+   * the order the questions were asked, each carrying its question's id. An
+   * implementation must honour `input.signal` at every await, settling
+   * promptly with `ABORTED` once it aborts: a consumer's deadline bounds the
+   * answer it uses, but bounds its wait only when the engine aborts.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws {@link JudgmentError} for an unconfigured credential

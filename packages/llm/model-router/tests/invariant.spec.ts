@@ -39,7 +39,7 @@ function decision(
     stateHash: '00000000',
     stateSeqs: [0],
     selection: { candidateId: 'cheap', provider: 'cheap-provider', model: 'cheap-model' },
-    sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 1 },
+    sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 1 },
     ...overrides,
   }
   return Object.fromEntries(
@@ -144,7 +144,7 @@ describe('model-router invariant companion', () => {
       outcome: 'kept-strong',
       reason: 'low-confidence',
       selection: undefined,
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }))
     expect(() => { header(session, 'strong-provider', 'strong-model') }).not.toThrow()
     // A non-header event is not a claim about the route.
@@ -157,7 +157,7 @@ describe('model-router invariant companion', () => {
     session.append('turn/start', { turn: 1 })
     session.append('model-routing/decision', decision({
       outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
-      sticky: { active: false, turnsElapsed: 0, entryBase: { provider: 'strong', model: 'manual' } },
+      sticky: { active: false, stepsElapsed: 0, entryBase: { provider: 'strong', model: 'manual' } },
     }))
     expect(() => { header(session, 'cheap-provider', 'cheap-model') }).toThrow(/does not match the selected route/)
     expect(() => { header(session, 'strong', 'manual') }).not.toThrow()
@@ -170,7 +170,7 @@ describe('model-router invariant companion', () => {
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
     session.append('model-routing/decision', decision({
-      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 1, entryBase: { provider: 'strong', model: 'strong-model' } },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 1, entryBase: { provider: 'strong', model: 'strong-model' } },
     }))
 
     expect(() => { header(session, 'cheap-provider', 'cheap-model', 'You are a coding agent powered by the strong-model model.') })
@@ -189,7 +189,7 @@ describe('model-router invariant companion', () => {
     session.append('turn/start', { turn: 1 })
     session.append('model-routing/decision', decision({
       outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
-      sticky: { active: false, turnsElapsed: 0, entryBase: { provider: 'strong', model: 'strong-model' } },
+      sticky: { active: false, stepsElapsed: 0, entryBase: { provider: 'strong', model: 'strong-model' } },
     }))
     // The recovery request runs the manual route, so naming it is accurate.
     expect(() => { header(session, 'strong', 'strong-model', 'You are the strong-model model.') }).not.toThrow()
@@ -202,7 +202,7 @@ describe('model-router invariant companion', () => {
       reason: 'route-failed',
       selection: undefined,
       failure: { code: 'AUTH', provider, model: 'cheap-model' },
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: { provider: 'strong', model: 'strong-model' } },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'route-failed', entryBase: { provider: 'strong', model: 'strong-model' } },
     })
     const rejected = /a route-failed decision must follow the same step's downgraded decision for the failed provider/
 
@@ -235,7 +235,7 @@ describe('model-router invariant companion', () => {
     const session = ctx.sessions.create()
     session.append('model-routing/decision', decision({
       outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }))
     expect(() => { header(session, 'strong', 'manual') }).toThrow(/recovery decision carries no manual route/)
   })

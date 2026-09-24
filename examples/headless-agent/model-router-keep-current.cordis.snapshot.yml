@@ -46,10 +46,8 @@
                   reasoningEffort: high
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
-              difficultyToEffort:
-                scoreThreshold: 4
-                reasoningEffort: high
+              hold:
+                minSteps: 3
               routeInstructions: Pick the cheapest route that can finish this turn.
               difficultyInstructions: Rate how much reasoning this turn needs.
           - id: judgment-dispatch

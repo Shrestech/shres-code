@@ -60,6 +60,7 @@
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-model-router": "workspace:^",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
@@ -77,6 +78,7 @@
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-model-router": "workspace:^",
     "@types/react": "~19.2.18",
     "@types/react-dom": "~19.2.5",

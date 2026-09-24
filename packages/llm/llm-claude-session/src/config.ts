@@ -261,6 +261,8 @@ export function resolveRoute(
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'anthropic-messages',
+    // Anthropic Messages reports cache reads and writes in every usage block.
+    cacheUsage: 'reported',
     baseURL,
     cacheRetention: config.cacheRetention ?? DEFAULT_CACHE_RETENTION,
     models: models.map(model => ({

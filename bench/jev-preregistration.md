@@ -33,9 +33,20 @@ own):
 
 The router's config in `route-on` is frozen here: `tier: "fast"`,
 `downgradeThreshold: 0.8`, `downgradeMargin: 0.1`,
-`minTurnsDowngraded: 5`, `escalateBack: { scoreThreshold: 4 }`,
-`maxRouteErrors: 2`, `onUnavailable: "fallback"`, and exactly one
-candidate (the weak route). The judgment engine is the TypeSafe provider on its
+`hold: { minSteps: 20, maxSteps: 40 }`, `difficulty: { entryScoreCeiling: 2 }`,
+`reentryCooldownTurns: 2`, `escalateBack: { scoreThreshold: 4 }`,
+`maxRouteErrors: 2`, `onUnavailable: "fallback"`, `judgmentDeadlineMs: 1500`,
+`judgmentFailures: { holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 }`,
+and exactly one candidate (the weak route). Amendment: the step-counted
+`hold`, the entry ceiling, and the re-entry cooldown replace the turn-counted
+`minTurnsDowngraded: 5` this arm was first frozen with, which the router no
+longer accepts, and the judgment deadline and failure handling are pinned at
+their defaults. No trial was recorded under the original rule: the repository
+holds no `route-on` or `route-off` run, and the stored runs in
+`bench/analysis/out-of-loop-stored-runs.json` cover only the J-Space
+experiments. The confirmatory routing preregistration is PR 16 of the
+[routing redesign plan](../.agents/notes/proposed/feature/2026-09-24-model-routing-redesign-plan.md).
+The judgment engine is the TypeSafe provider on its
 `fast` tier (`jev-preview`, measured at 273 ms against 685 ms for
 `accurate` on a 1.7k-token state), the tier both consumers use here.
 
@@ -91,7 +102,7 @@ point loses the saving it was built for. The sticky horizon is the protection:
 with **±0.06 judgment-score wobble** around the 0.8 gate, a non-sticky policy
 flaps across the boundary and re-prefills on nearly every flip, which is
 **sub-break-even flapping** by construction rather than a measurable effect.
-`minTurnsDowngraded: 0` keeps the non-sticky design reachable in Config,
+`hold.minSteps: 0` keeps the non-sticky design reachable in Config,
 so the claim stays falsifiable: a future run may disable stickiness
 deliberately and measure the flapping directly. It is not measured here because
 it is expected to lose, and a losing arm still costs real spend.

@@ -33,7 +33,7 @@ Usage chunks carry the X API's reported input/output/reasoning token counts; the
 
 #### KV Cache effect
 
-Provider-side. The X API reports cached input inside its usage when it serves a cache hit; this adapter passes those counts through as `cacheReadTokens` unchanged.
+Provider-side. The X API reports cached input inside its usage, so the route declares `cacheUsage: 'reported'` and every call carries `cacheReadTokens` and `cacheWriteTokens`, a miss as 0.
 
 ## Known Limitations and Deferred Work
 

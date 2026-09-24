@@ -147,7 +147,13 @@ export interface JudgmentInput {
   questions: readonly JudgmentQuestion[]
   /** Model tier; omission resolves to `accurate`. */
   tier?: JudgmentTier
-  /** Cancellation signal; an aborted ask fails with {@link JudgmentErrorCode} `ABORTED`. */
+  /**
+   * Cancellation signal. Every engine must honour it at every await, including
+   * credential resolution, redaction, retry waits, and response reads: once it
+   * aborts, the ask settles promptly with {@link JudgmentErrorCode} `ABORTED`.
+   * A consumer that combines it with a deadline bounds how long it waits only
+   * through this obligation.
+   */
   signal?: AbortSignal
   /**
    * The asking consumer. A dispatcher answers the ask with the engine the
@@ -234,6 +240,7 @@ export type JudgmentFittingResult =
 export interface JudgmentFittingEngine {
   /**
    * Redact each alternative once, select the first fitting state, and judge it.
+   * Honours `input.signal` as {@link JudgmentInput.signal} requires.
    * @param input - complete ordered states, common questions, tier, and cancellation signal.
    * @returns measured input and answers, or a capacity rejection without inference.
    * @throws JudgmentError with the same failure classes as {@link JudgmentEngine.ask}.
@@ -250,7 +257,8 @@ export interface JudgmentEngine {
   /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */
   readonly fitting?: JudgmentFittingEngine
   /**
-   * Answer one set of typed questions about one state.
+   * Answer one set of typed questions about one state. Honours `input.signal`
+   * as {@link JudgmentInput.signal} requires.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws JudgmentError for an unconfigured credential (`UNCONFIGURED`), an

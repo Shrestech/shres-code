@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
 import { structuredPatch } from 'diff'
+import { promptTokens } from '@shres-code/shres-code-llm/usage'
 import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import type {
   AssistantRequestConfig, ConversationPromptSnapshot,
@@ -752,7 +753,12 @@ function inputTotal(usage: TrajectoryUsage): number | undefined {
     && usage.cacheRead === undefined
     && usage.cacheWrite === undefined
   ) return undefined
-  return (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+  return promptTokens({
+    inputTokens: usage.input ?? 0,
+    outputTokens: 0,
+    ...(usage.cacheRead === undefined ? {} : { cacheReadTokens: usage.cacheRead }),
+    ...(usage.cacheWrite === undefined ? {} : { cacheWriteTokens: usage.cacheWrite }),
+  })
 }
 
 function UsageRows({ usage }: { usage: TrajectoryUsage | undefined }) {
@@ -772,13 +778,19 @@ function UsageRows({ usage }: { usage: TrajectoryUsage | undefined }) {
           <dd>{usage.cacheRead} tok</dd>
         </div>
       )}
+      {usage.cacheRead === undefined && usage.input !== undefined && (
+        <div className={css.requestTokenDetail}>
+          <dt>Cached</dt>
+          <dd>not reported</dd>
+        </div>
+      )}
       {usage.cacheWrite !== undefined && (
         <div className={css.requestTokenDetail}>
           <dt>Cache created</dt>
           <dd>{usage.cacheWrite} tok</dd>
         </div>
       )}
-      {usage.input !== undefined && (
+      {usage.input !== undefined && usage.cacheRead !== undefined && (
         <div className={css.requestTokenDetail}>
           <dt>Other</dt>
           <dd>{usage.input} tok</dd>

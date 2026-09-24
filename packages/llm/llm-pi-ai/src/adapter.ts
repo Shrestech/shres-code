@@ -50,6 +50,7 @@ import type {
 import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
 import type { HostedTool } from '@shres-code/shres-code-llm'
+import { resolveCacheUsage } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls } from './hosted-tools/index.ts'
@@ -395,6 +396,7 @@ export class PiAiAdapter extends LlmAdapter {
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
+    const cacheUsage = resolveCacheUsage(profile.cacheUsage, model.api)
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
     const hosted = this.hostedPlanOf(profile, model, options.model)
     // Whether a cache key goes out is decided per request for the model actually
@@ -484,6 +486,7 @@ export class PiAiAdapter extends LlmAdapter {
       // provider can accept an oversized prompt silently.
       const translated = toStreamChunks(
         events,
+        cacheUsage,
         SILENT_OVERFLOW_PROTOCOLS.has(model.api) ? model.contextWindow : undefined,
       )
       const iterator = hostedNames === undefined

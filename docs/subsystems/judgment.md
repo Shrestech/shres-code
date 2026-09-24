@@ -138,7 +138,13 @@ interface JudgmentInput {
   questions: readonly JudgmentQuestion[]
   /** Model tier; omission resolves to `accurate`. */
   tier?: JudgmentTier
-  /** Cancellation signal; an aborted ask fails with {@link JudgmentErrorCode} `ABORTED`. */
+  /**
+   * Cancellation signal. Every engine must honour it at every await, including
+   * credential resolution, redaction, retry waits, and response reads: once it
+   * aborts, the ask settles promptly with {@link JudgmentErrorCode} `ABORTED`.
+   * A consumer that combines it with a deadline bounds how long it waits only
+   * through this obligation.
+   */
   signal?: AbortSignal
   /**
    * The asking consumer. A dispatcher answers the ask with the engine the
@@ -188,6 +194,8 @@ interface JudgmentResult {
 Every engine implements `JudgmentEngine`, and so does the service mounted as `ctx.judgment`. The engine providers are [`judgment-typesafe`](../../packages/llm/judgment-typesafe/README.md), which calls a remote engine, [`judgment-shield`](../../packages/llm/judgment-shield/README.md), which calls a deployment-run loopback gateway, and [`judgment-laya`](../../packages/llm/judgment-laya/README.md), which supervises a local laya-mlx gateway on Apple silicon; the last two share one Shield wire client. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
 
 `fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
+
+Both `ask()` and `fitting.ask()` must honour `input.signal` at every await — credential resolution, redaction, retry waits, the request, and the response read — and settle promptly with `ABORTED` once it aborts. A consumer's deadline depends on this: the model router combines the turn's signal with `judgmentDeadlineMs`, and its deadline always bounds the answer it uses, but bounds its wait only when the engine aborts on the combined signal.
 
 ```ts type-equiv
 /** Ordered complete state alternatives for one atomic capacity check and judgment. */
@@ -254,6 +262,7 @@ type JudgmentFittingResult =
 interface JudgmentFittingEngine {
   /**
    * Redact each alternative once, select the first fitting state, and judge it.
+   * Honours `input.signal` as {@link JudgmentInput.signal} requires.
    * @param input - complete ordered states, common questions, tier, and cancellation signal.
    * @returns measured input and answers, or a capacity rejection without inference.
    * @throws JudgmentError with the same failure classes as {@link JudgmentEngine.ask}.
@@ -272,7 +281,8 @@ interface JudgmentEngine {
   /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */
   readonly fitting?: JudgmentFittingEngine
   /**
-   * Answer one set of typed questions about one state.
+   * Answer one set of typed questions about one state. Honours `input.signal`
+   * as {@link JudgmentInput.signal} requires.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws JudgmentError for an unconfigured credential (`UNCONFIGURED`), an
@@ -466,7 +476,10 @@ The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, b
 ```ts cordis-catalog
 /**
  * Answer one set of typed questions about one state. Answers come back in
- * the order the questions were asked, each carrying its question's id.
+ * the order the questions were asked, each carrying its question's id. An
+ * implementation must honour `input.signal` at every await, settling
+ * promptly with `ABORTED` once it aborts: a consumer's deadline bounds the
+ * answer it uses, but bounds its wait only when the engine aborts.
  * @param input - the state, the questions, the optional tier, and the cancellation signal.
  * @returns the answers with the engine and model identity and the ask's duration.
  * @throws {@link JudgmentError} for an unconfigured credential

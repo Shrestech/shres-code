@@ -204,6 +204,8 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'openai-responses',
+    // xAI's Responses endpoint reports cached input under input_tokens_details.
+    cacheUsage: 'reported',
     baseURL,
     hostedTools: resolveHostedTools(config),
     headers: {

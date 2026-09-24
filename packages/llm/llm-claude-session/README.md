@@ -55,7 +55,7 @@ Usage chunks carry Anthropic's reported input/output counts, with thinking token
 
 #### KV Cache effect
 
-Provider-side. pi-ai places up to four Anthropic `cache_control` breakpoints — the Claude Code identity block, the harness system prompt, the last tool, and the final block of the last user message — in the retention `cacheRetention` names: `{type: 'ephemeral'}` for `short`, `{type: 'ephemeral', ttl: '1h'}` for `long`, and no breakpoints for `none`. A cached prefix stays readable for the declared `promptCacheTtlMs`, counted from the start of the request that wrote or last read it; an idle gap longer than that makes the next request re-write the whole prefix. Anthropic reports hits and writes inside its usage, and this adapter passes them through as `cacheReadTokens` / `cacheWriteTokens`; the usage chunk carries no split between five-minute and one-hour writes.
+Provider-side. pi-ai places up to four Anthropic `cache_control` breakpoints — the Claude Code identity block, the harness system prompt, the last tool, and the final block of the last user message — in the retention `cacheRetention` names: `{type: 'ephemeral'}` for `short`, `{type: 'ephemeral', ttl: '1h'}` for `long`, and no breakpoints for `none`. A cached prefix stays readable for the declared `promptCacheTtlMs`, counted from the start of the request that wrote or last read it; an idle gap longer than that makes the next request re-write the whole prefix. Anthropic reports prompt-cache hits and writes inside every usage block, so the route declares `cacheUsage: 'reported'` and every call carries both `cacheReadTokens` and `cacheWriteTokens`, a miss as 0; the usage chunk carries no split between five-minute and one-hour writes.
 
 ## Known Limitations and Deferred Work
 

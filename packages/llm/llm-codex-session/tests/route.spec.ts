@@ -36,3 +36,9 @@ describe('resolveRoute headers', () => {
     expect(Object.keys(efforts)).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
   })
 })
+
+describe('cache-count reporting', () => {
+  it('declares reported cache counts for the ChatGPT Responses backend', () => {
+    expect(resolveRoute({}, 'account-7').cacheUsage).toBe('reported')
+  })
+})

@@ -32,8 +32,8 @@ const CANDIDATE = 'flash'
 /** Confidence the scripted route answer reports. */
 const ROUTE_CONFIDENCE = 0.9
 
-/** Probability-weighted difficulty the scripted score answer reports. */
-const DIFFICULTY_SCORE = 2
+/** Probability-weighted difficulty the scripted score answer reports; below the default entry ceiling. */
+const DIFFICULTY_SCORE = 1
 
 /** Fixture configuration selecting the scripted route and difficulty. */
 export interface Config {
