@@ -14,7 +14,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { JudgmentSettings } from './types.ts'
 
 /** The `judgment` settings namespace, carried by the Model UI's Classifier section. */
@@ -46,11 +46,11 @@ export interface JudgmentSettingsInstall {
   readonly base?: JudgmentSettings
   /**
    * Reject a selection the installing service cannot serve, such as an engine
-   * that is not registered. It runs on writes and document reloads once the
-   * section is registered, and never while the section registers: at
-   * registration a stored selection can name an engine whose provider has not
-   * registered yet, and rejecting it there would replace the stored selection
-   * with the composition default.
+   * that is not registered; throw `SettingsFieldError` naming the selecting
+   * field. It runs for the `write` and `reload` validation causes and never
+   * for `register`: at registration a stored selection can name an engine
+   * whose provider has not registered yet, and rejecting it there would fail
+   * the registration.
    * @param value - the resolved section, structurally valid.
    */
   readonly validateSelection?: (value: JudgmentSettings) => void
@@ -72,14 +72,18 @@ export function judgmentEnabled(source: () => JudgmentSettings): boolean {
  * without a value. A valueless `overrides:` means no overrides. Whether an
  * id names a registered engine is the installing service's check.
  * @param value - the resolved section.
- * @throws TypeError naming the invalid field.
+ * @throws SettingsFieldError naming the invalid field.
  */
 export function assertJudgmentSettingsShape(value: JudgmentSettings): void {
   const engine: unknown = value.engine
-  if (engine !== undefined && !isEngineIdText(engine)) throw new TypeError('judgment: engine must name an engine id')
+  if (engine !== undefined && !isEngineIdText(engine)) {
+    throw new SettingsFieldError(['engine'], 'judgment: engine must name an engine id')
+  }
   for (const [consumer, id] of Object.entries(value.overrides ?? {})) {
-    if (consumer === '') throw new TypeError('judgment: overrides keys must name a consumer id')
-    if (!isEngineIdText(id)) throw new TypeError(`judgment: overrides.${consumer} must name an engine id`)
+    if (consumer === '') throw new SettingsFieldError(['overrides', consumer], 'judgment: overrides keys must name a consumer id')
+    if (!isEngineIdText(id)) {
+      throw new SettingsFieldError(['overrides', consumer], `judgment: overrides.${consumer} must name an engine id`)
+    }
   }
 }
 
@@ -110,13 +114,9 @@ export function installJudgmentSettings(ctx: Context, install: JudgmentSettingsI
     // source at the decision it gates, which is what keeps a committed change
     // effective without a re-registration.
     onChange: () => {},
-    validate: (value) => {
+    validate: (value, cause) => {
       assertJudgmentSettingsShape(value)
-      // The settings service resolves and validates a namespace before it
-      // records the registration, so an unregistered namespace here means this
-      // call is the registration itself; see JudgmentSettingsInstall.validateSelection.
-      if (validateSelection === undefined || ctx.get('settings')?.get(JUDGMENT_SETTINGS_NAMESPACE) === undefined) return
-      validateSelection(value)
+      if (cause !== 'register') validateSelection?.(value)
     },
   })
   return () => source()

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
 import {
   JUDGMENT_SETTINGS_NAMESPACE,
@@ -255,10 +256,17 @@ describe('settings writes', () => {
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
     await engine(ctx, { id: 'alpha' })
 
-    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'laya' }))
-      .rejects.toThrow('judgment: engine names engine "laya", which is not composed')
-    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'laya' } }))
-      .rejects.toThrow('judgment: overrides.model-router names engine "laya", which is not composed')
+    const engineRefusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'laya' }).then(() => undefined, (error: unknown) => error)
+    const overrideRefusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'laya' } })
+      .then(() => undefined, (error: unknown) => error)
+
+    expect(engineRefusal).toBeInstanceOf(SettingsFieldError)
+    expect(engineRefusal).toMatchObject({ path: ['engine'], message: 'judgment: engine names engine "laya", which is not composed' })
+    expect(overrideRefusal).toBeInstanceOf(SettingsFieldError)
+    expect(overrideRefusal).toMatchObject({
+      path: ['overrides', 'model-router'],
+      message: 'judgment: overrides.model-router names engine "laya", which is not composed',
+    })
     expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
   })
 
@@ -282,7 +290,7 @@ describe('settings writes', () => {
     await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'mac' }))
       .rejects.toThrow('judgment: engine "mac" requires darwin-arm64')
     await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'mac' } }))
-      .rejects.toThrow('judgment: engine "mac" requires darwin-arm64')
+      .rejects.toMatchObject({ path: ['overrides', 'model-router'], message: 'judgment: engine "mac" requires darwin-arm64' })
     await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'anywhere' })
     expect(ctx.judgment.settings().engine).toBe('anywhere')
 
@@ -299,6 +307,19 @@ describe('settings writes', () => {
     await engine(ctx, { id: 'alpha' })
 
     await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: '' })).rejects.toThrow('judgment: engine must name an engine id')
+  })
+
+  it('keeps the last good selection when a reloaded document selects an unregistered engine', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => ctx.logger)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    await engine(ctx, { id: 'alpha' })
+
+    ;(ctx.settings as unknown as { publish(doc: Record<string, unknown>): void }).publish({ judgment: { engine: 'laya' } })
+
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
+    expect(warn.mock.calls.some(call => String(call[0]).includes('keeping last good'))).toBe(true)
   })
 
   it('keeps a stored selection whose provider registers after the dispatcher', async () => {

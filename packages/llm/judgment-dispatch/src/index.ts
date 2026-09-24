@@ -18,6 +18,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
+import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import {
   JudgmentEngineRegistry,
   JudgmentError,
@@ -208,19 +209,21 @@ function selectedIds(settings: DispatchedSettings): string[] {
  * Reject a selection this dispatcher cannot serve: an id no provider
  * registered, or an engine whose descriptor names another host.
  * @param registry - the live registry.
- * @param settings - the resolved section a write would commit.
- * @throws Error naming the settings field and the engine.
+ * @param settings - the resolved section a write or reload would commit.
+ * @throws SettingsFieldError naming the selecting field and the engine.
  */
 function assertSelectionServable(registry: JudgmentEngineRegistry, settings: DispatchedSettings): void {
-  const fields: Array<[string, string]> = [['engine', settings.engine]]
-  for (const [consumer, id] of Object.entries(settings.overrides ?? {})) fields.push([`overrides.${consumer}`, id])
+  const fields: Array<[readonly string[], string]> = [[['engine'], settings.engine]]
+  for (const [consumer, id] of Object.entries(settings.overrides ?? {})) fields.push([['overrides', consumer], id])
   const host = `${process.platform}-${process.arch}`
-  for (const [field, id] of fields) {
+  for (const [path, id] of fields) {
     const entry = registry.get(judgmentEngineId(id))
-    if (entry === undefined) throw new Error(`judgment: ${field} names engine "${id}", which is not composed`)
+    if (entry === undefined) {
+      throw new SettingsFieldError(path, `judgment: ${path.join('.')} names engine "${id}", which is not composed`)
+    }
     const required = entry.descriptor.host
     if (required !== undefined && required !== 'any' && required !== host) {
-      throw new Error(`judgment: engine "${id}" requires ${required}`)
+      throw new SettingsFieldError(path, `judgment: engine "${id}" requires ${required}`)
     }
   }
 }

@@ -14,7 +14,9 @@ The registry rejects a descriptor whose id differs from the registered id, a `su
 
 Every ask goes to one engine: the `judgment.overrides` entry for the ask's new optional `consumer` id, else `judgment.engine`. The dispatcher's required `defaultEngine` config is the section's composition value for `engine`; no engine is chosen by registration order. An unregistered selection fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with its detail. The dispatcher never asks another engine, so a consumer takes its own engine-unavailable path instead of acting on an answer made under another engine's calibration. Every result, fitted results included, carries `engineId`. `fitting` is a getter that is present while the deployment-wide engine supports fitting; a fitted ask routed by an override to an engine without fitting fails `UNAVAILABLE`.
 
-The `judgment` section becomes `{ enabled, engine?, overrides? }`. The Definition's shape check rejects an empty or valueless engine id by field name. The dispatcher's selection check rejects a write that selects an unregistered engine or an engine whose descriptor names another host. The selection check does not run while the section registers, because a stored selection can name an engine whose provider registers later in the same load. After the Loader settles, the dispatcher logs each selected id that is still unregistered, once per id.
+The `judgment` section becomes `{ enabled, engine?, overrides? }`. The Definition's shape check rejects an empty or valueless engine id. The dispatcher's selection check rejects a write that selects an unregistered engine or an engine whose descriptor names another host. Both throw `SettingsFieldError` with the path of the selecting field (`['engine']` or `['overrides', <consumer>]`). The selection check skips the `register` validation cause, because a stored selection can name an engine whose provider registers later in the same load. After the Loader settles, the dispatcher logs each selected id that is still unregistered, once per id.
+
+The settings seam gains what these checks need, generically for every namespace: `SettingsRegisterOptions.validate` receives the validation cause (`register`, `write`, or `reload`), a registrant throws `SettingsFieldError` to name the offending field by keys and array indices, and the configuration wire's `settings-rejected` error carries that `path` beside the message so a settings form can show the refusal at the field. A check that reads a live service, such as the LLM runtime's providers for the model-router namespace, uses the same cause rule.
 
 `worker-escalation`, `compaction-jev`, and `judgment-guardrails` send their consumer ids on every ask, so an override can move one of them to another engine. The model router does not send one yet; its asks follow `judgment.engine`.
 
@@ -28,7 +30,11 @@ Every composition that mounted a provider directly now mounts the dispatcher wit
 
 **Pick the first registered engine when none is configured.** Registration order depends on Loader scheduling, so the answering engine would change between loads without a configuration change. `defaultEngine` is required.
 
-**Validate a stored selection when the section registers.** A settings service that rejects a stored section at registration replaces it with the composition value, so a selection naming an engine that registers later in the same load would be lost. Validation runs on writes and reloads, and the settle-time log reports a selection that never resolves.
+**Validate a stored selection when the section registers.** A stored section that fails validation at registration fails the registration itself, so a selection naming an engine that registers later in the same load would take the dispatcher down. The selection check runs for writes and reloads, and the settle-time log reports a selection that never resolves.
+
+**Infer the registration pass inside the hook.** A hook can detect registration by the namespace not yet being recorded, but that depends on the settings service's internal ordering and every owner would repeat it. The explicit validation cause states it once in the seam.
+
+**Encode the field only in the message text.** A client would have to parse prose to place the refusal. `SettingsFieldError.path` is structured and survives the wire.
 
 **Move `installJudgmentSettings` out of the `JudgmentService` constructor into the dispatcher.** Every single-engine test double would then have to reinstall the toggle its consumer suites exercise. The constructor still installs the section; the dispatcher passes the composition layer and the selection check through it, so a deployment's section is always the dispatcher's.
 
@@ -49,3 +55,4 @@ This decision replaces the single-provider `ctx.judgment` mount described in the
 - The registry suite covers descriptor rejection, notification order, disposal through the provider fiber, and announcements after removal.
 - The provider, router, worker-escalation, compaction-jev, and guardrails suites pass with the dispatcher composed, and the consumer suites assert the consumer id on each ask.
 - The eight keyless model-router example snapshots replay unchanged with the dispatcher composed.
+- The settings suite covers the validation cause for register, each write mode, and reload, and a `SettingsFieldError` reaching the writer with its path; the configuration wire suite covers `settings-rejected` carrying the path for a field error and omitting it for any other refusal.

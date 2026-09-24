@@ -34,6 +34,7 @@
   "peerDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {

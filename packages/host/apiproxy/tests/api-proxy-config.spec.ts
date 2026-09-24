@@ -15,7 +15,7 @@ import ToolRuntime from '@shres-code/shres-code-tools'
 import UserQuestionService from '@shres-code/shres-code-user-questions'
 import LlmRuntime, { LlmAdapter } from '@shres-code/shres-code-llm'
 import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@shres-code/shres-code-llm'
-import { SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
+import { SettingsFieldError, SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import { CredentialProvider } from '@shres-code/shres-code-credentials'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
@@ -686,6 +686,26 @@ describe('settings domain', () => {
     const error = expectErr(await api.settings.update(request({ ns, patch })))
     expect(error.code).toBe('settings-rejected')
     expect(error.details).toEqual({ ns })
+  })
+
+  it('reports the field an owner validation names, and none for any other refusal', async () => {
+    const ctx = await harness()
+    ctx.settings.register(NS, AdapterConfig, {
+      validate: (value, cause) => {
+        if (cause === 'write' && value.baseURL === 'https://unknown') {
+          throw new SettingsFieldError(['baseURL'], 'baseURL names an endpoint no provider serves')
+        }
+        if (cause === 'write' && value.baseURL === 'https://plain') throw new Error('plain refusal')
+      },
+    })
+    const api = createApiProxy(ctx, DEFAULTS)
+
+    const named = expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://unknown' } })))
+    const plain = expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://plain' } })))
+
+    expect(named).toEqual({ code: 'settings-rejected', message: 'baseURL names an endpoint no provider serves', details: { ns: 'llm-deepseek', path: ['baseURL'] } })
+    expect(plain.code).toBe('settings-rejected')
+    expect(plain.details).toEqual({ ns: 'llm-deepseek' })
   })
 
   it('answers an unregistered namespace exactly like an unexposed one', async () => {

@@ -77,6 +77,9 @@ describe('rpcErrorSchema', () => {
     expect(rpcErrorSchema.parse({ code: 'command-error', message: 'm', details: {} }).code).toBe('command-error')
     expect(rpcErrorSchema.parse({ code: 'unknown-command', message: 'm', details: {} }).code).toBe('unknown-command')
     expect(rpcErrorSchema.parse({ code: 'title-invalid', message: 'm', details: { sessionId: 's' } }).code).toBe('title-invalid')
+    expect(rpcErrorSchema.parse({ code: 'settings-rejected', message: 'm', details: { ns: 'n' } }).code).toBe('settings-rejected')
+    expect(rpcErrorSchema.parse({ code: 'settings-rejected', message: 'm', details: { ns: 'n', path: ['candidates', 2, 'provider'] } }))
+      .toEqual({ code: 'settings-rejected', message: 'm', details: { ns: 'n', path: ['candidates', 2, 'provider'] } })
     // The credentials producer still emits this code, so the branch has to stay.
     expect(rpcErrorSchema.parse({ code: 'credential-rejected', message: 'm', details: { ref: 'r' } }).code).toBe('credential-rejected')
     expect(rpcErrorSchema.parse({ code: 'internal', message: 'm', details: {} }).code).toBe('internal')
@@ -86,6 +89,7 @@ describe('rpcErrorSchema', () => {
     expect(() => rpcErrorSchema.parse({ code: 'agent-busy', message: 'm', details: {} })).toThrow()
     expect(() => rpcErrorSchema.parse({ code: 'title-invalid', message: 'm', details: {} })).toThrow()
     expect(() => rpcErrorSchema.parse({ code: 'command-error', message: 'm' })).toThrow()
+    expect(() => rpcErrorSchema.parse({ code: 'settings-rejected', message: 'm', details: { ns: 'n', path: [true] } })).toThrow()
     expect(() => rpcErrorSchema.parse({ code: 'nope', message: 'm', details: {} })).toThrow()
   })
 })

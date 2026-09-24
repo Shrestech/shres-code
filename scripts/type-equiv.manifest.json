@@ -1747,6 +1747,11 @@
     },
     {
       "doc": "docs/subsystems/settings.md",
+      "symbol": "SettingsValidationCause",
+      "source": "packages/settings/settings/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/settings.md",
       "symbol": "SettingsApplies",
       "source": "packages/settings/settings/src/index.ts"
     },
