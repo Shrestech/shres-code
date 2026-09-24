@@ -3895,7 +3895,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:211`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:213`](../packages/core/system-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-terminal-bash"></a>
 

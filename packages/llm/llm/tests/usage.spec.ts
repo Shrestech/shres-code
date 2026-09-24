@@ -21,6 +21,18 @@ describe('cacheCount', () => {
     expect(cacheCount(usage, 'write')).toBeUndefined()
   })
 
+  it('reads a write carried without a read count as unreported', () => {
+    const usage: TokenUsage = { inputTokens: 10, outputTokens: 2, cacheWriteTokens: 5 }
+    expect(cacheCount(usage, 'read')).toBeUndefined()
+    expect(cacheCount(usage, 'write')).toBeUndefined()
+    // Unreported, but still prompt input.
+    expect(promptTokens(usage)).toBe(15)
+    const reported: TokenUsage = { inputTokens: 1, outputTokens: 1, cacheReadTokens: 2, cacheWriteTokens: 3 }
+    const sum = addTokenUsage(reported, usage)
+    expect(sum).toEqual({ inputTokens: 21, outputTokens: 3 })
+    expect(promptTokens(sum)).toBe(promptTokens(reported) + promptTokens(usage))
+  })
+
   it('rejects an unknown kind', () => {
     expect(() => cacheCount({ inputTokens: 1, outputTokens: 1 }, 'hit' as CacheCountKind)).toThrow()
   })
