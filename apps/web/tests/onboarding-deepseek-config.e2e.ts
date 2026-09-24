@@ -37,7 +37,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     // keyless dormant rows would otherwise count as a usable provider and
     // bypass this DeepSeek first-run scenario. Keep the lane focused on the
     // missing credential it is meant to exercise.
-    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session'] as const) {
+    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session', 'llm-claude-session'] as const) {
       await scaffold.ctx.settings.mutate(settingsNamespace(namespace), [
         { op: 'set', path: ['enabled'], value: false },
       ])

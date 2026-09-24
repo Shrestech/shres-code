@@ -1454,6 +1454,12 @@ export interface Config {
   models?: ClaudeSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to `DEFAULT_REFRESH_LEEWAY_MS`. */
   refreshLeewayMs?: number
+  /**
+   * Prompt-cache retention every request asks for; defaults to
+   * `DEFAULT_CACHE_RETENTION`. `long` asks for the one-hour cache and `none`
+   * disables prompt caching.
+   */
+  cacheRetention?: ClaudeSessionCacheRetention
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -1485,11 +1491,14 @@ export interface ClaudeSessionModelConfig {
     supportsTemperature?: boolean
   }
 }
+
+/** Prompt-cache retention the route requests: pi-ai's `none`, `short`, or `long`. */
+export type ClaudeSessionCacheRetention = NonNullable<PiAiProviderProfile['cacheRetention']>
 ```
 
-Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts) · [`PiAiProviderProfile`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:139`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -3579,7 +3588,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:184`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:218`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 

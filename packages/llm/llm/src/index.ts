@@ -281,6 +281,16 @@ export interface DirectoryRegistrationHandle {
 }
 
 /**
+ * Whether an adapter-reported prompt-cache lifetime is absent or a
+ * non-negative whole number of milliseconds.
+ * @param value - the adapter's `promptCacheTtlMs` field.
+ * @returns true for a value the seam may pass through.
+ */
+function isPromptCacheTtl(value: number | undefined): boolean {
+  return value === undefined || (Number.isSafeInteger(value) && value >= 0)
+}
+
+/**
  * The abstract `llm` service: an adapter registry plus a streaming model-call
  * API, interceptable via the `llm/stream` waterfall.
  */
@@ -608,6 +618,7 @@ export class LlmRuntime extends Service {
         || typeof model.name !== 'string'
         || model.name.length === 0
         || (model.description !== undefined && typeof model.description !== 'string')
+        || !isPromptCacheTtl(model.promptCacheTtlMs)
         || seen.has(model.id)
       ) {
         throw new LlmError(`adapter returned invalid or duplicate model metadata for provider "${provider}"`, 'INVALID_CATALOG')
@@ -622,6 +633,7 @@ export class LlmRuntime extends Service {
         ...model.description === undefined ? {} : { description: model.description },
         ...inputModalities === undefined ? {} : { inputModalities },
         ...hostedTools === undefined ? {} : { hostedTools },
+        ...model.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: model.promptCacheTtlMs },
       }
     })
   }
@@ -683,6 +695,13 @@ export class LlmRuntime extends Service {
         'INVALID_MODEL_MAX_TOKENS',
       )
     }
+    const promptCacheTtlMs = resolved.promptCacheTtlMs
+    if (!isPromptCacheTtl(promptCacheTtlMs)) {
+      throw new LlmError(
+        `adapter returned invalid prompt-cache TTL for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_CACHE_TTL',
+      )
+    }
     const info: LlmResolvedModelInfo = {
       provider,
       id: model,
@@ -692,6 +711,7 @@ export class LlmRuntime extends Service {
       ...hostedTools === undefined ? {} : { hostedTools },
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
+      ...promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs },
     }
     const reasoning = resolved.reasoning
     if (reasoning === undefined) return info
