@@ -80,6 +80,11 @@ async function mount(ctx: Context, config: Partial<LlmJudgmentConfig> = {}) {
   return { fiber, entry, engine: entry.engine as LlmJudgmentEngine }
 }
 
+/** Run every pending microtask, which is all a released route resolution still needs to finish. */
+function drain(): Promise<void> {
+  return new Promise((resolve) => { setImmediate(resolve) })
+}
+
 /** Wait until the engine's route resolution settles out of `starting`. */
 async function settled(entry: { status(): { state: string } }): Promise<void> {
   await vi.waitFor(() => { expect(entry.status().state).not.toBe('starting') })
@@ -167,8 +172,40 @@ describe('registration', () => {
     await fiber.dispose()
     expect(ctx.judgmentEngines.get(ID)).toBeUndefined()
     release.resolve(undefined)
-    await Promise.resolve()
+    await drain()
+    // The resolution completed with the model resolved, and published nothing.
+    expect(entry.status()).toEqual({ state: 'starting', detail: 'resolving the configured llm route' })
+  })
+
+  it('keeps the newer resolution when an older one finishes last and fails', async () => {
+    const ctx = await base()
+    const stale = Promise.withResolvers<undefined>()
+    let calls = 0
+    ctx.llm.registerAdapter([PROVIDER], new class extends MockAdapter {
+      override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        calls += 1
+        if (calls === 1) {
+          await stale.promise
+          throw new Error('stale catalog lookup failed')
+        }
+        return super.resolveModel(provider, model)
+      }
+    }([]))
+    const changes = vi.fn()
+    ctx.judgmentEngines.subscribe(changes)
+    const { entry } = await mount(ctx)
     expect(entry.status().state).toBe('starting')
+
+    // A topology change starts a second resolution while the first is pending.
+    ctx.llm.registerAdapter(['other'], new MockAdapter([]))
+    await vi.waitFor(() => { expect(entry.status()).toEqual({ state: 'ready' }) })
+    const announced = changes.mock.calls.length
+
+    stale.resolve(undefined)
+    await drain()
+    expect(calls).toBe(2)
+    expect(entry.status()).toEqual({ state: 'ready' })
+    expect(changes).toHaveBeenCalledTimes(announced)
   })
 })
 

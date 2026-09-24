@@ -289,7 +289,9 @@ export class LlmJudgmentEngine implements JudgmentEngine {
     } catch (error: unknown) {
       next = unresolvedStatus(error, provider, model)
     }
-    if (signal.aborted || generation !== this.generation) return
+    // A later resolution or the fiber's disposal, which also bumps the
+    // generation, supersedes this one: a stale result must not overwrite it.
+    if (generation !== this.generation) return
     this.publish(next)
   }
 

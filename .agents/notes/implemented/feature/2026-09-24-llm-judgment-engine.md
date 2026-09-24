@@ -81,6 +81,7 @@ Later work:
 - `tests/engine.spec.ts` covers:
   - the descriptor for both egress values;
   - every status transition, including adapter registration and removal and the temperature refusal logged once by field name;
+  - an older resolution that finishes last and fails leaving the newer `ready` status in place, and a resolution that finishes after disposal publishing nothing;
   - a refused reasoning effort;
   - the exact request;
   - usage present and absent;
