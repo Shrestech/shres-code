@@ -18,9 +18,23 @@ export const inject = ['invariants']
  * Install the commit-event contract: `settings/updated` fires only for a
  * currently registered namespace, only when the resolved value changed, and
  * only with the service's authoritative resolved value — all judged with the
- * seam's own equality predicate.
+ * seam's own equality predicate. `settings/registered` fires only with the
+ * registered namespace's authoritative value, and `settings/unregistered`
+ * only once the namespace no longer reads.
  */
 const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
+  ctx.on('settings/registered', (ns, value) => {
+    const current = ctx.get('settings')?.get(ns)
+    if (current === undefined) fail(`settings/registered for "${ns}" emitted while the namespace is unregistered`)
+    if (!deepEqualJson(current, value)) {
+      fail(`settings/registered for "${ns}" does not match the authoritative resolved value`)
+    }
+  })
+  ctx.on('settings/unregistered', (ns) => {
+    if (ctx.get('settings')?.get(ns) !== undefined) {
+      fail(`settings/unregistered for "${ns}" emitted while the namespace is still registered`)
+    }
+  })
   ctx.on('settings/updated', (ns, next, prev) => {
     const settings = ctx.get('settings')
     if (settings === undefined) {

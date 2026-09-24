@@ -123,8 +123,11 @@ export interface ServerToolCallBlock {
   name?: string
   /** Provider-issued call id for the hosted invocation, when reported. */
   id?: CallId
-  /** Provider-neutral completion state of the hosted call. */
-  status: 'completed' | 'failed'
+  /**
+   * Provider-neutral completion state of the hosted call; absent when the
+   * provider or adapter did not report one, which says nothing about success.
+   */
+  status?: 'completed' | 'failed'
   /**
    * Bounded, provider-neutral results the hosted call produced; omitted when
    * the call returned none. A mutable array like sibling blocks (Wire
@@ -509,4 +512,13 @@ export interface GenerateOptions {
    * generation policy. Ordinary conversation requests leave it unset.
    */
   purpose?: 'compaction' | 'session-title' | 'wiki-summarize' | 'wiki-extract'
+  /**
+   * Narrow the hosted tools the route declares for this model to this list for
+   * one request: `[]` offers none, and omission keeps every declared hosted
+   * tool. A request may only remove declarations; `LlmRuntime.stream` fails
+   * a list naming a hosted tool the resolved model does not declare with
+   * `UNSUPPORTED_OPTION` before dispatch, so an adapter that declares no
+   * hosted tools cannot silently ignore it.
+   */
+  hostedTools?: readonly HostedTool[]
 }

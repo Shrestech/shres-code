@@ -106,7 +106,7 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.getByTitle(en['delegated.hint'])).toBeTruthy()
   })
 
-  it('tags declared input modalities and hosted web search, and only those', () => {
+  it('tags declared modalities and hosted search without inferring access from a model name', () => {
     const directory = createSnapshotStore(state({
       current: { provider: 'provider', model: 'seeing' },
       groups: [{
@@ -121,6 +121,8 @@ describe('ModelSelect reasoning effort', () => {
           { id: 'listening', name: 'Listening', inputModalities: ['text', 'audio'] },
           { id: 'searching', name: 'Searching', hostedTools: ['web_search'] },
           { id: 'x-only', name: 'X only', hostedTools: ['x_search'] },
+          { id: 'cursor-grok', name: 'Grok via Cursor' },
+          { id: 'both', name: 'Both searches', hostedTools: ['x_search', 'web_search'] },
         ],
       }],
     }))
@@ -142,8 +144,11 @@ describe('ModelSelect reasoning effort', () => {
       'Undeclared',
       'Listeningaudio',
       'Searchingweb search',
-      'X only',
+      'X onlyX search',
+      'Grok via Cursor',
+      'Both searchesweb searchX search',
     ])
+    expect(screen.getAllByTitle(en['hosted.hint'])).toHaveLength(4)
   })
 
   it('offers provider default only when the adapter does not configure a model default', () => {

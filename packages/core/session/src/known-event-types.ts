@@ -36,6 +36,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'escalation/decision',
   'feedback/record',
   'goal/change',
+  'grok-x-search/request',
   'guard/decision',
   'hook/invoked',
   'hook/result',

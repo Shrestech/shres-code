@@ -60,6 +60,7 @@
     "react": "^19.2.8"
   },
   "devDependencies": {
+    "@shres-code/schemastery": "workspace:^",
     "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-connection": "workspace:^",
     "@shres-code/shres-code-client-locale": "workspace:^",

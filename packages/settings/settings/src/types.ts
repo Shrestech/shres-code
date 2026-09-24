@@ -46,5 +46,26 @@ declare module '@shres-code/cordis' {
      * @mode emit
      */
     'settings/document-updated'(ns: SettingsNamespace, revision: number): void
+
+    /**
+     * One namespace registration attached: its owner called `register()` and
+     * the namespace is readable through `get()` from this point. A consumer of
+     * another plugin's namespace reads `get()` once and follows this event,
+     * `settings/updated`, and `settings/unregistered`, so plugin load order
+     * does not matter. Listener containment matches `settings/updated`.
+     * @param ns - the namespace that became registered.
+     * @param value - the namespace's resolved value at registration.
+     * @mode emit
+     */
+    'settings/registered'(ns: SettingsNamespace, value: unknown): void
+
+    /**
+     * One namespace registration detached, because its owner's fiber was
+     * disposed or unloaded; `get()` returns `undefined` from this point until a
+     * later registration. Listener containment matches `settings/updated`.
+     * @param ns - the namespace that is no longer registered.
+     * @mode emit
+     */
+    'settings/unregistered'(ns: SettingsNamespace): void
   }
 }

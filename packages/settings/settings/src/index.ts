@@ -488,9 +488,13 @@ export abstract class SettingsProvider extends Service {
     }
     this.ctx.effect(() => {
       this.registrations.set(ns, registration)
+      this.emitContained(ns, ['settings/registered', ns, registration.resolved])
       // TODO(settings-registration-quiescence): Deactivate every watcher and await
       // its tail on disposal so callbacks cannot outlive the registrant fiber.
-      return () => this.registrations.delete(ns)
+      return () => {
+        this.registrations.delete(ns)
+        this.emitContained(ns, ['settings/unregistered', ns])
+      }
     }, `settings.register(${JSON.stringify(String(ns))})`)
     return {
       get: () => registration.resolved as T,
@@ -761,14 +765,31 @@ export abstract class SettingsProvider extends Service {
     this.emitDocumentUpdated(registration.ns, registration.revision)
   }
 
-  /** Contained fan-out of `settings/document-updated`, mirroring {@link commit}'s. */
+  /** Announce a raw-section revision change. */
   private emitDocumentUpdated(ns: SettingsNamespace, revision: number): void {
+    this.emitContained(ns, ['settings/document-updated', ns, revision])
+  }
+
+  /**
+   * Fan one namespace event out one listener at a time (the plain emit stops
+   * at the first throwing listener, starving the rest). Invariant violations
+   * are harness-fatal by design and rethrow after every listener ran; any
+   * other failure, sync or async, is contained and logged so one broken
+   * observer cannot wedge the emitting path (and, through it, a provider's
+   * reload loop).
+   * @param ns - the namespace the event is about, for failure logs.
+   * @param args - event name followed by its listener arguments. Cordis
+   *   `dispatch` shifts the name off this array, so after the call it holds
+   *   exactly the listener arguments (the same idiom as `EventsService.parallel`).
+   */
+  private emitContained(ns: SettingsNamespace, args: [string, ...unknown[]]): void {
     let invariantFailure: unknown
-    const args = ['settings/document-updated', ns, revision]
     for (const listener of this.ctx.events.dispatch('emit', args) as Array<(...listenerArgs: unknown[]) => unknown>) {
       try {
-        const returned = listener(ns, revision)
+        const returned = listener(...args)
         if (returned != null && typeof (returned as PromiseLike<unknown>).then === 'function') {
+          // An emit listener may still be an async function; its rejection
+          // cannot reach the synchronous INVARIANT rethrow below.
           void Promise.resolve(returned as PromiseLike<unknown>).then(undefined, (error: unknown) => {
             this.warnListenerFailure(ns, error)
           })
@@ -808,33 +829,7 @@ export abstract class SettingsProvider extends Service {
       this.pendingTails.add(segment)
       void segment.then(() => this.pendingTails.delete(segment))
     }
-    // Fan the event out one listener at a time (the plain emit stops at the
-    // first throwing listener, starving the rest). Invariant violations are
-    // harness-fatal by design and rethrow after every listener ran; any other
-    // failure is contained so one broken observer cannot wedge the commit
-    // path (and, through it, a provider's reload loop).
-    let invariantFailure: unknown
-    const args = ['settings/updated', registration.ns, next, prev, source]
-    for (const listener of this.ctx.events.dispatch('emit', args) as Array<(...listenerArgs: unknown[]) => unknown>) {
-      try {
-        const returned = listener(registration.ns, next, prev, source)
-        if (returned != null && typeof (returned as PromiseLike<unknown>).then === 'function') {
-          // An emit listener may still be an async function; its rejection
-          // cannot reach the synchronous INVARIANT rethrow below, so it is
-          // contained here instead of becoming an unhandled rejection.
-          void Promise.resolve(returned as PromiseLike<unknown>).then(undefined, (error: unknown) => {
-            this.warnListenerFailure(registration.ns, error)
-          })
-        }
-      } catch (error) {
-        if ((error as { code?: unknown } | null)?.code === 'INVARIANT') {
-          invariantFailure ??= error
-          continue
-        }
-        this.warnListenerFailure(registration.ns, error)
-      }
-    }
-    if (invariantFailure !== undefined) throw invariantFailure as Error
+    this.emitContained(registration.ns, ['settings/updated', registration.ns, next, prev, source])
   }
 
   /** Contained-watcher diagnostic shared by the sync and async failure paths. */

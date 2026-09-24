@@ -30,7 +30,7 @@
   - heading "Models & providers" [level=1]
   - paragraph: Set up Shres for the way you work.
   - heading "Providers" [level=2]
-  - paragraph: HTTP providers need an API key. Delegated CLIs use a command on your PATH and their own login — a key is optional.
+  - paragraph: API keys and subscription sign-ins are managed per provider. Delegated CLIs use a command on this host.
   - status: Saved minimax-cn.
   - list:
     - listitem:

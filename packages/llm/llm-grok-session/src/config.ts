@@ -107,6 +107,13 @@ export interface Config {
   hostedWebSearch?: boolean
   /** Serve X (Twitter) search as a hosted backend tool. Defaults to on. */
   hostedXSearch?: boolean
+  /**
+   * Expose the four X search tools of `@shres-code/shres-code-tool-grok-x-search`
+   * to Shres agents on other routes. Those tools ask this route's hosted X search,
+   * so they apply only while `enabled` and `hostedXSearch` are also on.
+   * Defaults to off. Turning it on does not check the Grok sign-in or plan.
+   */
+  agentXTools?: boolean
 }
 
 // Mirrors pi-ai's modality gate (text|image); a pi-ai modality drift fails
@@ -135,6 +142,7 @@ export const Config: z<Config> = z.object({
   cliVersion: z.string(),
   hostedWebSearch: z.boolean().default(true),
   hostedXSearch: z.boolean().default(true),
+  agentXTools: z.boolean().default(false),
 })
 
 /**
@@ -151,15 +159,17 @@ export interface CredentialSpec {
  * Resolve the section's hosted-tool switches into the profile declaration the
  * shared adapter enforces, failing loud on a value the boundary cannot serve.
  * A section comes through composition JSON as well as the typed settings
- * schema, so a non-boolean switch is refused here rather than silently
- * treated as off. Both switches default on, matching the Grok CLI's own
- * sampler: the proxy's models reach their freshest with both hosted tools.
+ * schema, so a non-boolean switch — including `agentXTools`, which gates the
+ * X search tools this route serves to other providers — is refused here
+ * rather than silently treated as off. Both hosted switches default on,
+ * matching the Grok CLI's own sampler: the proxy's models reach their
+ * freshest with both hosted tools.
  * @param config - composition or settings section value.
  * @returns the hosted-tool switches the route profile declares.
  */
 export function resolveHostedTools(config: Config): PiAiHostedTools {
   const source = config as unknown as Record<string, unknown>
-  for (const field of ['hostedWebSearch', 'hostedXSearch'] as const) {
+  for (const field of ['hostedWebSearch', 'hostedXSearch', 'agentXTools'] as const) {
     const value = source[field]
     if (value !== undefined && typeof value !== 'boolean') {
       throw new Error(`llm-grok-session: ${field} must be a boolean`)

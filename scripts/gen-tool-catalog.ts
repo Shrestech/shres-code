@@ -63,6 +63,11 @@ import LedgerService from '@shres-code/shres-code-ledger'
 import * as ToolLedger from '@shres-code/shres-code-tool-ledger'
 import GrokCredential from '@shres-code/shres-code-grok-credential'
 import * as ToolImageGen from '@shres-code/shres-code-tool-image-gen'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import * as LlmGrokSession from '@shres-code/shres-code-llm-grok-session'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import * as ToolGrokXSearch from '@shres-code/shres-code-tool-grok-x-search'
 import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import JspaceService from '@shres-code/shres-code-jspace'
@@ -119,6 +124,17 @@ function registerCatalogSubagentProvider(ctx: Context, name: string): void {
     prepareContinuable: () => Promise.reject(new Error('tool-catalog provider cannot prepare a child')),
   }
   ctx.subagents.registerProvider(provider)
+}
+
+/** In-memory settings document for packages whose tools follow a settings section. */
+class CatalogSettings extends SettingsProvider {
+  private readonly doc: Record<string, unknown> = {}
+  get writable(): boolean { return true }
+  protected load(): Promise<Record<string, unknown>> { return Promise.resolve(structuredClone(this.doc)) }
+  protected persist(ns: SettingsNamespace, section: Record<string, unknown>): Promise<void> {
+    this.doc[ns] = structuredClone(section)
+    return Promise.resolve()
+  }
 }
 
 /** Minted child-scope keys for packages whose tools are never global. */
@@ -592,6 +608,23 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-grok-x-search',
+    dir: 'tool-grok-x-search',
+    source: 'packages/llm/tool-grok-x-search/src/index.ts',
+    requires: ['ctx.tools', 'ctx.llm', 'ctx.settings', 'the grok-session route', 'owning Agent session'],
+    writes: ['tool/call', 'grok-x-search/request', 'tool/result'],
+    async mount(ctx) {
+      // The tools follow the llm-grok-session section and are default-off; the
+      // catalog opens the gate so their schemas are catalogued. No request is sent.
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(CatalogSettings)
+      await ctx.plugin(LlmGrokSession, { agentXTools: true })
+      await ctx.plugin(ToolGrokXSearch)
+    },
+    note:
+      'The four X search tools are registered only while the llm-grok-session section has enabled, hostedXSearch, and agentXTools on; the catalog opens that gate. Each call asks the grok-session route with only hosted x_search offered.',
   },
   {
     pkg: '@shres-code/shres-code-tool-tracker',

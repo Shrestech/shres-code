@@ -27,6 +27,19 @@ The optional `llm-grok-session` settings section overlays the composition entry 
 | `cliVersion` | `1.0.13` | CLI version the route advertises via `x-grok-client-version` (sent with `X-XAI-Token-Auth: xai-grok-cli` and `x-grok-client-identifier: grok-shell`, the header set the proxy's 426 gate requires); a proxy floor bump is a settings entry. |
 | `hostedWebSearch` | `true` | Serve web search as a hosted backend tool instead of the local `tool-web` tool. While on, the colliding local `web_search` function tool is dropped from the request for this route (hosted wins). Both switches default on, matching the Grok CLI's own sampler. |
 | `hostedXSearch` | `true` | Serve X (Twitter) search as a hosted backend tool. |
+| `agentXTools` | `false` | Share X search with Shres agents on other routes through the four X search tools of [`@shres-code/shres-code-tool-grok-x-search`](../tool-grok-x-search/README.md), which ask this route. They are registered only while `enabled`, `hostedXSearch`, and this switch are all on. Turning it on does not check the Grok sign-in or plan; a call fails with the route's credential error when they do not allow it. |
+
+## Hosted search
+
+The route can present web search and X (Twitter) search as hosted backend tools - the provider (the Grok proxy) executes the search on the model's behalf - instead of asking a harness tool to run it. Both switches default on, matching the Grok CLI's own sampler.
+
+When a switch is on, the matching Responses tool entry is spliced into the outgoing request's tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build CLI itself sends: `{"type": "web_search"}` and `{"type": "x_search"}`. Hosted wins on a name collision: while hosted web search is on, the local `web_search` function tool is dropped from the request, and while hosted X search is on, local function tools named after any X call name (`x_search`, `x_keyword_search`, `x_semantic_search`, `x_user_search`, `x_thread_fetch`) are dropped. Tools registered under other names are unaffected.
+
+The backend reports each X search it runs as a custom tool call under one of those five names. The adapter records each one as a `server-tool-call` content block with `kind: "x_search"` and the reported subtype in `name`, so the agent loop logs it but never dispatches it; search results ride the assistant text the model writes. A block carries no `status`, because the pinned pi-ai dependency reports none. A call name outside the five, or any X call while `hostedXSearch` is off, stays an ordinary tool call. A step whose only calls are hosted ends the turn after that step. On the next request the assistant message replays without the hosted calls: the request carries no function call or function output for them.
+
+The provider executes the search; this route never runs a local web_search for it. X search runs in conversations on this Grok subscription route; conversations on other providers reach it only through the four X search tools that `agentXTools` enables. The Customize Grok web-search switch controls the separate API-key-backed web-search method, which returns web results only.
+
+This package owns the `llm-grok-session` settings namespace (`GROK_SESSION_SETTINGS_NAMESPACE`); other plugins read the section through `ctx.settings` and never write it.
 
 ## Hosted search
 

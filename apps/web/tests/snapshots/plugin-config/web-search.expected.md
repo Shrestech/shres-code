@@ -49,7 +49,7 @@
         - paragraph: Leave blank to use the provider default.
         - text: Grok
         - switch "Grok" [checked]
-        - paragraph: Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.
+        - paragraph: Web results using XAI_API_KEY. For subscription-backed X tools and sharing with other agents, open Settings → Models & providers → Grok (subscription).
         - text: Claude
         - switch "Claude" [checked]
         - paragraph: Anthropic web search, using the same key as the Claude CLI.
