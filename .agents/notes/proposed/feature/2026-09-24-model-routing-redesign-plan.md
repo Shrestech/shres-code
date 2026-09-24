@@ -37,7 +37,7 @@ The shield prompt-security doctrine and the guard packages are out of scope. `@s
    - The router returns to strong at the next cold point, or immediately on a quality signal: difficulty, a keep-current answer, or a worker-escalation fold firing.
    - Plan mode always forces strong (b). Executing an approved plan is an opt-in entry point.
 4. **Routing into subagents (a) is the highest-value lever.** Children have isolated contexts, so routing them causes no main-cache churn, and their delegation prompts are short enough to fit Laya's 512–1,024-token window. Subagent routing gets its own extension point, `subagent/child-route`, and a static policy that needs no judge.
-5. **Each strong base declares an objective (e) and its own candidate set.** `basePolicies[]` pairs each base with `objective: quota | dollars | latency` and an explicit candidate list. A base with no entry is never routed. This replaces the flat allowlist semantics and fixes bug 3.
+5. **Routing starts only from listed strong routes, each with an objective (e), into one shared pool.** `routeFrom[]` lists every strong route routing may start from, each with `objective: quota | dollars | latency`, and `candidates` is the one owner-edited pool all listed routes draw from (owner decision D-46, design D-48). A route that is not listed is never routed. The router imposes no cost or strength order within the pool (§3.3).
 6. **The judgment engine becomes runtime-selectable (R1).** A Definition-owned engine registry (`ctx.judgmentEngines`) and a dispatcher (`judgment-dispatch`) provide `ctx.judgment`, with the selection held in the `judgment` settings namespace. Operating points (threshold and margin) are recorded **per engine**. An engine without one never decides a downgrade.
 7. **Laya runs locally (R2)** through a supervised MLX gateway (`judgment-laya` plus `python/laya-gateway`) that speaks the judgment-shield wire.
    - It removes the ~700 ms judge latency (Laya answers in about 7–14 ms), third-party egress, and the dependency on TypeSafe's terms clause (vi).
@@ -50,7 +50,7 @@ The shield prompt-security doctrine and the guard packages are out of scope. `@s
 
 | Element | Verdict | Notes |
 |---|---|---|
-| Allowlist as ceiling; fail-to-strong for every uncertainty class | **Keep** | Extended: `basePolicies` scopes the allowlist per base (§4.5). |
+| Allowlist as ceiling; fail-to-strong for every uncertainty class | **Keep** | Extended: `routeFrom` bounds where routing starts, and the shared pool bounds where it goes (§3.3). |
 | `stickyState` pure fold, shared with the `modelRouting` projection | **Keep** | New fold inputs: cold-point facts recorded on decisions, verification triggers, and cooldowns. All come from logged events or decision fields, never from wall-clock time at replay. |
 | Decision→header pre-publication invariant (`invariant.ts`) | **Keep** | Extended to `route-failed` fallback retries (§3.4). |
 | OFF arm byte-identical to no router | **Keep** | `shadow` mode writes only an `ignorable: true` event; an off run still writes nothing. |
@@ -68,7 +68,7 @@ The shield prompt-security doctrine and the guard packages are out of scope. `@s
 
 The layers are evaluated in order, and the first one that forces strong wins:
 
-1. **Manual authority.** `manual-deviation`; a base not listed in `basePolicies` → `base-unlisted`. No judgment runs.
+1. **Manual authority.** `manual-deviation`; a base not listed in `routeFrom` → `base-unlisted`. No judgment runs.
 2. **Plan phase (b).** `plan/mode` active → `plan-mode` (kept-strong, no judgment).
 3. **Recovery and breakers.** `route-errors` recovery, `reentry-cooldown`, `breaker-open`.
 4. **Verification exits (c)** while held. A worker-escalation trigger fired since streak entry → `verification-escalated`.
@@ -87,7 +87,7 @@ The layers are evaluated in order, and the first one that forces strong wins:
   - entry costs nothing on the strong side, because the strong cache is already cold;
   - the return at the next cold point costs nothing extra either;
   - only the quality exits pay a deliberate re-prefill.
-- **(e) Per-route objective.** Adopt as a required label on each `basePolicies` entry. The label selects which switch points and candidates are admissible, and it is recorded on every decision.
+- **(e) Per-route objective.** Adopt as a required label on each `routeFrom` entry. The label selects which switch points and candidates are admissible, and it is recorded on every decision.
   - There is no runtime price table: repository policy keeps realized usage as the only runtime cost currency.
   - Prices exist only in the bench's dated price snapshot (§5.1).
 
@@ -295,7 +295,7 @@ Verified list prices (USD per million tokens, peak rates):
 - **CI is off.** GitHub Actions are disabled at the repository level, and the CI workflow has been disabled manually since 2026-08-17, so nothing has enforced the documentation gates.
   - Baseline at origin/master `481ea66c52`: doc-sync passes 15 of 26 gates and fails 11. The failing gates are cordis catalog, doc graphs, config catalog, export jsdoc, type equivalence, markdown wrap, markdown links, package paths, package README model experience, package README limitations, and agent note format.
   - Baseline at #195 (`f0abff5519`): 14 pass and 12 fail, the same 11 gates plus doc refs.
-  - Current state: #203 (PR 0b) brings master to 26 of 26. The #195 cleanup commits `2b9bbfd58c`, `c8ef75b2fb`, and `cee6f55279` bring #195 to 17 passed and 9 failed, and every remaining failure is in master's baseline.
+  - Current state: #203 (PR 0b) merged into the Jev branch, which passes 26 of 26 gates. The #195 cleanup commits `2b9bbfd58c`, `c8ef75b2fb`, and `cee6f55279` bring #195 to 17 passed and 9 failed, and every remaining failure is in master's baseline.
 
 ### Laya findings
 
@@ -340,7 +340,7 @@ Verified list prices (USD per million tokens, peak rates):
 
 ## 2. Phase 1: cache prerequisites
 
-All three workstreams are separate PRs against master.
+All three workstreams are separate PRs into the Jev branch (D-60).
 
 ### 2.1 `cacheRetention` in `llm-claude-session`
 
@@ -464,7 +464,7 @@ These fixes are stacked on #195 and land before it merges. All live in `packages
 - **Route question.** `routeQuestion` (`index.ts:1144-1160`) is built from `eligibleCandidates`, so the duplicate disappears from the question.
 - **Defensive fold.** In `decide()`, before `gate()` (`index.ts:953`), an answer naming a candidate whose assessment is `equals-base` is treated as `keep-current`, with reason `current-preferred`. This closes the held-streak path where the duplicate bypassed `current-preferred` and `sticky-hold` kept the cheap route (`index.ts:942-972`).
 - **`candidate-equals-base` keeps a narrower meaning (D-19).** It fires only when every configured candidate equals the manual route, and it skips judgment. RoutingChip's idle signal depends on it. When candidates fail for mixed reasons, the decision reports `candidate-ineligible`, with per-assessment `equals-base` reasons. It is a reachable decision reason, not an assertion.
-- **Load-time check.** With `basePolicies` (§4.5), a candidate listed for its own base fails at load.
+- **No load-time self-listing check.** The shared pool (§3.3) has no per-route lists, so a pool model equal to the manual route is excluded at runtime as `equals-base`.
 
 **Logging.** `candidateEligibility.assessments[].reason: 'equals-base'`.
 
@@ -502,23 +502,35 @@ The guard below enforces the rule for any template once the router is composed. 
 
 ### 3.3 Bug 3: no cost or strength ordering
 
-`basePolicies` (§4.5) fixes this structurally: a candidate is admissible only for bases that list it.
+The owner edits one shared candidate pool and enables the strong routes routing may start from (owner decision D-46); the design is D-48.
 
-**Load-time validation.**
-- Every listed id exists in `candidates`.
-- A base may not list itself.
-- The objective is `quota | dollars | latency`.
-- No base is listed twice.
+**Config.**
+- `candidates` is the one shared pool: `{ id, provider, model, reasoningEffort?, description }`. Ids are unique, non-empty, and not `keep-current`. `description` is required and at most 160 characters, because every description is sent in every judgment question.
+- `routeFrom: [{ provider, model, objective, allowEveryTurn? }]` is a fail-closed allowlist of strong routes, matched on provider and model. `objective` is required on each entry (§4.5).
 
-**Runtime.** A base with no entry gets `kept-strong` / `base-unlisted` with no judgment, failing closed.
+**Load- and write-time validation.** Each case has a named error: a route listed twice; an unknown objective; a `latency` route with `judgmentDeadlineMs` above 200; a `quota` route under per-turn entry without `allowEveryTurn: true`; and an `initialMode` other than `off` with an empty `routeFrom` (`routeFrom is empty: routing can never run`). PR 8a's settings `validate` hook applies the same messages on write, and at write time also rejects a pool `provider` the llm runtime does not register.
+
+**Runtime.** Every fail-closed class keeps the strong route:
+- `base-unlisted`: the manual route is not in `routeFrom`. No judgment runs, and a held streak whose route is removed ends with `brokenBy: 'base-unlisted'`.
+- `no-candidates`: the pool is empty.
+- `candidate-ineligible`: nothing remains after `equals-base` (§3.1) and the capability checks.
+- `engine-uncalibrated`: the selected engine has no operating point (PR 8b).
+
+A pool edit takes effect at the next decision, and a held candidate removed from the pool ends its streak with `unknown-candidate`. Every decision records `candidateEligibility` and the matched entry's `objective`, so an edit cannot reinterpret history.
+
+**Unprotected by owner choice.** A pool model can be a lateral or upward move from some listed route, because the router imposes no cost or strength order. The card (PR 9b) shows two warnings, not errors: a pool model that is also a `routeFrom` route, and a pool model whose declared context window is smaller than a listed route's.
 
 **Tests.**
 - `config.spec.ts`:
-  - `rejects a basePolicies entry naming an unknown candidate`;
-  - `rejects a base listing itself`.
+  - `routeFrom rejects duplicate and invalid objective`;
+  - `latency objective requires deadline <= 200`;
+  - `quota base refuses every-turn without allowEveryTurn`;
+  - `refuses an empty routeFrom unless routing starts off`;
+  - `requires a description of at most 160 characters on every pool candidate`.
 - `controller.spec.ts`:
   - `base-unlisted keeps strong without judging`;
-  - `GLM base cannot select a candidate listed only for Opus`.
+  - `removing a held pool candidate ends the streak`;
+  - `ends a held streak with base-unlisted when settings remove its route from routeFrom`.
 
 ### 3.4 Bug 4: a candidate failure fails the whole turn
 
@@ -649,12 +661,12 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
 
 ```yaml
 initialMode: 'off'            # 'off' | 'shadow' | 'on'
-candidates:                   # unchanged item fields: id, provider, model, reasoningEffort?, description?
-  - { id: flash, provider: ollama-cloud, model: deepseek-v4.1-flash:cloud, description: small well-scoped edits }
-basePolicies:                 # required when initialMode != off; [] means every base is unlisted
-  - { provider: claude-session, model: claude-opus-5-5, objective: quota, candidates: [flash] }
-operatingPoints:              # per registry engine id; absent engine => engine-uncalibrated
-  - { engine: laya, downgradeThreshold: <set from the §5.7 replay>, downgradeMargin: <set from the §5.7 replay> }
+candidates:                   # the one shared pool: id, provider, model, reasoningEffort?, description (required, <= 160 chars)
+  - { id: flash, provider: ollama-cloud, model: deepseek-v4.1-flash:cloud, description: "small, well-scoped edits in familiar code" }
+routeFrom:                    # required unless initialMode is off; an unlisted base is never routed
+  - { provider: claude-session, model: claude-opus-5-5, objective: quota }
+operatingPoints:              # per registry engine id; absent engine => engine-uncalibrated (PR 8b)
+  - { engine: laya, downgradeThreshold: <set from the §5.7 replay>, downgradeMargin: <set from the §5.7 replay>, calibratedBy: <preregistration id> }
 entry:
   policy: cold-points         # 'cold-points' | 'every-turn'
   coldPoints: [session-start, post-compaction, idle, manual-switch, plan-approved]
@@ -680,16 +692,14 @@ tier: fast
 - unknown keys fail;
 - `plan-approved` in `coldPoints` requires `planMode.forceStrong`;
 - `recheckEverySteps >= 1`;
-- every `operatingPoints[].engine` must be a registered engine id, checked at the earliest resolvable point (§R1.3).
+- every `operatingPoints[].engine` must be a registered engine id, checked at the earliest resolvable point (§R1.3);
+- `operatingPoints[].calibratedBy` names the preregistration whose replay set the point; an entry without it is uncalibrated.
 
 ### 4.2 (a) Subagent and seat routing
 
-**Extension point.** A new waterfall, `subagent/child-route`, is declared in `packages/subagent/subagent` (runtime types) and dispatched inside `effectiveChildRoute` (`packages/subagent/subagent/src/child-agent.ts:104-113`).
-- Payload: `{ parent: Agent; requested?: AgentOptions; inherited: {provider?, model?}; kind: 'subagent' | 'workflow' | 'fork'; agentType?: string; prompt: string; signal }`.
-- It returns `{provider?, model?, reasoningEffort?}`.
-- This is a subagent-capability change, not an agent-loop change. Update the extension-point list in `docs/architecture.md` (line ~82) and `docs/subsystems/subagent.md`.
+**Extension point.** `subagent/child-route` is implemented (PR 13a, #219). `@shres-code/shres-code-subagent` declares the waterfall, and `SubagentRuntime.resolveChildRoute(name, input)` is its only dispatch site, which the delegation consumers call once per fresh child. The [child-route note](../../implemented/architecture/2026-09-24-subagent-child-route.md) records the payload, the cases that skip dispatch, the ordering contract, and why dispatch is not inside `effectiveChildRoute`. `docs/architecture.md` lists the waterfall among the extension points, and `docs/subsystems/subagent.md` owns its types.
 
-**Router listener.** `childPolicies: [{ match: { kind?: 'subagent' | 'workflow', agentType?: string }, candidate: <id>, judge?: boolean }]` is applied under the parent's `basePolicies` entry, and the candidate must be listed there.
+**Router listener.** `childPolicies: [{ match: { kind?: 'subagent' | 'workflow', agentType?: string }, candidate: <id>, judge?: boolean }]` (PR 13b) applies only while the parent's manual route is listed in `routeFrom`, and `candidate` must be a pool id.
 - `judge: false` (the default) is a static route.
 - `judge: true` asks the selected engine a two-option question (`keep-current` or the candidate) about the delegation prompt. That prompt is short, which makes it the best fit for Laya's window.
 
@@ -703,16 +713,15 @@ tier: fast
 - the child's first `request/header` must match it, which the invariant checks;
 - the existing spawn telemetry already logs the route in the parent's model-visible result.
 
-**Failure.** The in-turn fallback (§3.4) applies within the child. The router listener is installed per agent through `installModelSelection` for children too. The in-process driver does not call it for children, so subagents and team seats are never routed (Evidence, defects and gaps). Installing it is part of this PR.
+**Failure.** The in-turn fallback (§3.4) applies within the child. The router listener is installed per agent through `installModelSelection` for children too. The in-process driver does not call it for children, so subagents and team seats are never routed (Evidence, defects and gaps). Installing it is part of PR 13b.
 
 **Tests.**
-- `subagent/tests/child-route.spec.ts`:
-  - `explicit request overrides child route`;
-  - `fork children are never routed`;
-  - `listener disposal restores inheritance` (HMR safety).
-- Router `child-policy.spec.ts`.
-- A Loader test composing `tool-subagent` with the router.
-- Keyless snapshot `model-router-subagent.cordis.snapshot.yml`.
+- PR 13a: `packages/subagent/subagent/tests/child-route.spec.ts` covers explicit override, fork exclusion, byte-identical behaviour without a listener, and listener disposal (HMR safety).
+- PR 13b:
+  - router `child-policy.spec.ts`;
+  - a Loader test composing `tool-subagent` with the router;
+  - keyless snapshot `model-router-subagent.cordis.snapshot.yml`;
+  - `subagent-section.client.spec.tsx` for the card's subagent section (§R1.5).
 
 ### 4.3 (b) Plan/execute phase routing
 
@@ -755,14 +764,14 @@ tier: fast
 - A held streak returns to strong at the next cold point, with `brokenBy: 'cold-point-return'`, unless the judge re-affirms at that cold point (the candidate passes the judge check and the streak continues).
 - A held streak also returns on the quality exits (§1.2) or at `hold.maxSteps`.
 
-**Objective semantics** (`basePolicies[].objective`, recorded on every decision as `objective`):
+**Objective semantics** (`routeFrom[].objective`, recorded on every decision resolved against that route as `objective`):
 - `quota`: the strong route is a subscription or credit plan, and the aim is to move tokens off it.
   - Candidates on flat plans are admissible if listed.
-  - Cold-point switching is required: `every-turn` is refused at load for a quota base unless that entry sets `allowEveryTurn: true`, for bench use.
+  - Cold-point switching is required: `every-turn` is refused at load for a quota route unless its entry sets `allowEveryTurn: true`, for bench use. Until PR 12 adds cold-point entry, per-turn entry is the only policy, so every quota entry sets it.
 - `dollars`: a metered strong route.
-  - Candidates must be listed by the deployment, whose Agent Note must cite the price snapshot. The router enforces no prices.
+  - The deployment chooses the pool, and its Agent Note must cite the price snapshot. The router enforces no prices.
   - `every-turn` is permitted.
-- `latency`: only candidates whose declared `LlmModelInfo` is marked `latencyClass: 'fast'`, or which are listed.
+- `latency`: a strong route chosen for speed. Admission is the shared pool, as for the other objectives.
   - Judging must fit the deadline, so `judgmentDeadlineMs <= 200` is required. In practice that requires a local engine.
 
 **Tests.**
@@ -862,17 +871,25 @@ The settings API needs a validator hook if `installSettingsSection` lacks one: a
 #### R1.5 UI
 
 - **Server exposure.** The registry list and status are exposed through the existing Typert RPC gateway as a `judgmentEngines` host API: `list` plus a status subscription. The `judgment` and `model-router` settings sections use the existing settings RPC.
-- **New client plugin package, `packages/client/ui-settings-model-routing`,** following the `ui-settings-*` convention. `ui-model-routing` stays the chat-surface chip, a separate role. The "Model routing" section shows:
-  - the **mode**: off, shadow, or on, with a note that it matches `/route`;
-  - the **engine selector**: registered engines with descriptor badges (local or remote egress, calibrated or uncalibrated), a status dot, and the detail;
-  - the `judgment.enabled` toggle, moved from the Classifier card;
-  - an Install button for Laya when its status is `not-installed` (§R2.4);
-  - a read-only view of `basePolicies`, `operatingPoints`, and `entry.policy` in v1. Editing is through settings YAML; editable forms wait until the Phase 4 operating points exist.
+- **New client plugin package, `packages/client/ui-settings-model-routing`,** following the `ui-settings-*` convention. `ui-model-routing` stays the chat-surface chip, a separate role. The owner edits the pool and `routeFrom` in the card; thresholds stay read-only until they are calibrated (D-46). The "Model routing" section is delivered in three PRs (D-48, D-51):
+  - **PR 9a**, after PR 8a:
+    - the **mode**: off, shadow, or on, with a note that it matches `/route`;
+    - the **engine selector**: registered engines with descriptor badges (local or remote egress, calibrated or uncalibrated), a status dot, and the detail;
+    - the `judgment.enabled` toggle, moved from the Classifier card;
+    - an Install button for Laya when its status is `not-installed` (§R2.4).
+  - **PR 9b**, after PRs 7, 8a, and 9a:
+    - the **pool editor**: add a model from the llm model list the Models editor uses; an editable id slugged from the model; an effort select from the model's declared efforts; the description, with guidance at 120 characters and a hard stop at 160; remove;
+    - **route from**: one toggle per configured strong model, each requiring an objective with no preselection;
+    - a **read-only view** of `downgradeThreshold` and `downgradeMargin` per engine, with an "Uncalibrated" badge for any operating point without `calibratedBy`, plus the hysteresis values and `hold.*`;
+    - the cross-membership and always-ineligible warnings (§3.3), computed by a new `modelRouting.poolStatus()` Typert host API that reports, per pool entry and listed route, registration, declared context, modalities, efforts, and the eligibility floor with `equals-base` flagged.
+    - The whole section saves in one settings write; the server `validate` hook runs, a rejection shows the named message beside the offending row, and nothing is published until the write commits.
+  - **PR 13b**: the subagent section, shown only when the router's config schema has `childPolicies`. It lists "match (kind or agent type) → pool id" rules with an optional judge toggle, offers only pool ids, and states that fork children are never routed.
 - **Tests.**
-  - `tests/model-routing-section.client.spec.tsx`: it renders engines and status; selecting an engine writes `judgment.engine`; unregistered ids are not offered; a rejected write shows the named error.
-  - `tests/browser-plugin.client.spec.ts`: slot-registration disposal (HMR safety).
-  - A real-composition Loader test (the web-app composition with TypeSafe plus a fake shield engine registered): a settings write switches `selectedEngine` on the next decision.
-  - The PR includes a GIF recorded against the real server (`record-browser-gif` skill).
+  - `tests/model-routing-section.client.spec.tsx` (9a): it renders engines and status; selecting an engine writes `judgment.engine`; unregistered ids are not offered; a rejected write shows the named error.
+  - 9b: `pool-editor.client.spec.tsx` (add from the runtime list, editable slug, description counter and hard stop, remove, both warnings); `route-from.client.spec.tsx` (a toggle requires an objective; the named server error appears on its row); `thresholds.client.spec.tsx` (the uncalibrated badge).
+  - `tests/browser-plugin.client.spec.ts`: slot-registration disposal (HMR safety); the host `poolStatus` registration is disposed with its fiber.
+  - A real-composition Loader test (the web-app composition with TypeSafe plus a fake shield engine registered): a settings write switches `selectedEngine` on the next decision (9a); a write adding a pool model routes to it on the next decision, a write removing it ends a held streak with `unknown-candidate`, and a write naming an unregistered provider is rejected by name with the pool unchanged (9b).
+  - PRs 9a, 9b, and 13b each include a GIF recorded against the real server (`record-browser-gif` skill).
 
 ### R2. Laya running locally inside shres-code
 
@@ -1048,7 +1065,7 @@ The design is **a new provider package that owns a supervised sidecar**. judgmen
 
 ## 5. Phase 4: measurement before default-on
 
-The bench work lands in separate PRs against master.
+The bench work lands in separate PRs into the Jev branch (D-60).
 
 ### 5.1 Bench cost accounting
 
@@ -1167,47 +1184,44 @@ Until then, the default is `off`, and `shadow` is permitted with a local engine.
 
 ## 6. Delivery sequence
 
-Stacks use GitHub native stacks (the `shres-merging-stacked-prs` skill). "#195-stack" means stacked on `feat/jev-judgment-foundation` and landing with or immediately after #195, following the repository rule to fix the introducing PR before the defect propagates. "master" means independent of #195. "PR 0b" means stacked on `fix/master-doc-sync`. The delivery amendments below the table record the changes made to the bases and scope during delivery.
+Every PR in this plan targets and merges into `feat/jev-judgment-foundation` (the Jev branch, #195's head), where the owner tests and verifies routing. Nothing merges to master, which is reached only through draft #195 once the owner is satisfied (D-60). Stacks on the Jev branch use GitHub native stacks (the `shres-merging-stacked-prs` skill), and a PR fixes a defect it introduces before the defect propagates. The Status column records each PR's state on the Jev branch; #204, #207, and #216 are numbers `gh stack link` printed for native stacks, not PRs (D-59). The delivery amendments below the table record the decisions that changed scope and order.
 
-| # | Title | Base | Packages | Depends on | Agent Note | Key tests |
+| # | Title | Status | Packages | Depends on | Agent Note | Key tests |
 |---|---|---|---|---|---|---|
-| 0 | Catalog classification fix (GitHub #202, branch `fix/catalog-request-response` at `91b8a940a4`): `Request` and `Response` on `ctx.clientModules.fetchBundle`, plus `ctx.cursorCredential` ported byte-identical from #195 | master | `scripts/gen-cordis-catalog.ts`, regenerated catalogs | — | existing | `verify-cordis-catalog`, `verify-doc-graphs`; master doc-sync moves from 15 to 17 of 26 with no regression |
-| 0b | Restore master doc-sync: the remaining 9 gates (GitHub #203, branch `fix/master-doc-sync`) | stacked on PR 0 (GitHub native stack #204) | the files named by the failing master gates | 0 | — | `pnpm run doc-sync` passes 26 of 26 on master; a prerequisite for re-enabling CI (D5) |
-| 1 | `llm-claude-session: explicit cacheRetention and promptCacheTtlMs` (rebased onto PR 0b as `9bb8941cdc`) | master, stacked on PR 0b | llm-claude-session, llm (`LlmModelInfo.promptCacheTtlMs`) | — | `implemented/feature/2026-09-24-claude-session-cache-retention.md` (records the OAuth 1-hour probe result once the owner runs it; pending, D-25) | config.spec cases in §2.1; the opt-in `.e2e.ts` cache-TTL probe (D-24, D-25); no GIF, because the Web GUI does not render the field (D-31) |
-| 2 | `llm: three-state cache usage telemetry` (branch `feat/three-state-cache-usage`) | PR 0b (`fix/master-doc-sync`) | llm (`cacheCount`), llm-pi-ai (`cacheUsage`), llm-deepseek, other adapters, token-meter, compaction-basic readers, `bench/runner/metrics.js` | 0b | `implemented/architecture/2026-09-24-three-state-cache-usage.md` | the D-22 behaviours (pi-ai reported zero and unreported omission, `cacheCount` returning `undefined` for absence, token-meter "not reported", bench `cacheHitShare`); stream/translate specs; session-adapter and invariant coverage; token-meter specs; keyless snapshot re-record |
-| 3 | `system-prompt: section stability classes and prefix-stability check` (GitHub #205, `adb866aa45`) | master, stacked on PR 0b | core/system-prompt | — | `implemented/architecture/2026-09-25-stable-prompt-prefix.md` (the requirement; the doctrine-section migration is owned elsewhere) | `prefix-stability.spec.ts` |
-| 4 | `model-router: equals-base eligibility, frozen effort, base-name guard` (bugs 1, 7, 2; GitHub #206, native stack #207 on #195) | #195-stack | model-router, bundle/headless, bundle/web-app, the `apps/cli` agent presets, router-composing example compositions | #195 | `implemented/bug-fix/2026-09-24-routing-correctness-after-live-review.md` (created here; extended by PRs 5–7) | §3.1, §3.2, §3.7; snapshot re-records. The persona change (D10) is a separable commit. |
-| 5 | `model-router: in-turn fallback via agent/request-error` (bug 4; in progress on branch `fix/model-router-in-turn-fallback`) | #195-stack | model-router | 4 | same note | §3.4; `model-router-fallback` snapshot |
-| 6 | `model-router: hysteresis, step horizon, judgment deadline/tolerance/breaker` (bugs 5, 6) | #195-stack | model-router | 5 | same note | §3.5, §3.6 |
-| 7 | `model-router: basePolicies and per-route objective; compaction summarizes on the manual route; thinking-mode eligibility` (bugs 3, 8, 9; (e)) | #195-stack | model-router, compaction-basic, llm (`thinkingMode`), llm-claude-session e2e | 6 | same note | §3.3, §3.8, §3.9; e2e `foreign-return` |
-| — | **#195 doc-gate cleanup** (commits `2b9bbfd58c`, `c8ef75b2fb`, `cee6f55279`): fix only the doc-gate failures #195 introduces relative to master, on #195 itself, and add `Request`/`Response` classification lines identical to PR 0's, so the catalog generator works for the #195 stack (D-11). #195 moves from 14/12 to 17/9 (D-17) | #195-stack | the files named by the branch-introduced failures | #195 | — | no doc-gate failure beyond master's baseline |
-| — | **Merge #195 with PRs 4–7 and the doc-gate cleanup.** The router ships in no default bundle; the demo home follows owner decision D1. After PR 0 lands, merging #195 produces four additive conflicts, resolved by union plus regeneration. PRs 10a and 11, siblings on #195, are retargeted to master once #195 lands (D-16). | | | | | pre-push checks per the `shres-pre-push-checks` skill |
-| 8 | `judgment: engine registry and dispatcher; per-engine operating points` (R1 backend) | master (after #195) | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`endpointPolicy`; `createShieldWireEngine` lands in PR 10a), judgment-laya (migrated from its standalone PR 10a provider into the registry), model-router (`operatingPoints`, `selectedEngine`), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | #195, 10a | `implemented/architecture/2026-09-28-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
-| 9 | `ui-settings-model-routing: Model routing section with engine switch` (R1 UI) | master | client/ui-settings-model-routing (new), ui-settings-models (Classifier card removed), api Typert gateway (`judgmentEngines` host API) | 8 | same as PR 8 (UI section) | client specs in §R1.5; browser-plugin disposal; GIF |
-| 10a | `judgment-laya: supervised local MLX gateway` as a standalone `ctx.judgment` provider (R2, R3; D-9; in progress) | #195 sibling (branch `feat/judgment-laya-local`), retargeted to master after #195 lands | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | #195 | `implemented/feature/2026-09-30-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.spec.ts`; notices check |
-| 11 | `progress-signals: extract escalation folds` | sibling on #195, base `feat/jev-judgment-foundation` (D-16), GitHub #209; `packages/team/worker-escalation` exists only on #195 | team/progress-signals (new), worker-escalation | #195; independent of PRs 4–7 | `implemented/architecture/2026-09-29-progress-signals-extraction.md` | moved unit tests; worker-escalation regression |
-| 12 | `model-router: cold-point entry, verification exits, plan-mode gate, shadow mode` ((b), (c), (d)) | master | model-router, plan-mode (read-only fold consumer), ui-trajectory (cold-point and shadow rows) | 1, 2, 7, 8, 11 | `proposed/feature/2026-09-27-cold-point-routing-and-child-routes.md` → implemented; partially supersedes the 2026-09-17 proposal and the 2026-09-22 note | §4.3–4.6; `model-router-coldpoint` and `model-router-shadow` snapshots |
-| 13 | `subagent: child-route waterfall; model-router child policies` ((a)) | master | subagent/subagent, model-router, `docs/architecture.md` (extension-point list), `docs/subsystems/subagent.md` | 12 | same note as PR 12 | §4.2; `model-router-subagent` snapshot |
-| 14 | `judgment-llm: LLM-as-judge engine` (R4) | master | judgment-llm (new) | 8 | `implemented/feature/2026-10-xx-llm-judgment-engine.md` (calibration caveats) | structured-output parse; logprob path; verbalized flag; config rejects temperature on Opus |
-| 15a | Research price snapshot for the bench (§5.1; D-20, D-23, D-30), GitHub #208, squashed as `235f507966` | #203 (PR 0b, `fix/master-doc-sync`) | bench/prices | 0b | — | prices tests 8/8; doc-sync 26/26; a required `nullFields` array keeps every missing price explicit |
-| 15 | `bench: priced cache-inclusive accounting, judge calls, TTFT, dollar cap` | master | bench/runner, bench/prices | 2 | `implemented/process/2026-10-xx-bench-priced-accounting.md` | metrics unit tests over fixture trials |
-| 16 | `bench: multi-turn routing suite with idle gaps, arms, offline judge replay, preregistration` | master | `bench/tasks/routing-multiturn`, `bench/routing/replay-judges.mjs`, `runner/arms.js`, preregistration | 12, 13, 15 | `proposed/process/2026-10-xx-routing-measurement-gate.md` | runner dry-run; replay on fixture states |
-| 17 | `routing: default-on decision` (only if §5.8 passes) | master | bundle defaults or recommended profile, model-router README | PR 16 results | a new decision note citing the results | snapshot of the default composition |
+| 0 | Catalog classification fix (#202): `Request` and `Response` on `ctx.clientModules.fetchBundle`, plus `ctx.cursorCredential` ported byte-identical from #195 | closed unmerged: its classification is already on the Jev branch | `scripts/gen-cordis-catalog.ts`, regenerated catalogs | — | existing | `verify-cordis-catalog`, `verify-doc-graphs` |
+| 0b | Restore doc-sync: the remaining 9 gates (#203, branch `fix/master-doc-sync`) | merged as `995eec0447` | the files named by the failing gates | — | — | `pnpm run doc-sync` passes 26 of 26; a prerequisite for re-enabling CI (D5) |
+| 0c | `llm-pi-ai` unit tests against the installed pi-ai 0.84.1 catalog (#211, D-32) | merged as `13328e9b69` | llm-pi-ai | — | — | llm-pi-ai 281 of 281 |
+| 0d | Web snapshots for the Claude subscription provider rows (#217) | merged as `3c87c82f21` | web goldens (test-only) | — | — | the web snapshot lane replays 19 of 19 |
+| 1 | `llm-claude-session: explicit cacheRetention and promptCacheTtlMs` (#210) | merged as `1561af98a1` | llm-claude-session, llm (`LlmModelInfo.promptCacheTtlMs`) | — | `implemented/feature/2026-09-24-claude-session-cache-retention.md` (records the OAuth 1-hour probe result once the owner runs it; pending, D-25) | config.spec cases in §2.1; the opt-in `.e2e.ts` cache-TTL probe (D-24, D-25); no GIF, because the Web GUI does not render the field (D-31) |
+| 2 | `llm: three-state cache usage telemetry` (#214) | merged as `16045771ea` | llm (`cacheCount`), llm-pi-ai (`cacheUsage`), llm-deepseek, other adapters, token-meter, compaction-basic readers, `bench/runner/metrics.js` | 0b | `implemented/architecture/2026-09-24-three-state-cache-usage.md` | the D-22 behaviours (pi-ai reported zero and unreported omission, `cacheCount` returning `undefined` for absence, token-meter "not reported", bench `cacheHitShare`); stream/translate specs; session-adapter and invariant coverage; token-meter specs; keyless snapshot re-record |
+| 3 | `system-prompt: section stability classes and prefix-stability check` (#205) | merged as `29b9756bfc` | core/system-prompt | — | `implemented/architecture/2026-09-24-stable-prompt-prefix.md` (the requirement; the doctrine-section migration is owned elsewhere) | `prefix-stability.spec.ts` |
+| 4 | `model-router: equals-base eligibility, frozen effort, base-name guard` (bugs 1, 7, 2; #206) | landed through #212's merge `853b4129ab` | model-router, bundle/headless, bundle/web-app, the `apps/cli` agent presets, router-composing example compositions | — | `implemented/bug-fix/2026-09-24-routing-correctness-after-live-review.md` (created here; extended by PRs 5–7) | §3.1, §3.2, §3.7; snapshot re-records. The persona change (D10) is a separable commit. |
+| 5 | `model-router: in-turn fallback via agent/request-error` (bug 4; #212) | merged as `853b4129ab` | model-router | 4 | same note | §3.4; `model-router-fallback` snapshot |
+| 6 | `model-router: hysteresis, step horizon, judgment deadline/tolerance/breaker` (bugs 5, 6; #220) | merged as `6b83872393` | model-router | 5 | same note | §3.5, §3.6 |
+| 7 | `model-router: shared pool and routeFrom with per-route objective; compaction summarizes on the manual route; thinking-mode eligibility` (bugs 3, 8, 9; (e); branch `fix/model-router-routefrom-compaction-thinking`) | not merged | model-router, compaction-basic, compaction-jev, llm (`thinkingMode`), llm-pi-ai, ui-trajectory, ui-model-routing, llm-claude-session e2e, bench overlays, router compositions | 6 | same note | §3.3, §3.8, §3.9; the opt-in `foreign-return` e2e |
+| — | **#195 doc-gate cleanup** (commits `2b9bbfd58c`, `c8ef75b2fb`, `cee6f55279`): fix only the doc-gate failures #195 introduces relative to master, on #195 itself (D-11) | on the Jev branch | the files named by the branch-introduced failures | — | — | no doc-gate failure beyond master's baseline |
+| — | **#195 → master.** The consolidated Jev branch reaches master only through #195, a draft, once the owner has verified routing on it (D-60). The router ships in no default bundle; the demo home follows owner decision D1. | draft | | | | pre-push checks per the `shres-pre-push-checks` skill |
+| 8a | `judgment: engine registry and dispatcher` (R1 backend; branch `feat/judgment-engine-registry`; D-39) | not merged | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`endpointPolicy`), judgment-laya (migrated into the registry), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | 10a | `implemented/architecture/2026-09-24-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
+| 8b | `model-router: per-engine operating points` (D-39, D-48) | not merged | model-router (`operatingPoints` with `calibratedBy`, `engine-uncalibrated`, `selectedEngine` and `operatingPoint` on decisions) | 7, 8a | extends the 8a note | an engine without an operating point keeps strong as `engine-uncalibrated` |
+| 9a | `ui-settings-model-routing: mode, engine selector, enabled toggle, engine status` (R1 UI; D-48) | not merged | client/ui-settings-model-routing (new), ui-settings-models (Classifier card removed), api Typert gateway (`judgmentEngines` host API) | 8a | same as PR 8a (UI section) | 9a specs in §R1.5; browser-plugin disposal; GIF |
+| 9b | `ui-settings-model-routing: pool editor, route from, read-only thresholds` (D-46, D-48) | not merged | client/ui-settings-model-routing, api Typert gateway (`modelRouting.poolStatus()`) | 7, 8a, 9a | same as PR 8a (UI section) | 9b specs in §R1.5; Loader pool-edit test; GIF |
+| 10a | `judgment-laya: supervised local MLX gateway` as a `ctx.judgment` provider (R2, R3; D-9; #213) | merged as `a583c1c692` | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | — | `implemented/feature/2026-09-24-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.spec.ts`; notices check |
+| 11 | `progress-signals: extract escalation folds` (#209) | merged as `4f4b9802c1` | team/progress-signals (new), worker-escalation | — | `implemented/architecture/2026-09-24-progress-signals-extraction.md` | moved unit tests; worker-escalation regression |
+| 12 | `model-router: cold-point entry, verification exits, plan-mode gate, shadow mode` ((b), (c), (d)) | not merged | model-router, plan-mode (read-only fold consumer), ui-trajectory (cold-point and shadow rows) | 1, 2, 7, 8b, 11 | a new proposed note for cold-point routing, moved to implemented when the PR lands; partially supersedes the 2026-09-17 proposal and the 2026-09-22 note | §4.3–4.6; `model-router-coldpoint` and `model-router-shadow` snapshots |
+| 13a | `subagent: child-route waterfall` ((a); D-51; #219) | merged as `fce43521e7` | subagent/subagent, tool-subagent, `docs/architecture.md` (extension-point list), `docs/subsystems/subagent.md` | — | `implemented/architecture/2026-09-24-subagent-child-route.md` | `child-route.spec.ts`; behaviour without a listener is byte-identical |
+| 13b | `model-router: child policies; card subagent section` ((a); D-51) | not merged | model-router (`childPolicies`, `model-routing/child-decision`, `installModelSelection` for children), client/ui-settings-model-routing | 9b, 12 | the PR 12 note | §4.2; `model-router-subagent` snapshot; GIF |
+| 14 | `judgment-llm: LLM-as-judge engine` (R4; branch `feat/judgment-llm`) | not merged | judgment-llm (new) | 8a | `implemented/feature/2026-09-24-llm-judgment-engine.md` (calibration caveats) | structured-output parse; logprob path; verbalized flag; config rejects temperature on Opus |
+| 15a | Research price snapshot for the bench (§5.1; D-20, D-23, D-30; #208) | merged as `7c542532fc` | bench/prices | — | — | prices tests 8/8; doc-sync 26/26; a required `nullFields` array keeps every missing price explicit |
+| 15 | `bench: priced cache-inclusive accounting, judge calls, TTFT, dollar cap` (#218) | merged as `db65f2bb72` | bench/runner, bench/prices | 15a | `implemented/process/2026-09-24-bench-priced-accounting.md` | accounting unit tests over fixture trials |
+| 16 | `bench: multi-turn routing suite with idle gaps, arms, offline judge replay, preregistration` | not merged | `bench/tasks/routing-multiturn`, `bench/routing/replay-judges.mjs`, `runner/arms.js`, preregistration | 12, 13b, 15 | a new process note for the routing measurement gate | runner dry-run; replay on fixture states |
+| 17 | `routing: default-on decision` (only if §5.8 passes) | not merged | bundle defaults or recommended profile, model-router README | PR 16 results | a new decision note citing the results | snapshot of the default composition |
 
-**Dependency parallelism.**
-- PRs 1, 2, 3, and 15a (stacked on PR 0b) and PRs 10a and 11 (siblings on #195, independent of PRs 4–7) proceed in parallel with PRs 4–7.
-- PR 8 unblocks PRs 9 and 14.
+**Dependency order.**
+- The routing chain continues 7 → (8a → 9a) → 9b → 13b, with 8b after PRs 7 and 8a (D-48).
+- PR 8a unblocks PRs 9a and 14. PR 12 needs PRs 7, 8b, and 11. PR 16 needs PRs 12, 13b, and 15.
 - The Laya install on this Mac (owner decision D8) unblocks the PR 10a e2e.
 
-**Execution order.**
-- PR 10a runs first, on #195, as a standalone `ctx.judgment` provider (D-9).
-- After #195 merges, the local-engine chain continues with PR 8, which migrates PR 10a's provider into the registry, then PR 9. The chain completes before PRs 12, 13, and 14.
-- PRs 1, 2, 3, 11, and 15a run as parallel tracks.
-- The first wave is PRs 0, 1, and 4. PR 0b follows PR 0.
-
-**Delivery amendments.** Decisions made during delivery, identified D-0 to D-32, amend this sequence. This list is the durable record of them. Provenance: the local research archive in `.run/routing-review-evidence/2026-09-24/` and `~/shres-research/routing-review-2026-09-24.tar.zst`, which is not in git.
-
-GitHub numbers: PR 0 is #202 and PR 0b is #203, and together they form native stack #204. PR 3 is #205. PR 4 is #206, linked to #195 as native stack #207. PR 15a is #208, based on #203. PR 11 is #209, a sibling on #195.
+**Delivery amendments.** Decisions made during delivery, numbered D-0 onward in the delivery log, amend this sequence. This list is the durable record of those that change the plan. Provenance: the local research archive in `.run/routing-review-evidence/2026-09-24/` and `~/shres-research/routing-review-2026-09-24.tar.zst`, which is not in git.
 
 - **D-0 PR 0 scope.** origin/master had four catalog violations, not two, because `ctx.cursorCredential` was never classified there.
   - PR 0 ports the cursor-credential classification from #195 byte-identical (commit `91b8a940a4`), so the later #195 merge does not conflict on it.
@@ -1276,6 +1290,11 @@ GitHub numbers: PR 0 is #202 and PR 0b is #203, and together they form native st
 - **D-30 PR 15a README.** `40e0a3ceb1` states that an empty `offPeakWindowsUtc` next to non-empty peak windows means no off-peak rate is published. The prices tests pass 8 of 8.
 - **D-31 PR 1 rebased; no GIF.** PR 1 is `9bb8941cdc`, a single commit on `fix/master-doc-sync`, with doc-sync at 26 of 26. The Models settings editor is hand-written per adapter family and maps `llm-claude-session` to its `unknown` layout, which shows only the `settings.yaml` hint. The Web GUI therefore does not render `cacheRetention`, and the GIF rule does not apply.
 - **D-32 PR 0c: master unit tests.** Master fails 3 `llm-pi-ai` unit tests against the installed pi-ai 0.84.1 DeepSeek catalog. These failures predate this plan. A root-cause fix on a branch based on PR 0b makes master's unit tests green, a prerequisite for re-enabling CI (D5).
+- **D-39 PR 8 split.** PR 8a covers the judgment engine registry, `judgment-dispatch` (the single `ctx.judgment`, with a required `defaultEngine` and no engine fallback), the `judgment` settings `{ enabled, engine, overrides }` with a `validate` hook, and the typesafe, shield, and laya migrations. PR 8b, after PR 7, makes model-router consume `operatingPoints` and record `selectedEngine` and `operatingPoint`. PR 9 needs only 8a, and deferring the router part avoids conflicts with PRs 6 and 7, which rewrite the router config.
+- **D-46 Editable shared pool (owner decision).** The Settings "Model routing" card edits the model pool in v1, and thresholds stay read-only until they are calibrated. One shared pool serves every strong model, replacing per-base candidate lists, and the subagent pool (`childPolicies`) lives in the same card. Routing runs only from the strong models the owner enables, and `equals-base` candidates stay excluded. The owner accepts that a pool candidate can be a lateral or upward move for some routes.
+- **D-48 Shared-pool design.** `candidates` is the one shared pool, with required descriptions of at most 160 characters, and `routeFrom` is a fail-closed allowlist of strong routes with a required objective on each entry (§3.3, §4.1, §4.5). It supersedes `basePolicies` with its per-base candidate lists and base-lists-itself load error, which `equals-base` covers. PR 9 splits into 9a and 9b (§R1.5), and PR 13b adds the card's subagent section. `operatingPoints[].calibratedBy` and `engine-uncalibrated` belong to PR 8b, where operating points arrive.
+- **D-51 PR 13 split.** PR 13a is the generic `subagent/child-route` waterfall with no router code; without a listener, delegation is byte-identical. PR 13b adds the router's `childPolicies`, `installModelSelection` for children, the `model-routing/child-decision` event, and the card's subagent section, after PR 9b.
+- **D-60 Consolidation branch (owner rule).** Every model-routing PR, including routing improvements, the cache prerequisites, and the bench work, targets and merges into `feat/jev-judgment-foundation` for the owner to test and verify. Nothing merges to master. Master is reached through #195, now a draft, once the owner is satisfied. This rule supersedes the master bases and master retargeting in D-6, D-12, D-16, and D-18: those PRs merged into the Jev branch (§6).
 
 ## 7. Owner decisions
 
@@ -1430,7 +1449,7 @@ Each entry gives the recommendation, followed by the resolution.
   - The §5.7 Laya evaluation criteria either pass, giving Laya an operating point, or fail, leaving it shadow-only.
   - Routing becomes default-on only when every §5.8 criterion holds.
 - **Documentation.** Each PR lands its Agent Note from §6 and cross-links this proposal, and this proposal's shipped portions are recorded present-tense in those notes.
-- **Documentation gates.** No delivery PR adds a doc-gate failure relative to the doc-sync baselines recorded under Evidence. PR 0b brings master to all 26 doc-sync gates. The #195 cleanup leaves #195 at 17 of 26, with only failures from master's baseline, which clear when the merge-forward brings in PR 0b's fixes.
+- **Documentation gates.** No delivery PR adds a doc-gate failure relative to the doc-sync baselines recorded under Evidence. PR 0b (#203) brings the Jev branch to all 26 doc-sync gates, and every later PR keeps it there.
 - **Owner decisions.** D3's clause (vi) clarification precedes any use of TypeSafe answers as bench, replay, or shadow data. D5, D10, and D12 are resolved before the PRs that depend on them merge.
 
 ## Risks
@@ -1451,4 +1470,4 @@ Each entry gives the recommendation, followed by the resolution.
   - Temperature cannot be matched across arms, so variance must come from repeats.
   - Time-of-day pricing and tokenizer differences complicate dollar comparisons.
 - **TypeSafe terms.** Clause (vi) restricts using the service to develop new products. Until the owner obtains written clarification, TypeSafe cannot supply bench, replay, or shadow data.
-- **No CI.** GitHub Actions are disabled, so every gate in this plan runs only locally until D5 is resolved and PR 0b has restored master doc-sync.
+- **No CI.** GitHub Actions are disabled, so every gate in this plan runs only locally until D5 is resolved.
