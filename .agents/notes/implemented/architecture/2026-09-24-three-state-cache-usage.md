@@ -62,4 +62,6 @@ pi-ai logs written before this change encode a reported zero as absent, so their
 
 Aggregates over calls with mixed reporting fold the partially reported counts into input and drop them from the cache figures, so a session that mixes a reporting and a non-reporting route shows fewer cache tokens and more input than a partial sum would. The prompt total is exact either way.
 
+A routed turn is the common case. When a turn mixes a reported strong route with an unreported candidate, every per-turn aggregate summed with `addTokenUsage` shows its cache counts as not reported: the headless `result.usage` that `runFixtureTurn` sums, and the trajectory's per-assistant and cumulative usage. Per-request trajectory cells and the session stats line are unaffected, because they read each call's own usage and token-meter buckets each call separately, so the reported strong-route calls keep their cache figures there.
+
 Sessions recorded from providers that never reported cache counts now show `Cache not reported` where the stats line showed `Cache hit 0%`, and the hit rate of a session that mixes reported and unreported calls rises because unreported input leaves the denominator.
