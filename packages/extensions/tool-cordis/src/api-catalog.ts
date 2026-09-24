@@ -1164,7 +1164,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'stream(options: GenerateOptions): AsyncIterable<StreamChunk>',
-        description: 'Stream one model call as raw chunks (token-level deltas). Replay state is retained only when the same adapter instance owns its historical provider and the target provider. Final adapter selection remains fixed through asynchronous exact-model resolution and dispatch. Adapter selection, dispatch, and iteration failures become terminal `error` or `aborted` finish chunks; middleware, nested-call, cleanup, and consumer failures remain thrown.',
+        description: 'Stream one model call as raw chunks (token-level deltas). Replay state is retained only when the same adapter instance owns its historical provider and the target provider. Final adapter selection remains fixed through asynchronous exact-model resolution and dispatch. Adapter selection, dispatch, and iteration failures become terminal `error` or `aborted` finish chunks; middleware, nested-call, cleanup, and consumer failures remain thrown.\n\nA `hostedTools` list naming a tool outside the resolved model info\'s `hostedTools` ends the stream with an `UNSUPPORTED_OPTION` error finish before the adapter is called. An adapter whose model info declares `hostedTools` MUST apply a request\'s `hostedTools` narrowing: it offers only the listed hosted tools and treats the rest as undeclared.',
         parameters: [{ name: 'options', description: 'the full request; `options.provider` selects the adapter.' }],
         returns: 'the chunk stream, possibly wrapped by `llm/stream` listeners.',
       },
@@ -3093,6 +3093,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'ns', description: 'the namespace whose stored section changed.' }, { name: 'revision', description: 'the namespace\'s new revision.' }],
   },
   {
+    name: 'settings/registered',
+    mode: 'emit',
+    signature: '\'settings/registered\'(ns: SettingsNamespace, value: unknown): void',
+    summary: 'One namespace registration attached: its owner called `register()` and the namespace is readable through `get()` from this point.',
+    description: 'One namespace registration attached: its owner called `register()` and the namespace is readable through `get()` from this point. A consumer of another plugin\'s namespace reads `get()` once and follows this event, `settings/updated`, and `settings/unregistered`, so plugin load order does not matter. Listener containment matches `settings/updated`.',
+    parameters: [{ name: 'ns', description: 'the namespace that became registered.' }, { name: 'value', description: 'the namespace\'s resolved value at registration.' }],
+  },
+  {
+    name: 'settings/unregistered',
+    mode: 'emit',
+    signature: '\'settings/unregistered\'(ns: SettingsNamespace): void',
+    summary: 'One namespace registration detached, because its owner\'s fiber was disposed or unloaded; `get()` returns `undefined` from this point until a later registration.',
+    description: 'One namespace registration detached, because its owner\'s fiber was disposed or unloaded; `get()` returns `undefined` from this point until a later registration. Listener containment matches `settings/updated`.',
+    parameters: [{ name: 'ns', description: 'the namespace that is no longer registered.' }],
+  },
+  {
     name: 'settings/updated',
     mode: 'emit',
     signature: '\'settings/updated\'(ns: SettingsNamespace, next: unknown, prev: unknown, source: SettingsUpdateSource): void',
@@ -3806,7 +3822,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'wiki-summarize\' | \'wiki-extract\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'wiki-summarize\' | \'wiki-extract\';\n    hostedTools?: readonly HostedTool[];\n}',
   },
   {
     name: 'GenericCallView',
@@ -4606,7 +4622,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ServerToolCallBlock',
-    declaration: 'export interface ServerToolCallBlock {\n    type: \'server-tool-call\';\n    kind: string;\n    name?: string;\n    id?: CallId;\n    status: \'completed\' | \'failed\';\n    results?: ServerToolResult[];\n}',
+    declaration: 'export interface ServerToolCallBlock {\n    type: \'server-tool-call\';\n    kind: string;\n    name?: string;\n    id?: CallId;\n    status?: \'completed\' | \'failed\';\n    results?: ServerToolResult[];\n}',
   },
   {
     name: 'ServerToolResult',

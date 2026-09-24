@@ -32,6 +32,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'compaction/summary',
   'feedback/record',
   'goal/change',
+  'grok-x-search/request',
   'hook/invoked',
   'hook/result',
   'jspace/advisor',

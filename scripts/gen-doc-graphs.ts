@@ -897,7 +897,7 @@ const EVENT_API_METHODS = new Set(['on', 'once', 'emit', 'parallel', 'serial', '
 export class EventRelationCollector {
   private readonly relations = new Map<string, EventRelation>()
   private readonly fileCallSites = new Map<ts.SourceFile, CallSiteIndex>()
-  private readonly localCalleeProofs = new Map<ts.FunctionDeclaration, boolean>()
+  private readonly localCalleeProofs = new Map<LocalHelper, boolean>()
   private globalCallSites: CallSiteIndex | null = null
   private readonly contextType: ts.Type
   private readonly agentDispatchType: ts.Type
@@ -957,7 +957,7 @@ export class EventRelationCollector {
    * the function value outward, so the original full package-source index
    * decides instead.
    */
-  private callSitesFor(owner: ts.FunctionDeclaration): ts.CallExpression[] {
+  private callSitesFor(owner: LocalHelper): ts.CallExpression[] {
     if (!this.globalCallSites && !this.provenLocalCallee(owner)) {
       this.globalCallSites = this.buildCallSiteIndex(this.packageSourceFiles)
     }
@@ -973,28 +973,36 @@ export class EventRelationCollector {
 
   /**
    * Prove every same-file reference to one helper is a direct callee. The
-   * proof owns its premises: an exported helper or a helper in a global
+   * proof owns its premises: an exported function or a function in a global
    * script file (no import/export means program-wide scope, callable from
-   * another file with no same-file reference at all) fails immediately.
+   * another file with no same-file reference at all) fails immediately, and
+   * so does a TypeScript `private` method, which another file can still call
+   * as `instance['name'](...)`. Only a `#name` method is confined to its
+   * class, and so to its file.
    * Alias escapes (re-export statements, default exports, value reads)
    * resolve back to the owner symbol at a non-callee position and fail the
    * proof, as does anything the scan cannot positively classify.
    */
-  private provenLocalCallee(owner: ts.FunctionDeclaration): boolean {
+  private provenLocalCallee(owner: LocalHelper): boolean {
     const cached = this.localCalleeProofs.get(owner)
     if (cached !== undefined) return cached
-    if (hasExportModifier(owner) || !ts.isExternalModule(owner.getSourceFile())) {
+    const premisesFail = ts.isFunctionDeclaration(owner)
+      ? hasExportModifier(owner) || !ts.isExternalModule(owner.getSourceFile())
+      : !ts.isPrivateIdentifier(owner.name)
+    if (premisesFail) {
       this.localCalleeProofs.set(owner, false)
       return false
     }
     const name = owner.name
-    const ownerSymbol = name && this.project.checker.getSymbolAtLocation(name)
+    // A computed method name has no fixed text to find references by.
+    const nameText = name !== undefined && !ts.isComputedPropertyName(name) ? name.text : undefined
+    const ownerSymbol = nameText !== undefined && name !== undefined && this.project.checker.getSymbolAtLocation(name)
     let proven = !!ownerSymbol
-    const refersToOwner = (identifier: ts.Identifier): boolean => {
+    const refersToOwner = (reference: ts.Identifier | ts.PrivateIdentifier | ts.StringLiteral): boolean => {
       // Shorthand properties resolve to the property symbol; ask for the value side.
-      const local = ts.isShorthandPropertyAssignment(identifier.parent)
-        ? this.project.checker.getShorthandAssignmentValueSymbol(identifier.parent)
-        : this.project.checker.getSymbolAtLocation(identifier)
+      const local = ts.isShorthandPropertyAssignment(reference.parent)
+        ? this.project.checker.getShorthandAssignmentValueSymbol(reference.parent)
+        : this.project.checker.getSymbolAtLocation(reference)
       if (!local) return false
       const symbol = local.flags & ts.SymbolFlags.Alias
         ? this.project.checker.getAliasedSymbol(local)
@@ -1003,7 +1011,10 @@ export class EventRelationCollector {
     }
     const visit = (node: ts.Node): void => {
       if (!proven) return
-      if (ts.isIdentifier(node) && node !== name && node.text === name?.text
+      // A private method is also reachable through `this['name']`, so a string
+      // key naming it counts as a reference too.
+      const reference = ts.isIdentifier(node) || ts.isPrivateIdentifier(node) || ts.isStringLiteral(node)
+      if (reference && node !== name && node.text === nameText
         && !isDirectCallee(node) && refersToOwner(node)) {
         proven = false
         return
@@ -1122,10 +1133,15 @@ export class EventRelationCollector {
     return events
   }
 
-  /** Follow a non-exported local helper parameter back to every resolved call site. */
+  /**
+   * Follow a local helper parameter back to every resolved call site. A local
+   * helper is a non-exported function declaration or a private method
+   * (`private` or `#name`); a public or protected method can be called from
+   * code the scan does not see, so its parameter stays unresolved.
+   */
   private eventNamesFromParameter(parameter: ts.ParameterDeclaration, seen: Set<ts.Node>): Set<string> {
     const owner = parameter.parent
-    if (!ts.isFunctionDeclaration(owner) || hasExportModifier(owner)) return new Set()
+    if (!isLocalHelper(owner)) return new Set()
     const index = owner.parameters.indexOf(parameter)
     if (index < 0) return new Set()
     const events = new Set<string>()
@@ -1176,9 +1192,33 @@ export class EventRelationCollector {
   }
 }
 
-/** Return whether an identifier is the callee of a call, seen through value-preserving wrappers. */
-function isDirectCallee(identifier: ts.Identifier): boolean {
-  let current: ts.Node = identifier
+/** A helper whose every call site the scan can find: see {@link isLocalHelper}. */
+type LocalHelper = ts.FunctionDeclaration | ts.MethodDeclaration
+
+/**
+ * Whether a parameter owner is a local helper: a non-exported function
+ * declaration, or a class method declared `private` or with a `#` name.
+ * @param owner - the parameter's owning declaration.
+ * @returns true for a helper whose call sites stay within reach of the scan.
+ */
+function isLocalHelper(owner: ts.Node): owner is LocalHelper {
+  if (ts.isFunctionDeclaration(owner)) return !hasExportModifier(owner)
+  if (!ts.isMethodDeclaration(owner)) return false
+  if (ts.isPrivateIdentifier(owner.name)) return true
+  return ts.getModifiers(owner)?.some(modifier => modifier.kind === ts.SyntaxKind.PrivateKeyword) ?? false
+}
+
+/**
+ * Whether a reference is the callee of a call: a bare name, a property access
+ * name, or an element-access string key, through value-preserving wrappers.
+ */
+function isDirectCallee(reference: ts.Identifier | ts.PrivateIdentifier | ts.StringLiteral): boolean {
+  let current: ts.Node = reference
+  const parent = reference.parent
+  if ((ts.isPropertyAccessExpression(parent) && parent.name === reference)
+    || (ts.isElementAccessExpression(parent) && parent.argumentExpression === reference)) {
+    current = parent
+  }
   while (
     ts.isParenthesizedExpression(current.parent)
     || ts.isAsExpression(current.parent)

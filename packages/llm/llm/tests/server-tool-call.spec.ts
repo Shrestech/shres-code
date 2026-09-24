@@ -61,6 +61,12 @@ describe('toServerToolCallBlock', () => {
     expect(Object.isFrozen(block.results)).toBe(true)
   })
 
+  it('omits an unreported status instead of inferring completion', () => {
+    const block = toServerToolCallBlock({ kind: 'x_search', name: 'x_user_search', id: 'call-1' })
+    expect(block).toEqual({ type: 'server-tool-call', kind: 'x_search', name: 'x_user_search', id: 'call-1' })
+    expect('status' in block).toBe(false)
+  })
+
   it('rejects a missing or blank hosted tool kind', () => {
     expect(() => toServerToolCallBlock({ kind: '', status: 'completed' })).toThrow(TypeError)
   })

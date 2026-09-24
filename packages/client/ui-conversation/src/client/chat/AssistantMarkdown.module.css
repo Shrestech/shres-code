@@ -17,6 +17,15 @@
   gap: 16px;
 }
 
+.hostedTool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
 /* Interrupted-turn terminal marker: quiet inline tag, no animation. */
 .stopped {
   align-self: flex-start;

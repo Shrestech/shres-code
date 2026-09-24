@@ -54,7 +54,15 @@ export type { GrokSessionEntry, GrokSessionOptions } from '@shres-code/shres-cod
 export const name = 'llm-grok-session'
 export const inject = ['llm']
 
-const NS = settingsNamespace('llm-grok-session')
+/**
+ * Settings namespace this plugin owns. Consumers of the section, such as the
+ * `agentXTools` gate of `@shres-code/shres-code-tool-grok-x-search`, read it
+ * through `ctx.settings`; it is registered only while this plugin is loaded
+ * and a settings service is mounted.
+ */
+export const GROK_SESSION_SETTINGS_NAMESPACE = settingsNamespace('llm-grok-session')
+
+const NS = GROK_SESSION_SETTINGS_NAMESPACE
 
 /**
  * The registry captures these per route; a change here must re-register.

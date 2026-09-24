@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "find recent X posts from xai about grok and answer with the X tools verdict"
+    }
+  ]
+}

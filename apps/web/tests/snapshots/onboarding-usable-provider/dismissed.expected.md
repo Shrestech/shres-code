@@ -30,7 +30,7 @@
   - heading "Models & providers" [level=1]
   - paragraph: Set up Shres for the way you work.
   - heading "Providers" [level=2]
-  - paragraph: HTTP providers need an API key. Delegated CLIs use a command on your PATH and their own login — a key is optional.
+  - paragraph: API keys and subscription sign-ins are managed per provider. Delegated CLIs use a command on this host.
   - list:
     - listitem:
       - text: Cursor (subscription) cursor-session
@@ -95,7 +95,43 @@
       - button "Edit Ollama Cloud (ollama-cloud)": Edit
     - listitem:
       - text: Grok (subscription) grok-session
-      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-grok-session)
+      - region "Grok subscription tools":
+        - paragraph: Requires a Grok account with subscription access and a Grok Build CLI sign-in (grok login) on this host. No XAI_API_KEY is used. Shres Code does not verify your plan here; requests report sign-in or access errors.
+        - text: Hosted web search
+        - switch "Hosted web search" [checked]
+        - paragraph: Web search run by Grok during conversations on this subscription route.
+        - text: Hosted X search
+        - switch "Hosted X search" [checked]
+        - paragraph: X search run by Grok during conversations on this subscription route.
+        - text: Share X search with Shres agents
+        - switch "Share X search with Shres agents" [disabled]
+        - paragraph: After Apply, tool-capable Shres agents can discover and call these tools on their next request. Turning sharing off removes them; normal permissions still apply. Delegated CLI routes use their own tools and do not receive these.
+        - paragraph: Enable this provider and Hosted X search to share these tools. Sharing stays inactive while either prerequisite is off.
+        - term:
+          - code: x_keyword_search
+        - definition: Ask Grok to search public X posts using keywords and search operators.
+        - term:
+          - code: x_semantic_search
+        - definition: Ask Grok to find public X posts matching a description or meaning.
+        - term:
+          - code: x_user_search
+        - definition: Ask Grok to find X accounts by name, handle, or topic.
+        - term:
+          - code: x_thread_fetch
+        - definition: Ask Grok to retrieve an X post and its thread using a post URL or ID.
+        - paragraph: Each tool call makes a request through your Grok subscription and uses its quota. Grok may choose a different X operation; results name the operations actually used. These tools read content, not publish posts. A Grok model on the Cursor route does not itself grant this access.
+      - paragraph: Models this route advertises. The model picker stays in sync with this list.
+      - region "Models":
+        - text: Models Using the adapter defaults
+        - paragraph: No models will be shown in the selector. Unlisted IDs can still be sent directly.
+        - button "Add model":
+          - img
+          - text: Add model
+      - button "Cancel"
+      - button "Apply"
+    - listitem:
+      - text: Claude (subscription) claude-session
+      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-claude-session)
       - button "Cancel"
       - button "Apply" [disabled]
     - listitem:

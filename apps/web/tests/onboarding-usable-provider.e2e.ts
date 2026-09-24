@@ -33,7 +33,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     // Keep subscription-session routes out of this keyless lane: their
     // dormant, keyless rows would satisfy readiness before the test can prove
     // that configuring another provider ends first-run onboarding.
-    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session'] as const) {
+    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session', 'llm-claude-session'] as const) {
       await scaffold.ctx.settings.mutate(settingsNamespace(namespace), [
         { op: 'set', path: ['enabled'], value: false },
       ])

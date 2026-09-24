@@ -44,6 +44,7 @@
   },
   "devDependencies": {
     "@shres-code/shres-code-grok-credential": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
     "@shres-code/shres-code-attachment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",

@@ -99,6 +99,45 @@ async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[
   return chunks
 }
 
+describe('hosted-tool narrowing', () => {
+  class HostedAdapter extends RecordingAdapter {
+    constructor(private readonly hosted: LlmModelInfo['hostedTools']) {
+      super(SCRIPT)
+    }
+
+    override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+      return Promise.resolve({ provider, id: model, name: model, ...this.hosted === undefined ? {} : { hostedTools: this.hosted } })
+    }
+  }
+
+  it('fails a hosted tool the resolved model does not declare before calling the adapter', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const plain = new HostedAdapter(undefined)
+    ctx.llm.registerAdapter(['plain'], plain)
+    const chunks = await collect(ctx.llm.stream({ provider: 'plain', model: 'm', messages: [], hostedTools: ['x_search'] }))
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: 'UNSUPPORTED_OPTION' } } })
+    expect(plain.lastOptions).toBeUndefined()
+  })
+
+  it('passes a declared subset, an empty list, and an absent list through to the adapter', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const hosted = new HostedAdapter(['web_search', 'x_search'])
+    ctx.llm.registerAdapter(['hosted'], hosted)
+    for (const hostedTools of [['x_search'] as const, [] as const, undefined]) {
+      await collect(ctx.llm.stream({
+        provider: 'hosted', model: 'm', messages: [],
+        ...hostedTools === undefined ? {} : { hostedTools },
+      }))
+      expect(hosted.lastOptions?.hostedTools).toEqual(hostedTools)
+    }
+    const partial = await collect(ctx.llm.stream({ provider: 'hosted', model: 'm', messages: [], hostedTools: ['web_search', 'unknown' as never] }))
+    expect(partial.at(-1)).toMatchObject({ reason: { failure: { code: 'UNSUPPORTED_OPTION' } } })
+  })
+})
+
 describe('LlmRuntime', () => {
   it('recognizes structured and model-capacity context-window overflow details', () => {
     expect(isContextWindowExceededError('context_length_exceeded maximum context length')).toBe(true)

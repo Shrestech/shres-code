@@ -15,6 +15,28 @@ async function setup(withProvider: boolean): Promise<Context> {
 }
 
 describe('settings invariants', () => {
+  it('accepts the service registration events and fails forged ones', async () => {
+    const ctx = await setup(true)
+    const fiber = ctx.plugin({
+      inject: ['settings'],
+      apply: (child: Context) => {
+        child.settings.register(settingsNamespace('ui-theme'), z.object({ theme: z.string().default('dark') }))
+      },
+    })
+    await fiber
+    expect(() => {
+      ctx.emit('settings/registered', settingsNamespace('ui-theme'), { theme: 'forged' })
+    }).toThrow(/authoritative/)
+    expect(() => {
+      ctx.emit('settings/registered', settingsNamespace('ghost'), {})
+    }).toThrow(/unregistered/)
+    expect(() => {
+      ctx.emit('settings/unregistered', settingsNamespace('ui-theme'))
+    }).toThrow(/still registered/)
+    await fiber.dispose()
+    expect(ctx.settings.get(settingsNamespace('ui-theme'))).toBeUndefined()
+  })
+
   it('fails a settings/updated emission without a live settings service', async () => {
     const ctx = await setup(false)
     expect(() => {

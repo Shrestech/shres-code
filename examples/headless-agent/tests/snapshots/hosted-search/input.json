@@ -2,7 +2,7 @@
   "steps": [
     {
       "op": "prompt",
-      "text": "search the web and answer with the hosted search verdict"
+      "text": "search X, record the result with todo_write, and answer with the hosted search verdict"
     }
   ]
 }

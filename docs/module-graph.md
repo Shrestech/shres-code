@@ -18,10 +18,12 @@ flowchart TD
     pkg_untrusted_frame["untrusted-frame"]
   end
   subgraph group_llm["packages/llm"]
+    pkg_claude_credential["claude-credential"]
     pkg_codex_credential["codex-credential"]
     pkg_cursor_credential["cursor-credential"]
     pkg_grok_credential["grok-credential"]
     pkg_llm["llm"]
+    pkg_llm_claude_session["llm-claude-session"]
     pkg_llm_cli_bridge["llm-cli-bridge"]
     pkg_llm_codex_session["llm-codex-session"]
     pkg_llm_cursor_session["llm-cursor-session"]
@@ -31,6 +33,7 @@ flowchart TD
     pkg_llm_retry["llm-retry"]
     pkg_llm_xai_apikey["llm-xai-apikey"]
     pkg_token_meter["token-meter"]
+    pkg_tool_grok_x_search["tool-grok-x-search"]
     pkg_tool_image_gen["tool-image-gen"]
   end
   subgraph group_core["packages/core"]
@@ -475,6 +478,8 @@ flowchart TD
   pkg_settings_file --> pkg_home_paths
   pkg_settings_file --> pkg_invariants
   pkg_settings_file --> pkg_settings
+  pkg_claude_credential --> pkg_invariants
+  pkg_claude_credential --> pkg_llm
   pkg_codex_credential --> pkg_invariants
   pkg_codex_credential --> pkg_llm
   pkg_cursor_credential --> pkg_invariants
@@ -520,6 +525,11 @@ flowchart TD
   pkg_speech --> pkg_llm
   pkg_speech --> pkg_settings
   pkg_speech --> pkg_typert_protocol
+  pkg_llm_claude_session --> pkg_claude_credential
+  pkg_llm_claude_session --> pkg_invariants
+  pkg_llm_claude_session --> pkg_llm
+  pkg_llm_claude_session --> pkg_llm_pi_ai
+  pkg_llm_claude_session --> pkg_settings
   pkg_llm_cli_bridge --> pkg_credentials
   pkg_llm_cli_bridge --> pkg_invariants
   pkg_llm_cli_bridge --> pkg_launch_environment
@@ -877,6 +887,14 @@ flowchart TD
   pkg_token_meter --> pkg_llm
   pkg_token_meter --> pkg_session
   pkg_token_meter --> pkg_session_projection
+  pkg_tool_grok_x_search --> pkg_invariants
+  pkg_tool_grok_x_search --> pkg_llm
+  pkg_tool_grok_x_search --> pkg_llm_grok_session
+  pkg_tool_grok_x_search --> pkg_session
+  pkg_tool_grok_x_search --> pkg_settings
+  pkg_tool_grok_x_search --> pkg_timeout
+  pkg_tool_grok_x_search --> pkg_tools
+  pkg_tool_grok_x_search --> pkg_untrusted_frame
   pkg_tool_image_gen --> pkg_attachment
   pkg_tool_image_gen --> pkg_grok_credential
   pkg_tool_image_gen --> pkg_invariants
@@ -1801,6 +1819,7 @@ flowchart TD
 | [`attachment-local`](../packages/attachment/attachment-local) | `attachment` | [`attachment`](../packages/attachment/attachment), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants) |
 | [`credentials-local`](../packages/credentials/credentials-local) | `credentials` | [`atomic-write`](../packages/util/atomic-write), [`credentials`](../packages/credentials/credentials), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment) |
 | [`settings-file`](../packages/settings/settings-file) | `settings` | [`atomic-write`](../packages/util/atomic-write), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings) |
+| [`claude-credential`](../packages/llm/claude-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`codex-credential`](../packages/llm/codex-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`cursor-credential`](../packages/llm/cursor-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`grok-credential`](../packages/llm/grok-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
@@ -1812,6 +1831,7 @@ flowchart TD
 | [`web`](../packages/web/web) | `web` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`lsp`](../packages/lsp/lsp) | `lsp` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`speech`](../packages/speech/speech) | `speech` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
+| [`llm-claude-session`](../packages/llm/llm-claude-session) | `llm` | [`claude-credential`](../packages/llm/claude-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cli-bridge`](../packages/llm/llm-cli-bridge) | `llm` | [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`llm-codex-session`](../packages/llm/llm-codex-session) | `llm` | [`codex-credential`](../packages/llm/codex-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cursor-session`](../packages/llm/llm-cursor-session) | `llm` | [`cursor-credential`](../packages/llm/cursor-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings) |
@@ -1891,6 +1911,7 @@ flowchart TD
 | [`terminal-bash`](../packages/terminal/terminal-bash) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`subprocess`](../packages/subprocess/subprocess), [`terminal`](../packages/terminal/terminal) |
 | [`wiki-filesystem`](../packages/wiki/wiki-filesystem) | `wiki` | [`atomic-write`](../packages/util/atomic-write), [`fs`](../packages/fs/fs), [`invariants`](../packages/runtime-diagnostics/invariants), [`wiki`](../packages/wiki/wiki) |
 | [`token-meter`](../packages/llm/token-meter) | `llm` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection) |
+| [`tool-grok-x-search`](../packages/llm/tool-grok-x-search) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-grok-session`](../packages/llm/llm-grok-session), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`timeout`](../packages/util/timeout), [`tools`](../packages/core/tools), [`untrusted-frame`](../packages/util/untrusted-frame) |
 | [`tool-image-gen`](../packages/llm/tool-image-gen) | `llm` | [`attachment`](../packages/attachment/attachment), [`grok-credential`](../packages/llm/grok-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`agent-loop`](../packages/core/agent-loop) | `core` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`settings`](../packages/settings/settings), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`agent-tool-presentation`](../packages/core/agent-tool-presentation) | `core` | [`invariants`](../packages/runtime-diagnostics/invariants), [`tools`](../packages/core/tools) |

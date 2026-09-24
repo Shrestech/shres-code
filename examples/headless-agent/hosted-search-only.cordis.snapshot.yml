@@ -1,0 +1,17 @@
+# Keyless hosted-only variant of hosted-search.cordis.snapshot.yml: the
+# fixture backend's first step carries every hosted X call name and an answer
+# but no local tool call, so the real agent loop must finish after one step
+# without dispatching any hosted call.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: hosted-search-snapshot-backend
+            name: './tests/fixtures/hosted-search-snapshot-backend.mjs'
+            config:
+              localCall: false

@@ -1,6 +1,6 @@
 // AssistantMarkdown: renders assistant blocks in order — markdown text body,
 // reasoning as the figma Think summary row (expand = indented gray text),
-// other-block JSON fallback. Tool-call heads are NOT rendered here: the chat
+// hosted-tool summaries and other-block JSON fallback. Local tool-call heads are NOT rendered here: the chat
 // view groups them into tool rows through its keyed toolview slot (figma
 // step-summary flow). Shared by finalized nodes and the streaming partial;
 // the turn-level loading dots live in the chat view's tail, not here.
@@ -33,7 +33,23 @@ export interface AssistantMarkdownProps {
   t: ChatViewSlotProps['t']
 }
 
-/** Reasoning block as the Think variant summary row (figma 39:28304). */
+/** Provider extensions retain their reported names instead of acquiring known-tool semantics. */
+function hostedLabel(block: Extract<AssistantBlock, { kind: 'server-tool-call' }>['block'], t: ChatViewSlotProps['t']): string {
+  const category = block.kind === 'x_search' ? t('hosted.x') : block.kind === 'web_search' ? t('hosted.web') : block.kind
+  if (block.name === undefined || block.name === block.kind) return category
+  if (block.kind !== 'x_search') return category + ' · ' + block.name
+  let operation: string
+  switch (block.name) {
+    case 'x_keyword_search': operation = t('hosted.keyword'); break
+    case 'x_semantic_search': operation = t('hosted.semantic'); break
+    case 'x_user_search': operation = t('hosted.users'); break
+    case 'x_thread_fetch': operation = t('hosted.thread'); break
+    default: operation = block.name
+  }
+  return category + ' · ' + operation
+}
+
+/** Assistant prose, reasoning, provider-hosted calls, and extension blocks in transcript order. */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
   blocks, streaming, interrupted, loadImage, mentions, t,
 }: AssistantMarkdownProps) {
@@ -85,6 +101,14 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(<ImageGallery key={start} images={group} load={imageLoader} align="start" labels={messageImageLabels(t)} />)
         break
       }
+      case 'server-tool-call':
+        rendered.push(
+          <div className={css.hostedTool} key={i}>
+            <span>{hostedLabel(block.block, t)}</span>
+            {block.block.status === 'failed' && <span>{t('hosted.failed')}</span>}
+          </div>,
+        )
+        break
       // Grouped into tool rows by ChatView; hasVisible above skips an empty shell.
       case 'tool-call':
         break

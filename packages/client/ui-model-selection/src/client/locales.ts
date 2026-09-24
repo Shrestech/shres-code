@@ -31,6 +31,8 @@ export const en = {
   'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Shres Code approval.',
   'modality.vision': 'vision',
   'hosted.webSearch': 'web search',
+  'hosted.xSearch': 'X search',
+  'hosted.hint': 'Provided by this model route; account access is checked when you send a request.',
 } satisfies Record<string, string>
 
 /** The ModelKey union. */

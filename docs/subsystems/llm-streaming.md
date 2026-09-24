@@ -27,7 +27,7 @@ interface ContentBlockMap {
 }
 ```
 
-The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `ToolCallBlock` (`id: CallId`, `name`, raw-JSON `arguments`), `ToolResultBlock` (`toolCallId`, nested `content: ContentBlock[]`, `isError?`), and `ServerToolCallBlock` (a hosted tool the provider executed on the model's behalf — `kind`, optional `name`/`id`, `status`, bounded `results` of `{ title?, url?, snippet? }`). `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it.
+The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `ToolCallBlock` (`id: CallId`, `name`, raw-JSON `arguments`), `ToolResultBlock` (`toolCallId`, nested `content: ContentBlock[]`, `isError?`), and `ServerToolCallBlock` (a hosted tool the provider executed on the model's behalf — `kind`, optional `name`/`id`, optional `status` present only when reported, bounded `results` of `{ title?, url?, snippet? }`). `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it.
 
 Source: [`packages/llm/llm/src/message.ts`](../../packages/llm/llm/src/message.ts)
 
@@ -454,6 +454,11 @@ interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
+  /**
+   * Provider-executed tools this model's route serves inside the conversation;
+   * absent declares none, so the local tool catalog applies unchanged.
+   */
+  hostedTools?: readonly HostedTool[]
 }
 ```
 
@@ -549,6 +554,15 @@ interface GenerateOptions {
    * generation policy. Ordinary conversation requests leave it unset.
    */
   purpose?: 'compaction' | 'session-title' | 'wiki-summarize' | 'wiki-extract'
+  /**
+   * Narrow the hosted tools the route declares for this model to this list for
+   * one request: `[]` offers none, and omission keeps every declared hosted
+   * tool. A request may only remove declarations; `LlmRuntime.stream` fails
+   * a list naming a hosted tool the resolved model does not declare with
+   * `UNSUPPORTED_OPTION` before dispatch, so an adapter that declares no
+   * hosted tools cannot silently ignore it.
+   */
+  hostedTools?: readonly HostedTool[]
 }
 ```
 
@@ -642,6 +656,14 @@ interface LlmDiscoveredModel {
    * route's catalog or `defaultInput` fallback rather than a claim.
    */
   input?: readonly ModelModality[]
+  /**
+   * The endpoint declares audio input (speech-to-text) for this model.
+   * Display metadata only: the chat conversation never constructs audio
+   * parts, so this is not a chat modality and lives outside {@link input}.
+   */
+  audioInput?: boolean
+  /** The endpoint declares audio output (text-to-speech) for this model. */
+  audioOutput?: boolean
 }
 ```
 
@@ -889,6 +911,12 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
  * dispatch, and iteration failures become terminal `error` or `aborted`
  * finish chunks; middleware, nested-call, cleanup, and consumer failures
  * remain thrown.
+ *
+ * A `hostedTools` list naming a tool outside the resolved model info's
+ * `hostedTools` ends the stream with an `UNSUPPORTED_OPTION` error finish
+ * before the adapter is called. An adapter whose model info declares
+ * `hostedTools` MUST apply a request's `hostedTools` narrowing: it offers
+ * only the listed hosted tools and treats the rest as undeclared.
  * @param options - the full request; `options.provider` selects the adapter.
  * @returns the chunk stream, possibly wrapped by `llm/stream` listeners.
  */
