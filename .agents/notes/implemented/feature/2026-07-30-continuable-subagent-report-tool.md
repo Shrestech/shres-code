@@ -2,6 +2,8 @@
 
 Status: implemented
 
+> Authority, acceptance, `PARENT_UNAVAILABLE`, `DRAINING`, and durability decisions remain current. The waking-delivery scheduling clauses promising a separate turn and never steering an open turn are superseded by [busy-parent subagent report delivery](../bug-fix/2026-09-24-busy-parent-subagent-report-delivery.md).
+
 ## Problem
 
 Continuable in-process subagents can receive later parent messages, retain descendants, settle, and cold-resume, but the base lifecycle gives them no way to send selected content back to their direct parent. Their complete output already remains reconstructable from the durable child Session, so the missing capability is explicit delivery rather than result storage.
@@ -38,7 +40,7 @@ The package validates `reportDelivery: 'quiet' | 'wakeup'`; the default is `wake
 
 Quiet delivery calls `parent.inject()`. It adds model-visible context without starting a parent model request: an idle parent appends before the call returns, while an admitting or running parent stages the report for the next safe log position. It creates no inbox occurrence and therefore no synthetic continuation-manager acceptance record.
 
-Waking delivery calls `parent.followup()`. It creates one ordinary FIFO parent turn, wakes a parked parent driver, and never steers an open turn. When that parent is itself a continuable Activation, the send uses the manager's existing admission accounting so the parent cannot settle between synchronous enqueue and the admission microtask.
+Waking delivery schedules through the manager's shared waking lane, whose rule and maintenance exception [busy-parent subagent report delivery](../bug-fix/2026-09-24-busy-parent-subagent-report-delivery.md) owns. When that parent is itself a continuable Activation, the send uses the manager's existing admission accounting so the parent cannot settle between synchronous enqueue and the admission microtask.
 
 Both modes frame one user-role message as `Background subagent <child-id> reported:` followed by the exact `output`. The durable message source is `{ kind: 'subagent-report', senderSessionId: child.id }`. Normal Agent ordering governs concurrent sends; the subagent layer creates no second queue.
 
@@ -101,7 +103,7 @@ A post-creation revocation check can reject the Activation only after the Agent 
 - A continuable in-process child exposes exactly one scope-local `report` schema only while the report package's contribution is installed; unrelated Agents never expose it.
 - The tool returns the parent message's stable `MessageId`. Quiet delivery has no `InboxItemId`; waking delivery has a separate inbox occurrence.
 - Only the exact resident child may report, and only to the exact live direct parent derived from durable lineage. The service has no recipient parameter or offline fallback.
-- Waking delivery is the validated default: it creates exactly one later FIFO turn and never steers an open turn. Quiet delivery never starts a parent request.
+- Waking delivery is the validated default and schedules through the shared waking lane ([busy-parent subagent report delivery](../bug-fix/2026-09-24-busy-parent-subagent-report-delivery.md)); quiet delivery never starts a parent request.
 - Child cancellation or disposal after parent acceptance does not retract the report. Before acceptance, child disposal, drain, parent loss, or caller cancellation rejects the operation.
 - Fresh and resumed Activations compose current setup contributions before publication. Grants wait for the next Activation; revocation is immediate for resident children.
 - Unit coverage pins visibility, allow-list behavior, both delivery modes, stable message and sender identities, nested routing, invalid senders, absent parents, cancellation, drain, revocation races, and the absence of Jobs or implicit final reporting.

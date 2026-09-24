@@ -10,7 +10,8 @@ import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
 } from '@shres-code/shres-code-client-runtime/client'
 import type {
-  ConversationSnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
+  ConversationSnapshot, SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState,
+  WorkspaceView,
 } from '@shres-code/shres-code-client-runtime/client'
 import type { ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
@@ -83,6 +84,11 @@ function conversationSnapshot(overrides: Partial<ConversationSnapshot> = {}): Co
   }
 }
 
+/** One session-list row. An absent `origin` is an ordinary fork, which ends a lineage. */
+function row(id: string, over: Partial<SessionSummary> = {}): SessionSummary {
+  return { id: sid(id), displayTitle: id, running: false, blank: false, updatedAt: 3, ...over }
+}
+
 /** Minimal export-like utility whose dialog is portaled outside Activity. */
 function PortaledExportAction(): ReactNode {
   const [open, setOpen] = useState(false)
@@ -119,6 +125,8 @@ function mount(
     talkMode?: boolean
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Session-list rows that seed a subagent lineage under the selected child. */
+    descendants?: SessionSummary[]
     /** Nested Activity content that can consume keyboard events in a test. */
     activityAction?: ReactNode
     /** Activity utility with a portal-owned dialog, like Session export. */
@@ -133,9 +141,15 @@ function mount(
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
   }
   const listed = options.omitSummaryRow !== true
+  // Lineage seeds ride byId only: the runtime list keeps addressed rows out of ids.
+  const descendants = options.descendants ?? []
   const sessions = createSnapshotStore<SessionListState>({
     ids: listed ? [root, SID] : [root],
-    byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
+    byId: {
+      [root]: rootRow,
+      ...listed && { [SID]: childRow },
+      ...Object.fromEntries(descendants.map(entry => [entry.id, entry])),
+    },
     current: SID,
     phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
@@ -284,7 +298,7 @@ function mount(
   }
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open,
+    view, chat, sink, retargetWorkspace, session, sessions, slotCalls, seatOwners, open,
     pickerOwner: () => pickerOwner,
     chainOwner: () => chainOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
@@ -599,5 +613,92 @@ describe('ConversationRoot resident composer', () => {
     }))
     expect(b.view.getByRole('alert').textContent).toContain('Message send failed (offline)')
     expect(b.view.queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+})
+
+describe('Activity trigger running-subagent count', () => {
+  it('stays absent without a running descendant', () => {
+    const b = mount(conversationSnapshot())
+    const trigger = b.view.getByRole('button', { name: 'Activity' })
+    expect(b.view.queryByText(/subagent running/)).toBeNull()
+    // Absent, not empty: the accessibility contract is the null attribute.
+    expect(trigger.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('badges the singular count and describes the Activity control with it', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      descendants: [row('run-1', { parentId: SID, origin: 'subagent', running: true })],
+    })
+    const trigger = b.view.getByRole('button', { name: 'Activity' })
+    const badge = b.view.getByText('1 subagent running')
+    expect(trigger.textContent).toContain('1 subagent running')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(trigger.getAttribute('aria-describedby')).toBe(badge.id)
+  })
+
+  it('badges the plural count while other descendants stay idle', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      descendants: [
+        row('run-1', { parentId: SID, origin: 'subagent', running: true }),
+        row('run-2', { parentId: SID, origin: 'subagent', running: true }),
+        row('idle-1', { parentId: SID, origin: 'subagent' }),
+      ],
+    })
+    expect(b.view.getByText('2 subagents running')).toBeTruthy()
+  })
+
+  it('counts a running grandchild reached through subagent lineage', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      descendants: [
+        row('mid', { parentId: SID, origin: 'subagent' }),
+        row('deep', { parentId: sid('mid'), origin: 'subagent', running: true }),
+      ],
+    })
+    expect(b.view.getByText('1 subagent running')).toBeTruthy()
+  })
+
+  it('ignores ordinary forks, other owners, and parentless subagents', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      descendants: [
+        row('fork', { parentId: SID }),
+        row('fork-child', { parentId: sid('fork'), origin: 'subagent', running: true }),
+        row('other-child', { parentId: sid('root'), origin: 'subagent', running: true }),
+        row('orphan', { origin: 'subagent', running: true }),
+      ],
+    })
+    expect(b.view.queryByText(/subagent running/)).toBeNull()
+  })
+
+  it('does not count the viewed session itself', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      // The viewed child replaces its own list row: a running subagent counts
+      // under its parent, never under the session being viewed.
+      descendants: [row('s1', { parentId: sid('root'), origin: 'subagent', running: true })],
+    })
+    const trigger = b.view.getByRole('button', { name: 'Activity' })
+    expect(b.view.queryByText(/subagent running/)).toBeNull()
+    expect(trigger.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('drops the badge when the running descendant stops', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      descendants: [row('run-1', { parentId: SID, origin: 'subagent', running: true })],
+    })
+    expect(b.view.getByText('1 subagent running')).toBeTruthy()
+
+    const stopped = b.sessions.getSnapshot()
+    act(() => {
+      b.sessions.set({
+        ...stopped,
+        byId: {
+          ...stopped.byId,
+          [sid('run-1')]: row('run-1', { parentId: SID, origin: 'subagent' }),
+        },
+      })
+    })
+    b.rerender()
+
+    expect(b.view.queryByText(/subagent running/)).toBeNull()
+    expect(b.view.getByRole('button', { name: 'Activity' }).getAttribute('aria-describedby')).toBeNull()
   })
 })

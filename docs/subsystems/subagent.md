@@ -223,7 +223,16 @@ interface SubagentReportMessageSource {
 ```
 
 ```ts type-equiv
-/** Deployment scheduling policy for accepted child reports. */
+/**
+ * Deployment scheduling policy for accepted child reports.
+ *
+ * `wakeup` delivers on the shared child-to-parent waking lane: an idle parent
+ * gets one ordinary turn, a busy parent is steered into its open turn. Because
+ * `Agent.status` folds maintenance into `idle`, a report arriving during
+ * compaction stays a separate next-turn follow-up, which preserves FIFO order
+ * with human prompts queued during that maintenance. `quiet` injects into the
+ * parent's inbox without waking it.
+ */
 type SubagentReportDelivery = 'quiet' | 'wakeup'
 ```
 
@@ -251,7 +260,7 @@ interface SubagentSettledMessageSource {
 ```ts type-equiv
 /** Options for one continuable child's report to its direct parent. */
 interface SubagentReportOptions {
-  /** Already-resolved parent scheduling policy. */
+  /** Already-resolved parent scheduling policy; its lane is on {@link SubagentReportDelivery}. */
   readonly delivery: SubagentReportDelivery
   /** Caller cancellation, owning authorization and admission until acceptance. */
   readonly signal: AbortSignal

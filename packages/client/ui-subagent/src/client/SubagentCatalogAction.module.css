@@ -21,6 +21,18 @@
   margin: 0 5px;
 }
 
+.running {
+  margin: 0 5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .activitySlot {
   display: inline-flex;
   align-items: flex-end;

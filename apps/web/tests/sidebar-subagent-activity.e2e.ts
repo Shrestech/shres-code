@@ -19,11 +19,12 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot, selectSessionView } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/sidebar-subagent-activity', import.meta.url))
 const RUNNING_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-running.expected.md')
 const PINNED_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-pinned.expected.md')
+const ACTIVITY_RUNNING_EXPECTED = join(SNAPSHOT_DIR, 'activity-running.expected.md')
 const MODE = webSnapshotMode()
 const HOLD_PROVIDER = 'web-test-hold'
 const HOLD_MODEL = 'hold'
@@ -148,8 +149,21 @@ describe('web e2e: sidebar subagent activity', () => {
     )
     expect(await ownerRow.locator('[data-state="ongoing"]').count()).toBe(1)
     await ownerRow.click()
+    const activityTrigger = page.getByRole('button', { name: 'Activity', exact: true })
+    await expect.poll(() => activityTrigger.textContent()).toContain('1 subagent running')
+    expect(await activityTrigger.getByText('1 subagent running', { exact: true }).isVisible()).toBe(true)
+    expect(await activityTrigger.getAttribute('aria-expanded')).toBe('false')
+    expect(await activityTrigger.evaluate((element) => {
+      const description = element.getAttribute('aria-describedby')
+      return description === null ? null : document.getElementById(description)?.textContent
+    })).toBe('1 subagent running')
+    await compareOrRefreshGolden(
+      ACTIVITY_RUNNING_EXPECTED,
+      await captureStableAria(page, 'header:has([aria-label="Activity"])', scaffold.workspaceCwd),
+      MODE,
+    )
     const activity = await openSessionActivity(page)
-    const runningTrigger = activity.getByRole('button', { name: '1 subagent running' })
+    const runningTrigger = activity.getByRole('button', { name: '1 subagent running', exact: true })
     await runningTrigger.waitFor({ timeout: 10_000 })
     expect(await runningTrigger.locator('[data-state="ongoing"]').count()).toBe(1)
 
@@ -168,7 +182,29 @@ describe('web e2e: sidebar subagent activity', () => {
       await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd),
       MODE,
     )
-    await assertFixtureInventory(SNAPSHOT_DIR, ['owner-running.expected.md', 'owner-pinned.expected.md'])
+    await openSessionActivity(page)
+    await runningTrigger.click()
+    await page.getByRole('tree', { name: 'Subagent sessions' })
+      .getByRole('treeitem', { name: /sidebar activity child/ }).click()
+    await selectSessionView(page, 'Trajectory')
+    await page.locator('[class*="centerCol"]').getByRole('table').getByText('Hold this delegated task open.', { exact: true })
+      .waitFor({ timeout: 15_000 })
+    expect(scaffold.ctx.agents.get(childId)?.status).toBe('running')
+    expect(await activityTrigger.getAttribute('aria-describedby')).toBeNull()
+    await selectSessionView(page, 'Chat')
+    await page.getByRole('navigation', { name: 'Session hierarchy' })
+      .getByRole('button', { name: 'Delegate a background job.' }).click()
+    await expect.poll(() => activityTrigger.textContent()).toContain('1 subagent running')
+
+    const child = scaffold.ctx.agents.get(childId)
+    if (child === undefined) throw new Error('held child disappeared before cancellation')
+    child.cancel({ kind: 'user' })
+    await child.whenIdle()
+    await expect.poll(() => activityTrigger.textContent()).not.toContain('subagent running')
+    expect(await activityTrigger.getAttribute('aria-describedby')).toBeNull()
+    await assertFixtureInventory(SNAPSHOT_DIR, [
+      'owner-running.expected.md', 'owner-pinned.expected.md', 'activity-running.expected.md',
+    ])
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   })

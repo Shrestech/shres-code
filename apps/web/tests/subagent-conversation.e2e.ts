@@ -15,7 +15,7 @@ import {
   launchWebScaffold, watchConsole,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot, selectSessionView } from './support.ts'
 
 const BASE_FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
 const AVAILABLE_CHILD_EXPECTED = fileURLToPath(new URL('./snapshots/subagent-conversation/ui.expected.md', import.meta.url))
@@ -354,6 +354,17 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       scaffold.workspaceCwd,
     )
     await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+  })
+
+  it('shows the persisted child trajectory without activating it or mixing in its parent', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-trajectory'))
+    await selectSessionView(page, 'Trajectory')
+    const ledger = page.locator('[class*="centerCol"]').getByRole('table')
+    await ledger.getByText(INITIAL_PROMPT, { exact: true }).waitFor({ timeout: 15_000 })
+    expect(await ledger.getByText(PARENT_PROMPT, { exact: true }).count()).toBe(0)
+    expect(scaffold.ctx.agents.get(childId)).toBeUndefined()
+    await selectSessionView(page, 'Chat')
+    await page.getByRole('textbox', { name: 'Message the agent' }).waitFor()
   })
 
   it('continues through FIFO follow-up admission and receives the child mux events', async () => {
