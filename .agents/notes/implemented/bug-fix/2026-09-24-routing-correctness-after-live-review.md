@@ -20,6 +20,8 @@ A failed judgment call also ended a held streak. Every engine failure resolved t
 
 Compaction summarized on the routed candidate. compaction-basic resolved its summarization target from the latest request header, which during a streak carries the candidate, so the durable summary every later manual-route turn reads was written by the cheaper model.
 
+A return to the manual route could lose thinking. Anthropic keeps thinking across a tool-use continuation only from the signed thinking blocks of earlier assistant turns. A routed segment carries none, so a return to a route that thinks on a fixed budget runs that turn without thinking, and nothing in the log said whether a return had thought.
+
 Effort also moved inside a streak. The `difficultyToEffort` lift was recomputed from every step's difficulty answer, so a held candidate switched between its own effort and the lifted effort as the answers varied, while the streak comparison looked only at the candidate id. Anthropic invalidates cached message blocks when the request's effort changes, so each switch re-prefilled the conversation, and the fold, which compares effort, reset the route-failure count on changes the decision recorded as a continued streak.
 
 ## Decision
@@ -84,6 +86,12 @@ While a streak holds, the first `judgmentFailures.holdTolerance` (default 2) con
 
 compaction-basic gains `summarizationRoute: 'manual' | 'request'`, default `manual`, at the top level and in each exact-target policy, and compaction-jev restates it in its schema. With no summarization pair configured, `manual` summarizes on the route a composed `ctx.modelRouting` reports through `stickySelection`, the entry route of a held streak, and falls back to the latest request header without a router or a streak; `request` keeps the latest header. A configured pair still wins, and compaction-jev's draft and escalation paths inherit the rule through the base summarizer. The summarization call envelope already records its provider and model, so the choice is logged.
 
+### Budget-thinking manual routes are not routed from
+
+`LlmModelInfo` gains `thinkingMode: 'adaptive' | 'budget' | 'none'`, validated by the LLM runtime on listing and exact resolution (`INVALID_CATALOG`, `INVALID_MODEL_THINKING_MODE`). llm-pi-ai declares it for anthropic-messages models from the same fact its request builder reads: `adaptive` for a model whose compat sets `forceAdaptiveThinking`, `budget` for any other reasoning model, `none` for a non-reasoning one; other protocols declare nothing. While the manual route declares `budget` and its prepared effort enables reasoning, eligibility excludes every other candidate as `thinking-mode-incompatible` before any lookup, and the consult resolves `thinking-mode-incompatible` without a judgment call; a held streak whose manual route becomes budget-thinking ends as `candidate-ineligible`. claude-session ships only adaptive models, so the rule is dormant there.
+
+The `modelRouting` projection reports `returnThinking: 'present' | 'absent'` for the first `assistant/message` after the last ended streak, derived from its content blocks, which is the observed check for adaptive routes; no event is added. The opt-in `llm-claude-session` probe `tests/foreign-return.e2e.ts` (`SHRES_E2E_CLAUDE_FOREIGN_RETURN=1` and a Claude login) continues a DeepSeek-shaped tool-call segment on `claude-opus-5-5` with reasoning enabled and checks that the request is accepted and the reply thinks. It spends subscription quota and was not run for this change.
+
 ## Alternatives considered
 
 **Omit the duplicate from the question only.** An engine answer naming it would reach the gate as an unknown candidate, and `sticky-hold` treats every gate failure below the horizon as a reason to keep the held cheap route. The answer has to be read as the current model before the gate.
@@ -120,6 +128,8 @@ compaction-basic gains `summarizationRoute: 'manual' | 'request'`, default `manu
 
 **Reset the failure count when the breaker closes.** A closed breaker that needs a full threshold of new failures before reopening sends that many calls to an engine that has not recovered; the half-open trial sends one.
 
+**Strip or rewrite the routed segment before a return.** Removing the routed turns would drop model-visible history the log records, and rewriting them as Anthropic turns would invent thinking the candidate never produced; excluding routing from a budget-thinking route keeps the log and the request consistent.
+
 **Summarize on the candidate by default.** The candidate's prefix is the one the last request warmed, but the summary is durable and model-visible to every later manual-route turn, and the plan's cold-point policy treats a compaction as a point where routing returns to the manual route anyway, so the cache advantage does not outweigh the quality risk.
 
 **Per-base candidate lists.** A list per strong route states an order the pool cannot, but the owner edits one pool from the routing card, and a candidate that is a downgrade from one route is kept out of the others only by duplicating the pool per route. Starting routing only from listed routes, plus the `equals-base` rule and the capability floors, protects what a per-base list protected except the lateral-move case, which the owner accepts and the card surfaces as a warning.
@@ -141,6 +151,8 @@ Every held decision now records steps rather than turns, and the per-turn entry 
 `controller.spec.ts` pins a deadline expiry recorded as `DEADLINE` with the turn kept, a late answer discarded, the recorded engine code, a held streak surviving its hold tolerance and ending at the next failure, the breaker opening, staying closed to asks, reopening on a failed trial, and closing on an answer, a turn cancellation during the ask that propagates without a decision, and `judgment-input-too-large` ending a held streak at once. `folds.spec.ts` pins which decisions count as failed calls and which leave the count alone. The keyless snapshots are unchanged by this part, because their scripted engine never fails; the trajectory labels `judgment-failure-held` as a held downgrade and `breaker-open` as a quiet marker, which `routing.client.spec.ts` pins.
 
 Every composition that turns routing on now lists its strong route in `routeFrom` and describes each pool candidate: the keyless router snapshots, the Loader and provider compositions, the Laya composition, and the bench arms, whose preregistration records the added `routeFrom`. A deployment configuration written before this change fails load by name until it does the same. `config.spec.ts` pins each named `routeFrom` and description error; `controller.spec.ts` pins `base-unlisted` without a judgment call, the recorded `objective`, a held streak ended when its route is removed from `routeFrom`, and a held pool candidate removed from the pool. The refreshed keyless fixtures differ only by the candidate descriptions in the recorded questions and assessments and by the recorded `objective`.
+
+`eligibility.spec.ts` pins `excludes routing under a budget-thinking Anthropic base` and the unaffected cases (reasoning off or unset, adaptive, none); `controller.spec.ts` pins the consult without a judgment call, the held-streak exit, and `returnThinking` across returns; llm's `service.spec.ts` pins `thinkingMode` validation and pass-through, and llm-pi-ai's `adapter.spec.ts` pins the declared modes.
 
 compaction-basic's `compaction-basic.spec.ts` pins the manual route during a held streak, `request` keeping the latest header, the fallback without a router or a streak, an exact-target override, and the named validation error. The router's Loader composition runs compaction-basic with a held streak and checks the summarization request's model and the recorded `compaction/summary` for both routes.
 

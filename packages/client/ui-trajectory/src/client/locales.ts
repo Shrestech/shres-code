@@ -47,6 +47,7 @@ export type TrajectoryKey =
   | 'routing.reason.lowConfidence'
   | 'routing.reason.thinMargin'
   | 'routing.reason.candidateEqualsBase'
+  | 'routing.reason.thinkingModeIncompatible'
   | 'routing.reason.currentPreferred'
   | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
@@ -110,6 +111,7 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.lowConfidence': 'low confidence',
   'routing.reason.thinMargin': 'thin top-two margin',
   'routing.reason.candidateEqualsBase': 'already on the routed model',
+  'routing.reason.thinkingModeIncompatible': 'manual model thinks on a fixed budget, which a return would lose',
   'routing.reason.currentPreferred': 'current model preferred',
   'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
@@ -155,6 +157,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'low-confidence': 'routing.reason.lowConfidence',
   'thin-margin': 'routing.reason.thinMargin',
   'candidate-equals-base': 'routing.reason.candidateEqualsBase',
+  'thinking-mode-incompatible': 'routing.reason.thinkingModeIncompatible',
   'current-preferred': 'routing.reason.currentPreferred',
   'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',

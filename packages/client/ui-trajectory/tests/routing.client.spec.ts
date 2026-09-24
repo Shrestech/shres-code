@@ -191,6 +191,15 @@ describe('trajectoryRoutingRow', () => {
     expect(ROUTING_BREAK_KEYS['base-unlisted']).toBe('routing.reason.baseUnlisted')
   })
 
+  it('shows thinking-mode-incompatible as the quiet marker with its label', () => {
+    const refused = decision({
+      outcome: 'kept-strong', reason: 'thinking-mode-incompatible', sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(refused)).toEqual({ outcome: 'kept-strong', reason: 'thinking-mode-incompatible', quiet: true })
+    expect(en[ROUTING_REASON_KEYS['thinking-mode-incompatible']])
+      .toBe('manual model thinks on a fixed budget, which a return would lose')
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',

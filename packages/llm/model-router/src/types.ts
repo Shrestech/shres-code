@@ -8,7 +8,7 @@
  * @module @shres-code/shres-code-model-router/types
  */
 
-import type { HostedTool, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
 import type {
   JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
 } from '@shres-code/shres-code-judgment'
@@ -88,8 +88,10 @@ export interface ModelRoutingRouteFrom {
 
 /**
  * Stable result of one candidate check. `equals-base` marks a candidate naming
- * the manual provider/model at any effort; every other reason is a capability
- * result.
+ * the manual provider/model at any effort; `thinking-mode-incompatible` marks
+ * every other candidate while the manual route runs budget thinking, because a
+ * return after a routed segment would run it without thinking; every other
+ * reason is a capability result.
  */
 export type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
@@ -105,6 +107,7 @@ export type ModelRoutingCandidateEligibilityReason =
   | 'context-too-small'
   | 'max-tokens-exceeds-context'
   | 'hosted-tools-incompatible'
+  | 'thinking-mode-incompatible'
 
 /** Detached, JSON-safe facts recorded for one configured candidate. */
 export interface ModelRoutingCandidateAssessment {
@@ -142,6 +145,8 @@ export interface ModelRoutingCandidateRequirements {
   readonly contextWindow?: number
   /** Manual hosted-tool floor, when its metadata declares one. */
   readonly hostedTools?: readonly HostedTool[]
+  /** Manual route's thinking mode, when its metadata declares one. */
+  readonly thinkingMode?: LlmThinkingMode
 }
 
 /** Candidate list and detached capability assessments for one routing request. */
@@ -217,6 +222,12 @@ export type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The manual route runs budget thinking with reasoning enabled, so every
+   * other candidate is excluded and no judgment runs: returning to it after a
+   * routed segment would run the manual model without thinking.
+   */
+  | 'thinking-mode-incompatible'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
   /** The difficulty answer prevents entry into a downgraded streak. */
@@ -470,6 +481,14 @@ export interface ModelRoutingProjection {
    * streak has been entered.
    */
   lastStrong?: ModelRoutingEntryBaseView
+  /**
+   * Whether the first `assistant/message` after the last ended streak — the
+   * return to the manual route — carried a reasoning block. An Anthropic route
+   * that thinks resumes without thinking after a routed segment when the
+   * provider refuses the foreign continuation, so this is the observed check.
+   * Absent until one such reply.
+   */
+  returnThinking?: 'present' | 'absent'
 }
 
 declare module '@shres-code/shres-code-session/types' {

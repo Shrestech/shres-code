@@ -2,6 +2,7 @@ import type {
   LlmCallConfig,
   LlmResolvedModelInfo,
   LlmRuntime,
+  LlmThinkingMode,
   Message,
   ModelModality,
   HostedTool,
@@ -22,6 +23,7 @@ interface ModelOverrides {
   inputModalities?: readonly ModelModality[]
   hostedTools?: readonly HostedTool[]
   defaultMaxTokens?: number
+  thinkingMode?: LlmThinkingMode
 }
 
 function model(
@@ -37,6 +39,7 @@ function model(
     ...overrides.inputModalities === undefined ? {} : { inputModalities: overrides.inputModalities },
     ...overrides.hostedTools === undefined ? {} : { hostedTools: overrides.hostedTools },
     ...overrides.defaultMaxTokens === undefined ? {} : { defaultMaxTokens: overrides.defaultMaxTokens },
+    ...overrides.thinkingMode === undefined ? {} : { thinkingMode: overrides.thinkingMode },
   }
 }
 
@@ -174,6 +177,47 @@ describe('assessModelRoutingCandidates', () => {
     // and the other candidate are resolved.
     expect(resolveModelInfo.mock.calls.map(call => `${String(call[0])}/${String(call[1])}`))
       .toEqual(['manual/strong', 'cheap-provider/cheap-model'])
+  })
+
+  it('excludes routing under a budget-thinking Anthropic base', async () => {
+    const configured = [candidate('same', { provider: 'manual', model: 'strong' }), candidate('cheap')]
+    const { runtime, resolveModelInfo } = fakeRuntime({
+      models: [
+        model('manual', 'strong', { contextWindow: 1_000, thinkingMode: 'budget' }),
+        model('cheap-provider', 'cheap-model', { contextWindow: 2_000 }),
+      ],
+    })
+
+    const result = await assessModelRoutingCandidates(runtime, { ...BASE, reasoningEffort: ReasoningEffortId('high') }, [], configured)
+
+    expect(result.requirements).toMatchObject({ thinkingMode: 'budget' })
+    expect(result.eligibleCandidates).toEqual([])
+    expect(result.assessments).toEqual([
+      { id: 'same', provider: 'manual', model: 'strong', reason: 'equals-base' },
+      { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model', reason: 'thinking-mode-incompatible' },
+    ])
+    // The base property excludes candidates without looking them up.
+    expect(resolveModelInfo.mock.calls.map(call => `${String(call[0])}/${String(call[1])}`)).toEqual(['manual/strong'])
+  })
+
+  it('keeps routing under a budget-thinking base with reasoning off or unset, and under an adaptive base', async () => {
+    const cases: [LlmThinkingMode, LlmCallConfig][] = [
+      ['budget', BASE],
+      ['budget', { ...BASE, reasoningEffort: ReasoningEffortId('off') }],
+      ['adaptive', { ...BASE, reasoningEffort: ReasoningEffortId('high') }],
+      ['none', { ...BASE, reasoningEffort: ReasoningEffortId('high') }],
+    ]
+    for (const [thinkingMode, base] of cases) {
+      const { runtime } = fakeRuntime({
+        models: [
+          model('manual', 'strong', { contextWindow: 1_000, thinkingMode }),
+          model('cheap-provider', 'cheap-model', { contextWindow: 2_000 }),
+        ],
+      })
+      const result = await assessModelRoutingCandidates(runtime, base, [], [candidate('cheap')])
+      expect(result.assessments.map(assessment => assessment.reason)).toEqual(['eligible'])
+      expect(result.requirements.thinkingMode).toBe(thinkingMode)
+    }
   })
 
   it('excludes a same-model different-effort candidate as equals-base', async () => {

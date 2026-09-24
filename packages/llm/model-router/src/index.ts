@@ -192,6 +192,9 @@ interface ModelRoutingUnitState {
   last: ModelRoutingLastDecision | null
   sticky: ModelRoutingStickyFoldState
   lastStrong: ModelRoutingEntryBaseView | null
+  /** A streak just ended and its first manual-route reply has not arrived. */
+  returnPending: boolean
+  returnThinking: 'present' | 'absent' | null
 }
 
 /** Project one in-process selection onto its plain wire view. */
@@ -321,6 +324,7 @@ const modelRoutingProjectionSchema = zod.object({
     model: zod.string(),
     reasoningEffort: zod.string(),
   }).partial({ reasoningEffort: true }).optional(),
+  returnThinking: zod.union([zod.literal('present'), zod.literal('absent')]).optional(),
 }) as unknown as ZodType<ModelRoutingProjection>
 
 /**
@@ -494,6 +498,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           last: null,
           sticky: createStickyFoldState(),
           lastStrong: null,
+          returnPending: false,
+          returnThinking: null,
         }),
         apply: (state, event) => {
           const sticky = advanceStickyFoldState(state.sticky, event)
@@ -521,8 +527,18 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
                 // Only an active record carries a base, so the retained route
                 // outlives the streak: ending one reports nothing itself.
                 lastStrong: data.sticky.entryBase ?? state.lastStrong,
+                // The next reply is the first on the manual route after the streak.
+                returnPending: state.sticky.active && !sticky.active ? true : state.returnPending,
               }
             }
+            // The sticky fold ignores replies, so its accumulator is unchanged here.
+            case 'assistant/message':
+              if (!state.returnPending) return state
+              return {
+                ...state,
+                returnPending: false,
+                returnThinking: event.data.message.content.some(block => block.type === 'reasoning') ? 'present' : 'absent',
+              }
             default:
               return sticky === state.sticky ? state : { ...state, sticky }
           }
@@ -534,6 +550,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             pending: state.wanted !== null && state.wanted !== state.active,
             ...state.last === null ? {} : { last: state.last },
             ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
+            ...state.returnThinking === null ? {} : { returnThinking: state.returnThinking },
             sticky: {
               active: sticky.active,
               stepsElapsed: sticky.stepsElapsed,
@@ -541,8 +558,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // The accumulator counts held steps and failed judgment calls, and records the re-entry cooldown turn.
-        stateVersion: 8,
+        // The unit state records whether the first manual-route reply after a streak carried thinking.
+        stateVersion: 9,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -1036,6 +1053,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       // can change nothing, which the routing UI reports as its idle state.
       if (held === undefined && eligibility.assessments.every(assessment => assessment.reason === 'equals-base')) {
         return keep('candidate-equals-base')
+      }
+      if (held === undefined && eligibility.assessments.some(assessment => assessment.reason === 'thinking-mode-incompatible')) {
+        return keep('thinking-mode-incompatible')
       }
       return {
         ...keep('candidate-ineligible'),

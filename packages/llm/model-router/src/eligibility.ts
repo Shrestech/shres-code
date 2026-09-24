@@ -83,6 +83,7 @@ function candidateRequirements(
       model: info.id,
       ...info.context === undefined ? {} : { contextWindow: info.context.contextWindow },
       ...info.hostedTools === undefined ? {} : { hostedTools: Object.freeze([...info.hostedTools]) },
+      ...info.thinkingMode === undefined ? {} : { thinkingMode: info.thinkingMode },
     },
   })
 }
@@ -141,7 +142,9 @@ function hasHostedToolFloor(
  * A candidate naming the manual provider/model is excluded as `equals-base`
  * before any lookup, whatever its effort: it is no downgrade, and a same-model
  * effort change invalidates the prompt cache on providers that render effort
- * into the cached request.
+ * into the cached request. While the manual route declares `budget` thinking
+ * and its effective effort enables reasoning, every other candidate is
+ * excluded as `thinking-mode-incompatible` before any lookup.
  * @param runtime - exact LLM runtime owning provider registrations.
  * @param base - manual route and request controls to preserve on candidates.
  * @param messages - request messages used only for nested image detection.
@@ -167,9 +170,10 @@ export async function assessModelRoutingCandidates(
   const unavailableRequirements = candidateRequirements(needsImage)
 
   let baseInfo: LlmResolvedModelInfo
+  let basePrepared: PreparedCandidateCall
   try {
     baseInfo = await runtime.resolveModelInfo(base.provider, base.model, signal)
-    await runtime.prepareCall(base, signal)
+    basePrepared = await runtime.prepareCall(base, signal)
   } catch (error) {
     rethrowCancellation(error, signal)
     const assessments = Object.freeze(candidates.map(candidate => baseFailureAssessment(candidate, 'base-unavailable')))
@@ -186,6 +190,11 @@ export async function assessModelRoutingCandidates(
     }
   }
 
+  // Anthropic requires the signed thinking of earlier assistant turns in a
+  // tool-use continuation; a routed segment carries none, so a budget-thinking
+  // manual route that enables reasoning would resume without thinking.
+  const baseEffort = basePrepared.config.reasoningEffort
+  const budgetThinking = baseInfo.thinkingMode === 'budget' && baseEffort !== undefined && String(baseEffort) !== 'off'
   const eligibleCandidates: ModelRoutingCandidate[] = []
   const assessments: ModelRoutingCandidateAssessment[] = []
   const addAssessment = (
@@ -202,6 +211,10 @@ export async function assessModelRoutingCandidates(
     signal?.throwIfAborted()
     if (candidate.provider === base.provider && candidate.model === base.model) {
       addAssessment(candidate, 'equals-base')
+      continue
+    }
+    if (budgetThinking) {
+      addAssessment(candidate, 'thinking-mode-incompatible')
       continue
     }
     let info: LlmResolvedModelInfo

@@ -58,6 +58,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmThinkingMode",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmModelDiscoveryRequest",
       "source": "packages/llm/llm/src/types.ts"
     },

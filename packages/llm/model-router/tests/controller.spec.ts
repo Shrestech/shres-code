@@ -37,6 +37,7 @@ import LlmRuntime, {
   CallId,
   LlmAdapter,
   ReasoningEffortId,
+  createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@shres-code/shres-code-llm'
@@ -792,6 +793,31 @@ describe('the downgrade gate', () => {
     b.engine.choice = { ...PASSING, option: 'vision', probabilities: { vision: 0.9, cheap: 0.05, other: 0.02 } }
     expect(await b.resolve(1)).toBeUndefined()
     expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'unknown-candidate' })
+  })
+
+  it('keeps strong without asking from a budget-thinking base', async () => {
+    const b = await bench({ capabilities: { [`${STRONG.provider}/${STRONG.model}`]: { thinkingMode: 'budget' } } })
+    // The base resolves its low default effort, which enables budget thinking.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'thinking-mode-incompatible',
+      candidateEligibility: { eligibleCandidates: [], assessments: [{ id: 'cheap', reason: 'thinking-mode-incompatible' }] },
+      sticky: { active: false },
+    })
+
+    // A held streak whose base turns budget-thinking ends as candidate-ineligible.
+    const held = await bench({ settings: true })
+    openTurn(held.session, 1)
+    user(held.session, 'a small change')
+    expect(await held.resolve(1)).toEqual(CHEAP)
+    closeTurn(held.session, 1)
+    openTurn(held.session, 2)
+    startStep(held.session, 2)
+    held.adapter.setModelInfo(STRONG.provider, STRONG.model, { thinkingMode: 'budget' })
+    expect(await held.resolve(2)).toBeUndefined()
+    expect(held.decision(1)).toMatchObject({ reason: 'candidate-ineligible', sticky: { brokenBy: 'candidate-ineligible' } })
   })
 
   it('reports candidate-equals-base without asking when every candidate is the manual route', async () => {
@@ -2448,6 +2474,63 @@ describe('the projection unit', () => {
       () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
     )
     expect(projectionOf(b.ctx, b.session)).toMatchObject({ active: true, pending: false })
+  })
+
+  it('observes whether the first reply after an ended streak carried thinking', async () => {
+    /** One assistant reply in the open turn, with or without a reasoning block. */
+    function reply(b: Bench, turn: number, thinking: boolean): void {
+      b.session.append('assistant/message', {
+        turn,
+        step: 1,
+        message: createAssistantMessage({
+          content: [...thinking ? [{ type: 'reasoning' as const, text: 'plan' }] : [], { type: 'text' as const, text: 'done' }],
+          source: { provider: STRONG.provider, model: STRONG.model },
+        }),
+      }, { surfaceOp: 'append' })
+    }
+    const b = await bench({ projections: true })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    reply(b, 1, false)
+    // No streak has ended yet, so the routed reply is not a return.
+    expect(projectionOf(b.ctx, b.session)).not.toHaveProperty('returnThinking')
+    closeTurn(b.session, 1)
+
+    openTurn(b.session, 2)
+    b.engine.score = { ...EASY, score: 4 }
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({ reason: 'escalated' })
+    reply(b, 2, true)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    // Later replies do not overwrite the observed return.
+    reply(b, 2, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    closeTurn(b.session, 2)
+
+    // A strong decision that ended no streak starts no new observation.
+    openTurn(b.session, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decision(2)).toMatchObject({ reason: 'reentry-cooldown' })
+    reply(b, 3, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    closeTurn(b.session, 3)
+
+    // The next ended streak's return replaces it.
+    for (const turn of [4, 5]) {
+      openTurn(b.session, turn)
+      await b.resolve(turn)
+      closeTurn(b.session, turn)
+    }
+    openTurn(b.session, 6)
+    b.engine.score = EASY
+    expect(await b.resolve(6)).toEqual(CHEAP)
+    closeTurn(b.session, 6)
+    openTurn(b.session, 7)
+    b.engine.score = { ...EASY, score: 4 }
+    expect(await b.resolve(7)).toBeUndefined()
+    reply(b, 7, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('absent')
   })
 
   it('reports the last decision and the sticky streak with its elapsed steps', async () => {

@@ -16,7 +16,7 @@ The latest explicit `agent/model-selection` event is the manual selection author
 
 ## Candidate eligibility and fitted state
 
-Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task.
+Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task. While the manual route declares `thinkingMode: 'budget'` and its prepared effort enables reasoning, every other candidate is excluded as `thinking-mode-incompatible` before any lookup and the consult records `thinking-mode-incompatible` without a judgment call, because a return to that route after a routed segment would run without thinking. The projection's `returnThinking` records whether the first `assistant/message` after the last ended streak carried a reasoning block.
 
 The router builds complete state alternatives from one live session surface snapshot. The first retains the configured context window, then older whole entries are removed progressively; the final alternative retains the current entry alone. `state.maxFitCandidates` bounds the alternatives offered, including that final current-entry alternative, and rejects values below `2`. No alternative is sliced mid-entry.
 
@@ -25,8 +25,10 @@ When `ctx.judgment.fitting` is available, the router sends the ordered alternati
 ```ts type-equiv
 /**
  * Stable result of one candidate check. `equals-base` marks a candidate naming
- * the manual provider/model at any effort; every other reason is a capability
- * result.
+ * the manual provider/model at any effort; `thinking-mode-incompatible` marks
+ * every other candidate while the manual route runs budget thinking, because a
+ * return after a routed segment would run it without thinking; every other
+ * reason is a capability result.
  */
 type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
@@ -42,6 +44,7 @@ type ModelRoutingCandidateEligibilityReason =
   | 'context-too-small'
   | 'max-tokens-exceeds-context'
   | 'hosted-tools-incompatible'
+  | 'thinking-mode-incompatible'
 ```
 
 ```ts type-equiv
@@ -83,6 +86,8 @@ interface ModelRoutingCandidateRequirements {
   readonly contextWindow?: number
   /** Manual hosted-tool floor, when its metadata declares one. */
   readonly hostedTools?: readonly HostedTool[]
+  /** Manual route's thinking mode, when its metadata declares one. */
+  readonly thinkingMode?: LlmThinkingMode
 }
 ```
 
@@ -155,6 +160,12 @@ type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The manual route runs budget thinking with reasoning enabled, so every
+   * other candidate is excluded and no judgment runs: returning to it after a
+   * routed segment would run the manual model without thinking.
+   */
+  | 'thinking-mode-incompatible'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
   /** The difficulty answer prevents entry into a downgraded streak. */
@@ -687,5 +698,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:377`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:381`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

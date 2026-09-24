@@ -15,6 +15,7 @@ import type {
   LlmModelContext,
   LlmModelDiscoveryRequest,
   LlmModelInfo,
+  LlmThinkingMode,
   LlmResolvedModelInfo,
   LlmProviderInfo,
   HostedTool,
@@ -288,6 +289,18 @@ export interface DirectoryRegistrationHandle {
  */
 function isPromptCacheTtl(value: number | undefined): boolean {
   return value === undefined || (Number.isSafeInteger(value) && value >= 0)
+}
+
+/** Thinking modes an adapter may declare. */
+const THINKING_MODES: ReadonlySet<unknown> = new Set<LlmThinkingMode>(['adaptive', 'budget', 'none'])
+
+/**
+ * Whether an adapter-reported thinking mode is absent or one the seam defines.
+ * @param value - the adapter's `thinkingMode` field.
+ * @returns true for a value the seam may pass through.
+ */
+function isThinkingMode(value: unknown): boolean {
+  return value === undefined || THINKING_MODES.has(value)
 }
 
 /**
@@ -619,6 +632,7 @@ export class LlmRuntime extends Service {
         || model.name.length === 0
         || (model.description !== undefined && typeof model.description !== 'string')
         || !isPromptCacheTtl(model.promptCacheTtlMs)
+        || !isThinkingMode(model.thinkingMode)
         || seen.has(model.id)
       ) {
         throw new LlmError(`adapter returned invalid or duplicate model metadata for provider "${provider}"`, 'INVALID_CATALOG')
@@ -634,6 +648,7 @@ export class LlmRuntime extends Service {
         ...inputModalities === undefined ? {} : { inputModalities },
         ...hostedTools === undefined ? {} : { hostedTools },
         ...model.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: model.promptCacheTtlMs },
+        ...model.thinkingMode === undefined ? {} : { thinkingMode: model.thinkingMode },
       }
     })
   }
@@ -702,6 +717,13 @@ export class LlmRuntime extends Service {
         'INVALID_MODEL_CACHE_TTL',
       )
     }
+    const thinkingMode = resolved.thinkingMode
+    if (!isThinkingMode(thinkingMode)) {
+      throw new LlmError(
+        `adapter returned an invalid thinking mode for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_THINKING_MODE',
+      )
+    }
     const info: LlmResolvedModelInfo = {
       provider,
       id: model,
@@ -712,6 +734,7 @@ export class LlmRuntime extends Service {
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
       ...promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs },
+      ...thinkingMode === undefined ? {} : { thinkingMode },
     }
     const reasoning = resolved.reasoning
     if (reasoning === undefined) return info
