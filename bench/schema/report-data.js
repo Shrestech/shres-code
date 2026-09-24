@@ -102,6 +102,9 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number} compactionVerificationTrials - success trials logging at least one compaction verification: the verification-adoption screen's input.
  * @property {number | null} totalJevCompactionAcceptedBelowThreshold - below-threshold acceptances summed over the trials that logged a verification; null when none did.
  * @property {number | null} totalJevSelectionDegraded - degraded selections summed over the trials that logged a selection; null when none did.
+ * @property {import('../runner/accounting.js').AccountingSummary | null} accounting - pooled priced accounting over the
+ *   arm's success trials: dollars and their upper bound, quota tokens, raw tokens by class, cache-hit and unreported
+ *   shares, judge calls and latency, and TTFT percentiles; null when no trial carries accounting.
  */
 
 /**

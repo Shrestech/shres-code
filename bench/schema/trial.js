@@ -38,9 +38,10 @@ export const FAILURE_MODES = Object.freeze([
  *   provider-reported usage only.
  * @property {number} descendantSessions - count of descendant sessions in the closure (excludes
  *   the root; includes descendants whose logs carry no usage events).
- * @property {number | null} costIncludingDescendants - estimated cost over the same closure;
- *   always null until the bench carries a price table (none exists in-tree, and stale prices
- *   are wrong prices), so token fields remain the cost currency.
+ * @property {number | null} costIncludingDescendants - exact API-equivalent USD over the same
+ *   closure from the trial's `accounting` (`exactCost`): priced model calls plus priced judge
+ *   usage, excluding subscription routes; null when any such call is unpriced or lacks a
+ *   reported cache-read count, and on trials recorded before the bench priced trials.
  * @property {boolean | null} danglingCard - card open at session end (last jspace state not
  *   closed); null for jspace-off arms.
  * @property {number | null} verifiedCheckpointShare - fraction of checkpoint lines carrying
@@ -122,6 +123,7 @@ export const FAILURE_MODES = Object.freeze([
  * @property {boolean} timedOut - the phase exceeded its timeout and was killed.
  * @property {boolean} budgetExceeded - the live token cap terminated this phase's spawn.
  * @property {TrialMetrics} metrics - this phase's metrics.
+ * @property {import('../runner/accounting.js').TrialAccounting} [accounting] - this phase's priced accounting.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601.
  */
@@ -142,6 +144,10 @@ export const FAILURE_MODES = Object.freeze([
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601.
  * @property {PhaseRecord[]} [phases] - chain trials only, in phase order.
+ * @property {string} [priceSnapshot] - id (`YYYY-MM-DD`) of the `bench/prices` snapshot the trial
+ *   was priced under; absent on trials recorded before the bench priced trials.
+ * @property {import('../runner/accounting.js').TrialAccounting} [accounting] - priced, cache-inclusive
+ *   accounting over the root session and its descendants; for chains, the sum over phases.
  * @property {{ violations: string[] }} [integrity] - arm-integrity audit findings; omitted when clean.
  */
 
@@ -224,6 +230,54 @@ function validateExecution(value, name) {
 }
 
 /**
+ * Validate one accounting record. Throws on the first violation.
+ * @param {unknown} value - candidate.
+ * @param {string} name - dotted field path used in error messages.
+ * @returns {void}
+ */
+function validateAccounting(value, name) {
+  const a = /** @type {Record<string, unknown>} */ (value)
+  if (typeof a !== 'object' || a === null || Array.isArray(a)) throw new Error(`${name} must be a record`)
+  const nonNegative = (record, fields, path) => {
+    for (const field of fields) {
+      const count = record[field]
+      if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) {
+        throw new Error(`${path}.${field} must be a non-negative number`)
+      }
+    }
+  }
+  nonNegative(a, ['calls', 'unreportedCalls', 'dollars', 'dollarsUpperBound', 'offPeakCalls', 'unpricedCalls', 'quotaCalls', 'quotaTokens', 'quotaUnpricedTokens'], name)
+  const tokens = /** @type {Record<string, unknown>} */ (a.tokens)
+  if (typeof tokens !== 'object' || tokens === null) throw new Error(`${name}.tokens must be a record`)
+  nonNegative(tokens, ['uncachedInput', 'unreportedInput', 'output', 'cacheRead', 'cacheWrite'], `${name}.tokens`)
+  for (const field of ['cacheHitShare', 'unreportedShare']) {
+    const share = a[field]
+    if (share !== null && (typeof share !== 'number' || share < 0 || share > 1)) throw new Error(`${name}.${field} must be in [0, 1] or null`)
+  }
+  if (!Array.isArray(a.unpricedModels) || a.unpricedModels.some(item => typeof item !== 'string')) {
+    throw new Error(`${name}.unpricedModels must be a string array`)
+  }
+  const numbers = (list, path) => {
+    if (!Array.isArray(list) || list.some(item => typeof item !== 'number' || !Number.isFinite(item) || item < 0)) {
+      throw new Error(`${path} must be an array of non-negative numbers`)
+    }
+  }
+  numbers(a.ttftSamplesMs, `${name}.ttftSamplesMs`)
+  const judge = /** @type {Record<string, unknown>} */ (a.judge)
+  if (typeof judge !== 'object' || judge === null) throw new Error(`${name}.judge must be a record`)
+  nonNegative(judge, ['calls', 'latencyMs', 'criticalPathMs', 'vendorPlanCalls', 'pricedCalls', 'unpricedCalls', 'dollars', 'dollarsUpperBound'], `${name}.judge`)
+  numbers(judge.latencySamplesMs, `${name}.judge.latencySamplesMs`)
+  const byKind = /** @type {Record<string, unknown>} */ (judge.callsByKind)
+  if (typeof byKind !== 'object' || byKind === null) throw new Error(`${name}.judge.callsByKind must be a record`)
+  nonNegative(byKind, ['decision', 'child-decision', 'shadow-decision'], `${name}.judge.callsByKind`)
+  const byEngine = judge.byEngine
+  if (typeof byEngine !== 'object' || byEngine === null || Array.isArray(byEngine)) {
+    throw new Error(`${name}.judge.byEngine must be a record`)
+  }
+  nonNegative(/** @type {Record<string, unknown>} */ (byEngine), Object.keys(byEngine), `${name}.judge.byEngine`)
+}
+
+/**
  * Validate one chain phase record. Throws on the first violation.
  * @param {unknown} value - candidate.
  * @param {number} index - expected phaseIndex; phases are strictly 0..n-1 in order.
@@ -239,6 +293,7 @@ function validatePhaseRecord(value, index) {
   if (p.exitCode !== null && !Number.isSafeInteger(p.exitCode)) throw new Error(`${name}.exitCode must be an integer|null`)
   if (typeof p.timedOut !== 'boolean') throw new Error(`${name}.timedOut must be boolean`)
   validateMetrics(p.metrics, `${name}.metrics`)
+  if (p.accounting !== undefined) validateAccounting(p.accounting, `${name}.accounting`)
   for (const field of ['startedAt', 'endedAt']) {
     if (typeof p[field] !== 'string' || /** @type {string} */ (p[field]).length === 0) {
       throw new Error(`${name}.${field} must be a non-empty string`)
@@ -278,6 +333,13 @@ export function validateTrial(value) {
   if (t.phases !== undefined) {
     if (!Array.isArray(t.phases) || t.phases.length === 0) throw new Error('trial.phases must be a non-empty array')
     t.phases.forEach((phase, index) => validatePhaseRecord(phase, index))
+  }
+  if (t.priceSnapshot !== undefined && (typeof t.priceSnapshot !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.priceSnapshot))) {
+    throw new Error('trial.priceSnapshot must be a YYYY-MM-DD snapshot id when present')
+  }
+  if (t.accounting !== undefined) validateAccounting(t.accounting, 'trial.accounting')
+  if ((t.priceSnapshot === undefined) !== (t.accounting === undefined)) {
+    throw new Error('trial.priceSnapshot and trial.accounting are recorded together')
   }
   if (t.integrity !== undefined) {
     const integrity = /** @type {Record<string, unknown>} */ (t.integrity)

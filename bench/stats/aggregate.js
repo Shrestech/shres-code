@@ -8,6 +8,7 @@
  * @module bench/stats/aggregate
  */
 
+import { summarizeAccounting } from '../runner/accounting.js'
 import { wilsonInterval } from './intervals.js'
 
 /** TrialMetrics field → ReportCell mean field, in ReportCell order. */
@@ -191,6 +192,7 @@ export function summarizeArm(arm, trials) {
     meanUnverifiedShare: unverifiedValues.length > 0 ? mean(unverifiedValues) : null,
     meanEchoOkRejectRate: echoOkValues.length > 0 ? mean(echoOkValues) : null,
     ...jevAggregates(ok),
+    accounting: summarizeAccounting(ok),
   }
 }
 
