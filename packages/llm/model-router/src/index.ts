@@ -87,6 +87,7 @@ import {
   advanceStickyFoldState,
   createStickyFoldState,
   foldModelRouting,
+  judgmentFailuresFor,
   readStickyFoldState,
   sameSelection,
   stickyState,
@@ -570,8 +571,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // The unit state records whether the first manual-route reply after a streak carried thinking.
-        stateVersion: 9,
+        // The accumulator keys its counted judgment failures by engine.
+        stateVersion: 10,
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
@@ -1056,15 +1057,18 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
     }
-    // The breaker is half-open once its window passes: only an answered call
+    const engine = this.ctx.get('judgment')
+    const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
+    const selectedEngine = engine?.selectedEngine(consumer)
+    // Failures count per engine, so an engine switch starts from none. The
+    // breaker is half-open once its window passes: only an answered call
     // clears the count, so the next failure opens it again.
-    const failures = sticky.judgmentFailures
+    const failures = judgmentFailuresFor(sticky.judgmentFailures, selectedEngine)
     if (failures !== undefined && config.judgmentFailures.breakerOpenTurns > 0
       && failures.count >= config.judgmentFailures.breakerThreshold
       && turn - failures.turn <= config.judgmentFailures.breakerOpenTurns) {
       return keep('breaker-open')
     }
-    const engine = this.ctx.get('judgment')
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
     const llm = this.ctx.get('llm')
@@ -1105,9 +1109,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       reason: 'engine-unavailable' | 'invalid-answer',
       appliesPolicy: boolean,
       code?: ModelRoutingEngineFailure['code'],
+      engineState?: ModelRoutingEngineFailure['engineState'],
     ): ModelRoutingDecision => {
-      const engineFailure = code === undefined ? {} : { engineFailure: { code } }
-      if (held !== undefined && (sticky.judgmentFailures?.count ?? 0) < config.judgmentFailures.holdTolerance) {
+      const engineFailure = code === undefined
+        ? {}
+        : { engineFailure: { code, ...engineState === undefined ? {} : { engineState } } }
+      // A warming engine has not failed: it holds a streak without spending the tolerance.
+      if (held !== undefined && (engineState !== undefined
+        || (failures?.count ?? 0) < config.judgmentFailures.holdTolerance)) {
         return {
           outcome: 'downgraded',
           reason: 'judgment-failure-held',
@@ -1138,13 +1147,20 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
       return { ...keep(reason), ...engineFailure }
     }
+    // An engine that is still starting or not yet installed cannot answer: the
+    // call is not made and the fold does not count it as a failure.
+    const engineState = selectedEngine === undefined
+      ? undefined
+      : this.ctx.get('judgmentEngines')?.get(selectedEngine)?.status().state
+    if (selectedEngine !== undefined) facts.engineId = selectedEngine
+    if (engineState === 'starting' || engineState === 'not-installed') {
+      return judgmentFailed('engine-unavailable', true, 'UNAVAILABLE', engineState)
+    }
     // The deadline aborts the call alone: the turn's own signal still cancels
     // the turn, and an answer arriving after the deadline is not used.
     const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
     const askSignal = AbortSignal.any([signal, deadline])
-    const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
     const fitting = engine.fittingFor(consumer)
-    const selectedEngine = engine.selectedEngine(consumer)
     const states = fitting === undefined ? [state.text] : state.alternatives.map(candidate => candidate.text)
     facts.inputChars = states.reduce((total, text) => total + text.length, 0)
     const askStarted = Date.now()

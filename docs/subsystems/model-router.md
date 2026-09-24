@@ -304,6 +304,12 @@ interface ModelRoutingEngineFailure {
    * carried no code, or an answer arrived after it.
    */
   code: JudgmentErrorCode | 'DEADLINE'
+  /**
+   * The selected engine's registry state when it was still becoming ready. The
+   * router made no call, and the fold does not count the decision as a failed
+   * judgment toward `judgmentFailures.holdTolerance` or the breaker.
+   */
+  engineState?: 'starting' | 'not-installed'
 }
 ```
 
@@ -311,7 +317,7 @@ One decision is logged per fresh judged request step as `model-routing/decision`
 
 ## Failed judgment calls
 
-Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest, and clears the count on a decision that carries a route answer. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
+Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest and the `engineId` they were routed to, and clears the count on a decision that carries a route answer. A failure routed to another engine starts a new count, and the consult reads the count only against the engine `ctx.judgment.selectedEngine('model-router')` selects, so an engine switch clears the breaker and the hold tolerance at once. A selected engine whose registry status is `starting` or `not-installed` is not asked; the decision records `engineFailure.engineState`, and the fold does not count it. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
 
 ## In-turn fallback
 
@@ -433,6 +439,12 @@ interface ModelRoutingJudgmentFailures {
   readonly count: number
   /** Turn of the latest failed judgment call. */
   readonly turn: number
+  /**
+   * Registry id of the engine the counted calls were routed to; absent when a
+   * single-engine service answered or the log predates the field. A failure
+   * routed to another engine starts a new count.
+   */
+  readonly engineId?: string
 }
 ```
 
@@ -729,5 +741,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:393`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:394`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

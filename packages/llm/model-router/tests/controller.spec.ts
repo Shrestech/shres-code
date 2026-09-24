@@ -23,13 +23,19 @@ import { Context } from '@shres-code/cordis'
 import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
-import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError, judgmentEngineId } from '@shres-code/shres-code-judgment'
+import JudgmentService, {
+  JUDGMENT_SETTINGS_NAMESPACE,
+  JudgmentError,
+  judgmentEngineId,
+  registerJudgmentEngine,
+} from '@shres-code/shres-code-judgment'
 import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import type {
   JudgmentAnswer,
   JudgmentChoiceAnswer,
   JudgmentConsumerId,
   JudgmentEngineId,
+  JudgmentEngineStatus,
   JudgmentInput,
   JudgmentFittingEngine,
   JudgmentTokenLimits,
@@ -66,7 +72,7 @@ import ModelRoutingController, {
   ROUTE_QUESTION_ID,
   stateHash,
 } from '../src/index.ts'
-import { stickyState } from '../src/folds.ts'
+import { judgmentFailuresFor, stickyState } from '../src/folds.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 import type { ModelRoutingDecision, ModelRoutingProjection } from '../src/types.ts'
 
@@ -156,6 +162,49 @@ class ScriptedJudgment extends JudgmentService {
       answers.push(this.score)
     }
     return Promise.resolve({ answers, engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 3, ...this.stamp })
+  }
+}
+
+/** TEST DOUBLE: a registry engine that answers PASSING and EASY, with a status the test sets. */
+interface RegisteredEngine {
+  readonly asks: JudgmentInput[]
+  setStatus(status: JudgmentEngineStatus): void
+}
+
+/**
+ * Register one scripted engine with `ctx.judgmentEngines`.
+ * @param ctx - context carrying the dispatcher's registry.
+ * @param id - registry id.
+ * @param status - initial status.
+ * @returns the engine's asks and its status control.
+ */
+async function registeredEngine(ctx: Context, id: string, status: JudgmentEngineStatus): Promise<RegisteredEngine> {
+  const asks: JudgmentInput[] = []
+  let current = status
+  let announce: () => void = () => undefined
+  await ctx.plugin({
+    name: `engine-${id}`,
+    inject: ['judgmentEngines'],
+    apply: (inner: Context) => {
+      const engine = {
+        ask: (input: JudgmentInput): Promise<JudgmentResult> => {
+          asks.push(input)
+          return Promise.resolve({ answers: [PASSING, EASY], engine: id, model: `${id}-1`, latencyMs: 2 })
+        },
+      }
+      announce = registerJudgmentEngine(inner, {
+        engine,
+        descriptor: { id: judgmentEngineId(id), label: id, egress: 'none', calibration: 'calibrated', supportsFitting: false },
+        status: () => current,
+      })
+    },
+  })
+  return {
+    asks,
+    setStatus: (next) => {
+      current = next
+      announce()
+    },
   }
 }
 
@@ -1332,6 +1381,108 @@ describe('judgment failures', () => {
     expect(await off.resolve(2)).toBeUndefined()
     expect(off.engine.asks).toHaveLength(2)
     expect(off.decision(1)).toMatchObject({ reason: 'engine-unavailable' })
+  })
+
+  it('counts failures per engine: a switch resets the breaker and the hold tolerance', async () => {
+    const b = await bench({
+      config: { ...CONFIG, judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 5 } },
+    })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.selected = judgmentEngineId('laya')
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'laya gateway exited')
+    expect(await b.resolve(1)).toBeUndefined()
+    nextTurn(b, 2)
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 2, turn: 2, engineId: 'laya' })
+    nextTurn(b, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open' })
+
+    // Another engine is not held to the first one's failures.
+    b.engine.selected = judgmentEngineId('typesafe')
+    nextTurn(b, 4)
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'engine-unavailable', engineId: 'typesafe' })
+    expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 1, turn: 4, engineId: 'typesafe' })
+    b.engine.failure = undefined
+    nextTurn(b, 5)
+    expect(await b.resolve(5)).toEqual(CHEAP)
+
+    // A held streak's tolerance restarts on a switch too.
+    const held = await heldInto({ ...CONFIG, hold: { minSteps: 1 }, judgmentFailures: { holdTolerance: 1 } })
+    held.engine.selected = judgmentEngineId('laya')
+    held.engine.failure = new Error('socket hang up')
+    expect(await held.resolve(2)).toEqual(CHEAP)
+    expect(held.decision(1)).toMatchObject({ reason: 'judgment-failure-held', engineId: 'laya' })
+    held.engine.selected = judgmentEngineId('typesafe')
+    nextTurn(held, 3)
+    expect(await held.resolve(3)).toEqual(CHEAP)
+    expect(held.decision(2)).toMatchObject({ reason: 'judgment-failure-held', engineId: 'typesafe' })
+    nextTurn(held, 4)
+    expect(await held.resolve(4)).toBeUndefined()
+    expect(held.decision(3)).toMatchObject({ reason: 'engine-unavailable', sticky: { active: false } })
+  })
+
+  it('keeps counting a pre-engine-id failure against any engine', () => {
+    const failures = { count: 2, turn: 3 }
+    expect(judgmentFailuresFor(failures, 'laya')).toBe(failures)
+    expect(judgmentFailuresFor({ ...failures, engineId: 'laya' }, undefined)).toEqual({ ...failures, engineId: 'laya' })
+    expect(judgmentFailuresFor({ ...failures, engineId: 'laya' }, 'typesafe')).toBeUndefined()
+    expect(judgmentFailuresFor(undefined, 'laya')).toBeUndefined()
+  })
+
+  it('does not count a starting or not-installed engine as a failure and makes no call', async () => {
+    const b = await bench({
+      engine: false,
+      config: { ...CONFIG, hold: { minSteps: 1 }, judgmentFailures: { holdTolerance: 0, breakerThreshold: 1, breakerOpenTurns: 5 } },
+    })
+    await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    const laya = await registeredEngine(b.ctx, 'laya', { state: 'starting' })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    for (const turn of [1, 2, 3]) {
+      if (turn > 1) nextTurn(b, turn)
+      expect(await b.resolve(turn)).toBeUndefined()
+      expect(b.decisions().at(-1)).toMatchObject({
+        outcome: 'kept-strong',
+        reason: 'engine-unavailable',
+        engineId: 'laya',
+        engineFailure: { code: 'UNAVAILABLE', engineState: 'starting' },
+      })
+      expect(b.decisions().at(-1)).not.toHaveProperty('latencyMs')
+    }
+    laya.setStatus({ state: 'not-installed', detail: 'run /laya install' })
+    nextTurn(b, 4)
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ engineFailure: { engineState: 'not-installed' } })
+    expect(laya.asks).toHaveLength(0)
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // Once ready, the first consult asks; the warm-up opened no breaker.
+    laya.setStatus({ state: 'ready' })
+    nextTurn(b, 5)
+    expect(await b.resolve(5)).toEqual(CHEAP)
+    expect(laya.asks).toHaveLength(1)
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'gate-passed', engineId: 'laya' })
+
+    // A restart while a streak holds keeps the candidate without spending the tolerance.
+    laya.setStatus({ state: 'starting' })
+    for (const turn of [6, 7]) {
+      nextTurn(b, turn)
+      expect(await b.resolve(turn)).toEqual(CHEAP)
+      expect(b.decisions().at(-1)).toMatchObject({ reason: 'judgment-failure-held', engineFailure: { engineState: 'starting' } })
+    }
+    expect(stickyState(b.session.events)).toMatchObject({ active: true })
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // An engine that is registered but failing still counts.
+    laya.setStatus({ state: 'unavailable', detail: 'gateway exited 1' })
+    nextTurn(b, 8)
+    expect(await b.resolve(8)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' } })
+    expect(b.decisions().at(-1)?.engineFailure).not.toHaveProperty('engineState')
+    expect(stickyState(b.session.events).judgmentFailures).toMatchObject({ count: 1, engineId: 'laya' })
   })
 
   it('keeps state-too-large and judgment-input-too-large as immediate strong exits of a held streak', async () => {
