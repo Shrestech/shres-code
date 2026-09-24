@@ -27,7 +27,7 @@ A text reply, a second tool call, or an answer cut off at the output limit is `I
 
 **The route is resolved, and the engine never falls back.** The engine is `starting` until `ctx.llm.resolveModelInfo()` resolves the configured route, and resolves it again on every `llm/adapters-updated`. A resolution failure leaves it `unavailable` with the failure text. A refused `reasoningEffort` leaves it `unconfigured`. A generation counter discards a resolution that a later one or the fiber's disposal superseded. Through the dispatcher, any status other than `ready` fails the ask `UNAVAILABLE`. No other route or engine is tried.
 
-**Temperature refusal is a route fact.** `LlmResolvedModelInfo` gains `acceptsTemperature?: boolean`. `false` means the route rejects or discards a stated temperature for that model, and absence is no claim. The llm runtime validates and carries it. The pi-ai adapter sets it from the Anthropic compat switch that makes pi-ai omit the field. A configured `temperature` on such a model leaves the engine `unconfigured`, with a detail naming the field, logged once as an error. It is never sent and silently dropped. This is the earliest resolvable point: adapters register after load and can change at runtime, so the check cannot run in the config schema.
+**Temperature refusal is a route fact.** `LlmResolvedModelInfo` gains `acceptsTemperature?: boolean`. `false` means the route rejects or discards a stated temperature for that model, and absence is no claim. The llm runtime validates and carries it. The pi-ai adapter sets it from the Anthropic compat switch that makes pi-ai omit the field, and llm-cli-bridge declares it for every model, because its stream refuses a stated temperature. A configured `temperature` on such a model leaves the engine `unconfigured`, with a detail naming the field, logged once as an error. It is never sent and silently dropped. This is the earliest resolvable point: adapters register after load and can change at runtime, so the check cannot run in the config schema.
 
 **One request, no retry.** Each ask consults the redactor exactly once, bounds the redacted state by `maxStateTokens` counted as UTF-8 bytes (no tokenizer emits more tokens than bytes), and makes one request bounded by `timeoutMs`. The caller's signal cancels it, and a cancelled ask fails `ABORTED` even when the route finished anyway. A failed request fails `UNAVAILABLE`, and its `LlmFailure` becomes the cause.
 
@@ -45,12 +45,12 @@ The engine appends nothing to a session, like every judgment provider. A judge r
 
 The system prompt is a pinned package constant. `renderJudgeMessage` and `answerTool` are pure functions of the state and the questions. So a log reader who rebuilds the router's state from `stateSeqs` and `stateProjection`, and checks it against `stateHash`, can rebuild the request byte for byte, except in these cases:
 
-- **The route and controls are not in the decision.** The decision carries `engine: 'llm'` and the model id, but neither the provider nor the configured `temperature` or `reasoningEffort`. The registry `engineId` names the route, but router decisions on this base do not record it. The consumer change that records `engineId` closes the route half; the controls come from the composition, which the log does not hold.
+- **The route and controls are not in the decision.** The decision carries `engine: 'llm'` and the model id, but neither the provider nor the configured `temperature` or `reasoningEffort`. The registry `engineId` names the route, but router decisions on this base do not record it. Recording `engineId` in the decision closes the route half; the controls come from the composition, which the log does not hold.
 - **Redaction output is not logged.** With a `ctx.judgmentRedactor` mounted, the sent state is whatever the hook returned. For a fitting engine the router logs that text in `judgmentInput`, but an `ask()` engine returns no redacted text to log. The same holds for TypeSafe.
-- **Usage is not yet logged.** `JudgmentResult.usage` is on the result, and the router's decision does not copy it yet. Bench accounting that prices judge calls from decisions needs that consumer change.
+- **Usage is not yet logged.** `JudgmentResult.usage` is on the result, and the router's decision does not copy it yet. Bench accounting that prices judge calls from decisions depends on it.
 - **The raw answer is not logged.** The decision records the route answer's probabilities as the engine returned them, after normalisation, and the difficulty's score and confidence. The tool arguments before normalisation are not recorded.
 
-Closing these gaps is a consumer change: adding `engineId` and `usage` to the decision event. This package cannot make it, because it holds no session.
+PR 8b, the router half of PR 8 in the [delivery plan](../../proposed/feature/2026-09-24-model-routing-redesign-plan.md#6-delivery-sequence), owns the first and third gaps: it adds `engineId` and `usage` to the router's decision events. This package cannot make that change, because it holds no session.
 
 ## Alternatives considered
 
@@ -73,7 +73,7 @@ Later work:
 - The router's operating points and `acceptVerbalized` gate belong to the router.
 - `judgment-shield`'s remote endpoint policy belongs to that package.
 - The Settings card's engine picker belongs to the Settings card.
-- The consumer that records `engineId` and `usage` in its decision event completes the reconstruction the section above describes.
+- PR 8b records `engineId` and `usage` in the router's decision events and adds the keyless snapshot example that composes an LLM judge. Until then no shipped example composes this engine, so its model-facing text is pinned by unit tests and its request by the Loader composition test.
 
 ## Verification
 

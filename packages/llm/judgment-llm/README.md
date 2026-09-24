@@ -32,7 +32,7 @@ The engine reports `starting` until `ctx.llm` has resolved the configured route,
 
 - `ready` when the route resolves and accepts every configured control;
 - `unavailable` with the resolution failure while no adapter serves the route or the model does not resolve;
-- `unconfigured` when the route refuses the configured `reasoningEffort`, or when `temperature` is set and the route declares the model does not accept a stated temperature (`LlmResolvedModelInfo.acceptsTemperature: false`, as for Claude Opus 4.7 and later on an Anthropic route). The detail names the field, and the engine logs it once as an error.
+- `unconfigured` when the route refuses the configured `reasoningEffort`, or when `temperature` is set and the route declares the model does not accept a stated temperature (`LlmResolvedModelInfo.acceptsTemperature: false`, as for Claude Opus 4.7 and later on an Anthropic route and for every llm-cli-bridge route). The detail names the field, and the engine logs it once as an error.
 
 Through the dispatcher, a status other than `ready` fails the ask `UNAVAILABLE` with that detail before the engine is asked. The engine never answers with another route or another engine.
 
