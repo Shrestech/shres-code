@@ -130,7 +130,7 @@ function script(session: Session): void {
     step: 1,
     message: createToolResultMessage({
       callId,
-      content: [{ type: 'text', text: 'Notes for the release: the policy lives in docs/policy.md.' }],
+      content: [{ type: 'text', text: 'Notes for the release: the policy lives in the team runbook.' }],
       isError: false,
     }),
   }, { surfaceOp: 'append', sourceEventSeqs: [called.seq] })
