@@ -147,6 +147,7 @@ describe('the guardrails observer', () => {
     expect(booted.judgment?.asks).toHaveLength(1)
     const ask = booted.judgment?.asks[0]
     expect(ask?.tier).toBe('fast')
+    expect(ask?.consumer).toBe('judgment-guardrails')
     expect(ask?.questions).toEqual([
       {
         kind: 'binary',

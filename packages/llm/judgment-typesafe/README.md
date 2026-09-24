@@ -1,6 +1,6 @@
 # @shres-code/shres-code-judgment-typesafe
 
-TypeSafe AI "System One" judgment provider for the typed-judgment seam (`ctx.judgment`). One ask posts the state and the typed questions to the vendor's `/v1/systemone` endpoint over raw `fetch`, and the vendor answers with probabilities instead of text: a `noul` probability for a binary question, an option distribution for a choice question, and a weighted score for a score question.
+TypeSafe AI "System One" judgment engine for the typed-judgment seam, registered in `ctx.judgmentEngines` as `typesafe` for [judgment-dispatch](../judgment-dispatch/README.md) to route asks to. One ask posts the state and the typed questions to the vendor's `/v1/systemone` endpoint over raw `fetch`, and the vendor answers with probabilities instead of text: a `noul` probability for a binary question, an option distribution for a choice question, and a weighted score for a score question.
 
 The engine owns transport, credential resolution, tier-to-model mapping, and the validation of the one untyped input it reads — the response body. It adds no prompt prose, no session event, and no tool: every question string, threshold, and decision belongs to the consuming package. The request path, headers, and body follow the vendor's documented API.
 
@@ -26,12 +26,15 @@ The deadline is armed once per ask, before the first request, so credential reso
 ## Composition
 
 ```yaml
+- name: '@shres-code/shres-code-judgment-dispatch'
+  config:
+    defaultEngine: typesafe
 - name: '@shres-code/shres-code-judgment-typesafe'
   config:
     apiKeyRef: TYPESAFE_API_KEY
 ```
 
-The key itself is never in configuration: the credentials seam (`ctx.credentials`, provided by `@shres-code/shres-code-credentials-local` for a file or environment source) resolves the reference. Without that service mounted, every ask fails with `UNCONFIGURED` and no request leaves the process.
+The provider injects `judgmentEngines`, so it loads only where the dispatcher does. Its registry descriptor declares `egress: 'remote'`, `calibration: 'calibrated'`, no fitting, and the vendor's terms URL; its status is always `ready`, because a missing credential surfaces per ask as `UNCONFIGURED`. The key itself is never in configuration: the credentials seam (`ctx.credentials`, provided by `@shres-code/shres-code-credentials-local` for a file or environment source) resolves the reference. Without that service mounted, every ask fails with `UNCONFIGURED` and no request leaves the process.
 
 ## Ask behaviour
 

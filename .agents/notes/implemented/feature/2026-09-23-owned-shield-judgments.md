@@ -8,7 +8,7 @@ Model routing consumes binary, choice, and ordered-score judgments. Shield's emb
 
 ## Decision
 
-The [Shield judgment provider](../../../../packages/llm/judgment-shield/README.md) implements the existing judgment capability through an explicitly configured loopback service. The Shield repository owns model loading, pinned artifact verification, token limits, training, and evaluation. The harness owns request cancellation, response limits, typed-answer validation, and tier-to-artifact configuration. Each response must identify the requested artifact exactly.
+The [Shield judgment provider](../../../../packages/llm/judgment-shield/README.md) implements the existing judgment capability through an explicitly configured loopback service. The Shield repository owns model loading, pinned artifact verification, token limits, training, and evaluation. The harness owns request cancellation, response limits, typed-answer validation, and tier-to-artifact configuration. Each response must identify the requested artifact exactly. The [judgment engine registry decision](../architecture/2026-09-24-judgment-engine-registry.md) registers this provider as the `shield` engine behind `judgment-dispatch` instead of mounting it as `ctx.judgment`.
 
 Routing continues to own its candidate allowlist, current-model alternative, difficulty policy, and manual-model fallback. The provider contributes no routing or security policy. Its answers also remain distinct from the paid Shield host service and enforceable security decisions.
 

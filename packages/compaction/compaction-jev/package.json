@@ -53,6 +53,7 @@
     "@shres-code/shres-code-credentials": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:^",
     "@shres-code/shres-code-judgment-typesafe": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-mock-server": "workspace:^",

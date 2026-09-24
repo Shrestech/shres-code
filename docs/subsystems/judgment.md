@@ -123,7 +123,7 @@ interface JudgmentScoreAnswer {
 
 ## One ask
 
-An ask carries the state, the questions, an optional tier, and the caller's cancellation signal. `tier` is the seam's speed-against-accuracy axis: a provider maps each tier to its own model id, and an omitted tier resolves to `accurate` so silence never weakens a decision. The result reports one answer per question, the engine that served the ask, the exact model that answered — a provider serving tier aliases reports the id the alias resolved to — and the ask's wall-clock duration.
+An ask carries the state, the questions, an optional tier, the caller's cancellation signal, and an optional consumer id. `tier` is the seam's speed-against-accuracy axis: a provider maps each tier to its own model id, and an omitted tier resolves to `accurate` so silence never weakens a decision. The result reports one answer per question, the engine that served the ask, the exact model that answered — a provider serving tier aliases reports the id the alias resolved to — and the ask's wall-clock duration. A dispatcher routes the ask by its `consumer` id and stamps the result with `engineId`, the registry id of the engine that answered.
 
 ```ts type-equiv
 /** One ask: the state every question is evaluated against, and the questions. */
@@ -140,7 +140,23 @@ interface JudgmentInput {
   tier?: JudgmentTier
   /** Cancellation signal; an aborted ask fails with {@link JudgmentErrorCode} `ABORTED`. */
   signal?: AbortSignal
+  /**
+   * The asking consumer. A dispatcher answers the ask with the engine the
+   * settings `overrides` map names for this id, and with the deployment-wide
+   * engine when the id is absent or has no override. Single-engine
+   * implementations ignore it.
+   */
+  consumer?: JudgmentConsumerId
 }
+```
+
+```ts type-equiv
+/**
+ * Nominal id a consumer names itself with on each ask, such as
+ * `worker-escalation`. The `judgment` settings `overrides` map is keyed by
+ * it, so a deployment can route one consumer to a different engine.
+ */
+type JudgmentConsumerId = Branded<'JudgmentConsumerId'>
 ```
 
 ```ts type-equiv
@@ -158,12 +174,18 @@ interface JudgmentResult {
   model: string
   /** Wall-clock duration of this ask in milliseconds. */
   latencyMs: number
+  /**
+   * Registry id of the engine the dispatcher routed the ask to. Present on
+   * every dispatched result; absent when a single-engine implementation served
+   * `ctx.judgment` directly.
+   */
+  engineId?: JudgmentEngineId
 }
 ```
 
 ## The engine contract
 
-One provider registers per context as `ctx.judgment`. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
+Every engine implements `JudgmentEngine`, and so does the service mounted as `ctx.judgment`. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
 
 `fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
 
@@ -216,7 +238,15 @@ type JudgmentTokenLimitReason = 'state' | 'head' | 'option' | 'batch'
 /** One fitted judgment, or an explicit capacity rejection without inference. */
 type JudgmentFittingResult =
   | { kind: 'answered'; fit: JudgmentTokenFit; result: JudgmentResult }
-  | { kind: 'unfit'; engine: string; model: string; limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+  | {
+    kind: 'unfit'
+    engine: string
+    model: string
+    limits: JudgmentTokenLimits
+    reason: JudgmentTokenLimitReason
+    /** Registry id of the engine a dispatcher routed the fitted ask to, as on {@link JudgmentResult}. */
+    engineId?: JudgmentEngineId
+  }
 ```
 
 ```ts type-equiv
@@ -254,6 +284,107 @@ interface JudgmentEngine {
 }
 ```
 
+## Engines and dispatch
+
+A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe` and `shield` — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
+
+Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer`, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
+
+A settings write that selects an unregistered engine, or an engine whose descriptor names another host, is rejected with an error naming the field and the engine. A stored selection is kept at registration even when its engine registers later in the same load; once the Loader settles, the dispatcher logs each selected id no provider registered, once per id.
+
+```ts type-equiv
+/** Nominal id of one engine registered in `ctx.judgmentEngines`, such as `typesafe` or `shield`. */
+type JudgmentEngineId = Branded<'JudgmentEngineId'>
+```
+
+```ts type-equiv
+/** Static facts about one registered engine, which a configuration surface shows before selection. */
+interface JudgmentEngineDescriptor {
+  /** Registry id; equals the id the engine registers under. */
+  readonly id: JudgmentEngineId
+  /** Human-readable name. */
+  readonly label: string
+  /** Where the engine sends the state it judges. */
+  readonly egress: JudgmentEngineEgress
+  /** How the engine produces its probabilities. */
+  readonly calibration: JudgmentEngineCalibration
+  /** Whether the engine exposes {@link JudgmentEngine.fitting}; must agree with it. */
+  readonly supportsFitting: boolean
+  /** Host the engine requires; omission means `any`. */
+  readonly host?: JudgmentEngineHost
+  /** URL of the terms that govern a remote engine's use. */
+  readonly terms?: string
+}
+```
+
+```ts type-equiv
+/**
+ * Where an engine sends the state it judges: `none` keeps it in the process,
+ * `local` sends it to another process on the same host, and `remote` sends it
+ * off the host to a third party.
+ */
+type JudgmentEngineEgress = 'none' | 'local' | 'remote'
+```
+
+```ts type-equiv
+/**
+ * How an engine produces its probabilities: `calibrated` from a classifier
+ * trained to output them, `logprob` from a generative model's token
+ * log-probabilities, and `verbalized` from numbers a generative model writes out.
+ * Thresholds do not transfer between engines of different calibration.
+ */
+type JudgmentEngineCalibration = 'calibrated' | 'logprob' | 'verbalized'
+```
+
+```ts type-equiv
+/** Host an engine can run on: one platform-architecture pair, or `any`. */
+type JudgmentEngineHost = 'darwin-arm64' | 'any'
+```
+
+```ts type-equiv
+/** Current state of one registered engine. */
+interface JudgmentEngineStatus {
+  /** Lifecycle state. */
+  readonly state: JudgmentEngineState
+  /** Diagnostic explaining a state other than `ready`. */
+  readonly detail?: string
+}
+```
+
+```ts type-equiv
+/**
+ * Lifecycle state of one registered engine. Only `ready` answers asks; every
+ * other state makes a dispatched ask fail `UNAVAILABLE` with the state's detail.
+ */
+type JudgmentEngineState = 'ready' | 'starting' | 'unavailable' | 'unconfigured' | 'not-installed' | 'unsupported-host'
+```
+
+```ts type-equiv
+/** One engine as its provider registers it. */
+interface JudgmentEngineEntry {
+  /** The engine that answers asks routed to this id. */
+  readonly engine: JudgmentEngine
+  /** Static facts about the engine. */
+  readonly descriptor: JudgmentEngineDescriptor
+  /**
+   * Read the engine's current state. The provider calls
+   * {@link JudgmentEngineRegistration.statusChanged} whenever the value changes.
+   * @returns the current state and its detail.
+   */
+  status(): JudgmentEngineStatus
+}
+```
+
+```ts type-equiv
+/** Disposer of one engine registration, carrying its status-change announcement. */
+interface JudgmentEngineRegistration {
+  /** Remove the engine from the registry; repeated calls do nothing. */
+  (): void
+  /** Notify registry subscribers that {@link JudgmentEngineEntry.status} changed; does nothing once disposed. */
+  statusChanged(): void
+}
+```
+
 ## Redaction hook
 
 `ctx.judgmentRedactor` is optional and interface-typed, and it has one home: the provider. When a deployment mounts one, every provider consults it exactly once per state candidate, before serialization, and sends what it returns; a consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook. A regular ask has one candidate; a fitting ask applies the same hook once to each offered candidate, so it remains the seam's single egress control over state text.
@@ -279,7 +410,9 @@ interface JudgmentRedactor {
 
 ## Deployment settings
 
-Mounting an engine installs the Definition-owned `judgment` settings namespace with the composition default `{ enabled: true }`; the toggle exists only where an engine does, and a configuration surface writes it through the settings seam. Consumers read it through the live source thunk the service exposes and treat `enabled: false` exactly as an absent engine, which reuses each consumer's own engine-absent path rather than adding a behavior mode. `judgmentEnabled(source)` reads `enabled` from that thunk. The engine itself never consults the toggle.
+The service mounted as `ctx.judgment` installs the Definition-owned `judgment` settings namespace, and a configuration surface writes it through the settings seam. Under `judgment-dispatch` its composition layer is `{ enabled: true, engine: <defaultEngine> }`; a single-engine implementation mounted directly installs `{ enabled: true }`. Consumers read the section through the live source thunk the service exposes and treat `enabled: false` exactly as an absent engine, which reuses each consumer's own engine-absent path rather than adding a behavior mode. `judgmentEnabled(source)` reads `enabled` from that thunk, and no engine consults the toggle.
+
+`engine` selects the deployment-wide engine and `overrides` maps a consumer id to the engine for that consumer's asks. An empty id, or an id key written without a value, is rejected by field name; a valueless `overrides` key means no overrides. The consumers that name themselves are `worker-escalation`, `compaction-jev`, and `judgment-guardrails`.
 
 ```ts type-equiv
 /**
@@ -291,12 +424,25 @@ Mounting an engine installs the Definition-owned `judgment` settings namespace w
 interface JudgmentSettings {
   /** Whether judgment is available to consumers in this deployment. */
   enabled: boolean
+  /**
+   * Registry id of the engine that answers every ask without an override.
+   * `judgment-dispatch` always supplies it from its required `defaultEngine`;
+   * it is absent only when a single-engine implementation serves
+   * `ctx.judgment` directly and there is nothing to select.
+   */
+  engine?: string
+  /**
+   * Engine per consumer, keyed by {@link JudgmentConsumerId}, overriding
+   * {@link engine} for that consumer's asks. A key no consumer names has no
+   * effect. Omitted, or `null` from a valueless YAML key, means no overrides.
+   */
+  overrides?: Readonly<Record<string, string>> | null
 }
 ```
 
 ## Failure classes
 
-A provider reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request; `UNAVAILABLE` for an engine that could not be reached, timed out, or refused the request; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. No threshold, margin, or fallback lives in the seam.
+An engine reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request, and for a selected engine no provider registered; `UNAVAILABLE` for an engine that could not be reached, timed out, refused the request, or is not `ready`; `INPUT_TOO_LARGE` for serialized input over the engine's request limit; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. No threshold, margin, or fallback lives in the seam.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -310,9 +456,9 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.judgment` — `JudgmentService` (abstract seam)
 
-Abstract judgment service. Load one implementation per context as `ctx.judgment`; it owns tier selection, credentials, transport, and the validation of every provider response it reads, and registers no session event, prompt, or tool of its own.
+Abstract judgment service. Load one implementation per context as `ctx.judgment`. A deployment loads `judgment-dispatch`, which routes each ask to a registered engine; a test can load a single-engine implementation directly. The service registers no session event, prompt, or tool of its own.
 
-Mounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle exists only where an engine does. settings reads it live.
+The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle and the engine selection exist only where `ctx.judgment` does. settings reads it live.
 
 ```ts cordis-catalog
 /**
@@ -329,5 +475,48 @@ Mounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE sec
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:114`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:180`](../../packages/llm/judgment/src/index.ts)
+
+<a id="ctxjudgmentengines--judgmentengineregistry"></a>
+
+### `ctx.judgmentEngines` — `JudgmentEngineRegistry`
+
+Engines a deployment composes, keyed by id. Registration is all-or-nothing and synchronous; subscribers are notified after every registration, removal, and announced status change, and re-read list and each entry's `status()` themselves.
+
+```ts cordis-catalog
+/**
+ * Register one engine. Call it inside the provider's `ctx.effect` so the
+ * returned disposer runs with the provider's fiber.
+ * @param id - the engine's registry id.
+ * @param entry - the engine, its descriptor, and its status read.
+ * @returns the disposer, carrying the status-change announcement.
+ * @throws Error when the descriptor names another id, when
+ *   `supportsFitting` disagrees with the engine's `fitting` capability, or
+ *   when the id is already registered.
+ */
+register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegistration
+
+/**
+ * Describe every registered engine.
+ * @returns the descriptors, in registration order.
+ */
+list(): readonly JudgmentEngineDescriptor[]
+
+/**
+ * Look up one registered engine.
+ * @param id - the registry id.
+ * @returns the entry, or `undefined` when no provider registered the id.
+ */
+get(id: JudgmentEngineId): JudgmentEngineEntry | undefined
+
+/**
+ * Observe registrations, removals, and announced status changes.
+ * @param listener - called after each change; what it throws or rejects
+ *   with is reported and does not reach the caller that caused the change.
+ * @returns the disposer ending this subscription.
+ */
+subscribe(listener: () => unknown): () => void
+```
+
+Source: [`packages/llm/judgment/src/registry.ts:30`](../../packages/llm/judgment/src/registry.ts)
 <!-- END GENERATED cordis-surface -->

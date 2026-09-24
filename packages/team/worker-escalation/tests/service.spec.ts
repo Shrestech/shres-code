@@ -487,6 +487,7 @@ describe('the Stage 1 judgment consult', () => {
     expect(booted.judgment?.asks).toHaveLength(1)
     const ask = booted.judgment?.asks[0]
     expect(ask?.tier).toBe('fast')
+    expect(ask?.consumer).toBe('worker-escalation')
     expect(ask?.questions).toEqual([{
       kind: 'choice',
       id: 'worker-progress',

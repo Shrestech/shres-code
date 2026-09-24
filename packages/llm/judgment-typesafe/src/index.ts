@@ -1,5 +1,6 @@
 /**
- * TypeSafe AI "System One" judgment provider for `ctx.judgment`.
+ * TypeSafe AI "System One" judgment engine, registered in
+ * `ctx.judgmentEngines` as `typesafe` for `judgment-dispatch` to route asks to.
  *
  * One ask sends the state and the typed questions to
  * `POST {endpoint}/v1/systemone` over raw `fetch` and maps the vendor's answer
@@ -26,8 +27,12 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { JudgmentError, JudgmentService } from '@shres-code/shres-code-judgment'
+import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
+  JudgmentEngine,
+  JudgmentEngineDescriptor,
+  JudgmentEngineId,
+  JudgmentEngineStatus,
   JudgmentErrorCode,
   JudgmentInput,
   JudgmentResult,
@@ -65,6 +70,26 @@ export type { TypesafeJudgmentConfig, TypesafeJudgmentModels, TypesafeJudgmentRe
 /** Value the seam reports as the engine that produced an answer. */
 const ENGINE = 'typesafe'
 
+/** Registry id this provider registers its engine under. */
+export const TYPESAFE_ENGINE_ID: JudgmentEngineId = judgmentEngineId(ENGINE)
+
+/**
+ * Registry facts for the TypeSafe engine: a remote, retained-input service
+ * with calibrated classifier probabilities and no tokenizer fitting, governed
+ * by the vendor's site terms.
+ */
+export const TYPESAFE_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freeze({
+  id: TYPESAFE_ENGINE_ID,
+  label: 'Jev (TypeSafe)',
+  egress: 'remote',
+  calibration: 'calibrated',
+  supportsFitting: false,
+  terms: 'https://typesafe.ai/legal/terms',
+})
+
+/** Status of an engine that resolves its credential and endpoint on each ask. */
+const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
+
 /** Vendor path one ask posts to, below the configured endpoint. */
 const SYSTEMONE_PATH = '/v1/systemone'
 
@@ -92,14 +117,19 @@ interface AskCancellation {
  * TypeSafe AI judgment engine: one HTTP request per attempt, one validated
  * answer per question, no session event and no prompt text of its own.
  *
- * Registered by {@link JudgmentService} as `ctx.judgment`. Nothing is cached
+ * Registered in `ctx.judgmentEngines` as {@link TYPESAFE_ENGINE_ID}; it is
+ * always `ready`, because a missing credential surfaces per ask as
+ * `UNCONFIGURED`. Nothing is cached
  * across asks — the credential reference is re-resolved and the deadline is
  * restarted on every call — so a rotated key reaches the next ask without a
  * restart. A refused attempt adds nothing to that list: the same ask is sent
  * again after the configured wait, and the credential and deadline of the ask
  * are the ones the first attempt used.
  */
-export class TypesafeJudgmentEngine extends JudgmentService {
+export class TypesafeJudgmentEngine implements JudgmentEngine {
+  /** The engine registry provided by `judgment-dispatch`. */
+  static inject = ['judgmentEngines']
+
   /**
    * Composition config schema. Unrecognized keys and wrong types fail plugin
    * load by name; a row that names no config fails on the missing `apiKeyRef`.
@@ -121,15 +151,18 @@ export class TypesafeJudgmentEngine extends JudgmentService {
 
   /** Resolved and validated ask facts. */
   readonly config: ResolvedTypesafeJudgmentConfig
+  /** The provider's context, read for the credentials service and the redaction hook on each ask. */
+  private readonly ctx: Context
 
   /**
-   * @param ctx - the context the engine registers `ctx.judgment` on.
+   * @param ctx - the provider context whose fiber owns the registration.
    * @param config - composition config; a row that names none fails load on
    *   the missing `apiKeyRef`.
    */
   constructor(ctx: Context, config: TypesafeJudgmentConfig = NO_CONFIG) {
-    super(ctx)
+    this.ctx = ctx
     this.config = resolveConfig(config)
+    registerJudgmentEngine(ctx, { engine: this, descriptor: TYPESAFE_ENGINE_DESCRIPTOR, status: () => READY })
   }
 
   /**
@@ -145,7 +178,7 @@ export class TypesafeJudgmentEngine extends JudgmentService {
    *   the response cannot answer the questions asked, or code `ABORTED` when the
    *   caller cancelled the ask, during a retry wait included.
    */
-  override async ask(input: JudgmentInput): Promise<JudgmentResult> {
+  async ask(input: JudgmentInput): Promise<JudgmentResult> {
     const startedAt = performance.now()
     const config = this.config
     const apiKey = await this.resolveApiKey()

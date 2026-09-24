@@ -48,5 +48,9 @@
                 reasoningEffort: high
               routeInstructions: Pick the cheapest route that can finish this turn.
               difficultyInstructions: Rate how much reasoning this turn needs.
+          - id: judgment-dispatch
+            name: '@shres-code/shres-code-judgment-dispatch'
+            config:
+              defaultEngine: snapshot
           - id: model-router-snapshot-fixture
             name: './tests/fixtures/model-router-snapshot-fixture.ts'

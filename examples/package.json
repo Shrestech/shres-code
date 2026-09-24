@@ -42,6 +42,7 @@
     "@shres-code/shres-code-invariants": "workspace:*",
     "@shres-code/shres-code-jobs-local": "workspace:*",
     "@shres-code/shres-code-judgment": "workspace:*",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:*",
     "@shres-code/shres-code-jspace": "workspace:*",
     "@shres-code/shres-code-jspace-prompt": "workspace:*",
     "@shres-code/shres-code-ledger": "workspace:*",

@@ -241,6 +241,7 @@ describe('semantic selection: chunking at maxSegmentsPerCall', () => {
 
     expect(under.judgment.asks).not.toHaveLength(0)
     expect(under.judgment.asks.every(input => input.tier === 'fast')).toBe(true)
+    expect(under.judgment.asks.every(input => input.consumer === 'compaction-jev')).toBe(true)
   })
 })
 

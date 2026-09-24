@@ -70,6 +70,7 @@
     "@shres-code/shres-code-agent": "workspace:^",
     "@shres-code/shres-code-agent-loop": "workspace:^",
     "@shres-code/shres-code-agent-default-model": "workspace:^",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
     "@shres-code/shres-code-llm-mock-server": "workspace:^",
     "@shres-code/shres-code-system-prompt": "workspace:^",

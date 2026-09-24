@@ -16,6 +16,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import AgentRegistry from '@shres-code/shres-code-agent'
 import { isCompactCheckpointSource } from '@shres-code/shres-code-compaction'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
+import { judgmentEngineId } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
 import { createUserMessage } from '@shres-code/shres-code-llm'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
@@ -62,7 +64,8 @@ describe('real Loader composition', () => {
       .filter(entry => entry.fiber === undefined && !entry.disabled)
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
-    expect(loaded.get('judgment')).toBeInstanceOf(TypesafeJudgmentEngine)
+    expect(loaded.get('judgment')).toBeInstanceOf(JudgmentDispatch)
+    expect(loaded.judgmentEngines.get(judgmentEngineId('typesafe'))?.engine).toBeInstanceOf(TypesafeJudgmentEngine)
     expect(loaded.get('compaction')).toBeInstanceOf(JevCompactionEngine)
     expect(loaded.agents).toBeInstanceOf(AgentRegistry)
 

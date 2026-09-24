@@ -1,7 +1,8 @@
 /**
  * Snapshot-only composition for the keyless model-routing fixtures: a scripted
- * `ctx.judgment` engine plus the model-selection wiring the headless example's
- * spine leaves to its app runner.
+ * judgment engine, registered in `ctx.judgmentEngines` as `snapshot` for the
+ * composed `judgment-dispatch` to route asks to, plus the model-selection
+ * wiring the headless example's spine leaves to its app runner.
  *
  * The judgment engine is an external service to the router, so the fixture
  * answers every ask from one configured script: the route question names either
@@ -14,8 +15,14 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { JudgmentService } from '@shres-code/shres-code-judgment'
-import type { JudgmentAnswer, JudgmentFittingEngine, JudgmentInput, JudgmentResult } from '@shres-code/shres-code-judgment'
+import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import type {
+  JudgmentAnswer,
+  JudgmentEngine,
+  JudgmentFittingEngine,
+  JudgmentInput,
+  JudgmentResult,
+} from '@shres-code/shres-code-judgment'
 import { createUserMessage } from '@shres-code/shres-code-llm'
 import { KEEP_CURRENT_OPTION_ID, MODEL_ROUTER_SETTINGS_NAMESPACE } from '@shres-code/shres-code-model-router'
 
@@ -58,20 +65,20 @@ export const Config: z<Config> = z.object({
 })
 
 /** A judgment engine answering every ask from the configured script. */
-class SnapshotJudgment extends JudgmentService {
+class SnapshotJudgment implements JudgmentEngine {
   static Config: z<Config> = Config
+  static inject = ['judgmentEngines']
 
-  declare readonly fitting?: JudgmentFittingEngine
+  readonly fitting?: JudgmentFittingEngine
 
   private readonly config: Required<Config>
 
   /**
-   * Create the scripted engine.
-   * @param ctx - the context the engine registers on.
+   * Create the scripted engine and register it as `snapshot`.
+   * @param ctx - the context whose fiber owns the registration.
    * @param config - the route and difficulty answers to emit.
    */
   constructor(ctx: Context, config: Config) {
-    super(ctx)
     this.config = {
       route: config.route ?? 'candidate',
       difficultyScore: config.difficultyScore ?? DIFFICULTY_SCORE,
@@ -103,6 +110,17 @@ class SnapshotJudgment extends JudgmentService {
         }
       } }
     }
+    registerJudgmentEngine(ctx, {
+      engine: this,
+      descriptor: {
+        id: judgmentEngineId('snapshot'),
+        label: 'Snapshot script',
+        egress: 'none',
+        calibration: 'calibrated',
+        supportsFitting: this.fitting !== undefined,
+      },
+      status: () => ({ state: 'ready' }),
+    })
   }
 
   /**
@@ -110,7 +128,7 @@ class SnapshotJudgment extends JudgmentService {
    * @param input - the state and questions the router asked.
    * @returns one scripted answer per question, in ask order.
    */
-  override ask(input: JudgmentInput): Promise<JudgmentResult> {
+  ask(input: JudgmentInput): Promise<JudgmentResult> {
     const answers: JudgmentAnswer[] = input.questions.map((question): JudgmentAnswer => {
       if (question.kind !== 'choice') {
         const score = this.config.hardEvidence !== '' && input.state.includes(this.config.hardEvidence)

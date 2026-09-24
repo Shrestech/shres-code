@@ -486,6 +486,7 @@ describe('arms registry', () => {
       sessionLogRoot: '/tmp/bench/route-shield/sessions/t/0',
     })
     assert.match(shield, /judgment-shield/)
+    assert.match(shield, /defaultEngine: "shield"/)
     assert.match(shield, /endpoint: "http:\/\/127\.0\.0\.1:8765"/)
     assert.match(shield, /convaiinnovations\/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982/)
     assert.match(shield, /initialMode: "on"/)

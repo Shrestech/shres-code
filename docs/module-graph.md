@@ -18,14 +18,17 @@ flowchart TD
     pkg_untrusted_frame["untrusted-frame"]
   end
   subgraph group_llm["packages/llm"]
+    pkg_claude_credential["claude-credential"]
     pkg_codex_credential["codex-credential"]
     pkg_cursor_credential["cursor-credential"]
     pkg_grok_credential["grok-credential"]
     pkg_judgment["judgment"]
+    pkg_judgment_dispatch["judgment-dispatch"]
     pkg_judgment_guardrails["judgment-guardrails"]
     pkg_judgment_shield["judgment-shield"]
     pkg_judgment_typesafe["judgment-typesafe"]
     pkg_llm["llm"]
+    pkg_llm_claude_session["llm-claude-session"]
     pkg_llm_cli_bridge["llm-cli-bridge"]
     pkg_llm_codex_session["llm-codex-session"]
     pkg_llm_cursor_session["llm-cursor-session"]
@@ -486,12 +489,16 @@ flowchart TD
   pkg_settings_file --> pkg_home_paths
   pkg_settings_file --> pkg_invariants
   pkg_settings_file --> pkg_settings
+  pkg_claude_credential --> pkg_invariants
+  pkg_claude_credential --> pkg_llm
   pkg_codex_credential --> pkg_invariants
   pkg_codex_credential --> pkg_llm
   pkg_cursor_credential --> pkg_invariants
   pkg_cursor_credential --> pkg_llm
   pkg_grok_credential --> pkg_invariants
   pkg_grok_credential --> pkg_llm
+  pkg_judgment_dispatch --> pkg_invariants
+  pkg_judgment_dispatch --> pkg_judgment
   pkg_judgment_shield --> pkg_invariants
   pkg_judgment_shield --> pkg_judgment
   pkg_judgment_shield --> pkg_timeout
@@ -542,6 +549,11 @@ flowchart TD
   pkg_judgment_guardrails --> pkg_judgment
   pkg_judgment_guardrails --> pkg_session
   pkg_judgment_guardrails --> pkg_settings
+  pkg_llm_claude_session --> pkg_claude_credential
+  pkg_llm_claude_session --> pkg_invariants
+  pkg_llm_claude_session --> pkg_llm
+  pkg_llm_claude_session --> pkg_llm_pi_ai
+  pkg_llm_claude_session --> pkg_settings
   pkg_llm_cli_bridge --> pkg_credentials
   pkg_llm_cli_bridge --> pkg_invariants
   pkg_llm_cli_bridge --> pkg_launch_environment
@@ -1857,9 +1869,11 @@ flowchart TD
 | [`attachment-local`](../packages/attachment/attachment-local) | `attachment` | [`attachment`](../packages/attachment/attachment), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants) |
 | [`credentials-local`](../packages/credentials/credentials-local) | `credentials` | [`atomic-write`](../packages/util/atomic-write), [`credentials`](../packages/credentials/credentials), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment) |
 | [`settings-file`](../packages/settings/settings-file) | `settings` | [`atomic-write`](../packages/util/atomic-write), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings) |
+| [`claude-credential`](../packages/llm/claude-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`codex-credential`](../packages/llm/codex-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`cursor-credential`](../packages/llm/cursor-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`grok-credential`](../packages/llm/grok-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
+| [`judgment-dispatch`](../packages/llm/judgment-dispatch) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment) |
 | [`judgment-shield`](../packages/llm/judgment-shield) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`timeout`](../packages/util/timeout) |
 | [`judgment-typesafe`](../packages/llm/judgment-typesafe) | `llm` | [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`timeout`](../packages/util/timeout) |
 | [`llm-deepseek`](../packages/llm/llm-deepseek) | `llm` | [`anonymous-user-id`](../packages/identity/anonymous-user-id), [`atomic-write`](../packages/util/atomic-write), [`attachment`](../packages/attachment/attachment), [`brand`](../packages/util/brand), [`credentials`](../packages/credentials/credentials), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings), [`timeout`](../packages/util/timeout) |
@@ -1871,6 +1885,7 @@ flowchart TD
 | [`lsp`](../packages/lsp/lsp) | `lsp` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`speech`](../packages/speech/speech) | `speech` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
 | [`judgment-guardrails`](../packages/llm/judgment-guardrails) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`session`](../packages/core/session), [`settings`](../packages/settings/settings) |
+| [`llm-claude-session`](../packages/llm/llm-claude-session) | `llm` | [`claude-credential`](../packages/llm/claude-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cli-bridge`](../packages/llm/llm-cli-bridge) | `llm` | [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`llm-codex-session`](../packages/llm/llm-codex-session) | `llm` | [`codex-credential`](../packages/llm/codex-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cursor-session`](../packages/llm/llm-cursor-session) | `llm` | [`cursor-credential`](../packages/llm/cursor-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings) |

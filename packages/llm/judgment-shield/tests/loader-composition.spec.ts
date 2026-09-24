@@ -6,10 +6,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Include from '@shres-code/cordis-plugin-include'
 import Loader from '@shres-code/cordis-plugin-loader'
-import ShieldJudgmentEngine from '../src/index.ts'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
+import ShieldJudgmentEngine, { SHIELD_ENGINE_ID } from '../src/index.ts'
 import { closeMockServers, mockServer } from './mock-server.ts'
 
 const ENGINE_SPECIFIER = '@shres-code/shres-code-judgment-shield'
+const DISPATCH_SPECIFIER = '@shres-code/shres-code-judgment-dispatch'
 let root: string | undefined
 let context: Context | undefined
 
@@ -34,8 +36,9 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   context.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
-      if (specifier !== ENGINE_SPECIFIER) throw new Error(`unexpected Loader import: ${specifier}`)
-      return ShieldJudgmentEngine
+      if (specifier === ENGINE_SPECIFIER) return ShieldJudgmentEngine
+      if (specifier === DISPATCH_SPECIFIER) return JudgmentDispatch
+      throw new Error(`unexpected Loader import: ${specifier}`)
     },
   } as unknown as NonNullable<typeof context.loader.internal>
   await context.loader.create({
@@ -46,9 +49,12 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   return context
 }
 
-/** One explicit provider row for the temporary composition. */
+/** The dispatcher row and one explicit provider row for the temporary composition. */
 function rows(endpoint: string, extra: readonly string[] = []): string[] {
   return [
+    `- name: '${DISPATCH_SPECIFIER}'`,
+    '  config:',
+    '    defaultEngine: shield',
     `- name: '${ENGINE_SPECIFIER}'`,
     '  config:',
     `    endpoint: '${endpoint}'`,
@@ -71,11 +77,12 @@ describe('real Loader composition', () => {
       .filter(entry => entry.fiber === undefined && !entry.disabled)
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
-    expect(loaded.get('judgment')).toBeInstanceOf(ShieldJudgmentEngine)
+    expect(loaded.judgmentEngines.get(SHIELD_ENGINE_ID)?.engine).toBeInstanceOf(ShieldJudgmentEngine)
 
     const result = await loaded.judgment.ask({ state: 'state', questions: [] })
 
     expect(result).toEqual({
+      engineId: 'shield',
       engine: 'shield',
       model: 'shield-accurate@loader',
       // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitest asymmetric matcher is typed as any.
@@ -91,7 +98,7 @@ describe('real Loader composition', () => {
       .toThrow(/unknown key "timeout"/)
   })
 
-  it('withdraws ctx.judgment when the Loader entry fiber disposes', async () => {
+  it('withdraws the engine from the registry when its Loader entry fiber disposes', async () => {
     const server = await mockServer([])
     const loaded = await loadYaml(rows(server.url))
     const entry = [...loaded.loader.entries()]
@@ -100,6 +107,8 @@ describe('real Loader composition', () => {
     expect(entry?.fiber).toBeDefined()
     await entry?.fiber?.dispose()
 
-    expect(loaded.get('judgment')).toBeUndefined()
+    expect(loaded.judgmentEngines.get(SHIELD_ENGINE_ID)).toBeUndefined()
+    await expect(loaded.judgment.ask({ state: 'state', questions: [] })).rejects
+      .toMatchObject({ code: 'UNCONFIGURED' })
   })
 })

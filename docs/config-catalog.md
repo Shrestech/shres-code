@@ -1164,6 +1164,24 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-judgment-dispatch"></a>
+
+## `@shres-code/shres-code-judgment-dispatch`
+
+```ts config-catalog
+/** Composition configuration of the dispatcher. */
+export interface JudgmentDispatchConfig {
+  /**
+   * Registry id of the engine that answers every ask the `judgment` settings
+   * do not route elsewhere. Required: the dispatcher never picks an engine by
+   * registration order.
+   */
+  defaultEngine: string
+}
+```
+
+Source: [`packages/llm/judgment-dispatch/src/config.ts:11`](../packages/llm/judgment-dispatch/src/config.ts)
+
 <a id="shres-codeshres-code-judgment-guardrails"></a>
 
 ## `@shres-code/shres-code-judgment-guardrails`
@@ -1241,6 +1259,8 @@ Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/ju
 
 ## `@shres-code/shres-code-judgment-shield`
 
+Requires: `judgmentEngines`
+
 ```ts config-catalog
 /** Configuration for the loopback-only typed-judgment gateway. */
 export interface ShieldJudgmentConfig {
@@ -1270,6 +1290,8 @@ Source: [`packages/llm/judgment-shield/src/types.ts:16`](../packages/llm/judgmen
 <a id="shres-codeshres-code-judgment-typesafe"></a>
 
 ## `@shres-code/shres-code-judgment-typesafe`
+
+Requires: `judgmentEngines`
 
 ```ts config-catalog
 /**
@@ -1418,7 +1440,7 @@ export interface ClaudeSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:106`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 

@@ -28,7 +28,7 @@ import BasicCompactionEngine, { summarizeWithLlm } from '@shres-code/shres-code-
 import type { BasicCompactionConfig, SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic'
 import { toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
 import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
-import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
   JudgmentInput,
@@ -90,6 +90,12 @@ export {
   resolveJevConfig,
 } from './config.ts'
 export type { JevCompactionConfig, JevOnVerifyFailure, JevVerifyCheckConfig, ResolvedJevConfig, ResolvedJevFacts } from './config.ts'
+
+/**
+ * The consumer id every compaction ask carries; a `judgment.overrides` entry
+ * under this key routes the asks to another engine.
+ */
+export const COMPACTION_JEV_JUDGMENT_CONSUMER = judgmentConsumerId('compaction-jev')
 
 /** Question-id prefix for a segment score question; each appends its span. */
 const SEGMENT_ID_PREFIX = 'segment'
@@ -365,7 +371,7 @@ export class JevCompactionEngine extends BasicCompactionEngine {
     if (engine === undefined) return undefined
     return {
       enabled: judgmentEnabled(engine.settings),
-      ask: input => engine.ask(input),
+      ask: input => engine.ask({ ...input, consumer: COMPACTION_JEV_JUDGMENT_CONSUMER }),
     }
   }
 

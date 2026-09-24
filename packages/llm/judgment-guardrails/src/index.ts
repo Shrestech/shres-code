@@ -21,7 +21,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryAnswer,
   JudgmentBinaryQuestion,
@@ -70,6 +70,12 @@ export const INJECTION_QUESTION_ID = judgmentQuestionId('guard-injection')
 
 /** The id the severity question is asked under, echoed by its answer. */
 export const SEVERITY_QUESTION_ID = judgmentQuestionId('guard-severity')
+
+/**
+ * The consumer id every guard ask carries; a `judgment.overrides` entry under
+ * this key routes the asks to another engine.
+ */
+export const GUARDRAILS_JUDGMENT_CONSUMER = judgmentConsumerId('judgment-guardrails')
 
 /**
  * Composition config schema, which is also the `judgment-guardrails` settings
@@ -205,6 +211,7 @@ export function apply(ctx: Context, config: GuardrailsConfig): () => void {
         questions: [injectionQuestion(current), severityQuestion(current)],
         tier: current.tier,
         signal: lifetime.signal,
+        consumer: GUARDRAILS_JUDGMENT_CONSUMER,
       })
     } catch (error: unknown) {
       // A provider that refused an unusable response classified it itself; every
