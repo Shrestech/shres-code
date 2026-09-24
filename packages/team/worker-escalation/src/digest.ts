@@ -16,7 +16,7 @@
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type {} from '@shres-code/shres-code-agent-team'
 import type {} from '@shres-code/shres-code-jspace'
-import { foldToolWindow } from './fold.ts'
+import { foldToolWindow } from '@shres-code/shres-code-progress-signals'
 import type { WorkerEscalationDigest, WorkerEscalationToolSignal } from './types.ts'
 
 /** Truncation marker appended when a bounded field is cut. */

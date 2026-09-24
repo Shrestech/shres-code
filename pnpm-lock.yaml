@@ -9494,6 +9494,27 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/team/progress-signals:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
+      '@shres-code/shres-code-sandbox':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-step-budget':
+        specifier: workspace:^
+        version: link:../../guard/step-budget
+
   packages/team/worker-escalation:
     dependencies:
       '@shres-code/schemastery':
@@ -9527,9 +9548,9 @@ importers:
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
-      '@shres-code/shres-code-sandbox':
+      '@shres-code/shres-code-progress-signals':
         specifier: workspace:^
-        version: link:../../sandbox/sandbox
+        version: link:../progress-signals
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session

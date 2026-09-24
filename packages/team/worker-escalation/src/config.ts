@@ -13,7 +13,12 @@
 import { settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import type { JudgmentTier } from '@shres-code/shres-code-judgment'
-import type { EscalationTrigger } from './types.ts'
+import { ESCALATION_TRIGGERS } from '@shres-code/shres-code-progress-signals'
+import type {
+  EscalationTrigger,
+  ResolvedEscalationTrigger,
+  ResolvedEscalationTriggers,
+} from '@shres-code/shres-code-progress-signals'
 
 /**
  * Settings namespace carrying the deployment's ladder configuration. Home is
@@ -21,18 +26,6 @@ import type { EscalationTrigger } from './types.ts'
  * same namespace value without importing the service.
  */
 export const WORKER_ESCALATION_SETTINGS_NAMESPACE: SettingsNamespace = settingsNamespace('worker-escalation')
-
-/**
- * The trigger table's rows, in the order the fold reports them and the order
- * the service resolves a firing set in.
- */
-export const ESCALATION_TRIGGERS: readonly EscalationTrigger[] = [
-  'errorBurst',
-  'attemptCount',
-  'repeatRunLength',
-  'stepBudgetExhausted',
-  'turnFailureStreak',
-]
 
 /** Each trigger's firing count, defaulted. */
 export const DEFAULT_TRIGGER_THRESHOLDS: Readonly<Record<EscalationTrigger, number>> = {
@@ -221,17 +214,6 @@ export interface WorkerEscalationConfig {
    */
   askToEscalate?: boolean
 }
-
-/** One resolved trigger row. */
-export interface ResolvedEscalationTrigger {
-  /** Whether this trigger may fire. */
-  readonly enabled: boolean
-  /** The trigger's own firing count, in the trigger's own unit. */
-  readonly threshold: number
-}
-
-/** Every resolved trigger row, keyed by trigger. */
-export type ResolvedEscalationTriggers = Readonly<Record<EscalationTrigger, ResolvedEscalationTrigger>>
 
 /** Resolved and validated ladder configuration. */
 export interface ResolvedWorkerEscalationConfig {

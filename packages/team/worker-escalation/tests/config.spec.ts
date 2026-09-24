@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { ESCALATION_TRIGGERS } from '@shres-code/shres-code-progress-signals'
 import {
   DEFAULT_JUDGMENT_CONFIDENCE,
   DEFAULT_JUDGMENT_MARGIN,
@@ -18,7 +19,6 @@ import {
   DEFAULT_MAX_EXCERPT_CHARS,
   DEFAULT_MIN_STEPS_BETWEEN,
   DEFAULT_TRIGGER_THRESHOLDS,
-  ESCALATION_TRIGGERS,
   WORKER_ESCALATION_SETTINGS_NAMESPACE,
   resolveConfig,
 } from '../src/config.ts'

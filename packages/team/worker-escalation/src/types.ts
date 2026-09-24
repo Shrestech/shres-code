@@ -1,21 +1,13 @@
 /**
- * Pure vocabulary of the worker difficulty ladder: the trigger identifiers,
- * the logged decision payload, and the bounded worker digest. Free of runtime
- * factories.
+ * Pure vocabulary of the worker difficulty ladder: the logged decision payload
+ * and the bounded worker digest. The trigger identifiers come from
+ * `@shres-code/shres-code-progress-signals`, which owns the folds that fire
+ * them. Free of runtime factories.
  *
  * @module @shres-code/shres-code-worker-escalation/types
  */
 
-/**
- * Why the ladder engaged on a worker session. A closed union; consumers switch
- * on it and end in `assertNever`.
- */
-export type EscalationTrigger =
-  | 'errorBurst'
-  | 'attemptCount'
-  | 'repeatRunLength'
-  | 'stepBudgetExhausted'
-  | 'turnFailureStreak'
+import type { EscalationTrigger } from '@shres-code/shres-code-progress-signals'
 
 /**
  * What one decision resolved: the ladder's own resolution, or the option the
@@ -172,36 +164,6 @@ export interface EscalationDecision {
   readonly ask?: EscalationAskOutcome
   /** Aging state this decision records for its goal epoch. */
   readonly aging: EscalationAging
-}
-
-/**
- * Numbers-first facts the Stage 1 ask's state carries about one worker
- * session: how its tool calls resolved, the identical-call chain in force, the
- * goal epoch's distinct failed approaches, and completed steps since the last
- * verified checkpoint. No excerpt of any kind is part of this state — the
- * error and argument excerpts exist for the Lead's report alone.
- */
-export interface WorkerEscalationProgressFacts {
-  /** Tool-sourced results that succeeded, excluding sandbox denials and charter probes. */
-  readonly ok: number
-  /** Tool-sourced results that failed, excluding sandbox denials and charter probes. */
-  readonly fail: number
-  /** Length of the identical-call chain in force at the fold point. */
-  readonly repeatRunLength: number
-  /** Distinct failed approaches since the goal epoch's progress floor. */
-  readonly attemptCount: number
-  /** Completed steps since the goal epoch's progress floor. */
-  readonly stepsSinceCheckpoint: number
-}
-
-/** One trigger's verdict at a fold point. */
-export interface EscalationTriggerOutcome {
-  /** The trigger this verdict is about. */
-  readonly trigger: EscalationTrigger
-  /** Whether the trigger is satisfied at the fold point. */
-  readonly fired: boolean
-  /** Session event seq the trigger fired at; absent when it did not fire. */
-  readonly triggerSeq?: number
 }
 
 /** One trailing tool signal in the worker digest. */
