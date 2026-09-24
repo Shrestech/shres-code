@@ -577,6 +577,61 @@ describe('LlmRuntime', () => {
       .rejects.toMatchObject({ code: 'INVALID_MODEL_INFO' })
   })
 
+  it.each([
+    [-1, 'negative'],
+    [1.5, 'fractional'],
+    [Number.POSITIVE_INFINITY, 'infinite'],
+  ] as const)('rejects an invalid exact prompt-cache TTL (%s: %s)', async (promptCacheTtlMs, _label) => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends ScriptedAdapter {
+      override resolveModel(): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider: 'route', id: 'model', name: 'Model', promptCacheTtlMs })
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+
+    await expect(ctx.llm.resolveModelInfo('route', 'model'))
+      .rejects.toMatchObject({ code: 'INVALID_MODEL_CACHE_TTL' })
+  })
+
+  it('passes a declared prompt-cache TTL through listing and exact resolution', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends ScriptedAdapter {
+      override listModels(): Promise<readonly LlmModelInfo[]> {
+        return Promise.resolve([
+          { provider: 'route', id: 'cached', name: 'Cached', promptCacheTtlMs: 300_000 },
+          { provider: 'route', id: 'uncached', name: 'Uncached', promptCacheTtlMs: 0 },
+          { provider: 'route', id: 'unknown', name: 'Unknown' },
+        ])
+      }
+
+      override resolveModel(_provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({
+          provider: 'route', id: model, name: model,
+          ...model === 'unknown' ? {} : { promptCacheTtlMs: model === 'cached' ? 3_600_000 : 0 },
+        })
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+
+    // A rebuild that drops the field reads as "lifetime unknown", so each
+    // declared value, including the zero of a route that writes no cache,
+    // must survive both detached copies.
+    await expect(ctx.llm.listModels('route')).resolves.toEqual([
+      { provider: 'route', id: 'cached', name: 'Cached', promptCacheTtlMs: 300_000 },
+      { provider: 'route', id: 'uncached', name: 'Uncached', promptCacheTtlMs: 0 },
+      { provider: 'route', id: 'unknown', name: 'Unknown' },
+    ])
+    await expect(ctx.llm.resolveModelInfo('route', 'cached'))
+      .resolves.toEqual({ provider: 'route', id: 'cached', name: 'cached', promptCacheTtlMs: 3_600_000 })
+    await expect(ctx.llm.resolveModelInfo('route', 'uncached'))
+      .resolves.toEqual({ provider: 'route', id: 'uncached', name: 'uncached', promptCacheTtlMs: 0 })
+    await expect(ctx.llm.resolveModelInfo('route', 'unknown'))
+      .resolves.toEqual({ provider: 'route', id: 'unknown', name: 'unknown' })
+  })
+
   it('preserves modality metadata through exact model resolution', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -1037,6 +1092,9 @@ describe('LlmRuntime', () => {
     [{ provider: 'route', id: 'm', name: 1 }, 'non-string name'],
     [{ provider: 'route', id: 'm', name: '' }, 'empty name'],
     [{ provider: 'route', id: 'm', name: 'M', description: 1 }, 'non-string description'],
+    [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: -1 }, 'negative prompt-cache TTL'],
+    [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: 1.5 }, 'fractional prompt-cache TTL'],
+    [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: Number.NaN }, 'NaN prompt-cache TTL'],
   ] as const)('rejects invalid model metadata (%s: %s)', async (metadata, _label) => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)

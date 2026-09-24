@@ -473,6 +473,14 @@ interface LlmModelInfo {
    * absent declares none, so the local tool catalog applies unchanged.
    */
   hostedTools?: readonly HostedTool[]
+  /**
+   * Prompt-cache lifetime this route requests, in milliseconds: how long a
+   * cached prefix stays readable after the start of the request that wrote or
+   * last read it, generation time included. `0` declares that the route writes
+   * no prompt cache. The value states what the adapter asks for; an upstream
+   * may retain a prefix for less. Absent means the adapter does not know.
+   */
+  promptCacheTtlMs?: number
 }
 ```
 
@@ -922,7 +930,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:288`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:298`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 

@@ -39,7 +39,7 @@ Unknown options, malformed arguments, unsupported schemas, tripped caps, provide
 For each `agent()` call:
 
 1. The worker sends `child-start` with a plain-data prompt and options.
-2. The host calls the start request's provider override, or otherwise the configured provider, through async `SubagentRuntime.start`, passing the workflow's parent and one canonical per-run abort signal. Provider choice applies to every child in that run and is not visible to the script.
+2. The host resolves the child's route once through `SubagentRuntime.resolveChildRoute` (kind `workflow`); a script `provider`/`model` override is explicit and is never routed. If admission closed while the route resolved, the host sends `child-start-error` without starting the child. Otherwise it calls the configured subagent provider through async `SubagentRuntime.start` with the resolved options, passing the workflow's parent and one canonical per-run abort signal. The subagent provider applies to every child in that run and is not visible to the script.
 3. If start rejects, the host sends `child-start-error`; provider startup has already reached quiescence and no child lifecycle event is emitted.
 4. If start fulfills while the workflow still admits work, the host records the run, observes `result`, then sends `child-started`. Even an already-settled result is forwarded afterward, preserving start-before-result order.
 5. The worker emits paired `workflow/agent-start` and `workflow/agent-end` narration and requests child disposal after collection.

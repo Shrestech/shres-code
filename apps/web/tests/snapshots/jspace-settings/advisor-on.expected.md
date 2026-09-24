@@ -58,6 +58,7 @@
     - option "groq"
     - option "zai"
     - option "Grok (subscription)"
+    - option "Claude (subscription)"
     - option "Codex (subscription)"
     - option "DeepSeek"
   - text: Model
@@ -82,6 +83,7 @@
     - option "groq"
     - option "zai"
     - option "Grok (subscription)"
+    - option "Claude (subscription)"
     - option "Codex (subscription)"
     - option "DeepSeek"
   - text: Model
