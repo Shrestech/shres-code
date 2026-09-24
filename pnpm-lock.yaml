@@ -6980,6 +6980,9 @@ importers:
       '@shres-code/shres-code-commands':
         specifier: workspace:^
         version: link:../../interaction/commands
+      '@shres-code/shres-code-compaction-basic':
+        specifier: workspace:^
+        version: link:../../compaction/compaction-basic
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -7019,6 +7022,9 @@ importers:
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+      '@shres-code/shres-code-token-meter':
+        specifier: workspace:^
+        version: link:../token-meter
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools

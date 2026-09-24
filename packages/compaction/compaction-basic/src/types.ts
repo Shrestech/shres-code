@@ -6,6 +6,9 @@
 
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 
+/** Which route a summary without a configured summarization pair runs on. */
+export type SummarizationRoute = 'manual' | 'request'
+
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {
   /** Compact at this fraction of the model's context window. Defaults to `0.8`. */
@@ -18,6 +21,13 @@ export interface CompactionPolicyConfig {
   summarizationProvider?: string
   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
   summarizationModel?: string
+  /**
+   * Route the summary runs on when no summarization pair is set. `manual`
+   * summarizes on the session's manual route, the entry route of a held model-
+   * routing streak rather than the routed candidate; `request` summarizes on
+   * the latest request's route. Defaults to `manual`.
+   */
+  summarizationRoute?: SummarizationRoute
   /** Provider generation cap for summarization. Defaults to `8192`. */
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
@@ -69,6 +79,7 @@ interface ResolvedPolicyFields {
   readonly thresholdRatio: number
   readonly summarizationProvider: string
   readonly summarizationModel: string
+  readonly summarizationRoute: SummarizationRoute
   readonly maxTokens: number
   readonly compactionRetries: number
   readonly maxOverflowRetries: number

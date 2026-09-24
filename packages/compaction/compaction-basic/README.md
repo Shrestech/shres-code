@@ -32,8 +32,9 @@ Every setting is optional. Top-level policy fields are defaults for every routed
 | `thresholdRatio` | no (default `0.8`) | Compact once the next request reaches `floor(routedContextWindow × ratio)`, priced as described under Measurement. |
 | `retainRatio` | no (default `0.16`) | Recent surface budget kept verbatim as a fraction of the routed context window; mutually exclusive with `retainTokens`. |
 | `retainTokens` | no | Absolute recent surface budget kept verbatim; mutually exclusive with `retainRatio` and must be below the resolved threshold. |
-| `summarizationProvider` | no (default `''`) | Set together with `summarizationModel`; an empty pair resolves the latest logged request target, then the `AgentOptions` pair. |
-| `summarizationModel` | no (default `''`) | Set together with `summarizationProvider`; an empty pair resolves the latest logged request target, then the `AgentOptions` pair. |
+| `summarizationProvider` | no (default `''`) | Set together with `summarizationModel`; an empty pair resolves the conversation target that `summarizationRoute` names, then the `AgentOptions` pair. |
+| `summarizationModel` | no (default `''`) | Set together with `summarizationProvider`; an empty pair resolves the conversation target that `summarizationRoute` names, then the `AgentOptions` pair. |
+| `summarizationRoute` | no (default `manual`) | Conversation target for an empty summarization pair. `manual` summarizes on the session's manual route: the entry route of a held model-routing streak, which a composed `ctx.modelRouting` reports, else the latest logged request target. `request` summarizes on the latest logged request target, which during a streak is the routed candidate. |
 | `maxTokens` | no (default `8192`) | Provider generation cap for the summarization call; may include reasoning tokens. |
 | `compactionRetries` | no (default `1`) | Extra attempts after the first when pressure remains above threshold. |
 | `maxOverflowRetries` | no (default `1`) | Maximum retries after canonical context-window overflow; `0` disables recovery only. |
@@ -116,7 +117,7 @@ Replacing rather than append-only. Each checkpoint invalidates reuse from the fi
 
 #### What the model sees
 
-The summarization model receives the conversation replayed verbatim — the same system prompt, tool schemas, and messages the last routed request sent for the shadowed region — followed by one final user message: the compaction instruction below. The conversation model never sees this private request or its reasoning; only returned text is stored.
+The summarization model receives the conversation replayed verbatim — the same system prompt, tool schemas, and messages the last routed request sent for the shadowed region — followed by one final user message: the compaction instruction below. The conversation model never sees this private request or its reasoning; only returned text is stored. With the default `summarizationRoute: manual` during a held model-routing streak, the request runs on the manual route, so it reuses that route's cached prefix rather than the routed candidate's: the summary is durable and read by every later manual-route turn, and compaction is where routing returns to the manual route anyway.
 
 ##### Compaction instruction (final user message)
 
@@ -167,7 +168,7 @@ This is a separate model call: the replayed conversation prefix plus the fixed i
 
 #### KV Cache effect
 
-The replayed system prompt, tools, and shadowed-region messages match the conversation's last routed request byte-for-byte, so the provider's warm prefix cache is reused up to the trailing instruction; only that instruction, and the summary output, is uncached. Routing the summarizer to a different provider/model, or compacting a non-head range, forgoes this reuse.
+The replayed system prompt, tools, and shadowed-region messages match the conversation's last routed request byte-for-byte, so the provider's warm prefix cache is reused up to the trailing instruction; only that instruction, and the summary output, is uncached. Routing the summarizer to a different provider/model, or compacting a non-head range, forgoes this reuse. During a held model-routing streak the last request ran on the routed candidate, so the default `summarizationRoute: manual` reuses the manual route's prefix only while that route's cache is still warm; `request` reuses the candidate's.
 
 ## Known Limitations and Deferred Work
 

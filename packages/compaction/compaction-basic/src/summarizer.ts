@@ -9,12 +9,14 @@ import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@s
 import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
 } from '@shres-code/shres-code-llm'
-import type { Agent } from '@shres-code/shres-code-agent'
+import type { Agent, ModelRoutingConsult } from '@shres-code/shres-code-agent'
 import type { CompactionFailureFacts, SummarizationFailureReason } from '@shres-code/shres-code-compaction'
+import type { SummarizationRoute } from './types.ts'
 
 interface SummaryConfig {
   readonly summarizationProvider: string
   readonly summarizationModel: string
+  readonly summarizationRoute: SummarizationRoute
   readonly maxTokens: number
 }
 
@@ -150,6 +152,20 @@ export function summarizationFailureFacts(
 }
 
 /**
+ * The manual route behind a held model-routing streak: the streak's entry route
+ * a composed `ctx.modelRouting` reports, or undefined without a router or a
+ * streak.
+ * @param ctx - the compaction service's context, which sees a composed router.
+ * @param agent - the agent whose conversation is summarized.
+ * @returns the manual provider and model, or undefined.
+ */
+function manualRoute(ctx: Context, agent: Agent): { provider: string; model: string } | undefined {
+  const routing = ctx.get('modelRouting') as ModelRoutingConsult | undefined
+  const manual = routing?.stickySelection(agent)
+  return manual === undefined ? undefined : { provider: manual.provider, model: manual.model }
+}
+
+/**
  * Run the default cache-reusing `ctx.llm.stream()` summarization call: replay
  * the conversation prefix, then append the compaction instruction as the final
  * user message so the provider's warm prefix cache is reused.
@@ -167,17 +183,19 @@ export async function summarizeWithLlm(
   agent: Agent,
   signal?: AbortSignal,
 ): Promise<SummaryResult> {
-  const latest = agent.session.requestHeader()?.config
+  const header = agent.session.requestHeader()?.config
+  const latest = header === undefined ? undefined : { provider: header.provider, model: header.model }
   const configured = config.summarizationProvider.length === 0
     ? undefined
     : { provider: config.summarizationProvider, model: config.summarizationModel }
+  const conversation = config.summarizationRoute === 'manual' ? manualRoute(ctx, agent) ?? latest : latest
   const agentTarget = agent.options.provider !== undefined
     && agent.options.provider.length > 0
     && agent.options.model !== undefined
     && agent.options.model.length > 0
     ? { provider: agent.options.provider, model: agent.options.model }
     : undefined
-  const target = configured ?? latest ?? agentTarget
+  const target = configured ?? conversation ?? agentTarget
   if (target === undefined) {
     throw new Error(
       'no provider/model available for summarization: set both BasicCompactionConfig summarization fields, route one request, or set both AgentOptions fields',

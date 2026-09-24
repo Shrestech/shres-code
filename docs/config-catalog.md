@@ -582,6 +582,13 @@ export interface CompactionPolicyConfig {
   summarizationProvider?: string
   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
   summarizationModel?: string
+  /**
+   * Route the summary runs on when no summarization pair is set. `manual`
+   * summarizes on the session's manual route, the entry route of a held model-
+   * routing streak rather than the routed candidate; `request` summarizes on
+   * the latest request's route. Defaults to `manual`.
+   */
+  summarizationRoute?: SummarizationRoute
   /** Provider generation cap for summarization. Defaults to `8192`. */
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
@@ -602,9 +609,12 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
   /** Exact routed model id to match within `provider`. */
   model: string
 }
+
+/** Which route a summary without a configured summarization pair runs on. */
+export type SummarizationRoute = 'manual' | 'request'
 ```
 
-Source: [`packages/compaction/compaction-basic/src/types.ts:43`](../packages/compaction/compaction-basic/src/types.ts)
+Source: [`packages/compaction/compaction-basic/src/types.ts:53`](../packages/compaction/compaction-basic/src/types.ts)
 
 <a id="shres-codeshres-code-compaction-jev"></a>
 

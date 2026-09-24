@@ -6,7 +6,7 @@ Composition swaps it for the basic row; it ships in no default bundle.
 
 ## Config
 
-Every `BasicCompactionConfig` field applies unchanged (`thresholdRatio`, `retainRatio`/`retainTokens`, `summarizationProvider`/`summarizationModel`, `maxTokens`, `compactionRetries`, `maxOverflowRetries`, `maxSummaryOverflowRetries`, `modelPolicies`, `auto`, `maxPointers`, `pinSeqs`) and is validated by the same resolver, with the same diagnostics. The class's schema restates all of them beside the fields below, so a forced-compaction overlay names one whole config. Unknown keys and wrong types fail plugin load by name.
+Every `BasicCompactionConfig` field applies unchanged (`thresholdRatio`, `retainRatio`/`retainTokens`, `summarizationProvider`/`summarizationModel`, `summarizationRoute`, `maxTokens`, `compactionRetries`, `maxOverflowRetries`, `maxSummaryOverflowRetries`, `modelPolicies`, `auto`, `maxPointers`, `pinSeqs`) and is validated by the same resolver, with the same diagnostics. The class's schema restates all of them beside the fields below, so a forced-compaction overlay names one whole config. Unknown keys and wrong types fail plugin load by name.
 
 | Key | Default | Effect |
 |---|---|---|

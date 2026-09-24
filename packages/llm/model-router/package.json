@@ -76,6 +76,8 @@
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-commands": "workspace:^",
+    "@shres-code/shres-code-compaction-basic": "workspace:^",
+    "@shres-code/shres-code-token-meter": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-judgment": "workspace:^",
     "@shres-code/shres-code-judgment-typesafe": "workspace:^",

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Context } from '@shres-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { AttachmentId } from '@shres-code/shres-code-attachment'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
@@ -36,7 +36,7 @@ import type {
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import type { TokenMeasurement } from '@shres-code/shres-code-token-meter'
-import { agentEvents, type Agent, type RequestErrorAction } from '@shres-code/shres-code-agent'
+import { agentEvents, type Agent, type ModelSelection, type RequestErrorAction } from '@shres-code/shres-code-agent'
 import ToolResultPruner from '@shres-code/shres-code-compaction-tool-result-pruner'
 
 const SIGNAL = new AbortController().signal
@@ -351,6 +351,7 @@ describe('compact configuration and defaults', () => {
       retainRatio: 0.16,
       summarizationProvider: '',
       summarizationModel: '',
+      summarizationRoute: 'manual',
       maxTokens: 8192,
       compactionRetries: 1,
       maxOverflowRetries: 1,
@@ -488,6 +489,8 @@ describe('compact configuration and defaults', () => {
       [{ summarizationModel: MODEL }, /must be set together/],
       [{ summarizationProvider: '' }, /must be set together/],
       [{ summarizationModel: '' }, /must be set together/],
+      [{ summarizationRoute: 'candidate' }, /BasicCompactionConfig\.summarizationRoute must be "manual" or "request"/],
+      [{ modelPolicies: [{ provider: MODEL, model: MODEL, summarizationRoute: 'latest' }] }, /modelPolicies\[0\]\.summarizationRoute must be "manual" or "request"/],
       [{ thresholdRatio: 0 }, /number in \(0, 1\]/],
       [{ thresholdRatio: 1.1 }, /number in \(0, 1\]/],
       [{ retainRatio: 0.9 }, /retainRatio \(0.9\) must be less than the resolved thresholdRatio \(0.8\)/],
@@ -1521,6 +1524,68 @@ describe('default one-shot summarizer', () => {
     expect(output.model).toBe('routed')
     expect(adapter.lastOptions?.provider).toBe('routed')
     expect(adapter.lastOptions?.model).toBe('routed')
+  })
+
+  /** TEST DOUBLE: the model-routing consult's manual-route report, as a held streak answers it. */
+  class HeldRouting extends Service {
+    constructor(ctx: Context, private readonly held: ModelSelection | undefined) {
+      super(ctx, 'modelRouting')
+    }
+
+    stickySelection(): ModelSelection | undefined {
+      return this.held
+    }
+  }
+
+  /** A session whose latest request ran the routed candidate. */
+  function routedSession(): Session {
+    const session = conversation(1)
+    session.append('request/header', { header: { config: { provider: 'routed', model: 'routed' } }, reason: 'initial' })
+    return session
+  }
+
+  it('summarizes on the manual route during a held streak by default', async () => {
+    const { ctx, adapter, compact } = await summarizerHarness([{ type: 'text', text: 'unused' }], undefined, 'routed')
+    const manual = new ScriptedAdapter([{ type: 'text', text: 'manual summary' }])
+    ctx.llm.registerAdapter(['manual'], manual)
+    void new HeldRouting(ctx, { provider: 'manual', model: 'manual' })
+
+    const output = await compact.runSummarize(promptInput('history'), agent(routedSession(), 'fallback'))
+    expect(output).toMatchObject({ provider: 'manual', model: 'manual' })
+    expect(manual.lastOptions).toMatchObject({ provider: 'manual', model: 'manual', purpose: 'compaction' })
+    expect(adapter.lastOptions).toBeUndefined()
+  })
+
+  it('summarizationRoute request uses the latest header', async () => {
+    const { ctx, adapter, compact } = await summarizerHarness(
+      [{ type: 'text', text: 'summary' }], undefined, 'routed', { auto: false, summarizationRoute: 'request' },
+    )
+    void new HeldRouting(ctx, { provider: 'manual', model: 'manual' })
+
+    const output = await compact.runSummarize(promptInput('history'), agent(routedSession(), 'fallback'))
+    expect(output).toMatchObject({ provider: 'routed', model: 'routed' })
+    expect(adapter.lastOptions).toMatchObject({ provider: 'routed', model: 'routed' })
+  })
+
+  it('summarizes on the latest header when the router holds no streak or none is composed', async () => {
+    for (const compose of [true, false]) {
+      const { ctx, adapter, compact } = await summarizerHarness([{ type: 'text', text: 'summary' }], undefined, 'routed')
+      if (compose) void new HeldRouting(ctx, undefined)
+      const output = await compact.runSummarize(promptInput('history'), agent(routedSession(), 'fallback'))
+      expect(output).toMatchObject({ provider: 'routed', model: 'routed' })
+      expect(adapter.lastOptions?.provider).toBe('routed')
+    }
+  })
+
+  it('lets an exact-target policy choose the summarization route', async () => {
+    const { ctx, adapter, compact } = await summarizerHarness(
+      [{ type: 'text', text: 'summary' }], undefined, 'routed',
+      { auto: false, modelPolicies: [{ provider: 'routed', model: 'routed', summarizationRoute: 'request' }] },
+    )
+    void new HeldRouting(ctx, { provider: 'manual', model: 'manual' })
+    const output = await compact.runSummarize(promptInput('history'), agent(routedSession(), 'fallback'))
+    expect(output).toMatchObject({ provider: 'routed', model: 'routed' })
+    expect(adapter.lastOptions?.provider).toBe('routed')
   })
 
   it('records the model actually dispatched after one-shot stream routing', async () => {
