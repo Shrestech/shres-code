@@ -471,6 +471,17 @@ export function SubagentCatalogAction({
   const descendantCount = Math.max(healthy.length, descendants.count)
   const totalCountKey = descendantCount === 1 ? 'count.total.one' : 'count.total.other'
   const runningCountKey = descendants.runningCount === 1 ? 'count.running.one' : 'count.running.other'
+  // A fully running subtree states its own size, so the total chip renders only
+  // while it carries a number the running count does not.
+  const totalVisible = descendants.runningCount !== descendantCount
+    || descendants.runningCount === 0
+  const runningText = t(runningCountKey, { count: descendants.runningCount })
+  const totalText = t(totalCountKey, { count: descendantCount })
+  // The accessible name mirrors the visible chips (label-in-name): both phrases
+  // while the total adds a number, the running phrase alone otherwise.
+  const triggerLabel = descendants.runningCount === 0
+    ? totalText
+    : totalVisible ? `${runningText}, ${totalText}` : runningText
   // Session summaries can announce membership before the descriptor-backed catalog catches up.
   // Keep that entry point visible through disabled loading rows; only catalog rows are navigable.
   const summaryBackedLoading = descendants.count > 0
@@ -609,10 +620,7 @@ export function SubagentCatalogAction({
         className={css.trigger}
         aria-haspopup="tree"
         aria-expanded={open}
-        aria-label={t(
-          descendants.runningCount > 0 ? runningCountKey : totalCountKey,
-          { count: descendants.runningCount > 0 ? descendants.runningCount : descendantCount },
-        )}
+        aria-label={triggerLabel}
         onClick={() => { changeOpen(!open) }}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return
@@ -630,7 +638,8 @@ export function SubagentCatalogAction({
               : <HoppingRoo size={12} />
           )}
         </span>
-        <span className={css.count}>{t(totalCountKey, { count: descendantCount })}</span>
+        {descendants.runningCount > 0 && <span className={css.running}>{runningText}</span>}
+        {totalVisible && <span className={css.count}>{totalText}</span>}
         <IconChevronDownOutline14 className={open ? css.triggerOpen : undefined} />
       </button>
       {open && (

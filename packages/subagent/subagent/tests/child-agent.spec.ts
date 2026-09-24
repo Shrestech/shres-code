@@ -8,7 +8,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@shres-code/shres-code-agent'
 import { SessionId } from '@shres-code/shres-code-session'
-import { childSessionMeta, effectiveChildRoute, resolveRequestedChildCwd } from '../src/child-agent.ts'
+import {
+  childSessionMeta,
+  effectiveAgentRoute,
+  effectiveChildRoute,
+  resolveRequestedChildCwd,
+} from '../src/child-agent.ts'
 
 function parent(overrides: {
   header?: { provider?: string; model?: string }
@@ -27,6 +32,21 @@ function parent(overrides: {
     options: overrides.options ?? {},
   } as Agent
 }
+
+describe('effectiveAgentRoute', () => {
+  it('reads the logged header before the live default and creation options', () => {
+    expect(effectiveAgentRoute(parent({
+      header: { provider: 'logged', model: 'h' },
+      defaults: { provider: 'live', model: 'm' },
+      options: { provider: 'opt', model: 'n' },
+    }))).toEqual({ provider: 'logged', model: 'h' })
+  })
+
+  it('reports only known creation-option fields without a header or default-model service', () => {
+    expect(effectiveAgentRoute(parent({ options: { model: 'n' } }))).toEqual({ model: 'n' })
+    expect(effectiveAgentRoute(parent({}))).toEqual({})
+  })
+})
 
 describe('effectiveChildRoute', () => {
   it('inherits the live default model when the parent has no logged header', () => {

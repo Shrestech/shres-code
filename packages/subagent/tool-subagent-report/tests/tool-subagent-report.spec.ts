@@ -7,7 +7,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import { assembleContextFor } from '@shres-code/shres-code-agent'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
-import { CallId, LlmAdapter } from '@shres-code/shres-code-llm'
+import { CallId, createUserMessage, LlmAdapter } from '@shres-code/shres-code-llm'
 import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
@@ -20,8 +20,14 @@ import * as tool from '../src/index.ts'
 
 const testSignal = new AbortController().signal
 
-/** Adapter that keeps child Activations resident until released. */
-class HeldAdapter extends LlmAdapter {
+/** Model-call source the fixtures observe and release. */
+interface GatedModelAdapter extends LlmAdapter {
+  readonly requests: GenerateOptions[]
+  release(): void
+}
+
+/** Adapter that keeps every Activation resident until the test releases it. */
+class HeldAdapter extends LlmAdapter implements GatedModelAdapter {
   readonly requests: GenerateOptions[] = []
   private readonly gate = Promise.withResolvers<undefined>()
 
@@ -39,13 +45,49 @@ class HeldAdapter extends LlmAdapter {
   }
 }
 
+/**
+ * Adapter holding each session's model calls behind that session's own gate, so
+ * one Agent can stay busy while another finishes. Once a session's gate is
+ * released, its later calls stream immediately.
+ */
+class SessionGatedAdapter extends LlmAdapter implements GatedModelAdapter {
+  readonly requests: GenerateOptions[] = []
+  private readonly gates = new Map<GenerateOptions['sessionId'], PromiseWithResolvers<undefined>>()
+
+  private gate(sessionId: GenerateOptions['sessionId']): PromiseWithResolvers<undefined> {
+    const existing = this.gates.get(sessionId)
+    if (existing !== undefined) return existing
+    const created = Promise.withResolvers<undefined>()
+    this.gates.set(sessionId, created)
+    return created
+  }
+
+  /** Release one session's held calls and leave its later calls ungated. */
+  releaseSession(sessionId: GenerateOptions['sessionId']): void {
+    this.gate(sessionId).resolve(undefined)
+  }
+
+  release(): void {
+    for (const gate of this.gates.values()) gate.resolve(undefined)
+  }
+
+  async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    this.requests.push(options)
+    await this.gate(options.sessionId).promise
+    for (const chunk of textResponse('held answer')) {
+      if (options.signal?.aborted) throw new Error('aborted')
+      yield chunk
+    }
+  }
+}
+
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
 /** Boot the real continuation graph with optional report installation. */
-async function setup(options: { load?: boolean; config?: tool.Config } = {}) {
+async function setup(options: { load?: boolean; config?: tool.Config; adapter?: GatedModelAdapter } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   const root = mkdtempSync(join(tmpdir(), 'shres-tool-subagent-report-'))
@@ -56,7 +98,7 @@ async function setup(options: { load?: boolean; config?: tool.Config } = {}) {
   const fiber = options.load === false
     ? undefined
     : await ctx.plugin(tool, options.config ?? { reportDelivery: 'quiet' })
-  const adapter = new HeldAdapter()
+  const adapter = options.adapter ?? new HeldAdapter()
   ctx.llm.registerAdapter(['mock'], adapter)
   const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   cleanups.push(async () => {
@@ -119,6 +161,29 @@ function reports(agent: Agent): { id: string; text: string; sender: string }[] {
       sender: message.source.senderSessionId,
     }]
   })
+}
+
+/**
+ * Report findings already committed to one Agent's log, in claim order. Reads
+ * the log rather than `reports()`, which also counts unclaimed inbox work and
+ * so cannot show that a delivery was claimed.
+ */
+function loggedReportFindings(agent: Agent, childId: SessionId): string[] {
+  const frame = `Background subagent ${childId} reported:`
+  return agent.session.events.flatMap((event) => {
+    if (event.type !== 'user/message' || event.data.source.kind !== 'subagent-report') return []
+    const texts = event.data.content.flatMap(block => block.type === 'text' ? [block.text] : [])
+    const at = texts.indexOf(frame)
+    return at === -1 ? [] : [texts.slice(at + 1).join('\n')]
+  })
+}
+
+/** Settlement notices one Agent has read, by the child that settled. */
+function settledNotices(agent: Agent): { sender: string }[] {
+  return agent.session.events.flatMap(event => event.type === 'user/message'
+    && event.data.source.kind === 'subagent-settled'
+    ? [{ sender: event.data.source.senderSessionId }]
+    : [])
 }
 
 function renderedText(result: { content: { type: string; text?: string }[] }): string {
@@ -204,7 +269,7 @@ describe('shres-tool-subagent-report', () => {
     expect(adapter.requests.filter(request => request.sessionId === parent.id)).toHaveLength(parentRequests)
   })
 
-  it('queues wakeup reports as one later parent turn', async () => {
+  it('wakes an idle parent with one later turn for a wakeup report', async () => {
     const { ctx, parent, adapter } = await setup({ config: { reportDelivery: 'wakeup' } })
     const { child } = await startChild(ctx, parent)
     const enqueues: string[] = []
@@ -220,6 +285,135 @@ describe('shres-tool-subagent-report', () => {
     await vi.waitFor(() => {
       expect(adapter.requests.some(request => request.sessionId === parent.id)).toBe(true)
     })
+  })
+
+  it('steers a report into the turn a running parent already has open', async () => {
+    const adapter = new SessionGatedAdapter()
+    const { ctx, parent } = await setup({ config: { reportDelivery: 'wakeup' }, adapter })
+    const turnStarts: number[] = []
+    ctx.on('session/event', (session, event) => {
+      if (session.id === parent.id && event.type === 'turn/start') turnStarts.push(event.data.turn)
+    })
+    // Open the parent's turn before the report, so the report meets a busy parent.
+    parent.followup(createUserMessage({ content: [{ type: 'text', text: 'parent works' }], source: { kind: 'user' } }))
+    await vi.waitFor(() => { expect(parent.status).toBe('running') })
+    const { started, child } = await startChild(ctx, parent)
+    const enqueues: string[] = []
+    ctx.on('agent/inbox/inserted', ({ agent, message }) => {
+      if (agent === parent) {
+        enqueues.push(agent.inbox.nextTurn.some(queued => queued.id === message.id) ? 'queued' : 'steering')
+      }
+    })
+
+    const result = await callReport(ctx, child, 'BUSY_FINDING')
+
+    expect(result.isError).toBe(false)
+    expect(enqueues).toEqual(['steering'])
+    expect(parent.inbox.nextStep).toHaveLength(1)
+    expect(parent.inbox.nextTurn).toHaveLength(0)
+    // The whole delivery is next-step input for the open turn: the report opened
+    // no turn of its own while the parent's held step 1 was still running.
+    expect(turnStarts).toEqual([1])
+
+    // Release only the parent, so the claim is observable without a child
+    // settlement notice adding a turn of its own.
+    adapter.releaseSession(parent.id)
+    await vi.waitFor(() => { expect(loggedReportFindings(parent, started.childId)).toEqual(['BUSY_FINDING']) })
+    expect(parent.inbox.nextStep).toHaveLength(0)
+    expect(parent.inbox.nextTurn).toHaveLength(0)
+    expect(turnStarts).toEqual([1])
+  })
+
+  it('claims back-to-back reports in one turn in send order', async () => {
+    const adapter = new SessionGatedAdapter()
+    const { ctx, parent } = await setup({ config: { reportDelivery: 'wakeup' }, adapter })
+    const { started, child } = await startChild(ctx, parent)
+    const turnStarts: number[] = []
+    ctx.on('session/event', (session, event) => {
+      if (session.id === parent.id && event.type === 'turn/start') turnStarts.push(event.data.turn)
+    })
+    const enqueues: string[] = []
+    ctx.on('agent/inbox/inserted', ({ agent, message }) => {
+      if (agent === parent) {
+        enqueues.push(agent.inbox.nextTurn.some(queued => queued.id === message.id) ? 'queued' : 'steering')
+      }
+    })
+
+    // Sent one after the other, so the first is claimed inside its own send and
+    // the second already reads a running parent.
+    expect((await callReport(ctx, child, 'FIRST')).isError).toBe(false)
+    expect((await callReport(ctx, child, 'SECOND')).isError).toBe(false)
+    expect(enqueues).toEqual(['queued', 'steering'])
+    // The first report's own send opened turn 1; the steered second one waits
+    // for that turn's next step rather than opening a turn of its own.
+    expect(turnStarts).toEqual([1])
+    expect(parent.inbox.nextStep).toHaveLength(1)
+
+    // Release only the parent: both reports are claimed at one boundary of the
+    // turn the first one opened, and the child stays held.
+    adapter.releaseSession(parent.id)
+    await vi.waitFor(() => {
+      expect(loggedReportFindings(parent, started.childId)).toEqual(['FIRST', 'SECOND'])
+    })
+    expect(parent.inbox.nextStep).toHaveLength(0)
+    expect(parent.inbox.nextTurn).toHaveLength(0)
+    expect(turnStarts).toEqual([1])
+  })
+
+  it('redirects a report on a cancelled running parent to its next turn', async () => {
+    const { ctx, parent, adapter } = await setup({ config: { reportDelivery: 'wakeup' } })
+    const { started, child } = await startChild(ctx, parent)
+    parent.followup(createUserMessage({ content: [{ type: 'text', text: 'parent works' }], source: { kind: 'user' } }))
+    await vi.waitFor(() => { expect(parent.status).toBe('running') })
+    const enqueues: string[] = []
+    ctx.on('agent/inbox/inserted', ({ agent, message }) => {
+      if (agent === parent) {
+        enqueues.push(agent.inbox.nextTurn.some(queued => queued.id === message.id) ? 'queued' : 'steering')
+      }
+    })
+    parent.cancel({ kind: 'user' })
+
+    const result = await callReport(ctx, child, 'AFTER_CANCEL')
+
+    expect(result.isError).toBe(false)
+    // A turn already cancelled takes no steering input, so the send is latched
+    // into next-turn and replayed once the parent converges.
+    expect(enqueues).toEqual(['queued'])
+    adapter.release()
+    await vi.waitFor(() => { expect(loggedReportFindings(parent, started.childId)).toEqual(['AFTER_CANCEL']) })
+  })
+
+  it('keeps each report as its own next turn while the parent maintains', async () => {
+    const adapter = new SessionGatedAdapter()
+    const { ctx, parent } = await setup({ config: { reportDelivery: 'wakeup' }, adapter })
+    const { started, child } = await startChild(ctx, parent)
+    const turnStarts: number[] = []
+    ctx.on('session/event', (session, event) => {
+      if (session.id === parent.id && event.type === 'turn/start') turnStarts.push(event.data.turn)
+    })
+    const maintaining = Promise.withResolvers<undefined>()
+    const maintenance = parent.runMaintenance(async () => { await maintaining.promise })
+
+    expect((await callReport(ctx, child, 'FIRST_WHILE_MAINTAINING')).isError).toBe(false)
+    expect((await callReport(ctx, child, 'SECOND_WHILE_MAINTAINING')).isError).toBe(false)
+
+    // Maintenance folds into an idle status, so the lane preserves FIFO with
+    // prompts queued during compaction instead of steering.
+    expect(parent.status).toBe('idle')
+    expect(parent.inbox.nextTurn).toHaveLength(2)
+    expect(parent.inbox.nextStep).toHaveLength(0)
+    expect(turnStarts).toEqual([])
+
+    maintaining.resolve(undefined)
+    await maintenance
+    adapter.releaseSession(parent.id)
+    await vi.waitFor(() => {
+      expect(loggedReportFindings(parent, started.childId))
+        .toEqual(['FIRST_WHILE_MAINTAINING', 'SECOND_WHILE_MAINTAINING'])
+    })
+    // One turn per report after maintenance, and no next-step claiming.
+    expect(turnStarts).toEqual([1, 2])
+    expect(parent.inbox.nextTurn).toHaveLength(0)
   })
 
   it('preserves accepted order across repeated reports', async () => {
@@ -273,6 +467,72 @@ describe('shres-tool-subagent-report', () => {
     await vi.waitFor(() => { expect(reports(child)).toHaveLength(1) })
     expect(reports(child)[0]?.sender).toBe(grandchildStart.childId)
     expect(reports(child)[0]?.text).toContain('WAKE_PARENT_CHILD')
+  })
+
+  it('rolls back the accepted report when a nested parent rejects the steered send', async () => {
+    const { ctx, parent, adapter } = await setup({ config: { reportDelivery: 'wakeup' } })
+    const { child } = await startChild(ctx, parent, 'outer task')
+    const { child: grandchild } = await startChild(ctx, child, 'inner task')
+    // The nested parent is running, so the report is steered; the rejection must
+    // reach the waking accounting that admitted the message.
+    vi.spyOn(child, 'steer').mockImplementationOnce(() => {
+      throw new Error('parent closed during delivery')
+    })
+
+    const result = await callReport(ctx, grandchild, 'REJECTED_STEER')
+
+    expect(result.isError).toBe(true)
+    expect(renderedText(result)).toContain('direct parent is not live; report was not delivered')
+    expect(child.inbox.nextStep).toHaveLength(0)
+    expect(child.inbox.nextTurn).toHaveLength(0)
+    // A retained accepted id would keep the nested parent's Activation running
+    // forever, so its release is what proves the rollback.
+    adapter.release()
+    await vi.waitFor(() => { expect(ctx.agents.get(child.id)).toBeUndefined() }, { timeout: 5_000 })
+  })
+
+  it('rolls back the accepted report when an idle nested parent rejects the followup', async () => {
+    const adapter = new SessionGatedAdapter()
+    const { ctx, parent } = await setup({ config: { reportDelivery: 'wakeup' }, adapter })
+    const { child } = await startChild(ctx, parent, 'outer task')
+    const { child: grandchild } = await startChild(ctx, child, 'inner task')
+    // Releasing the nested parent alone finishes its own turn; it stays resident
+    // while it owns the held grandchild, and its status reads idle.
+    adapter.releaseSession(child.id)
+    await vi.waitFor(() => { expect(child.status).toBe('idle') })
+    vi.spyOn(child, 'followup').mockImplementationOnce(() => {
+      throw new Error('parent closed during delivery')
+    })
+
+    const result = await callReport(ctx, grandchild, 'REJECTED_FOLLOWUP')
+
+    expect(result.isError).toBe(true)
+    expect(renderedText(result)).toContain('direct parent is not live; report was not delivered')
+    expect(child.inbox.nextStep).toHaveLength(0)
+    expect(child.inbox.nextTurn).toHaveLength(0)
+    adapter.release()
+    await vi.waitFor(() => { expect(ctx.agents.get(child.id)).toBeUndefined() }, { timeout: 5_000 })
+  })
+
+  it('keeps a nested parent live until its steered report is claimed, then settles it once', async () => {
+    const { ctx, parent, adapter } = await setup({ config: { reportDelivery: 'wakeup' } })
+    const { child } = await startChild(ctx, parent, 'outer task')
+    const { started: innerStart, child: grandchild } = await startChild(ctx, child, 'inner task')
+
+    expect((await callReport(ctx, grandchild, 'STEERED_FINDING')).isError).toBe(false)
+
+    expect(child.inbox.nextStep).toHaveLength(1)
+    // Unclaimed next-step input keeps the nested parent resident.
+    expect(ctx.agents.get(child.id)).toBe(child)
+
+    adapter.release()
+    await vi.waitFor(() => {
+      expect(loggedReportFindings(child, innerStart.childId)).toEqual(['STEERED_FINDING'])
+    })
+    await vi.waitFor(() => { expect(ctx.agents.get(child.id)).toBeUndefined() }, { timeout: 5_000 })
+    await vi.waitFor(() => {
+      expect(settledNotices(parent).filter(notice => notice.sender === child.id)).toHaveLength(1)
+    })
   })
 
   it('normalizes a direct parent send rejection', async () => {

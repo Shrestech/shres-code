@@ -1,0 +1,4 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "Delegate a background job." [disabled]
+  - button "Activity": Activity 1 subagent running

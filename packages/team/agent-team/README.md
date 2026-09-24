@@ -32,6 +32,10 @@ Writers pass `{ ignorable: true }`. A build without this plugin may skip the eve
 
 `TeamId` is the Lead `SessionId` under a distinct brand. `TeamTaskId` is team-local `task-<n>`. `TeamMessageId` is globally random. A teammate name is reserved permanently; a failed provisioning keeps its row.
 
+## Roster model binding
+
+A teammate's `active` `team/member` snapshot records `agentProvider` / `agentModel`, the LLM route returned by `ctx.subagents.startContinuable()` and persisted in the child's subagent descriptor; recovery of a leftover provisioning row copies the same fields from that descriptor. `provider` on the snapshot and on roster rows is the subagent spawn provider, such as `spawn`. `listMembers()` reports each row's own route as `agentProvider` / `model`: a loaded Lead reads its latest logged request header, else the live default-model selection, else its creation options; a loaded teammate reads its latest logged request header, else its creation options; an unloaded teammate reads its snapshot; an `unstarted` name reads the current template binding. A started teammate never adopts a later template change, and a row without a known route omits the model instead of showing the Lead's. A `/model` switch appears after that Agent's next request.
+
 ## Durability
 
 `TeamJournal.appendAndFlush(session, type, data)` appends the ignorable event, then awaits `ctx.sessions.flush(session)` and requires at least one persistence listener. An acknowledged append is durable before any later delivery attempt. Persistence plugins subscribe to `session/flush`. `transact(rootId, operation)` serializes mutations per Lead.
@@ -54,7 +58,7 @@ Seats share one provider key, so they share its prompt cache too: batched review
 
 ## Model Experience
 
-Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
+Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). A rostered teammate is the only agent with a second channel to its parent — `team_send` beside the optional `report` tool — so the policy ends with `Do not resend content you already delivered to the same recipient through another tool.`, which names no tool and therefore holds when that optional package is absent. Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
 
 #### KV Cache effect
 

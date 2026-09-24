@@ -10,6 +10,7 @@ import { AgentLoopCardController, type AgentLoopSettings } from '../src/client/a
 import { BashCardController, type BashSettings } from '../src/client/bash-card-controller.ts'
 import {
   WebSearchCardController,
+  type WebSearchBraveSettings,
   type WebSearchMethods,
   type WebSearchPerplexitySettings,
   type WebSearchSettings,
@@ -390,12 +391,67 @@ function webSearchController(
   methods = stubSettingsScope<WebSearchMethods>(),
   credentials = credentialsApi(true),
   perplexity = stubSettingsScope<WebSearchPerplexitySettings>(),
+  brave = stubSettingsScope<WebSearchBraveSettings>(),
 ) {
-  const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope, perplexity.scope)
-  return { host, methods, credentials, perplexity, controller }
+  const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope, perplexity.scope, brave.scope)
+  return { host, methods, credentials, perplexity, brave, controller }
 }
 
 describe('WebSearchCardController', () => {
+  it('keeps absent providers off and lets a Brave-only deployment edit its own settings', async () => {
+    const { brave, controller } = webSearchController()
+    acceptWrites(brave)
+    brave.publish({ status: 'ready', writable: true, value: {}, base: {}, user: {} })
+    const face = controller.inject()
+    expect(face.hooks.webSearchCard.getSnapshot()).toMatchObject({
+      available: true, writable: true, brave: { text: 'true' },
+      perplexity: { text: 'false' }, deepseek: { text: 'false' }, grok: { text: 'false' },
+      providers: { perplexity: { available: false, writable: false }, brave: { available: true, writable: true } },
+    })
+    face.edit('braveEnabled', 'false')
+    face.edit('braveBaseURL', 'https://brave.test')
+    face.save()
+    await vi.waitFor(() => { expect(brave.set.mock.calls).toEqual([['enabled', false], ['baseURL', 'https://brave.test']]) })
+    face.resetField('braveBaseURL')
+    face.save()
+    await vi.waitFor(() => { expect(brave.unset).toHaveBeenCalledWith('baseURL') })
+    face.edit('braveEnabled', 'true')
+    face.discard()
+    expect(face.hooks.webSearchCard.getSnapshot().brave.text).toBe('false')
+  })
+
+  it.each(['BRAVE_API_KEY', 'CUSTOM_BRAVE_KEY'])('stores a Brave key only through its credential reference %s', async (ref) => {
+    const { host, brave, perplexity, methods, credentials, controller } = webSearchController()
+    brave.publish({ status: 'ready', writable: true, value: { apiKeyEnv: ref }, user: {} })
+    const face = controller.inject()
+    face.edit('braveApiKey', ' test-brave-key ')
+    credentials.describe.mockImplementation(() => Promise.resolve({
+      rpcId: 'c-1' as never,
+      result: { ok: true, value: { credentials: { [ref]: { configured: true, writable: true } } } },
+    }))
+    face.save()
+    await vi.waitFor(() => { expect(credentials.set).toHaveBeenCalledWith({ ref, value: 'test-brave-key' }) })
+    await vi.waitFor(() => { expect(face.hooks.webSearchCard.getSnapshot()).toMatchObject({ dirty: false, braveApiKeyConfigured: true, braveApiKey: { text: '' } }) })
+    for (const scope of [host, brave, perplexity, methods]) expect(scope.set).not.toHaveBeenCalled()
+    credentials.describe.mockClear()
+    controller.refreshCredential(ref)
+    await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalledWith({ refs: [ref] }) })
+    face.edit('braveApiKey', ' ')
+    face.save()
+    expect(credentials.set).toHaveBeenCalledTimes(1)
+  })
+
+  it('isolates read-only provider settings from writable neighbors', () => {
+    const { host, brave, perplexity, controller } = webSearchController()
+    host.publish({ status: 'ready', writable: false, value: {} })
+    brave.publish({ status: 'ready', writable: true, value: {} })
+    perplexity.publish({ status: 'ready', writable: false, value: {} })
+    expect(controller.inject().hooks.webSearchCard.getSnapshot()).toMatchObject({
+      writable: true,
+      providers: { brave: { writable: true }, perplexity: { writable: false }, deepseek: { writable: false } },
+    })
+  })
+
   it('reads the credential state for the reference the section names', async () => {
     const { host, credentials, controller } = webSearchController()
     const state = () => controller.inject().hooks.webSearchCard.getSnapshot()
@@ -418,6 +474,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
@@ -448,6 +505,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
@@ -468,6 +526,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
@@ -497,6 +556,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: { apiKeyEnv: 'SEARCH_KEY' }, user: {} })
     const face = controller.inject()
@@ -516,6 +576,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
@@ -538,6 +599,7 @@ describe('WebSearchCardController', () => {
       { credentials: { describe, set } } as never,
       methods.scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     const face = controller.inject()
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
@@ -566,6 +628,7 @@ describe('WebSearchCardController', () => {
       { credentials: { describe, set: vi.fn() } } as never,
       methods.scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
 
@@ -582,6 +645,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       methods.scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     methods.publish({ status: 'ready', writable: true, value: { grok: true, claude: true, codex: true, kimi: true }, user: {} })
@@ -602,6 +666,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, base: {}, user: {} })
     const face = controller.inject()
@@ -624,6 +689,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       methods.scope,
       stubSettingsScope<WebSearchPerplexitySettings>().scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     methods.publish({ status: 'ready', writable: true, value: { grok: true, claude: true, codex: true, kimi: true, ollama: true }, user: {} })
@@ -647,6 +713,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       perplexity.scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     perplexity.publish({ status: 'ready', writable: true, value: {}, base: {}, user: {} })
@@ -671,6 +738,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       perplexity.scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     perplexity.publish({ status: 'ready', writable: true, value: {}, user: {} })
@@ -702,6 +770,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       perplexity.scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     perplexity.publish({ status: 'ready', writable: true, value: { apiKeyEnv: 'SONAR_KEY' }, user: {} })
@@ -723,6 +792,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       perplexity.scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     perplexity.publish({ status: 'ready', writable: true, value: {}, user: {} })
@@ -753,6 +823,7 @@ describe('WebSearchCardController', () => {
       credentials.api,
       stubSettingsScope<WebSearchMethods>().scope,
       perplexity.scope,
+      stubSettingsScope<WebSearchBraveSettings>().scope,
     )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     perplexity.publish({ status: 'ready', writable: true, value: { baseURL: 'https://stored.test' }, base: {}, user: { baseURL: 'https://stored.test' } })

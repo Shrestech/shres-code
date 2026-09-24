@@ -119,8 +119,8 @@ const DEFAULT_MAX_MESSAGES = 50
 
 /**
  * Non-model settings namespaces intentionally served to the Web client. The
- * plugin-owned entries (`agent-loop`, `bash`, `web-search-deepseek`,
- * `web-search-attached-cli`) are the
+ * plugin-owned entries (`agent-loop`, `shell`, `web-search-brave`,
+ * `web-search-perplexity`, `web-search-deepseek`, `web-search-attached-cli`) are the
  * host-plane sections the plugin configuration page edits; a namespace absent
  * here answers `settings-not-exposed` even when its owner registered it, so
  * adding a section to that page is a decision made here rather than by the
@@ -129,7 +129,8 @@ const DEFAULT_MAX_MESSAGES = 50
  * is deferred work.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek', 'web-search-attached-cli',
+  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme',
+  'web-search-brave', 'web-search-perplexity', 'web-search-deepseek', 'web-search-attached-cli',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -2792,6 +2793,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             id: String(row.id),
             ...row.description === undefined ? {} : { description: row.description },
             ...row.provider === undefined ? {} : { provider: row.provider },
+            ...row.agentProvider === undefined ? {} : { agentProvider: row.agentProvider },
             ...row.model === undefined ? {} : { model: row.model },
             diagnostics: [...row.diagnostics],
           })),

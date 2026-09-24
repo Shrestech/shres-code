@@ -52,7 +52,8 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.reset {
+.reset,
+.disclosure {
   border: none;
   background: none;
   padding: 0;
@@ -63,7 +64,8 @@
   cursor: pointer;
 }
 
-.reset:hover:not(:disabled) {
+.reset:hover:not(:disabled),
+.disclosure:hover:not(:disabled) {
   color: var(--dsw-alias-label-primary);
 }
 
@@ -157,6 +159,15 @@
 
 .switchOn .switchThumb {
   margin-left: 16px;
+}
+
+.provider {
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  padding-bottom: 12px;
+}
+
+.disclosure {
+  text-align: left;
 }
 
 .methods {

@@ -92,6 +92,8 @@
     "tests/subagent-interrupt.e2e.ts",
     "tests/subagent-interrupt-ui.e2e.ts",
     "tests/sidebar-subagent-activity.e2e.ts",
+    "tests/busy-parent-report.e2e.ts",
+    "tests/team-roster-models.e2e.ts",
     "tests/background-job-list.e2e.ts",
     "tests/bash-abort-row.e2e.ts",
     "tests/skill-tool-row.e2e.ts",

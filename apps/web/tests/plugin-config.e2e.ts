@@ -81,15 +81,20 @@ describe('web e2e: plugin configuration section', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
-  it('exposes the Perplexity and Z.AI search methods on the web-search card', async () => {
+  it('exposes Brave-first setup and independently collapses enabled provider settings', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-perplexity'))
     const dialog = await openPlugins()
     await dialog.getByText('Web search', { exact: true }).click()
 
-    // The shipped bundle mounts web-search-perplexity and the attached-CLI zai
-    // backend, so the card serves both namespaces with no key configured: the
-    // switches render, and Perplexity's key control is a password field whose
-    // endpoint is labeled distinctly from DeepSeek's.
+    const braveSwitch = dialog.getByRole('switch', { name: 'Brave', exact: true })
+    await braveSwitch.waitFor({ timeout: 10_000 })
+    await expect.poll(() => braveSwitch.getAttribute('aria-checked')).toBe('true')
+    expect(await dialog.getByLabel('Brave API key', { exact: true }).getAttribute('type')).toBe('password')
+    expect(await dialog.getByLabel('Brave API key', { exact: true }).inputValue()).toBe('')
+    const disclosure = dialog.getByRole('button', { name: 'Hide settings: Brave', exact: true })
+    expect(await disclosure.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px')
+    expect(await disclosure.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
+    expect(await dialog.getByText('First in the default web_search order when enabled and a key is configured; other methods are fallbacks.', { exact: true }).count()).toBe(1)
     const perplexitySwitch = dialog.getByRole('switch', { name: 'Perplexity', exact: true })
     await perplexitySwitch.waitFor({ timeout: 10_000 })
     expect(await dialog.getByRole('switch', { name: 'Z.AI', exact: true }).count()).toBe(1)
@@ -108,12 +113,50 @@ describe('web e2e: plugin configuration section', () => {
     expect(perplexityKeyBox!.y).toBeLessThan(deepseekBox!.y)
     const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
-    // No edit was staged: expanding the card changes nothing on disk.
-    expect(await settingsDocument()).not.toContain('web-search-perplexity')
+    const before = await settingsDocument()
+    const endpoint = dialog.getByLabel('Perplexity endpoint', { exact: true })
+    await endpoint.fill('https://staged-search.example')
+    await dialog.getByRole('button', { name: 'Hide settings: Perplexity', exact: true }).click()
+    expect(await endpoint.isVisible()).toBe(false)
+    expect(await perplexitySwitch.getAttribute('aria-checked')).toBe('true')
+    await dialog.getByRole('button', { name: 'Show settings: Perplexity', exact: true }).click()
+    expect(await endpoint.inputValue()).toBe('https://staged-search.example')
+    for (const enabled of [false, true, false, true]) {
+      await perplexitySwitch.click()
+      await expect.poll(() => perplexitySwitch.getAttribute('aria-checked')).toBe(String(enabled))
+      expect(await endpoint.isVisible()).toBe(enabled)
+    }
+    expect(await endpoint.inputValue()).toBe('https://staged-search.example')
+    expect(await settingsDocument()).toBe(before)
+    await dialog.getByRole('button', { name: 'Discard', exact: true }).click()
     expect(tripwire.pageErrors).toEqual([])
 
     // Leave the card collapsed for the scenarios that share this page.
     await dialog.getByText('Web search', { exact: true }).click()
+  }, 60_000)
+
+  it('saves a Brave key through credentials without putting it in settings', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-brave-key'))
+    const dialog = await openPlugins()
+    await dialog.getByText('Web search', { exact: true }).click()
+    const key = dialog.getByLabel('Brave API key', { exact: true })
+    await key.fill('brave-ui-test-key')
+    const save = dialog.getByRole('button', { name: 'Save', exact: true })
+    await save.click()
+    await expect.poll(() => save.isDisabled()).toBe(true)
+    expect(await key.inputValue()).toBe('')
+    const provider = key.locator('xpath=ancestor::section')
+    expect(await provider.getByText('A key is configured.', { exact: true }).count()).toBe(1)
+    expect(await settingsDocument()).not.toContain('brave-ui-test-key')
+    expect(await settingsDocument()).not.toContain('apiKey:')
+    await dialog.getByText('Web search', { exact: true }).click()
+    await dialog.getByText('Web search', { exact: true }).click()
+    expect(await key.isVisible()).toBe(false)
+    await dialog.getByRole('button', { name: 'Show settings: Brave', exact: true }).click()
+    expect(await key.inputValue()).toBe('')
+    expect(await provider.getByText('A key is configured.', { exact: true }).count()).toBe(1)
+    await dialog.getByText('Web search', { exact: true }).click()
+    expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('stages an edit and writes it only when saved', async () => {

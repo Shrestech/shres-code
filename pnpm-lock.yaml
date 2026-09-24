@@ -536,6 +536,9 @@ importers:
       '@shres-code/shres-code-pwsh-local':
         specifier: workspace:^
         version: link:../../packages/shell/pwsh-local
+      '@shres-code/shres-code-workspace':
+        specifier: workspace:^
+        version: link:../../packages/workspace/workspace
       '@types/node':
         specifier: ^26.2.0
         version: 26.5.0

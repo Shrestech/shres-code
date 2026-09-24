@@ -10,7 +10,7 @@ The shipped Perplexity surface is [the Settings Perplexity web-search note](../f
 
 ## Decision
 
-Each method's extra fields render immediately under that method's switch, still as siblings inside the methods list so adjacent `.field` borders continue to apply. DeepSeek's key and endpoint copy is `DeepSeek API key` and `DeepSeek endpoint`, matching Perplexity's prefixed labels so two password fields in one card cannot share an accessible name.
+Each method's extra fields render under its own switch in the provider's disclosure. The [search-provider disclosure decision](2026-09-24-search-provider-settings-and-disclosures.md) owns independent folding and supersedes the flat sibling layout. DeepSeek's key and endpoint copy is `DeepSeek API key` and `DeepSeek endpoint`, matching Perplexity's prefixed labels so two password fields in one card cannot share an accessible name.
 
 ## Alternatives considered
 
@@ -22,7 +22,7 @@ Each method's extra fields render immediately under that method's switch, still 
 
 ## Consequences
 
-Expanding Web search shows Perplexity's switch, key, and endpoint as one block, then DeepSeek's switch and its own fields. Turning a method off still hides only that method's extra fields.
+Perplexity's switch and disclosed key and endpoint form one block, followed by DeepSeek's switch and its own fields. Turning a method off hides only that method's extra fields; folding its disclosure keeps the method enabled.
 
 ## Testing
 

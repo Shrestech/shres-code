@@ -1,0 +1,53 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "Delegate two progress reports to" [disabled]
+  - button "Activity"
+- text: Delegate two progress reports to a background subagent, then answer. {{clock}}
+- button "Copy":
+  - img
+- button "Context injection @shres-code/shres-code-system-prompt":
+  - img
+  - img
+  - text: Context injection @shres-code/shres-code-system-prompt
+- button "Tool call subagent · Report progress twice":
+  - img
+  - img
+  - text: Tool call subagent · Report progress twice
+- paragraph: Waiting for the delegated child.
+- button "Context injection subagent-report" [expanded]:
+  - img
+  - text: Context injection subagent-report
+- paragraph: From session {{uuid}}
+- text: Background subagent {{uuid}} reported:PROGRESS_ONE
+- button "Context injection subagent-report" [expanded]:
+  - img
+  - text: Context injection subagent-report
+- paragraph: From session {{uuid}}
+- text: Background subagent {{uuid}} reported:PROGRESS_TWO
+- button "Context injection subagent-settled Background subagent {{uuid}} finished and will do no further work unless you send it more." [expanded]:
+  - img
+  - text: Context injection subagent-settled Background subagent {{uuid}} finished and will do no further work unless you send it more.
+- text: Background subagent {{uuid}} finished and will do no further work unless you send it more.Its closing message:CHILD_DONE
+- paragraph: PARENT_CLAIMED_TWO_REPORTS_AND_SETTLEMENT
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Read aloud":
+  - img
+- button "Branch into a new conversation":
+  - img
+- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- textbox "Message the agent"
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
+- button "Select model":
+  - text: Select model
+  - img
+- button "Send message" [disabled]
+- text: 1 turns · 3 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache not reported Input 48 tok · Output 24 tok

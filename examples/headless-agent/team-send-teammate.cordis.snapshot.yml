@@ -1,0 +1,53 @@
+# Keyless assembled-app coverage for teammate provisioning: the Lead's
+# `team_send` starts a rostered Aegis teammate, and the assembled teammate
+# prompt carries the `team:policy` section. The fence holds the Lead's
+# step-2 pre-step until the teammate's settlement notice is inserted, so the
+# Lead claims it at step 3 of the same turn instead of a later turn.
+
+- id: persistence
+  name: '@shres-code/shres-code-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: none
+
+- id: replay
+  name: '@shres-code/shres-code-llm-replay'
+
+- id: session-projection
+  name: '@shres-code/shres-code-session-projection'
+
+- id: settings
+  name: '@shres-code/shres-code-settings-file'
+  config:
+    watch: false
+
+- id: subagent
+  name: '@shres-code/shres-code-subagent'
+
+- id: subagent-spawn-in-process
+  name: '@shres-code/shres-code-subagent-spawn-in-process'
+  config:
+    providerName: spawn
+
+- id: agent-team
+  name: '@shres-code/shres-code-agent-team'
+
+- id: agent-seats
+  name: '@shres-code/shres-code-agent-seats'
+
+- id: agent
+  name: '@shres-code/shres-code-agent-spine-demo'
+  config:
+    agents:
+      - id: team-lead
+        provider: deepseek-official
+        model: deepseek-v4-flash
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolBash: false
+    toolJobs: false
+    goals: false
+
+- id: team-teammate-fence
+  name: './tests/fixtures/team-teammate-fence.ts'

@@ -1,7 +1,8 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
+import { indexSubagentDescendants } from '@shres-code/shres-code-client-runtime/client'
 import type { SessionId, SessionListState, SessionSummary } from '@shres-code/shres-code-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
@@ -57,7 +58,8 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  * Renders Session header chrome and the Activity inspector above the resident
  * conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
- * @returns the hidden blank-session header or visible title and Activity control.
+ * @returns the hidden blank-session header, or the visible title, the Activity
+ * control carrying its running-subagent count, and the Activity panel.
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
@@ -76,6 +78,14 @@ export function ConversationSessionHeader({
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
+  // Counted from the retained list mirror rather than the panel's subagent
+  // catalog: the trigger count must be current while the panel stays closed.
+  const summaries = useSessions(s => s.byId)
+  const runningDescendants = useMemo(
+    () => indexSubagentDescendants(summaries).get(sessionId)?.runningCount ?? 0,
+    [sessionId, summaries],
+  )
+  const activityRunningId = useId()
   const [activityOpen, setActivityOpen] = useState(false)
   const activityRef = useRef<HTMLDivElement | null>(null)
   const activityPanelRef = useRef<HTMLDivElement | null>(null)
@@ -154,6 +164,7 @@ export function ConversationSessionHeader({
               <button
                 type="button"
                 aria-label={t('activity.label')}
+                aria-describedby={runningDescendants > 0 ? activityRunningId : undefined}
                 ref={activityTriggerRef}
                 className={css.activityTrigger}
                 aria-expanded={activityOpen}
@@ -166,6 +177,14 @@ export function ConversationSessionHeader({
               >
                 <span className={css.activityMark} aria-hidden="true">+</span>
                 <span>{t('activity.label')}</span>
+                {runningDescendants > 0 && (
+                  <span id={activityRunningId} className={css.activityRunning}>
+                    {t(
+                      runningDescendants === 1 ? 'activity.running.one' : 'activity.running.other',
+                      { count: runningDescendants },
+                    )}
+                  </span>
+                )}
                 {active !== undefined && active.id !== DEFAULT_VIEW_ID
                   ? <span className={css.activityCurrent}>{active.label}</span>
                   : null}

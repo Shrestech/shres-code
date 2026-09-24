@@ -43,7 +43,22 @@ class GatedAdapter extends LlmAdapter {
     this.requests.push(options)
     const entry = this.script.shift()
     if (!entry) throw new Error('GatedAdapter: script exhausted')
-    if (entry.gate) await entry.gate
+    if (entry.gate) {
+      const signal = options.signal
+      if (signal === undefined) {
+        await entry.gate
+      } else {
+        signal.throwIfAborted()
+        const aborted = Promise.withResolvers<never>()
+        const onAbort = () => { aborted.reject(signal.reason) }
+        signal.addEventListener('abort', onAbort, { once: true })
+        try {
+          await Promise.race([entry.gate, aborted.promise])
+        } finally {
+          signal.removeEventListener('abort', onAbort)
+        }
+      }
+    }
     for (const chunk of entry.chunks) {
       if (options.signal?.aborted) throw new Error('aborted')
       yield chunk
@@ -52,16 +67,40 @@ class GatedAdapter extends LlmAdapter {
 }
 
 const roots: string[] = []
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+const contexts: Context[] = []
+afterEach(async () => {
+  vi.restoreAllMocks()
+  const failures: unknown[] = []
+  for (const ctx of contexts.splice(0).reverse()) {
+    try {
+      await ctx.fiber.dispose()
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  for (const root of roots.splice(0)) {
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'Subagent fixture teardown failed')
 })
+
+/** Create a context whose lifetime ends at the current test's teardown. */
+function createTestContext(): Context {
+  const ctx = new Context()
+  contexts.push(ctx)
+  return ctx
+}
 
 /** Boot the full continuable stack: loop, persistence, providers, and subagents. */
 async function setupWith(adapter: LlmAdapter, options: {
   persistence?: boolean
   maxConcurrentSubagents?: number | 'unlimited'
 } = {}) {
-  const ctx = new Context()
+  const ctx = createTestContext()
   await mountAgentLoopTestDependencies(ctx)
   let disposePersistence: (() => Promise<void>) | undefined
   let root: string | undefined
@@ -366,6 +405,7 @@ describe('SubagentRuntime.startContinuable', () => {
     // persona or tool filter, so the descriptor records only what exists.
     const routeless = ctx.agentLoop.create(SessionId('routeless'), {})
     const started = await ctx.subagents.startContinuable(startSpec(routeless))
+    expect(started.route).toEqual({})
     const child = await vi.waitFor(() => {
       const found = ctx.agents.get(started.childId)
       expect(found).toBeDefined()
@@ -423,7 +463,7 @@ describe('SubagentRuntime.startContinuable', () => {
     const started = await ctx.subagents.startContinuable(startSpec(routeless))
     await waitNoActivation(ctx, started.childId)
 
-    const fresh = new Context()
+    const fresh = createTestContext()
     await mountAgentLoopTestDependencies(fresh)
     await fresh.plugin(JsonlSessionPersistence, { root: root! })
     await fresh.plugin(AgentLoop, { agents: [] })
@@ -1908,6 +1948,60 @@ describe('continuable settlement delivery', () => {
       .toEqual(new Set([first.childId, second.childId]))
   })
 
+  it('delivers a report and a settlement into one turn of a busy parent', async () => {
+    const releaseParent = Promise.withResolvers<undefined>()
+    const releaseChild = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([
+      { chunks: textResponse('parent works'), gate: releaseParent.promise },
+      { chunks: textResponse('child answer'), gate: releaseChild.promise },
+      { chunks: textResponse('parent reacts') },
+    ])
+    const { ctx, parent } = await setupWith(adapter)
+    const turnStarts: number[] = []
+    ctx.on('session/event', (session, event) => {
+      if (session.id === parent.id && event.type === 'turn/start') turnStarts.push(event.data.turn)
+    })
+    // Open the parent's turn before the child exists, so both child-to-parent
+    // deliveries meet a parent that is already busy.
+    parent.followup(createUserMessage({ content: message('start working'), source: { kind: 'user' } }))
+    await vi.waitFor(() => { expect(parent.status).toBe('running') })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    const child = await vi.waitFor(() => {
+      const live = ctx.agents.get(started.childId)
+      expect(live).toBeDefined()
+      return live!
+    })
+    await vi.waitFor(() => {
+      expect(adapter.requests.filter(request => request.sessionId === started.childId)).toHaveLength(1)
+    })
+
+    await ctx.subagents.reportFrom(child, message('CHILD_FINDING'), {
+      delivery: 'wakeup',
+      signal: testSignal,
+    })
+    releaseChild.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+
+    // The report arrived first and the settlement notice second; both are
+    // next-step input for the turn the parent already has open.
+    expect(parent.inbox.nextStep.map(queued => queued.source.kind))
+      .toEqual(['subagent-report', 'subagent-settled'])
+    expect(parent.inbox.nextTurn).toHaveLength(0)
+
+    releaseParent.resolve(undefined)
+    await vi.waitFor(() => {
+      const kinds = parent.session.events.flatMap(event => event.type === 'user/message'
+        && event.data.source.kind !== 'plugin'
+        ? [event.data.source.kind]
+        : [])
+      expect(kinds).toEqual(['user', 'subagent-report', 'subagent-settled'])
+    })
+    // One turn claimed both deliveries; neither opened a turn of its own.
+    expect(turnStarts).toEqual([1])
+    expect(parent.inbox.nextStep).toHaveLength(0)
+  })
+
   it('holds a maintaining parent live until it can read the notice', async () => {
     const releaseFirst = Promise.withResolvers<undefined>()
     const releaseSecond = Promise.withResolvers<undefined>()
@@ -1940,6 +2034,11 @@ describe('continuable settlement delivery', () => {
     await waitNoActivation(ctx, first.childId)
     releaseSecond.resolve(undefined)
     await waitNoActivation(ctx, second.childId)
+    // Maintenance folds into an idle status, so both notices wait as next-turn
+    // items rather than being steered into a turn boundary.
+    expect(middle.inbox.nextStep).toHaveLength(0)
+    expect(middle.inbox.nextTurn.map(queued => queued.source.kind))
+      .toEqual(['subagent-settled', 'subagent-settled'])
     expect(ctx.agents.get(outer.childId)).toBe(middle)
 
     maintaining.resolve(undefined)
@@ -2355,10 +2454,63 @@ describe('continuable errors', () => {
     await waitNoActivation(ctx, started.childId)
   })
 
+  it('runs the route captured at start when the parent switches during provider preparation', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('child first')])
+    parkParent(ctx, parent)
+    const parentRequest = vi.spyOn(parent.session, 'requestHeader')
+    parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'before-switch' } })
+    const spawn = ctx.subagents.getProvider('spawn')!
+    const prepare = spawn.prepareContinuable!.bind(spawn)
+    vi.spyOn(spawn, 'prepareContinuable').mockImplementation(async (request) => {
+      parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'after-switch' } })
+      return prepare(request)
+    })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    expect(started.route).toEqual({ provider: 'mock', model: 'before-switch' })
+    await waitNoActivation(ctx, started.childId)
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'before-switch' })
+    expect(adapter.requests.find(request => request.sessionId === started.childId)?.model).toBe('before-switch')
+  })
+
+  it('returns the descriptor route and keeps it after the parent switches models', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('child first'), textResponse('later child')])
+    parkParent(ctx, parent)
+    const parentRequest = vi.spyOn(parent.session, 'requestHeader')
+    const started = await ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      request: {
+        prompt: message('routed work'),
+        parent,
+        agentOptions: { provider: 'mock', model: 'child-model' },
+      },
+    })
+    expect(started.route).toEqual({ provider: 'mock', model: 'child-model' })
+    await waitNoActivation(ctx, started.childId)
+    // The parent's next logged request header names a different model.
+    parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'parent-switched' } })
+
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    const descriptor = loaded.events.find(event => event.type === 'subagent/descriptor')?.data
+    expect(descriptor).toMatchObject({ agentProvider: started.route.provider, agentModel: started.route.model })
+    expect(adapter.requests.find(request => request.sessionId === started.childId)?.model).toBe('child-model')
+
+    // A child started after the switch inherits the switched parent route, and
+    // the earlier child's durable route is unchanged.
+    const later = await ctx.subagents.startContinuable(startSpec(parent))
+    expect(later.route).toEqual({ provider: 'mock', model: 'parent-switched' })
+    const reloaded = await ctx.sessionPersistence.load(started.childId)
+    expect(reloaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'child-model' })
+    await drainManager(ctx)
+  })
+
   it('unloading the manager drains its live activations', async () => {
     const hold = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([{ chunks: textResponse('child'), gate: hold.promise }])
-    const ctx = new Context()
+    const ctx = createTestContext()
     await mountAgentLoopTestDependencies(ctx)
     const root = mkdtempSync(join(tmpdir(), 'shres-subagent-continuation-'))
     roots.push(root)

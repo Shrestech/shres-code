@@ -27,16 +27,40 @@ import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-a
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
 const roots: string[] = []
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+const contexts: Context[] = []
+afterEach(async () => {
+  vi.restoreAllMocks()
+  const failures: unknown[] = []
+  for (const ctx of contexts.splice(0).reverse()) {
+    try {
+      await ctx.fiber.dispose()
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  for (const root of roots.splice(0)) {
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'Subagent fixture teardown failed')
 })
+
+/** Create a context whose lifetime ends at the current test's teardown. */
+function createTestContext(): Context {
+  const ctx = new Context()
+  contexts.push(ctx)
+  return ctx
+}
 
 /** Boot the continuable stack with real JSONL session persistence. */
 async function setup(
   script: Script,
   options: { sessionProjections?: boolean; projectionCache?: boolean } = {},
 ) {
-  const ctx = new Context()
+  const ctx = createTestContext()
   await mountAgentLoopTestDependencies(ctx)
   const root = mkdtempSync(join(tmpdir(), 'shres-subagent-list-'))
   roots.push(root)
@@ -147,7 +171,7 @@ const hostileProjectionDefinition: ProjectionDefinition<'subagentListHostileProb
 
 describe('SubagentRuntime.listChildren', () => {
   it('lists live children without persistence, query services, or the continuation runtime', async () => {
-    const ctx = new Context()
+    const ctx = createTestContext()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
@@ -182,7 +206,7 @@ describe('SubagentRuntime.listChildren', () => {
   })
 
   it('fails loud when the session store is not mounted', async () => {
-    const ctx = new Context()
+    const ctx = createTestContext()
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     await expect(ctx.subagents.listChildren(SessionId('no-store-parent'))).rejects.toThrow(
