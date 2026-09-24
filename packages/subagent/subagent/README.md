@@ -64,6 +64,10 @@ The seam owns the depth vocabulary shared by Service Providers and Consumers: th
 
 `inheritsParentContext` is descriptive rather than enforceable. It says only whether the child sees completed parent conversation history (`fork` does; `spawn` and the out-of-process one-shot providers do not), not whether it inherits tools, services, or authority. `runsRequestedModel` is descriptive in the same way: it says the child runs the route named by `agentOptions`, which only the in-process `spawn` and `fork` backends guarantee.
 
+## Inherited route
+
+A child whose request names no provider or model inherits its parent's manual selection: the selection in force on the parent (`selectionInForce` from the agent package), else the live default-model selection, else the parent's creation options. The selection in force is the parent's explicit `agent/model-selection`, else the manual base a composed router reports beneath a routed request header, else that logged header. So while the parent runs a held downgrade, a fresh, forked, or continuable child still starts on the parent's manual route, and a continuable child records that route in its descriptor and keeps it on follow-up and cold resume. Choosing a cheaper route for a child is a routing decision, made only through `subagent/child-route`. Without a router, the selection in force is the parent's explicit selection or its logged header, which every tool-driven delegation already carries.
+
 ## Child routing
 
 `subagent/child-route` is the extension point for choosing a fresh child's model. The two delegation consumers, `tool-subagent` (kind `subagent`, with its tool name as `agentType`) and the worker-thread workflow engine (kind `workflow`), call `resolveChildRoute()` once per child and start the child with its result; the tool derives its reported route from the same options. Other direct `start()` or `startContinuable()` callers, including Agent Teams rosters, never consult it.

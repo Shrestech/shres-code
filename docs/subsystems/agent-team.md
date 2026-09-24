@@ -126,14 +126,16 @@ type TeamMemberStatus =
  * Current runtime-enriched roster row.
  *
  * `agentProvider` / `model` are the row's own LLM route. The loaded Lead
- * reports its latest logged request header, else the live default-model
- * selection, else its creation options. A loaded teammate reports its latest
- * logged request header, else its creation options, which are the descriptor
- * route it was created or resumed with. An unloaded started teammate reports
- * its {@link TeamMemberSnapshot} route. An `unstarted` row reports the current
- * template binding. A row whose route is unknown omits both fields and never
- * reports the Lead's route instead. A `/model` switch appears after the
- * switched Agent's next request.
+ * reports its manual selection — its explicit `/model` selection, else the
+ * manual base a composed router reports beneath a routed request header, else
+ * its latest logged request header — else the live default-model selection,
+ * else its creation options, so a held downgrade never reads as the Lead's
+ * model. A loaded teammate reports its latest logged request header, else its
+ * creation options, which are the descriptor route it was created or resumed
+ * with. An unloaded started teammate reports its {@link TeamMemberSnapshot}
+ * route. An `unstarted` row reports the current template binding. A row whose
+ * route is unknown omits both fields and never reports the Lead's route
+ * instead. A teammate's `/model` switch appears after its next request.
  */
 interface TeamMemberView {
   readonly id: SessionId

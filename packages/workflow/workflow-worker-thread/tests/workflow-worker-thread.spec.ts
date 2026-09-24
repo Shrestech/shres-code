@@ -760,7 +760,7 @@ describe('shres-workflow-worker-thread', () => {
         id: SessionId('workflow-parent'),
         options: { provider: 'mock', model: 'strong' },
         ctx: { get: () => undefined },
-        session: { header: {}, requestHeader: () => undefined },
+        session: { header: {}, events: [], requestHeader: () => undefined },
       } as unknown as Agent
       const asked = Promise.withResolvers<{ kind: string; signal: AbortSignal }>()
       const release = Promise.withResolvers<undefined>()

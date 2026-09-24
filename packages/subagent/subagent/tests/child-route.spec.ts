@@ -303,7 +303,7 @@ describe('subagent/child-route', () => {
     const parent = {
       ctx: { get: () => undefined },
       options: { ...STRONG },
-      session: { header: {}, requestHeader: () => undefined },
+      session: { header: {}, events: [], requestHeader: () => undefined },
     } as unknown as Agent
     await expect(ctx.subagents.resolveChildRoute('local', input(parent))).rejects.toMatchObject({
       code: 'INVALID_CHILD_ROUTE',

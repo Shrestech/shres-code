@@ -9,6 +9,7 @@
  */
 
 import type { Context } from '@shres-code/cordis'
+import { selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, AgentOptions, CreateAgentOptions } from '@shres-code/shres-code-agent'
 import type { SandboxMode } from '@shres-code/shres-code-sandbox'
 import type { Session, SessionId } from '@shres-code/shres-code-session'
@@ -26,10 +27,10 @@ import type {} from '@shres-code/shres-code-user-approval'
 // them through the tool registry's global layer.
 import type {} from '@shres-code/shres-code-agent-presets'
 // Type-only: make `ctx.get('agentDefaultModel')` resolve to the default-model
-// service when composed — child route inheritance reads the parent's EFFECTIVE
-// model (logged request header, else the live default) instead of the parent's
-// creation-time AgentOptions, so a parent that switched models does not
-// silently misroute every later child onto its original route. Opportunistic
+// service when composed — child route inheritance reads the parent's MANUAL
+// selection (selection in force, else the live default) instead of the
+// parent's creation-time AgentOptions, so a parent that switched models does
+// not silently misroute every later child onto its original route. Opportunistic
 // (the documented `ctx.get` pattern), never a hard dep; the read is
 // non-installing, so it never attaches selection listeners to the parent.
 import type {} from '@shres-code/shres-code-agent-default-model'
@@ -67,20 +68,24 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
 }
 
 /**
- * An Agent's effective provider/model route, read without side effects: its
- * latest logged request header, else the live default-model selection when
- * that service is composed, else its creation-time options. This is the
- * route a delegating parent passes to new children and the route the Team
- * roster reports for the Lead. A `/model` selection made in this process
- * appears once the Agent makes its next request; until then the previous
- * header is reported, the same approximation any log-derived observer sees.
+ * An Agent's manual provider/model route, read without side effects: the
+ * model selection in force on it (`selectionInForce`), else the live
+ * default-model selection when that service is composed, else its
+ * creation-time options. This is the route a delegating parent passes to new
+ * children and the route the Team roster reports for the Lead. The selection
+ * in force is the explicit `agent/model-selection`, else the manual base a
+ * composed router reports beneath a routed request header, else that logged
+ * header. It is therefore never a routed candidate: while a downgrade is held,
+ * the header carries the candidate, and a child that inherited it would run
+ * the cheaper route with no routing decision of its own.
  * @param agent - the loaded Agent to read.
  * @returns the known route fields.
+ * @throws when the Agent's latest durable explicit selection has invalid fields.
  */
 export function effectiveAgentRoute(agent: Agent): { provider?: string; model?: string } {
-  const logged = agent.session.requestHeader()?.config
-  if (logged !== undefined) {
-    return { provider: logged.provider, model: logged.model }
+  const selected = selectionInForce(agent)
+  if (selected !== undefined) {
+    return { provider: selected.provider, model: selected.model }
   }
   const defaults = agent.ctx.get('agentDefaultModel')
   if (defaults !== undefined) {
@@ -95,7 +100,8 @@ export function effectiveAgentRoute(agent: Agent): { provider?: string; model?: 
 
 /**
  * The provider/model route a child of this parent would run: the parent's
- * effective route with any per-child request overrides applied. Option
+ * manual route ({@link effectiveAgentRoute}) with any per-child request
+ * overrides applied. Option
  * resolution and the model-facing spawn telemetry both read this, so the
  * logged route and the run route cannot drift.
  * @param parent - the delegating parent whose route the child inherits.
@@ -114,8 +120,8 @@ export function effectiveChildRoute(
 }
 
 /**
- * Resolve the child's `AgentOptions`: the parent's effective provider/model
- * route (logged header, else live default, else creation options) and the
+ * Resolve the child's `AgentOptions`: the parent's manual provider/model
+ * route (selection in force, else live default, else creation options) and the
  * parent's maxTokens unless the request overrides them, stamped with the
  * child's own delegation depth.
  * @param parent - the delegating parent whose route the child inherits.

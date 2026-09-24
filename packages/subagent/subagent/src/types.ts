@@ -398,7 +398,10 @@ export interface SubagentChildRouteRequest {
   readonly kind: SubagentChildRouteKind
   /** The subagent provider the child starts on. */
   readonly subagentProvider: string
-  /** The route the child runs when no listener answers: the parent's effective route. */
+  /**
+   * The route the child runs when no listener answers: the parent's manual
+   * selection, never a candidate a composed router serves the parent.
+   */
   readonly inherited: SubagentChildRoute
   /** The delegating tool's model-facing name, when a tool delegates. */
   readonly agentType?: string

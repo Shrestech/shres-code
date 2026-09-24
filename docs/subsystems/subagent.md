@@ -508,6 +508,8 @@ Provider `start()` fulfills with a published run. The service mints a unique `ru
 
 A delegation consumer may let a deployment choose a cheaper route for a fresh child. Before starting the child, the consumer calls `ctx.subagents.resolveChildRoute(provider, input)` once and passes the returned options as the start request's `agentOptions`, and derives any reported route from those same options with `effectiveChildRoute`. `tool-subagent` (kind `subagent`, with its tool name as `agentType`) and the worker-thread workflow engine (kind `workflow`) are the consuming callers; Team rosters and other direct `start()` callers never consult it.
 
+The inherited route a child starts on, and the `inherited` route a listener is told, is the parent's manual selection: `selectionInForce(parent)`, else the live default-model selection, else the parent's creation options. A composed router reports the manual base beneath a routed request header, so a child of a parent on a held downgrade does not inherit the candidate; a cheaper child route is a routing decision made only through this waterfall.
+
 The resolver dispatches the `subagent/child-route` waterfall at most once, keyed by the delegating parent's scope, and only when the requested options name neither a provider nor a model, the provider sets `runsRequestedModel`, and the provider does not seed the child with parent history. A fork child keeps its parent's warm cached prefix and is never routed, and team seats always name their route. A listener route is merged over the inherited route and resolved with `ctx.llm.resolveModelInfo()` before return, so an unregistered route rejects with `INVALID_CHILD_ROUTE` before any child exists; agent creation itself does not validate a route. A throwing listener is logged and the child keeps its inherited route, because routing is an optional cost policy that must not fail the delegation. An `InvariantError` raised during the dispatch propagates instead, because a violated invariant means the durable log is about to become inconsistent, and a cancelled delegation rejects with its reason.
 
 The waterfall settles before any child resource exists, so a listener that records its choice appends to the parent session before returning. That record precedes the child's creation in the parent log, which is the ordering a routing policy needs to keep every routed request reconstructable.
@@ -569,7 +571,10 @@ interface SubagentChildRouteRequest {
   readonly kind: SubagentChildRouteKind
   /** The subagent provider the child starts on. */
   readonly subagentProvider: string
-  /** The route the child runs when no listener answers: the parent's effective route. */
+  /**
+   * The route the child runs when no listener answers: the parent's manual
+   * selection, never a candidate a composed router serves the parent.
+   */
   readonly inherited: SubagentChildRoute
   /** The delegating tool's model-facing name, when a tool delegates. */
   readonly agentType?: string

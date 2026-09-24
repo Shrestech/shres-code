@@ -10,7 +10,7 @@ Extracted beside the `codex-credential` and `grok-credential` engines so any fut
 
 - `managerFor(spec): CursorSessionManager` — returns the one manager memoized for a credential spec (`{ securityPath, authPath, useKeychain, readKeychain?, now? }`). Keying is the source facts, so callers with the same credential facts share one single-flight read per source. The memoization caches each spec key for the service's lifetime; that is safe because every `current()` call re-reads the store at the moment it runs rather than trusting cached token state.
 
-`CursorSessionManager.current()` resolves the bearer token. Every resolve re-reads the store, so a rotation the CLI performs is adopted on the next call without restart. Credentials never reach diagnostics: failures name the source and the `cursor-agent login` recovery step, never a value.
+`CursorSessionManager.current()` resolves a `CursorSessionToken`, whose one field, `accessToken`, is the bearer credential for one request. Every resolve re-reads the store, so a rotation the CLI performs is adopted on the next call without restart. Credentials never reach diagnostics: failures name the source and the `cursor-agent login` recovery step, never a value.
 
 ## Composition
 

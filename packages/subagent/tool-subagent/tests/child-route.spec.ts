@@ -17,7 +17,7 @@ function parentAgent(): Agent {
     id: SessionId('parent-1'),
     ctx: { get: () => undefined },
     options: {},
-    session: { header: {}, requestHeader: () => undefined },
+    session: { header: {}, events: [], requestHeader: () => undefined },
   } as unknown as Agent
 }
 

@@ -90,6 +90,11 @@
     "@shres-code/shres-code-settings-file": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/cordis-plugin-include": "workspace:^",
-    "@shres-code/cordis-plugin-loader": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-fork-in-process": "workspace:^",
+    "@shres-code/shres-code-subagent-spawn-in-process": "workspace:^",
+    "@shres-code/shres-code-tool-subagent": "workspace:^"
   }
 }
