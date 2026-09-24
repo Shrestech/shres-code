@@ -1,0 +1,60 @@
+- region "Customize":
+  - complementary:
+    - heading "Customize" [level=2]
+    - button "Close":
+      - img
+      - text: Close
+    - img
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Customize":
+      - button "Plugins":
+        - img
+        - text: Plugins
+      - button "Agent presets":
+        - img
+        - text: Agent presets
+  - text: Customize
+  - heading "Plugins" [level=1]
+  - paragraph: Shape your agent with presets and plugins.
+  - paragraph: Configure and inspect the plugins installed in this deployment.
+  - tablist "Plugin views":
+    - tab "Plugin configuration"
+    - tab "Plugin list"
+    - tab "Manage" [selected]
+  - tabpanel "Manage":
+    - heading "Review install" [level=3]
+    - term: Spec
+    - definition:
+      - code: {{cwd}}/sources/plugin
+    - term: Package
+    - definition: fixture-managed-web 1.0.0
+    - term: Source
+    - definition: path
+    - term: Adds
+    - definition: fixture-managed-web@file:.shres-plugin-sources/{{uuid}}
+    - button "Confirm install"
+    - button "Cancel"
+    - heading "Install plugin" [level=3]
+    - text: Package spec
+    - textbox "Package spec":
+      - /placeholder: Package name or path
+      - text: {{cwd}}/sources/plugin
+    - button "Install"
+    - paragraph: Installing a plugin adds third-party code to this profile, and that code runs with full access on every future start. Confirming an install authorizes the operation; it does not prove that a person made the request.
+    - heading "Profile plugins" [level=3]
+    - list:
+      - listitem:
+        - strong: "@shres-code/shres-code-base"
+        - text: Active
+        - 'button "Remove: @shres-code/shres-code-base"': Remove
+      - listitem:
+        - strong: "@shres-code/shres-code-web-app"
+        - text: Active
+        - 'button "Remove: @shres-code/shres-code-web-app"': Remove
+    - heading "Installed skills" [level=3]
+    - text: Skill directory
+    - textbox "Skill directory":
+      - /placeholder: Path to a skill directory
+    - button "Add skill" [disabled]
+    - paragraph: No skills are installed.

@@ -26,6 +26,10 @@
       "types": "./lib/types/admin.d.ts",
       "default": "./lib/types/admin.js"
     },
+    "./gesture": {
+      "types": "./lib/types/gesture.d.ts",
+      "default": "./lib/types/gesture.js"
+    },
     "./home": {
       "types": "./lib/types/home.d.ts",
       "default": "./lib/types/home.js"

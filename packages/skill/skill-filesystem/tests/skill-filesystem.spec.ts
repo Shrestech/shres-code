@@ -167,6 +167,45 @@ describe('shres-skill-filesystem plugin exports', () => {
   })
 })
 
+describe('parseSkillDocument', () => {
+  it('parses frontmatter fields, invocation policy, metadata, and the trimmed body', () => {
+    expect(SkillFileSystem.parseSkillDocument([
+      '---',
+      'name: parsed-skill',
+      'description: Parsed skill',
+      'whenToUse: When parsing matters',
+      'disable-model-invocation: off',
+      'user-invocable: YES',
+      'metadata:',
+      '  owner: tests',
+      '---',
+      '',
+      '  Body line.  ',
+      '',
+    ].join('\n'))).toEqual({
+      name: 'parsed-skill',
+      description: 'Parsed skill',
+      whenToUse: 'When parsing matters',
+      invocation: { modelInvocable: true, userInvocable: true },
+      metadata: { owner: 'tests' },
+      content: 'Body line.',
+    })
+  })
+
+  it('rejects invalid documents with the discovery warning reasons', () => {
+    const parse = (raw: string): unknown => SkillFileSystem.parseSkillDocument(raw)
+    expect(() => parse('No frontmatter.')).toThrow('missing YAML frontmatter')
+    expect(() => parse('---\nname: open-frontmatter')).toThrow('missing YAML frontmatter')
+    expect(() => parse('---\n[]\n---\nbody')).toThrow('missing YAML frontmatter')
+    expect(() => parse('---\nname: bad-yaml\ndescription: [unclosed\n---\nbody')).toThrow('invalid YAML frontmatter')
+    expect(() => parse('---\nname: missing-description\n---\nbody')).toThrow('frontmatter requires name and description')
+    expect(() => parse('---\nname: ""\ndescription: Empty name\n---\nbody')).toThrow('frontmatter requires name and description')
+    expect(() => parse('---\nname: Bad_Name\ndescription: Bad\n---\nbody')).toThrow('invalid skill name "Bad_Name"')
+    expect(() => parse('---\nname: legacy\ndescription: Legacy\ndisableModelInvocation: true\n---\nbody')).toThrow('is unsupported; use "disable-model-invocation"')
+    expect(() => parse('---\nname: bad-boolean\ndescription: Bad\nuser-invocable: maybe\n---\nbody')).toThrow('must be a boolean')
+  })
+})
+
 describe('FileSystemSkillProvider', () => {
   it('discovers project, custom, user, and agents skill roots in priority order', async () => {
     const home = await tempDir('skill-home')

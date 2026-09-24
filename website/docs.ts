@@ -102,6 +102,14 @@ const homeAndGuide = englishPages([
     order: 4,
   },
   {
+    source: 'docs/cookbook/browserskill.md',
+    route: 'guide/browserskill.md',
+    label: 'Use BrowserSkill',
+    sidebar: 'guide',
+    section: 'Guide',
+    order: 5,
+  },
+  {
     source: 'docs/user/guide/python-sdk.md',
     route: 'guide/python-sdk.md',
     label: 'Python',
@@ -261,6 +269,7 @@ const subsystemGroups = [
     ['web.md', 'Web access'],
     ['speech.md', 'Speech I/O'],
     ['skills.md', 'Skills'],
+    ['profiles.md', 'Profiles and installation'],
     ['workflow.md', 'Workflows'],
     ['subagent.md', 'Subagents'],
   ]],

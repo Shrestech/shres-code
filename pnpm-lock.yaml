@@ -1080,6 +1080,9 @@ importers:
       '@shres-code/shres-code-goal':
         specifier: workspace:^
         version: link:../../goal/goal
+      '@shres-code/shres-code-host-plugin-admin':
+        specifier: workspace:^
+        version: link:../../host/plugin-admin
       '@shres-code/shres-code-host-plugin-inventory':
         specifier: workspace:^
         version: link:../../host/plugin-inventory
@@ -1153,6 +1156,12 @@ importers:
       js-yaml:
         specifier: ^4.2.0
         version: 4.3.1
+      npm-package-arg:
+        specifier: ^14.0.0
+        version: 14.0.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -1172,6 +1181,9 @@ importers:
       '@shres-code/cordis-plugin-timer':
         specifier: workspace:^
         version: link:../../../vendor/timer
+      '@shres-code/shres-code-atomic-write':
+        specifier: workspace:^
+        version: link:../../util/atomic-write
       '@shres-code/shres-code-home-paths':
         specifier: workspace:^
         version: link:../../util/home-paths
@@ -1181,12 +1193,18 @@ importers:
       '@shres-code/shres-code-launch-environment':
         specifier: workspace:^
         version: link:../../util/launch-environment
+      '@shres-code/shres-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
+      '@types/npm-package-arg':
+        specifier: ^6.1.4
+        version: 6.1.4
 
   packages/boot/cmdline:
     devDependencies:
@@ -1741,6 +1759,9 @@ importers:
       '@shres-code/shres-code-host-frontend-static':
         specifier: workspace:^
         version: link:../../host/frontend-static
+      '@shres-code/shres-code-host-plugin-admin':
+        specifier: workspace:^
+        version: link:../../host/plugin-admin
       '@shres-code/shres-code-host-plugin-inventory':
         specifier: workspace:^
         version: link:../../host/plugin-inventory
@@ -5692,6 +5713,40 @@ importers:
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
 
+  packages/host/plugin-admin:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-app-boot':
+        specifier: workspace:^
+        version: link:../../boot/app-boot
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
+      '@shres-code/shres-code-host-remote-control':
+        specifier: workspace:^
+        version: link:../remote-control
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-skill':
+        specifier: workspace:^
+        version: link:../../skill/skill
+      '@shres-code/shres-code-skill-filesystem':
+        specifier: workspace:^
+        version: link:../../skill/skill-filesystem
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+
   packages/host/plugin-inventory:
     dependencies:
       zod:
@@ -8140,15 +8195,24 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-atomic-write':
+        specifier: workspace:^
+        version: link:../../util/atomic-write
       '@shres-code/shres-code-fs':
         specifier: workspace:^
         version: link:../../fs/fs
+      '@shres-code/shres-code-fs-sandbox':
+        specifier: workspace:^
+        version: link:../../fs/fs-sandbox
       '@shres-code/shres-code-home-paths':
         specifier: workspace:^
         version: link:../../util/home-paths
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-sandbox-policy':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox-policy
       '@shres-code/shres-code-skill':
         specifier: workspace:^
         version: link:../skill
@@ -10332,6 +10396,9 @@ importers:
       '@shres-code/shres-code-app-boot':
         specifier: workspace:^
         version: link:../../packages/boot/app-boot
+      '@shres-code/shres-code-atomic-write':
+        specifier: workspace:^
+        version: link:../../packages/util/atomic-write
       '@shres-code/shres-code-attachment':
         specifier: workspace:^
         version: link:../../packages/attachment/attachment
@@ -13400,6 +13467,9 @@ packages:
   '@types/node@26.5.0':
     resolution: {integrity: sha512-dVSGpriSoCgz8WnDNTuSSuSv1PC/ALXihO4ulRZt7Md8k9mlbdin3lGOcDE8SnWOgf513ByWlXd7BK4azmyg/A==}
 
+  '@types/npm-package-arg@6.1.4':
+    resolution: {integrity: sha512-vDgdbMy2QXHnAruzlv68pUtXCjmqUk3WrBAsRboRovsOmxbfn/WiYCjmecyKjGztnMps5dWp4Uq2prp+Ilo17Q==}
+
   '@types/picomatch@3.0.2':
     resolution: {integrity: sha512-n0i8TD3UDB7paoMMxA3Y65vUncFJXjcUf7lQY7YyKGl6031FNjfsLs6pdLFCy2GNFxItPJG8GvvpbZc2skH7WA==}
 
@@ -14832,6 +14902,10 @@ packages:
   hookable@6.1.1:
     resolution: {integrity: sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==}
 
+  hosted-git-info@10.1.1:
+    resolution: {integrity: sha512-DeOnSPAvOndYKfw075gt8yZzQ7S2hNztw34zBTfhIzLhmBTswIBg5/y+pqu/VD5cYWm5goAFTusDmUEmKZ0PEQ==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
   hosted-git-info@4.1.0:
     resolution: {integrity: sha512-kyCuEOWjJqZuDbRHzL8V93NzQhwIB71oFWSyzVo+KPZI+pnQPPxucdkrOZvkLRnrf5URsQM+IJ09Dw29cRALIA==}
     engines: {node: '>=10'}
@@ -15688,6 +15762,10 @@ packages:
     resolution: {integrity: sha512-DlL+XwOy3NxAQ8xuC0okPgK46iuVNAK01YN7RueYBqqFeGsBjV9XmCAzAdgt+667bCl5kPh9EqKKDwnaPG1I7A==}
     engines: {node: '>=10'}
 
+  npm-package-arg@14.0.0:
+    resolution: {integrity: sha512-69XQh3k+dtGa1p+7RaR57IuG3rCko96xr/nUfN4yDYBXbTYICiWcOpsFKLN2GtGE9cyIljE+f1exnaYt9MvM+Q==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
   npm-run-path@6.0.0:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
     engines: {node: '>=18'}
@@ -15972,6 +16050,10 @@ packages:
   proc-log@6.1.0:
     resolution: {integrity: sha512-iG+GYldRf2BQ0UDUAd6JQ/RwzaQy6mXmsk/IzlYyal4A4SNFw54MeH4/tLkF4I5WoWG9SQwuqWzS99jaFQHBuQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
+
+  proc-log@7.0.0:
+    resolution: {integrity: sha512-FYgfaA69XZ93zaXLoMNQ+ViDXGGBgR8aLh03txzcFhV+9xOXx7+8DLCULrKKpR9+GsH9ZfHm82aSUPpozX0Ztg==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -16694,6 +16776,10 @@ packages:
   uuid@14.0.1:
     resolution: {integrity: sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==}
     hasBin: true
+
+  validate-npm-package-name@8.0.0:
+    resolution: {integrity: sha512-SCv6OOV6Xj2/3cXy3dGmADluJTNcL3o7hZAglNPTe+WYuEuvxgJzxPrSDLZhF+CwyQOubqgecjMmTJGMVLWjYQ==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
@@ -19413,6 +19499,8 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  '@types/npm-package-arg@6.1.4': {}
+
   '@types/picomatch@3.0.2': {}
 
   '@types/react-dom@19.2.5(@types/react@19.2.18)':
@@ -21090,6 +21178,10 @@ snapshots:
 
   hookable@6.1.1: {}
 
+  hosted-git-info@10.1.1:
+    dependencies:
+      lru-cache: 11.5.2
+
   hosted-git-info@4.1.0:
     dependencies:
       lru-cache: 6.0.0
@@ -22088,6 +22180,13 @@ snapshots:
 
   normalize-url@6.1.0: {}
 
+  npm-package-arg@14.0.0:
+    dependencies:
+      hosted-git-info: 10.1.1
+      proc-log: 7.0.0
+      semver: 7.8.5
+      validate-npm-package-name: 8.0.0
+
   npm-run-path@6.0.0:
     dependencies:
       path-key: 4.0.0
@@ -22405,6 +22504,8 @@ snapshots:
       parse-ms: 4.0.0
 
   proc-log@6.1.0: {}
+
+  proc-log@7.0.0: {}
 
   process-nextick-args@2.0.1: {}
 
@@ -23226,6 +23327,8 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   uuid@14.0.1: {}
+
+  validate-npm-package-name@8.0.0: {}
 
   vary@1.1.2: {}
 

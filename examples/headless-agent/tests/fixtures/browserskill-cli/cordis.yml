@@ -1,0 +1,28 @@
+# Keyless browser-skill CLI composition: the shipped headless base with only
+# the DeepSeek adapter swapped for the scripted fixture model. The bash
+# executor, bash tool, skill registry, and skill tool below are the normal
+# configured ones; this leaf adds no test-only confinement config and weakens
+# no shipped policy.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ../../../cordis.yml
+    patches:
+      - id: llm-deepseek
+        disabled: true
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: browser-skill-snapshot
+              model: fixture
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          skills:
+            filesystem:
+              watch: false
+          persona: Load the browser-skill skill and drive bsk exactly as its instructions document.
+      - insert:
+          - id: browser-skill-model
+            name: ./tests/fixtures/browserskill-cli/model.ts

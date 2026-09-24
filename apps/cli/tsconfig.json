@@ -93,6 +93,9 @@
       "path": "../../packages/core/tools"
     },
     {
+      "path": "../../packages/skill/skill-filesystem"
+    },
+    {
       "path": "../../packages/util/launch-environment"
     },
     {

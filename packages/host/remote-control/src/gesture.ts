@@ -1,9 +1,10 @@
 /**
- * The gesture-token ledger for the remoteAdmin gateway: one-shot,
- * verb(+alias)-scoped nonces proving a local user gesture stood behind one
- * mutation. Tokens live only in the serving process's memory — never
- * persisted, never logged — so a token minted by one daemon is meaningless on
- * another, and a replayed or re-fired request cannot cause a second mutation.
+ * The gesture-token ledger for the remoteAdmin and pluginAdmin gateways:
+ * one-shot, verb(+alias)-scoped nonces proving a local user gesture stood
+ * behind one mutation. Tokens live only in the serving process's memory —
+ * never persisted, never logged — so a token minted by one daemon is
+ * meaningless on another, and a replayed or re-fired request cannot cause a
+ * second mutation.
  * @module @shres-code/shres-code-host-remote-control/gesture
  */
 
@@ -32,17 +33,17 @@ export interface MintedGesture {
  * presented token is spent whatever the verdict, so a wrong-scope or expired
  * attempt cannot leave a re-usable authorization behind.
  */
-export class GestureLedger {
-  readonly #outstanding = new Map<string, { verb: AdminGestureVerb; alias: string | null; expiresAt: number }>()
+export class GestureLedger<V extends string = AdminGestureVerb> {
+  readonly #outstanding = new Map<string, { verb: V; alias: string | null; expiresAt: number }>()
 
   /**
    * Mint one token bound to the (verb, alias) mutation it authorizes.
    * @param verb - the mutation verb the token authorizes.
-   * @param alias - the alias it is scoped to; null only for registry-add.
+   * @param alias - the alias (or install spec, or skill path/name) it is scoped to; null only for registry-add.
    * @param now - epoch milliseconds of the minting instant.
    * @returns the token and its deadline.
    */
-  mint(verb: AdminGestureVerb, alias: string | null, now: number): MintedGesture {
+  mint(verb: V, alias: string | null, now: number): MintedGesture {
     if (this.#outstanding.size >= MAX_OUTSTANDING_TOKENS) {
       // The cap is at least one, so the oldest insertion exists.
       // oxlint-disable-next-line typescript/no-non-null-assertion -- size is at the cap here
@@ -60,11 +61,11 @@ export class GestureLedger {
    * before the verdict either way.
    * @param token - the presented nonce.
    * @param verb - the verb the caller is about to perform.
-   * @param alias - the alias that verb targets; null only for registry-add.
+   * @param alias - the alias (or install spec, or skill path/name) that verb targets; null only for registry-add.
    * @param now - epoch milliseconds of the consumption instant.
    * @returns true when the token authorizes this exact mutation.
    */
-  consume(token: string, verb: AdminGestureVerb, alias: string | null, now: number): boolean {
+  consume(token: string, verb: V, alias: string | null, now: number): boolean {
     const entry = this.#outstanding.get(token)
     if (entry === undefined) return false
     this.#outstanding.delete(token)

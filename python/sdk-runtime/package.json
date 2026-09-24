@@ -16,6 +16,7 @@
     "@shres-code/shres-code-agent-spine-demo": "workspace:^",
     "@shres-code/shres-code-app-boot": "workspace:^",
     "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-atomic-write": "workspace:^",
     "@shres-code/shres-code-shell": "workspace:^",
     "@shres-code/shres-code-shell-env": "workspace:^",
     "@shres-code/shres-code-bash-local": "workspace:^",

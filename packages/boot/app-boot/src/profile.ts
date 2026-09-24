@@ -34,7 +34,7 @@ import { basename, dirname, join } from 'node:path'
 import type { EntryOptions } from '@shres-code/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@shres-code/cordis-plugin-include'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
-import { loadOverlayPatches } from './index.ts'
+import { loadOverlayPatches } from './patch-files.ts'
 
 /** Directory under the Harness home holding every profile. */
 export const PROFILES_DIR = 'profiles'
@@ -409,8 +409,16 @@ export function resolveBundleDir(
  * patch layer. {@link loadProfile} and {@link loadProfileDirectory} share this
  * body so both apply the same two-anchor bundle resolution, the same
  * `shres.bundle.patch` validation, and the same user-layer rule.
+ * @internal
+ * @param binName - diagnostic prefix.
+ * @param name - profile display name.
+ * @param dir - profile directory.
+ * @param manifest - parsed current or candidate profile manifest.
+ * @param installAnchor - installation package anchor.
+ * @param options - whether to include the profile-owned patch.
+ * @returns the resolved layers without importing plugin modules.
  */
-function resolveProfile(
+export function resolveProfile(
   binName: string, name: string, dir: string, manifest: ProfileManifest,
   installAnchor: string, options: { userLayer?: boolean },
 ): Profile {

@@ -39,17 +39,29 @@ switch (invocation.mode) {
   }
   case 'plugin': {
     const { runPlugin } = await import('./plugin.ts')
-    process.exit(runPlugin(invocation.profile, invocation.args))
+    const { withProfilePluginRecovery } = await import('./plugin-recovery.ts')
+    process.exit(await withProfilePluginRecovery(invocation.profile, () => runPlugin(invocation.profile, invocation.args)))
+    break
+  }
+  case 'plugin-management': {
+    const { runPluginManagementCli } = await import('./plugin-managed-cli.ts')
+    process.exit(await runPluginManagementCli(invocation.command))
+    break
+  }
+  case 'skill': {
+    const { runSkillCli } = await import('./skill-cli.ts')
+    process.exit(await runSkillCli(invocation.command))
     break
   }
   case 'enable-edition': {
     const { runEnableEdition } = await import('./plugin.ts')
-    process.exit(runEnableEdition(invocation.profile, invocation.edition))
+    const { withProfilePluginRecovery } = await import('./plugin-recovery.ts')
+    process.exit(await withProfilePluginRecovery(invocation.profile, () => runEnableEdition(invocation.profile, invocation.edition)))
     break
   }
   case 'dump-config': {
     const { runDumpConfig } = await import('./dump-config.ts')
-    runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
+    await runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
     break
   }
   case 'models': {

@@ -1,10 +1,10 @@
 # apps/web browser e2e
 
-These tests boot the real web composition in-process and drive it with a real
-Chromium over real HTTP. The lane's mechanics — modes, fixtures, goldens, and
-the deliberate composition divergences from `shres web` — are documented in
-[`scaffold.ts`](scaffold.ts) and the
-[browser e2e Agent Note](../../../.agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md).
+Most scenarios boot the real Web composition in-process and drive Chromium over real HTTP. The lane’s mechanics, fixtures, goldens, and deliberate differences from `shres web` are documented in [`scaffold.ts`](scaffold.ts) and the [browser e2e Agent Note](../../../.agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md).
+
+## Managed installation
+
+[`plugin-manage.e2e.ts`](plugin-manage.e2e.ts) launches the source CLI through its ESM-only hook with built Web assets, an explicit child environment, temporary state roots, offline pnpm, and a new Playwright browser. Its fixture blocks external `fetch` calls in the Web process without changing the shipped plugin composition; it makes no model calls. Filesystem assertions and ARIA goldens cover skill copies, consent and cancellation, build-script refusal, retained plugin sources, and activation and removal across process restarts.
 
 ## These are Host-face tests
 

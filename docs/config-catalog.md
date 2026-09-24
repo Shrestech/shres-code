@@ -2686,7 +2686,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/skill/skill/src/index.ts:315`](../packages/skill/skill/src/index.ts)
+Source: [`packages/skill/skill/src/index.ts:310`](../packages/skill/skill/src/index.ts)
 
 <a id="shres-codeshres-code-skill-filesystem"></a>
 
@@ -2699,9 +2699,9 @@ Requires: `skills`
 export interface Config {
   /** Unique provider name. Defaults to `local`. */
   providerName?: string
-  /** Whether project and user roots are included around custom roots. */
+  /** Whether project, user, and plugin-installed roots are included around custom roots. */
   includeDefaultRoots?: boolean
-  /** Shres Code config root. Defaults to `$SHRES_HOME` or `~/.shres`. */
+  /** Shres Code config root. Defaults to `$SHRES_HOME` or `~/.shres`. Scans `skills` and `skills-installed` under it. */
   shresHome?: string
   /** Shared agent config root. Defaults to `$SHRES_AGENTS_HOME` or `~/.agents`. */
   agentsHome?: string
@@ -4492,6 +4492,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
 - `@shres-code/shres-code-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
 - `@shres-code/shres-code-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
+- `@shres-code/shres-code-host-plugin-admin` ([`packages/host/plugin-admin/src/index.ts`](../packages/host/plugin-admin/src/index.ts))
 - `@shres-code/shres-code-host-remote-control` ([`packages/host/remote-control/src/index.ts`](../packages/host/remote-control/src/index.ts))
 - `@shres-code/shres-code-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))
 - `@shres-code/shres-code-llm-mock-server` ([`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts))

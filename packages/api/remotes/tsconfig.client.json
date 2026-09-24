@@ -36,6 +36,9 @@
       "path": "../../speech/speech"
     },
     {
+      "path": "../../host/plugin-admin"
+    },
+    {
       "path": "../../host/plugin-inventory"
     },
     {

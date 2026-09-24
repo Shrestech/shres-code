@@ -4,6 +4,7 @@ import type { Context } from '@shres-code/cordis'
 import commandsRemote from '@shres-code/shres-code-commands/remote'
 import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
+import pluginAdminRemote from '@shres-code/shres-code-host-plugin-admin/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
 import remoteControlRemote from '@shres-code/shres-code-host-remote-control/remote'
 import messageFeedbackRemote from '@shres-code/shres-code-message-feedback/remote'
@@ -13,6 +14,14 @@ import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
 
 export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
+// The pluginAdmin namespaces' payload vocabulary rides the same rule: the
+// Client contribution names what it sends and receives through this
+// assembly, never through a Host package import.
+export type {
+  InstalledSkillView, ParkedTransactionView, PluginAdminConfirmOutcome, PluginAdminGestureVerb,
+  PluginAdminInstallOutcome, PluginAdminRemoveOutcome, PluginAdminStatusResult, PluginConfirmToken,
+  PluginGestureToken, PluginMutations, PluginTransactionId, SkillInstallOutcome, SkillRemoveOutcome,
+} from '@shres-code/shres-code-host-plugin-admin/types'
 export type {
   ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldPayloadInfo,
   ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
@@ -20,6 +29,7 @@ export type {
 } from '@shres-code/shres-code-shield/types'
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
+export type {} from '@shres-code/shres-code-host-plugin-admin/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
 export type {} from '@shres-code/shres-code-host-remote-control/remote'
 // The remote namespaces' payload vocabulary rides the same rule as the shield
@@ -126,8 +136,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, remoteControlRemote, messageFeedbackRemote,
-      speechRemote, shieldRemote,
+      commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote, remoteControlRemote,
+      messageFeedbackRemote, speechRemote, shieldRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

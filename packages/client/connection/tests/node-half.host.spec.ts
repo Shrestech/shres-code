@@ -231,6 +231,12 @@ describe('connection node half', () => {
       'remoteControl/list',
       'remoteAdmin/begin', 'remoteAdmin/inspect', 'remoteAdmin/connect', 'remoteAdmin/disconnect',
       'remoteAdmin/add', 'remoteAdmin/edit', 'remoteAdmin/removeEntry', 'remoteAdmin/status',
+      // The plugin-admin plane: the status read is reconnaissance-grade like
+      // the registry read, and the mutations install code the next boot
+      // executes or copy content into the shared skills root — the gesture
+      // gate stays inside the namespace.
+      'pluginAdmin/status', 'pluginAdmin/begin', 'pluginAdmin/stageInstall', 'pluginAdmin/confirm',
+      'pluginAdmin/cancel', 'pluginAdmin/removePlugin', 'pluginAdmin/skillAdd', 'pluginAdmin/skillRemove',
     ]) {
       const denied = fakeResponse()
       await routes[0]!.handler(

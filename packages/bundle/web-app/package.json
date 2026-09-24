@@ -97,6 +97,7 @@
     "@shres-code/shres-code-host-directory-picker-auto": "workspace:^",
     "@shres-code/shres-code-host-directory-picker-browse": "workspace:^",
     "@shres-code/shres-code-host-directory-picker-native": "workspace:^",
+    "@shres-code/shres-code-host-plugin-admin": "workspace:^",
     "@shres-code/shres-code-host-plugin-inventory": "workspace:^",
     "@shres-code/shres-code-host-remote-control": "workspace:^",
     "@shres-code/shres-code-host-webserver": "workspace:^",
