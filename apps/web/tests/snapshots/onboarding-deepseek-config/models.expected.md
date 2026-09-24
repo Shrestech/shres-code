@@ -133,6 +133,10 @@
       - switch "Enable Grok (subscription) (grok-session)"
       - button "Edit Grok (subscription) (grok-session)": Edit
     - listitem:
+      - text: Claude (subscription)
+      - switch "Enable Claude (subscription) (claude-session)"
+      - button "Edit Claude (subscription) (claude-session)": Edit
+    - listitem:
       - text: xAI (pay-per-token)
       - img "API key missing"
       - switch "Enable xAI (pay-per-token) (xai-apikey)"
