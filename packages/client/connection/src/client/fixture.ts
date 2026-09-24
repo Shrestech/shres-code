@@ -12,7 +12,7 @@ import {
   isTokenDelta,
 } from '@shres-code/shres-code-llm/message'
 import { CallId } from '@shres-code/shres-code-llm/brand'
-import { cacheCount } from '@shres-code/shres-code-llm/usage'
+import { cacheCount, promptTokens } from '@shres-code/shres-code-llm/usage'
 import type {
   AssistantMessage,
   ContentBlock,
@@ -1047,9 +1047,7 @@ function contextPressureOf(
   for (const event of log) {
     const sample = usageSampleOf(event)
     if (sample === undefined) continue
-    pressureTokens = sample.usage.inputTokens
-      + (sample.usage.cacheReadTokens ?? 0)
-      + (sample.usage.cacheWriteTokens ?? 0)
+    pressureTokens = promptTokens(sample.usage)
   }
   const contextWindow = lastRequestContext(log)?.contextWindow
   return {
