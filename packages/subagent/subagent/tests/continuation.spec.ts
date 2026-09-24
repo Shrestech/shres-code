@@ -1908,6 +1908,60 @@ describe('continuable settlement delivery', () => {
       .toEqual(new Set([first.childId, second.childId]))
   })
 
+  it('delivers a report and a settlement into one turn of a busy parent', async () => {
+    const releaseParent = Promise.withResolvers<undefined>()
+    const releaseChild = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([
+      { chunks: textResponse('parent works'), gate: releaseParent.promise },
+      { chunks: textResponse('child answer'), gate: releaseChild.promise },
+      { chunks: textResponse('parent reacts') },
+    ])
+    const { ctx, parent } = await setupWith(adapter)
+    const turnStarts: number[] = []
+    ctx.on('session/event', (session, event) => {
+      if (session.id === parent.id && event.type === 'turn/start') turnStarts.push(event.data.turn)
+    })
+    // Open the parent's turn before the child exists, so both child-to-parent
+    // deliveries meet a parent that is already busy.
+    parent.followup(createUserMessage({ content: message('start working'), source: { kind: 'user' } }))
+    await vi.waitFor(() => { expect(parent.status).toBe('running') })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    const child = await vi.waitFor(() => {
+      const live = ctx.agents.get(started.childId)
+      expect(live).toBeDefined()
+      return live!
+    })
+    await vi.waitFor(() => {
+      expect(adapter.requests.filter(request => request.sessionId === started.childId)).toHaveLength(1)
+    })
+
+    await ctx.subagents.reportFrom(child, message('CHILD_FINDING'), {
+      delivery: 'wakeup',
+      signal: testSignal,
+    })
+    releaseChild.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+
+    // The report arrived first and the settlement notice second; both are
+    // next-step input for the turn the parent already has open.
+    expect(parent.inbox.nextStep.map(queued => queued.source.kind))
+      .toEqual(['subagent-report', 'subagent-settled'])
+    expect(parent.inbox.nextTurn).toHaveLength(0)
+
+    releaseParent.resolve(undefined)
+    await vi.waitFor(() => {
+      const kinds = parent.session.events.flatMap(event => event.type === 'user/message'
+        && event.data.source.kind !== 'plugin'
+        ? [event.data.source.kind]
+        : [])
+      expect(kinds).toEqual(['user', 'subagent-report', 'subagent-settled'])
+    })
+    // One turn claimed both deliveries; neither opened a turn of its own.
+    expect(turnStarts).toEqual([1])
+    expect(parent.inbox.nextStep).toHaveLength(0)
+  })
+
   it('holds a maintaining parent live until it can read the notice', async () => {
     const releaseFirst = Promise.withResolvers<undefined>()
     const releaseSecond = Promise.withResolvers<undefined>()
@@ -1940,6 +1994,11 @@ describe('continuable settlement delivery', () => {
     await waitNoActivation(ctx, first.childId)
     releaseSecond.resolve(undefined)
     await waitNoActivation(ctx, second.childId)
+    // Maintenance folds into an idle status, so both notices wait as next-turn
+    // items rather than being steered into a turn boundary.
+    expect(middle.inbox.nextStep).toHaveLength(0)
+    expect(middle.inbox.nextTurn.map(queued => queued.source.kind))
+      .toEqual(['subagent-settled', 'subagent-settled'])
     expect(ctx.agents.get(outer.childId)).toBe(middle)
 
     maintaining.resolve(undefined)

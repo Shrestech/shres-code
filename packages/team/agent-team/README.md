@@ -50,7 +50,7 @@ Mailbox bookkeeping reconstructs from the Lead log; model-visible content recons
 
 ## Model Experience
 
-Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
+Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). A rostered teammate is the only agent with a second channel to its parent — `team_send` beside the optional `report` tool — so the policy ends with `Do not resend content you already delivered to the same recipient through another tool.`, which names no tool and therefore holds when that optional package is absent. Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
 
 #### KV Cache effect
 

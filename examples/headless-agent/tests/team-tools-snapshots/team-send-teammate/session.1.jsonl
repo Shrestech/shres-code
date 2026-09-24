@@ -1,0 +1,11 @@
+{"type":"session","version":0,"id":"team-send-teammate-aegis","createdAt":2,"delegationDepth":1}
+{"type":"assistant/chunk","seq":0,"time":1,"data":{"turn":1,"step":1,"chunk":{"type":"block-start","index":0,"blockType":"tool-call"}}}
+{"type":"assistant/chunk","seq":1,"time":2,"data":{"turn":1,"step":1,"chunk":{"type":"tool-call-delta","index":0,"id":"list-members","name":"team_list","argumentsDelta":"{}"}}}
+{"type":"assistant/chunk","seq":2,"time":3,"data":{"turn":1,"step":1,"chunk":{"type":"block-end","index":0,"block":{"type":"tool-call","id":"list-members","name":"team_list","arguments":"{}"}}}}
+{"type":"assistant/chunk","seq":3,"time":4,"data":{"turn":1,"step":1,"chunk":{"type":"usage","usage":{"inputTokens":10,"outputTokens":5}}}}
+{"type":"assistant/chunk","seq":4,"time":5,"data":{"turn":1,"step":1,"chunk":{"type":"finish","reason":{"kind":"tool-calls"}}}}
+{"type":"assistant/chunk","seq":5,"time":6,"data":{"turn":1,"step":2,"chunk":{"type":"block-start","index":0,"blockType":"text"}}}
+{"type":"assistant/chunk","seq":6,"time":7,"data":{"turn":1,"step":2,"chunk":{"type":"text-delta","index":0,"text":"AEGIS_REPLY"}}}
+{"type":"assistant/chunk","seq":7,"time":8,"data":{"turn":1,"step":2,"chunk":{"type":"block-end","index":0,"block":{"type":"text","text":"AEGIS_REPLY"}}}}
+{"type":"assistant/chunk","seq":8,"time":9,"data":{"turn":1,"step":2,"chunk":{"type":"usage","usage":{"inputTokens":10,"outputTokens":5}}}}
+{"type":"assistant/chunk","seq":9,"time":10,"data":{"turn":1,"step":2,"chunk":{"type":"finish","reason":{"kind":"stop"}}}}
