@@ -29,7 +29,7 @@ Every field is validated at load; unknown keys fail by name. Relative paths, a r
 | `maxResponseBytes` | `4194304` | Response body cap; at most 64 MiB. |
 | `restart.maxRestarts` / `windowMs` / `backoffMs` / `maxBackoffMs` | `5` / `600000` / `1000` / `30000` | Crash restarts allowed per sliding window, with exponential backoff between them. |
 
-The router's own judgment deadline, when it has one, should exceed `requestTimeoutMs` so a slow ask is classified by this provider.
+`requestTimeoutMs` is this provider's backstop: it bounds every ask from a consumer that sets no deadline of its own, the health check, and the startup smoke ask, which is the first inference after the checkpoint loads. The model router's `judgmentDeadlineMs` (default `1500`) sits below this default, so the router cuts a slow routing ask and its decision records `engineFailure.code: 'DEADLINE'`. A timeout here reports `UNAVAILABLE`, the code this provider also uses for a gateway that is not ready or has exited, so it is the less specific classification of a slow ask. Keep `requestTimeoutMs` above the router's deadline.
 
 ## Composition
 
