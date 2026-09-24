@@ -4617,6 +4617,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
   },
   {
+    name: 'ModelRoutingOperatingPoint',
+    declaration: 'export interface ModelRoutingOperatingPoint {\n    readonly engine: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly calibratedBy?: string;\n    readonly acceptVerbalized: boolean;\n}',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
   },
@@ -4790,7 +4794,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',

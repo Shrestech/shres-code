@@ -2488,10 +2488,22 @@ export interface ModelRouterConfig {
    * judgment call. Must be non-empty unless `initialMode` is `off`.
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
-  /** Route confidence at or above which a candidate may be selected. Required. */
+  /**
+   * Route confidence at or above which a candidate may be selected. Required.
+   * The global default for any engine without an operating point.
+   */
   downgradeThreshold: number
-  /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
+  /**
+   * Required top-two probability margin (`top1 - top2`) for a selection.
+   * Required. The global default for any engine without an operating point.
+   */
   downgradeMargin: number
+  /**
+   * Gate thresholds per judgment engine, which replace the global defaults
+   * for the engine each names. At most one per engine. A `verbalized` engine
+   * gates only through a point that sets `acceptVerbalized`.
+   */
+  operatingPoints?: ModelRoutingOperatingPointConfig[]
   /** Streak horizon and cap, in model steps. */
   hold?: ModelRoutingHoldConfig
   /** Entry side of the difficulty band. */
@@ -2598,6 +2610,27 @@ export interface ModelRoutingRouteFromConfig {
 }
 
 /**
+ * The gate thresholds one judgment engine is operated at, as configuration
+ * states them. Thresholds do not transfer between engines, so a point applies
+ * only to the engine it names.
+ */
+export interface ModelRoutingOperatingPointConfig {
+  /** Registry id of the engine this point applies to. */
+  engine: string
+  /** Route confidence at or above which a candidate may be selected. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. */
+  downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds; absence marks them uncalibrated. */
+  calibratedBy?: string
+  /**
+   * Allow gating on an engine whose descriptor declares `verbalized`
+   * calibration. Without it such an engine is refused as `engine-uncalibrated`.
+   */
+  acceptVerbalized?: boolean
+}
+
+/**
  * The streak horizon, counted in model steps: every `step/start` the loop logs
  * while a downgrade is held advances it, including later steps of the turn that
  * entered the streak.
@@ -2697,7 +2730,7 @@ export interface ModelRoutingStateConfig {
 export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:117`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:119`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

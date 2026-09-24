@@ -2587,6 +2587,16 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingOperatingPointConfig",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingThresholds",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingObjective",
       "source": "packages/llm/model-router/src/types.ts"
     },

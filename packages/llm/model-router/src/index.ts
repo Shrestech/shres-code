@@ -45,6 +45,7 @@ import {
   declareJudgmentConsumer,
   JudgmentError,
   judgmentConsumerId,
+  judgmentEngineId,
   judgmentEnabled,
   judgmentQuestionId,
 } from '@shres-code/shres-code-judgment'
@@ -105,6 +106,7 @@ import type {
   ModelRoutingProjection,
   ModelRoutingReason,
   ModelRoutingRouteFrom,
+  ModelRoutingThresholds,
   ModelRoutingSelection,
   ModelRoutingSelectionView,
 } from './types.ts'
@@ -413,6 +415,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })).default([]),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
+    operatingPoints: z.array(z.object({
+      engine: z.string().required(),
+      downgradeThreshold: z.number().min(0).max(1).required(),
+      downgradeMargin: z.number().min(0).max(1).required(),
+      calibratedBy: z.string(),
+      acceptVerbalized: z.boolean(),
+    })).default([]),
     hold: z.object({
       minSteps: z.number().step(1).min(0).default(DEFAULT_HOLD_MIN_STEPS),
       maxSteps: z.number().step(1).min(1).default(DEFAULT_HOLD_MAX_STEPS),
@@ -576,6 +585,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
+    this.reportUnregisteredOperatingPoints(ctx)
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
@@ -602,6 +612,56 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })
     ctx.inject(['agents', 'modelRouting'], (agentCtx) => {
       for (const agent of agentCtx.agents.list()) this.attachAgent(agent)
+    })
+  }
+
+  /**
+   * Report each operating point that names an engine no provider registered,
+   * once, after the Loader settles and again whenever a settings or registry
+   * change introduces one; report at info level when one resolves. A point for
+   * an unregistered engine never applies, and routing on the engine that was
+   * meant runs on the uncalibrated global defaults, so the typo must be seen.
+   * The Loader is read structurally, as `judgment-dispatch` reads it.
+   * @param ctx - the router's context.
+   */
+  private reportUnregisteredOperatingPoints(ctx: Context): void {
+    ctx.inject(['judgmentEngines'], (registryCtx) => {
+      const registry = registryCtx.judgmentEngines
+      const reported = new Set<string>()
+      let settled = false
+      const reconcile = (): void => {
+        if (!settled) return
+        const named = new Set(this.config().operatingPoints.map(point => point.engine))
+        for (const id of named) {
+          if (registry.get(judgmentEngineId(id)) !== undefined || reported.has(id)) continue
+          reported.add(id)
+          registryCtx.logger.error('model-router: operatingPoints names engine "%s", which is not composed; the point never applies', id)
+        }
+        for (const id of [...reported]) {
+          if (named.has(id) && registry.get(judgmentEngineId(id)) === undefined) continue
+          reported.delete(id)
+          if (named.has(id)) registryCtx.logger.info('model-router: engine "%s" is now composed; its operating point applies', id)
+        }
+      }
+      registryCtx.effect(() => {
+        let live = true
+        const loader = (registryCtx.get as (name: string) => { await(): Promise<void> } | undefined)('loader')
+        loader?.await().then(() => {
+          if (!live) return
+          settled = true
+          reconcile()
+        }, () => {
+          // A fiber elsewhere failed to load; the Loader reports it, and a
+          // later settings or registry change reconciles again.
+        })
+        return () => {
+          live = false
+        }
+      }, 'model-router: report unregistered operating points')
+      registryCtx.effect(() => registry.subscribe(reconcile), 'model-router: reconcile operating points on registry change')
+      registryCtx.effect(() => registryCtx.on('settings/updated', (ns) => {
+        if (ns === MODEL_ROUTER_SETTINGS_NAMESPACE) reconcile()
+      }), 'model-router: reconcile operating points on settings change')
     })
   }
 
@@ -1071,6 +1131,21 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
+    const registered = selectedEngine === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(selectedEngine)
+    const point = config.operatingPoints.find(entry => entry.engine === selectedEngine)
+    // A generative model's stated probabilities do not gate unless the
+    // deployment accepted them for this engine (owner decision 9).
+    if (registered?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true) {
+      return { ...keep('engine-uncalibrated'), engineId: selectedEngine as string }
+    }
+    const thresholds: ModelRoutingThresholds = point === undefined
+      ? { downgradeThreshold: config.downgradeThreshold, downgradeMargin: config.downgradeMargin, source: 'global' }
+      : {
+        downgradeThreshold: point.downgradeThreshold,
+        downgradeMargin: point.downgradeMargin,
+        source: 'operating-point',
+        ...point.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
+      }
     const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
     const eligibilityStarted = Date.now()
@@ -1149,9 +1224,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     // An engine that is still starting or not yet installed cannot answer: the
     // call is not made and the fold does not count it as a failure.
-    const engineState = selectedEngine === undefined
-      ? undefined
-      : this.ctx.get('judgmentEngines')?.get(selectedEngine)?.status().state
+    const engineState = registered?.status().state
     if (selectedEngine !== undefined) facts.engineId = selectedEngine
     if (engineState === 'starting' || engineState === 'not-installed') {
       return judgmentFailed('engine-unavailable', true, 'UNAVAILABLE', engineState)
@@ -1227,6 +1300,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ...facts,
       route: routeAnswer,
       ...difficulty === undefined ? {} : { difficulty },
+      thresholds,
     }
     // Entry and exit use different thresholds: a score in between holds a
     // streak but does not enter one.
@@ -1258,7 +1332,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'current-preferred' } },
       }
     }
-    const verdict = gate(eligibleConfig, routeAnswer)
+    const verdict = gate({ ...eligibleConfig, ...thresholds }, routeAnswer)
     const picked = verdict.ok
       ? { ok: true as const, selection: candidateSelection(verdict.candidate, config, difficulty, held) }
       : verdict

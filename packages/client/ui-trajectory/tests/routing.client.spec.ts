@@ -215,6 +215,15 @@ describe('trajectoryRoutingRow', () => {
       .toBe('manual model thinks on a fixed budget, which a return would lose')
   })
 
+  it('shows engine-uncalibrated as the quiet marker with its label', () => {
+    const refused = decision({
+      outcome: 'kept-strong', reason: 'engine-uncalibrated', engineId: 'llm:ollama/qwen3:8b', sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(refused)).toEqual({ outcome: 'kept-strong', reason: 'engine-uncalibrated', quiet: true })
+    expect(en[ROUTING_REASON_KEYS['engine-uncalibrated']])
+      .toBe('judge engine is not accepted for routing without an operating point')
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',

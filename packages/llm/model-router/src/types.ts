@@ -74,6 +74,53 @@ export interface ModelRoutingCandidate {
   description: string
 }
 
+/**
+ * The gate thresholds one judgment engine is operated at, as configuration
+ * states them. Thresholds do not transfer between engines, so a point applies
+ * only to the engine it names.
+ */
+export interface ModelRoutingOperatingPointConfig {
+  /** Registry id of the engine this point applies to. */
+  engine: string
+  /** Route confidence at or above which a candidate may be selected. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. */
+  downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds; absence marks them uncalibrated. */
+  calibratedBy?: string
+  /**
+   * Allow gating on an engine whose descriptor declares `verbalized`
+   * calibration. Without it such an engine is refused as `engine-uncalibrated`.
+   */
+  acceptVerbalized?: boolean
+}
+
+/** One resolved operating point. */
+export interface ModelRoutingOperatingPoint {
+  /** Registry id of the engine this point applies to. */
+  readonly engine: string
+  /** Route-confidence floor. */
+  readonly downgradeThreshold: number
+  /** Top-two margin floor. */
+  readonly downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds, when one did. */
+  readonly calibratedBy?: string
+  /** Whether a `verbalized` engine may gate. */
+  readonly acceptVerbalized: boolean
+}
+
+/** The gate thresholds one answered consult applied, as a decision records them. */
+export interface ModelRoutingThresholds {
+  /** Route-confidence floor applied. */
+  downgradeThreshold: number
+  /** Top-two margin floor applied. */
+  downgradeMargin: number
+  /** Whether they came from the engine's operating point or the global defaults. */
+  source: 'operating-point' | 'global'
+  /** Id of the preregistration whose replay set them; absent means uncalibrated. */
+  calibratedBy?: string
+}
+
 /** One resolved strong route that routing may start from. */
 export interface ModelRoutingRouteFrom {
   /** Registered provider route of the strong model. */
@@ -222,6 +269,11 @@ export type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The selected engine declares `verbalized` calibration and no operating
+   * point accepts it, so it is not asked and the manual route stands.
+   */
+  | 'engine-uncalibrated'
   /**
    * The manual route runs budget thinking with reasoning enabled, so every
    * other candidate is excluded and no judgment runs: returning to it after a
@@ -427,6 +479,8 @@ export interface ModelRoutingDecision {
   engineFailure?: ModelRoutingEngineFailure
   /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
   objective?: ModelRoutingObjective
+  /** The gate thresholds applied to the route answer, when a judgment call answered. */
+  thresholds?: ModelRoutingThresholds
 }
 
 /** A failed judgment call as a decision records it. */
