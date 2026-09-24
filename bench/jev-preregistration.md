@@ -40,7 +40,12 @@ and exactly one candidate (the weak route). Amendment: the step-counted
 `hold`, the entry ceiling, and the re-entry cooldown replace the turn-counted
 `minTurnsDowngraded: 5` this arm was first frozen with, which the router no
 longer accepts, and the judgment deadline and failure handling are pinned at
-their defaults. The judgment engine is the TypeSafe provider on its
+their defaults. No trial was recorded under the original rule: the repository
+holds no `route-on` or `route-off` run, and the stored runs in
+`bench/analysis/out-of-loop-stored-runs.json` cover only the J-Space
+experiments. The confirmatory routing preregistration is PR 16 of the
+[routing redesign plan](../.agents/notes/proposed/feature/2026-09-24-model-routing-redesign-plan.md).
+The judgment engine is the TypeSafe provider on its
 `fast` tier (`jev-preview`, measured at 273 ms against 685 ms for
 `accurate` on a 1.7k-token state), the tier both consumers use here.
 
