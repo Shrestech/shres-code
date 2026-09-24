@@ -1,7 +1,7 @@
 /**
  * Real laya-mlx end to end: install the pinned checkpoint through the
  * provider's own install path, launch the supervised gateway, and answer a
- * routing-shaped fitted ask through `ctx.judgment`.
+ * routing-shaped fitted ask through `ctx.judgment`, the dispatcher selecting `laya`.
  *
  * Self-skips unless the host is Apple silicon and `LAYA_E2E_RUNTIME_DIR`
  * names an absolute runtime directory. The first run downloads about 850 MB of
@@ -11,8 +11,9 @@ import { isAbsolute } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
-import { LayaJudgmentEngine } from '../src/index.ts'
+import { LAYA_ENGINE_ID, LayaJudgmentEngine } from '../src/index.ts'
 
 const RUNTIME_DIR = process.env['LAYA_E2E_RUNTIME_DIR']
 const REPO = 'convaiinnovations/laya-typed-decisions'
@@ -48,12 +49,13 @@ beforeAll(async () => {
   if (!runnable) return
   ctx = new Context()
   await ctx.plugin(LocalSubprocessRuntime)
+  await ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
   await ctx.plugin(LayaJudgmentEngine, {
     model: { repo: REPO, revision: REVISION, manifestSha256: MANIFEST_SHA256 },
     checkpointContext: 1024,
     runtimeDir: RUNTIME_DIR,
   })
-  engine = ctx.get('judgment') as LayaJudgmentEngine
+  engine = ctx.judgmentEngines.get(LAYA_ENGINE_ID)?.engine as LayaJudgmentEngine
   await waitFor(() => engine.status().state !== 'starting', 60_000)
   if (engine.status().state === 'not-installed') await engine.install()
   await waitFor(() => engine.status().state === 'ready' || engine.status().state === 'unavailable', 180_000)
@@ -66,19 +68,20 @@ afterAll(async () => {
 describe.skipIf(!runnable)('judgment-laya with real laya-mlx', () => {
   it('serves a routing-shaped fitted ask locally with the pinned artifact', async () => {
     expect(engine.status()).toEqual({ state: 'ready' })
-    const result = await engine.fitting.ask({ states: ['user: Rename total to sum in utils.py.'], questions: QUESTIONS })
+    expect(ctx?.judgmentEngines.get(LAYA_ENGINE_ID)?.status()).toEqual({ state: 'ready' })
+    const result = await ctx!.judgment.fitting!.ask({ states: ['user: Rename total to sum in utils.py.'], questions: QUESTIONS })
 
     if (result.kind !== 'answered') throw new Error(`expected an answered fit, got ${result.reason}`)
     expect(result.fit.limits).toMatchObject({ maxSequenceTokens: 1024, manifestSha256: MANIFEST_SHA256 })
-    expect(result.result).toMatchObject({ engine: 'shield', model: `${REPO}@${REVISION}` })
+    expect(result.result).toMatchObject({ engineId: 'laya', engine: 'shield', model: `${REPO}@${REVISION}` })
     const [route, difficulty] = result.result.answers
     expect(route?.kind).toBe('choice')
     expect(difficulty?.kind).toBe('score')
   })
 
   it('refuses an over-long state without inference', async () => {
-    const result = await engine.fitting.ask({ states: ['word '.repeat(2_000)], questions: QUESTIONS })
-    expect(result).toMatchObject({ kind: 'unfit', reason: 'state' })
+    const result = await ctx!.judgment.fitting!.ask({ states: ['word '.repeat(2_000)], questions: QUESTIONS })
+    expect(result).toMatchObject({ kind: 'unfit', reason: 'state', engineId: 'laya' })
   })
 })
 

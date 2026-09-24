@@ -26,10 +26,13 @@ interface SettingsRegisterOptions<T> {
   applies?: SettingsApplies
   /**
    * Reject a resolved section the owner could not act on, for constraints its
-   * schema cannot express — a cross-field requirement, or one field's validity
-   * depending on another's. Throwing here refuses the *write* that produced the
-   * value, so a caller learns at `update`/`replace`/`mutate` instead of storing
-   * something that would silently disable the owner.
+   * schema cannot express — a cross-field requirement, one field's validity
+   * depending on another's, or a value that must name something a live
+   * service currently holds. Throwing here refuses the *write* that produced
+   * the value, so a caller learns at `update`/`replace`/`mutate` instead of
+   * storing something that would silently disable the owner. Throw
+   * {@link SettingsFieldError} to name the offending field; a configuration
+   * wire reports its path so a form can show the message beside that field.
    *
    * Kept separate from the schema because the schema is also what a
    * configuration surface renders and what an absent section resolves through;
@@ -40,14 +43,29 @@ interface SettingsRegisterOptions<T> {
    * so an externally edited document cannot strand a running owner. At
    * registration there is no last good value yet, so a stored section that
    * already fails rejects the registration itself — again exactly as a schema
-   * failure does.
+   * failure does. A check against live services should therefore run only for
+   * the `write` cause, and only on the fields the write changes: at
+   * `register` a service a stored value names can register after the owner in
+   * the same load, and a `reload` that fails keeps the previous value in force
+   * with only a warning, which a file edit cannot see.
    * @param value - the resolved section, schema-valid by construction.
+   * @param cause - which operation produced the value.
    */
-  validate?: (value: T) => void
+  validate?: (value: T, cause: SettingsValidationCause) => void
 }
 ```
 
-`validate` runs after the schema admits a value, so it sees defaults and the composition base exactly as the owner will. `shres-llm-pi-ai` uses it to refuse a provider profile it could not serve at the write that produced it, rather than storing one that would disable every route in its namespace.
+```ts type-equiv
+/**
+ * Operation that produced a value handed to {@link SettingsRegisterOptions.validate}:
+ * `register` resolves the stored section as the owner registers, `write`
+ * resolves an `update`, `replace`, or `mutate` before it is persisted, and
+ * `reload` resolves a document the provider observed in storage.
+ */
+type SettingsValidationCause = 'register' | 'write' | 'reload'
+```
+
+`validate` runs after the schema admits a value, so it sees defaults and the composition base exactly as the owner will. `shres-llm-pi-ai` uses it to refuse a provider profile it could not serve at the write that produced it, rather than storing one that would disable every route in its namespace. The second argument names the operation that produced the value. A check that reads live services — the LLM runtime's providers or the judgment engine registry — runs only for `write` and judges only the fields the write changes: at `register` a service a stored value names can register after the owner in the same load, and a failed `reload` keeps the previous value in force with only a warning, so a file edit would fail without a visible sign. The owner applies a stored or reloaded value as written and reports what it cannot serve. Throwing `SettingsFieldError` names the offending field: its `path` holds keys and array indices from the section root, and the configuration wire reports it with the message so a form can show the refusal beside that field. Any other error rejects the write with its message alone.
 
 `applies` is a UI hint, not a mechanism: a `restart` owner simply never watches, so its value is read once at construction and configuration surfaces can badge the pending change.
 
@@ -250,7 +268,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:350`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:388`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 

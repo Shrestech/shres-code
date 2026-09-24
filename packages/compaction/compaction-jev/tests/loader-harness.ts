@@ -27,6 +27,7 @@ import AgentLoop from '@shres-code/shres-code-agent-loop'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import { CredentialProvider } from '@shres-code/shres-code-credentials'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
 import LlmRuntime, { LlmAdapter, createMessage, createUserMessage } from '@shres-code/shres-code-llm'
 import type { ContentBlock, GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@shres-code/shres-code-llm'
@@ -59,6 +60,8 @@ export const BASIC_SPECIFIER = '@shres-code/shres-code-compaction-basic'
 export const CREDENTIALS_SPECIFIER = '@shres-code/shres-code-credentials-memory'
 /** Loader specifier of the judgment provider. */
 export const JUDGMENT_SPECIFIER = '@shres-code/shres-code-judgment-typesafe'
+/** Loader specifier of the dispatcher that routes asks to the judgment provider. */
+const DISPATCH_SPECIFIER = '@shres-code/shres-code-judgment-dispatch'
 /** Loader specifier of the test-only judgment fixture this package's rows mount. */
 export const JUDGMENT_FIXTURE_SPECIFIER = '@shres-code/shres-code-compaction-jev-judgment-fixture'
 
@@ -236,6 +239,7 @@ export async function loadTree(lines: readonly string[]): Promise<LoadedTree> {
     ['@shres-code/shres-code-system-prompt', SystemPrompt],
     ['@shres-code/shres-code-tools', ToolRuntime],
     [CREDENTIALS_SPECIFIER, MemoryCredentials],
+    [DISPATCH_SPECIFIER, JudgmentDispatch],
     [JUDGMENT_SPECIFIER, TypesafeJudgmentEngine],
     [JUDGMENT_FIXTURE_SPECIFIER, ScriptedSnapshotJudgment],
     ['@shres-code/shres-code-agent', AgentRegistry],
@@ -309,6 +313,9 @@ export function compositionRows(endpoint: string, engineRows: readonly string[] 
     "- name: '@shres-code/shres-code-credentials-memory'",
     '  config:',
     `    ${CREDENTIAL_REF}: loader-key`,
+    `- name: '${DISPATCH_SPECIFIER}'`,
+    '  config:',
+    '    defaultEngine: typesafe',
     "- name: '@shres-code/shres-code-judgment-typesafe'",
     '  config:',
     `    apiKeyRef: ${CREDENTIAL_REF}`,

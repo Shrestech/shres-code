@@ -7,10 +7,11 @@
 # timestamp-free; the per-trial session root is added by the renderer.
 #
 # The basic provider is DISABLED, not patched away: compaction-jev registers the
-# same service key, so the two rows cannot both stand. The judgment engine and
-# the jev backend are INSERTED, never patched — the base headless composition
-# mounts neither, and a patch against a missing entry no-ops silently, which
-# would leave the arm measuring its own baseline. The engine resolves
+# same service key, so the two rows cannot both stand. The judgment dispatcher,
+# the judgment engine, and the jev backend are INSERTED, never patched — the base
+# headless composition mounts none of them, and a patch against a missing entry
+# no-ops silently, which would leave the arm measuring its own baseline. The
+# dispatcher's defaultEngine names the one engine the arm composes. The engine resolves
 # TYPESAFE_API_KEY through the credentials seam: only the reference name is
 # pinned here, never a key value.
 #
@@ -27,6 +28,10 @@
 - id: compaction-basic
   disabled: true
 - insert:
+    - id: judgment-dispatch
+      name: "@shres-code/shres-code-judgment-dispatch"
+      config:
+        defaultEngine: "typesafe"
     - id: judgment-typesafe
       name: "@shres-code/shres-code-judgment-typesafe"
       config:

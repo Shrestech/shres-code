@@ -2,21 +2,28 @@
  * Local Laya provider for the typed-judgment seam.
  *
  * The provider supervises one loopback gateway process that runs a pinned Laya
- * checkpoint through laya-mlx on Apple silicon, and answers `ctx.judgment`
- * asks over the Shield judgment wire. No judgment state leaves the machine.
+ * checkpoint through laya-mlx on Apple silicon, registers it in
+ * `ctx.judgmentEngines` as `laya`, and answers the asks `judgment-dispatch` routes to
+ * it over the Shield judgment wire. No judgment state leaves the machine.
  * Installing the gateway environment and checkpoint is an explicit action
  * (`/laya install` or {@link LayaJudgmentEngine.install}); startup never
- * downloads. Until the gateway is ready every ask fails `UNAVAILABLE`, which
- * consumers treat as an absent engine.
+ * downloads. Until the gateway is ready its registry status is not `ready`, so
+ * every ask the dispatcher routes to it fails `UNAVAILABLE`, which consumers
+ * treat as an absent engine.
  *
  * @module @shres-code/shres-code-judgment-laya
  */
 
-import { Context, Service } from '@shres-code/cordis'
+import { Service } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { JudgmentService } from '@shres-code/shres-code-judgment'
+import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
+  JudgmentEngine,
+  JudgmentEngineDescriptor,
+  JudgmentEngineId,
+  JudgmentEngineStatus,
   JudgmentFittingEngine,
   JudgmentInput,
   JudgmentResult,
@@ -88,16 +95,47 @@ export const LAYA_COMMAND = 'laya'
 /** Config omitted by a direct `ctx.plugin(LayaJudgmentEngine)` call. */
 const NO_CONFIG = {} as LayaJudgmentConfig
 
+/** Registry id this provider registers its engine under. */
+export const LAYA_ENGINE_ID: JudgmentEngineId = judgmentEngineId('laya')
+
+/**
+ * Registry facts for the Laya engine: a calibrated classifier with
+ * tokenizer-exact fitting, served by a gateway process this provider
+ * supervises on Apple silicon, so no state leaves the harness's own processes.
+ */
+export const LAYA_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freeze({
+  id: LAYA_ENGINE_ID,
+  label: 'Laya (local MLX)',
+  egress: 'none',
+  calibration: 'calibrated',
+  supportsFitting: true,
+  host: 'darwin-arm64',
+})
+
+/**
+ * Map a gateway status onto the registry vocabulary. The registry has no
+ * `stopped` state: a stopped gateway cannot answer, so it reports
+ * `unavailable` with the supervisor's detail; every other state is shared.
+ * @param status - the supervisor's current status.
+ * @returns the registry status.
+ */
+export function layaEngineStatus(status: LayaGatewayStatus): JudgmentEngineStatus {
+  const state = status.state === 'stopped' ? 'unavailable' : status.state
+  return status.detail === undefined ? { state } : { state, detail: status.detail }
+}
+
 /** Positive integer timer field bounded by the platform timer limit. */
 const timer = (fallback: number, max = MAX_TIMER_DELAY_MS): z<number> =>
   z.natural().min(1).max(max).default(fallback)
 
 /**
- * Local Laya judgment provider. One instance registers `ctx.judgment`,
- * supervises one gateway process, and registers the `/laya` command.
+ * Local Laya judgment engine. One instance registers in `ctx.judgmentEngines`
+ * as {@link LAYA_ENGINE_ID}, supervises one gateway process, and registers the
+ * `/laya` command.
  */
-export class LayaJudgmentEngine extends JudgmentService {
-  static inject = ['subprocess']
+export class LayaJudgmentEngine implements JudgmentEngine {
+  /** The subprocess runtime the gateway runs under, and the registry `judgment-dispatch` provides. */
+  static inject = ['subprocess', 'judgmentEngines']
 
   /**
    * Composition schema consumed by the Loader. {@link resolveConfig} repeats
@@ -134,18 +172,21 @@ export class LayaJudgmentEngine extends JudgmentService {
   /** Resolved pin, paths, limits, and restart budget. */
   readonly config: ResolvedLayaJudgmentConfig
   /** Atomic tokenizer fitting and judgment through the gateway. */
-  override readonly fitting: JudgmentFittingEngine
+  readonly fitting: JudgmentFittingEngine
+  /** The provider's context: subprocess spawning, logging, and the redaction hook. */
+  private readonly ctx: Context
   private readonly supervisor: LayaGatewaySupervisor
   private readonly lifetime = new AbortController()
   private installation: Promise<LayaInstallResult> | undefined
 
   /**
-   * @param ctx - context receiving `ctx.judgment`; it must carry `ctx.subprocess`.
+   * @param ctx - the provider context whose fiber owns the registration; it
+   *   must carry `ctx.subprocess` and `ctx.judgmentEngines`.
    * @param config - pinned checkpoint, checkpoint context, and optional limits.
    * @throws Error when any configuration field is invalid.
    */
   constructor(ctx: Context, config: LayaJudgmentConfig = NO_CONFIG) {
-    super(ctx)
+    this.ctx = ctx
     this.config = resolveConfig(config)
     this.supervisor = new LayaGatewaySupervisor({
       config: this.config,
@@ -155,6 +196,14 @@ export class LayaJudgmentEngine extends JudgmentService {
       logger: this.ctx.logger,
     })
     this.fitting = { ask: input => this.supervisor.askFitted(input) }
+    const announce = registerJudgmentEngine(ctx, {
+      engine: this,
+      descriptor: LAYA_ENGINE_DESCRIPTOR,
+      status: () => layaEngineStatus(this.supervisor.status()),
+    })
+    ctx.effect(() => this.supervisor.onStatus(() => {
+      announce()
+    }), 'judgment-laya: announce gateway status')
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: LAYA_COMMAND,
@@ -185,7 +234,7 @@ export class LayaJudgmentEngine extends JudgmentService {
    *   `INVALID_ANSWER` for an unusable response, and `ABORTED` when the
    *   caller cancels.
    */
-  override ask(input: JudgmentInput): Promise<JudgmentResult> {
+  ask(input: JudgmentInput): Promise<JudgmentResult> {
     return this.supervisor.ask(input)
   }
 

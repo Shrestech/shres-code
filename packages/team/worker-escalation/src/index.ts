@@ -37,7 +37,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { declareJudgmentConsumer, judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
@@ -174,6 +174,13 @@ const LADDER_EVENTS: ReadonlySet<string> = new Set([
 
 /** The Stage 1 ask's question id, echoed by the answer this ladder reads. */
 const PROGRESS_QUESTION_ID = judgmentQuestionId('worker-progress')
+
+/**
+ * The consumer id every Stage 0 progress ask carries, declared in
+ * `ctx.judgmentEngines` while the plugin is mounted; a `judgment.overrides`
+ * entry under this key routes the asks to another engine.
+ */
+export const WORKER_ESCALATION_JUDGMENT_CONSUMER = judgmentConsumerId('worker-escalation')
 
 /**
  * The two options the Stage 1 ask offers, which are exactly the choices a
@@ -369,6 +376,7 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
  *   caller that invoked `apply` directly.
  */
 export function apply(ctx: Context, config: WorkerEscalationConfig): () => void {
+  declareJudgmentConsumer(ctx, WORKER_ESCALATION_JUDGMENT_CONSUMER)
   let source: () => WorkerEscalationConfig = () => config
   let raw: WorkerEscalationConfig = config
   let resolved: ResolvedWorkerEscalationConfig = resolveConfig(config)
@@ -482,6 +490,7 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
         questions: [progressQuestion(current)],
         tier: current.judgmentTier,
         signal: lifetime.signal,
+        consumer: WORKER_ESCALATION_JUDGMENT_CONSUMER,
       })
     } catch (error: unknown) {
       // A provider that refused an unusable response classified it itself; every

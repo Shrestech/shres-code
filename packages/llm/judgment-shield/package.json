@@ -45,6 +45,7 @@
     "@shres-code/cordis-plugin-loader": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:^",
     "@shres-code/shres-code-timeout": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   }

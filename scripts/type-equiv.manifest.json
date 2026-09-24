@@ -1767,6 +1767,11 @@
     },
     {
       "doc": "docs/subsystems/settings.md",
+      "symbol": "SettingsValidationCause",
+      "source": "packages/settings/settings/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/settings.md",
       "symbol": "SettingsApplies",
       "source": "packages/settings/settings/src/index.ts"
     },
@@ -2438,6 +2443,56 @@
     {
       "doc": "docs/subsystems/judgment.md",
       "symbol": "JudgmentSettings",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentConsumerId",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineId",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineDescriptor",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineEgress",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineCalibration",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineHost",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineStatus",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineState",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineEntry",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngineRegistration",
       "source": "packages/llm/judgment/src/types.ts"
     },
     {

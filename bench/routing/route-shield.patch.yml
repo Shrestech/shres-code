@@ -12,6 +12,10 @@
     provider: "deepseek-official"
     model: "deepseek-v4-pro"
 - insert:
+    - id: judgment-dispatch
+      name: "@shres-code/shres-code-judgment-dispatch"
+      config:
+        defaultEngine: "shield"
     - id: judgment-shield
       name: "@shres-code/shres-code-judgment-shield"
       config:

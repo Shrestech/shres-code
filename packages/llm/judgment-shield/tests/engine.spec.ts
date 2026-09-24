@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
-import { JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { JudgmentEngineRegistry, JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
   JudgmentChoiceQuestion,
@@ -8,10 +8,33 @@ import type {
   JudgmentInput,
   JudgmentScoreQuestion,
 } from '@shres-code/shres-code-judgment'
-import ShieldJudgmentEngine, { readFittedWireResponse, readWireResponse, toWireRequest } from '../src/index.ts'
+import ShieldJudgmentEngine, {
+  readFittedWireResponse,
+  readWireResponse,
+  SHIELD_ENGINE_DESCRIPTOR,
+  SHIELD_ENGINE_ID,
+  toWireRequest,
+} from '../src/index.ts'
 import type { ShieldJudgmentConfig } from '../src/index.ts'
 import { closeMockServers, mockServer, redirectServer } from './mock-server.ts'
 import type { MockResponse, MockServer } from './mock-server.ts'
+
+
+/** A context with a bare engine registry, the one service a provider injects. */
+function engineContext(): Context {
+  const ctx = new Context()
+  ctx.provide('judgmentEngines', new JudgmentEngineRegistry((error: unknown) => {
+    throw error
+  }))
+  return ctx
+}
+
+/** The engine this provider registered on `ctx`. */
+function engine(ctx: Context): ShieldJudgmentEngine {
+  const entry = ctx.judgmentEngines.get(SHIELD_ENGINE_ID)
+  if (entry === undefined) throw new Error('the engine is not registered')
+  return entry.engine as ShieldJudgmentEngine
+}
 
 const MODELS = { fast: 'shield-fast@1', accurate: 'shield-accurate@1' }
 
@@ -127,7 +150,7 @@ async function harness(
   options: { redactor?: boolean; statefulRedactor?: boolean; config?: Partial<ShieldJudgmentConfig> } = {},
 ): Promise<{ ctx: Context; server: MockServer }> {
   const server = await mockServer(script)
-  const ctx = new Context()
+  const ctx = engineContext()
   contexts.push(ctx)
   if (options.statefulRedactor === true) await ctx.plugin(StatefulRedactor)
   else if (options.redactor === true) await ctx.plugin(StubRedactor)
@@ -239,7 +262,7 @@ describe('ShieldJudgmentEngine', () => {
   it('redacts once, maps the typed ask, and returns the owned identity', async () => {
     const { ctx, server } = await harness([{ kind: 'json', body: answerBody() }], { redactor: true })
 
-    const result = await ctx.judgment.ask(ask())
+    const result = await engine(ctx).ask(ask())
 
     expect(result).toEqual({
       engine: 'shield',
@@ -299,7 +322,7 @@ describe('ShieldJudgmentEngine', () => {
       engine: 'shield', model: MODELS.accurate, latencyMs: 1, answers: [],
     } }])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [] })
 
     expect(result.model).toBe(MODELS.accurate)
     expect(server.requests[0]?.body).toMatchObject({ model: MODELS.accurate, questions: [] })
@@ -307,24 +330,24 @@ describe('ShieldJudgmentEngine', () => {
 
   it('maps HTTP and JSON failures to stable judgment errors', async () => {
     const unavailable = await harness([{ kind: 'text', status: 503, body: 'busy' }])
-    const unavailableFailure = await failure(() => unavailable.ctx.judgment.ask(ask()))
+    const unavailableFailure = await failure(() => engine(unavailable.ctx).ask(ask()))
     expect(unavailableFailure.code).toBe('UNAVAILABLE')
     expect(unavailableFailure.message).toContain('HTTP 503')
 
     const malformed = await harness([{ kind: 'text', body: 'not json' }])
-    const malformedFailure = await failure(() => malformed.ctx.judgment.ask(ask()))
+    const malformedFailure = await failure(() => engine(malformed.ctx).ask(ask()))
     expect(malformedFailure.code).toBe('INVALID_ANSWER')
   })
 
   it('maps gateway model and response-size violations to INVALID_ANSWER', async () => {
     const mismatched = await harness([{ kind: 'json', body: answerBody({ model: 'other-model' }) }])
-    expect((await failure(() => mismatched.ctx.judgment.ask(ask()))).code).toBe('INVALID_ANSWER')
+    expect((await failure(() => engine(mismatched.ctx).ask(ask()))).code).toBe('INVALID_ANSWER')
 
     const oversized = await harness(
       [{ kind: 'json', body: answerBody(), headers: { 'content-length': '10000' } }],
       { config: { maxResponseBytes: 100 } },
     )
-    const oversizedFailure = await failure(() => oversized.ctx.judgment.ask(ask()))
+    const oversizedFailure = await failure(() => engine(oversized.ctx).ask(ask()))
     expect(oversizedFailure.code).toBe('INVALID_ANSWER')
     expect(oversizedFailure.message).toContain('maxResponseBytes 100')
 
@@ -332,7 +355,7 @@ describe('ShieldJudgmentEngine', () => {
       [{ kind: 'json', body: answerBody() }],
       { config: { maxResponseBytes: 100 } },
     )
-    const streamedFailure = await failure(() => streamedOversized.ctx.judgment.ask(ask()))
+    const streamedFailure = await failure(() => engine(streamedOversized.ctx).ask(ask()))
     expect(streamedFailure.code).toBe('INVALID_ANSWER')
   })
 
@@ -345,7 +368,7 @@ describe('ShieldJudgmentEngine', () => {
       { config: { maxRequestBytes: requestBytes - 1 } },
     )
 
-    const oversizedFailure = await failure(() => ctx.judgment.ask(ask({ state })))
+    const oversizedFailure = await failure(() => engine(ctx).ask(ask({ state })))
 
     expect(oversizedFailure.code).toBe('INPUT_TOO_LARGE')
     expect(oversizedFailure.message).toContain(`maxRequestBytes ${requestBytes - 1}`)
@@ -361,7 +384,7 @@ describe('ShieldJudgmentEngine', () => {
       { config: { maxRequestBytes: requestBytes } },
     )
 
-    await expect(ctx.judgment.ask(ask({ state }))).resolves.toMatchObject({ model: MODELS.fast })
+    await expect(engine(ctx).ask(ask({ state }))).resolves.toMatchObject({ model: MODELS.fast })
     expect(server.requests).toHaveLength(1)
     expect(server.requests[0]?.body).toMatchObject({ state, model: MODELS.fast })
   })
@@ -369,13 +392,13 @@ describe('ShieldJudgmentEngine', () => {
   it('classifies caller cancellation separately from the request deadline', async () => {
     const caller = await harness([{ kind: 'stall' }], { config: { timeoutMs: 500 } })
     const controller = new AbortController()
-    const pending = caller.ctx.judgment.ask(ask({ signal: controller.signal }))
+    const pending = engine(caller.ctx).ask(ask({ signal: controller.signal }))
     await new Promise<void>(resolve => setTimeout(resolve, 10))
     controller.abort()
     expect((await failure(() => pending)).code).toBe('ABORTED')
 
     const deadline = await harness([{ kind: 'stall' }], { config: { timeoutMs: 10 } })
-    expect((await failure(() => deadline.ctx.judgment.ask(ask()))).code).toBe('UNAVAILABLE')
+    expect((await failure(() => engine(deadline.ctx).ask(ask()))).code).toBe('UNAVAILABLE')
   })
 
   it('rejects a pre-cancelled ordinary ask before redaction or HTTP', async () => {
@@ -383,7 +406,7 @@ describe('ShieldJudgmentEngine', () => {
     const controller = new AbortController()
     controller.abort()
 
-    expect((await failure(() => ctx.judgment.ask(ask({ signal: controller.signal })))).code).toBe('ABORTED')
+    expect((await failure(() => engine(ctx).ask(ask({ signal: controller.signal })))).code).toBe('ABORTED')
     expect(StatefulRedactor.inputs).toEqual([])
     expect(server.requests).toEqual([])
   })
@@ -392,7 +415,7 @@ describe('ShieldJudgmentEngine', () => {
     const { ctx, server } = await harness([{ kind: 'json', body: answerBody() }])
     await ctx.plugin(NeverResolvingRedactor)
     const controller = new AbortController()
-    const pending = ctx.judgment.ask(ask({ signal: controller.signal }))
+    const pending = engine(ctx).ask(ask({ signal: controller.signal }))
 
     await Promise.resolve()
     expect(NeverResolvingRedactor.calls).toBe(1)
@@ -409,9 +432,9 @@ describe('ShieldJudgmentEngine', () => {
     RejectingRedactor.error = error
     const controller = new AbortController()
 
-    await expect(ctx.judgment.ask(ask({ signal: controller.signal }))).rejects.toBe(error)
+    await expect(engine(ctx).ask(ask({ signal: controller.signal }))).rejects.toBe(error)
     RejectingRedactor.error = 'plain rejection'
-    await expect(ctx.judgment.ask(ask({ signal: new AbortController().signal }))).rejects.toThrow('plain rejection')
+    await expect(engine(ctx).ask(ask({ signal: new AbortController().signal }))).rejects.toThrow('plain rejection')
     expect(server.requests).toEqual([])
   })
 
@@ -424,14 +447,14 @@ describe('ShieldJudgmentEngine', () => {
       controller.abort()
     })
 
-    expect((await failure(() => ctx.judgment.ask(ask({ signal: controller.signal })))).code).toBe('ABORTED')
+    expect((await failure(() => engine(ctx).ask(ask({ signal: controller.signal })))).code).toBe('ABORTED')
     expect(StatefulRedactor.inputs).toEqual([])
     expect(server.requests).toEqual([])
   })
 
   it('refuses a redirect before the gateway can forward state to another target', async () => {
     const servers = await redirectServer()
-    const ctx = new Context()
+    const ctx = engineContext()
     contexts.push(ctx)
     await ctx.plugin(ShieldJudgmentEngine, {
       endpoint: servers.redirect.url,
@@ -439,14 +462,14 @@ describe('ShieldJudgmentEngine', () => {
       timeoutMs: 500,
     })
 
-    const redirectFailure = await failure(() => ctx.judgment.ask(ask()))
+    const redirectFailure = await failure(() => engine(ctx).ask(ask()))
 
     expect(redirectFailure.code).toBe('UNAVAILABLE')
     expect(servers.targetRequests()).toBe(0)
   })
 
   it('classifies a refused connection as unavailable', async () => {
-    const ctx = new Context()
+    const ctx = engineContext()
     contexts.push(ctx)
     await ctx.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:1',
@@ -454,7 +477,7 @@ describe('ShieldJudgmentEngine', () => {
       timeoutMs: 500,
     })
 
-    expect((await failure(() => ctx.judgment.ask(ask()))).code).toBe('UNAVAILABLE')
+    expect((await failure(() => engine(ctx).ask(ask()))).code).toBe('UNAVAILABLE')
   })
 
   it('handles a successful response with no body stream', async () => {
@@ -464,7 +487,7 @@ describe('ShieldJudgmentEngine', () => {
       headers: new Headers(),
       text: async () => 'x'.repeat(101),
     } as unknown as Response)))
-    const ctx = new Context()
+    const ctx = engineContext()
     contexts.push(ctx)
     await ctx.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:8765',
@@ -472,7 +495,7 @@ describe('ShieldJudgmentEngine', () => {
       maxResponseBytes: 100,
     })
 
-    expect((await failure(() => ctx.judgment.ask(ask()))).code).toBe('INVALID_ANSWER')
+    expect((await failure(() => engine(ctx).ask(ask()))).code).toBe('INVALID_ANSWER')
 
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
@@ -480,13 +503,13 @@ describe('ShieldJudgmentEngine', () => {
       headers: new Headers(),
       text: async () => { throw new Error('body read failed') },
     } as unknown as Response)))
-    const failedBody = new Context()
+    const failedBody = engineContext()
     contexts.push(failedBody)
     await failedBody.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:8765',
       models: MODELS,
     })
-    expect((await failure(() => failedBody.judgment.ask(ask()))).code).toBe('UNAVAILABLE')
+    expect((await failure(() => engine(failedBody).ask(ask()))).code).toBe('UNAVAILABLE')
 
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
@@ -494,13 +517,13 @@ describe('ShieldJudgmentEngine', () => {
       headers: new Headers(),
       text: async () => JSON.stringify(answerBody({ answers: [] })),
     } as unknown as Response)))
-    const emptyBody = new Context()
+    const emptyBody = engineContext()
     contexts.push(emptyBody)
     await emptyBody.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:8765',
       models: MODELS,
     })
-    expect((await failure(() => emptyBody.judgment.ask(ask()))).code).toBe('INVALID_ANSWER')
+    expect((await failure(() => engine(emptyBody).ask(ask()))).code).toBe('INVALID_ANSWER')
     vi.unstubAllGlobals()
   })
 
@@ -508,22 +531,22 @@ describe('ShieldJudgmentEngine', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({
       start(controller) { controller.error(new Error('body broke')) },
     }), { status: 200 })))
-    const failedRead = new Context()
+    const failedRead = engineContext()
     contexts.push(failedRead)
     await failedRead.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:8765',
       models: MODELS,
     })
-    expect((await failure(() => failedRead.judgment.ask(ask()))).code).toBe('UNAVAILABLE')
+    expect((await failure(() => engine(failedRead).ask(ask()))).code).toBe('UNAVAILABLE')
 
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([0xff]), { status: 200 })))
-    const invalidUtf8 = new Context()
+    const invalidUtf8 = engineContext()
     contexts.push(invalidUtf8)
     await invalidUtf8.plugin(ShieldJudgmentEngine, {
       endpoint: 'http://127.0.0.1:8765',
       models: MODELS,
     })
-    expect((await failure(() => invalidUtf8.judgment.ask(ask()))).code).toBe('INVALID_ANSWER')
+    expect((await failure(() => engine(invalidUtf8).ask(ask()))).code).toBe('INVALID_ANSWER')
     vi.unstubAllGlobals()
   })
 
@@ -532,7 +555,7 @@ describe('ShieldJudgmentEngine', () => {
       [{ kind: 'json', body: fittedBody() }],
       { statefulRedactor: true },
     )
-    const fitting = ctx.judgment.fitting
+    const fitting = engine(ctx).fitting
     if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
 
     const result = await fitting.ask(fittedAsk({ states: ['short secret', 'longer secret state'] }))
@@ -562,7 +585,7 @@ describe('ShieldJudgmentEngine', () => {
 
   it('returns an explicit unfit result without asking inference', async () => {
     const { ctx, server } = await harness([{ kind: 'json', body: unfitBody() }])
-    const fitting = ctx.judgment.fitting
+    const fitting = engine(ctx).fitting
     if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
 
     await expect(fitting.ask(fittedAsk())).resolves.toEqual({
@@ -577,7 +600,7 @@ describe('ShieldJudgmentEngine', () => {
 
   it('rejects a pre-cancelled fitted ask before redacting candidates', async () => {
     const { ctx, server } = await harness([{ kind: 'json', body: fittedBody() }], { statefulRedactor: true })
-    const fitting = ctx.judgment.fitting
+    const fitting = engine(ctx).fitting
     if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
     const controller = new AbortController()
     controller.abort()
@@ -590,7 +613,7 @@ describe('ShieldJudgmentEngine', () => {
   it('preserves a redactor failure and classifies one that aborts the caller', async () => {
     const ordinaryFailure = await harness([{ kind: 'json', body: fittedBody() }])
     await ordinaryFailure.ctx.plugin(ThrowingRedactor)
-    const ordinaryFitting = ordinaryFailure.ctx.judgment.fitting
+    const ordinaryFitting = engine(ordinaryFailure.ctx).fitting
     if (ordinaryFitting === undefined) throw new Error('Shield provider did not expose fitting')
     const ordinaryError = new Error('ordinary redactor failed')
     ThrowingRedactor.error = ordinaryError
@@ -598,7 +621,7 @@ describe('ShieldJudgmentEngine', () => {
 
     const cancelled = await harness([{ kind: 'json', body: fittedBody() }])
     await cancelled.ctx.plugin(ThrowingRedactor)
-    const cancelledFitting = cancelled.ctx.judgment.fitting
+    const cancelledFitting = engine(cancelled.ctx).fitting
     if (cancelledFitting === undefined) throw new Error('Shield provider did not expose fitting')
     const controller = new AbortController()
     ThrowingRedactor.error = new Error('cancelled redactor failed')
@@ -636,7 +659,7 @@ describe('ShieldJudgmentEngine', () => {
 
     for (const body of bodies) {
       const { ctx } = await harness([{ kind: 'json', body }])
-      const fitting = ctx.judgment.fitting
+      const fitting = engine(ctx).fitting
       if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
       expect((await failure(() => fitting.ask(fittedAsk()))).code).toBe('INVALID_ANSWER')
     }
@@ -645,7 +668,7 @@ describe('ShieldJudgmentEngine', () => {
   it('accepts every unfit reason and an empty fitted question batch', async () => {
     for (const reason of ['head', 'option', 'batch'] as const) {
       const { ctx } = await harness([{ kind: 'json', body: unfitBody({ reason }) }])
-      const fitting = ctx.judgment.fitting
+      const fitting = engine(ctx).fitting
       if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
       await expect(fitting.ask(fittedAsk())).resolves.toMatchObject({ kind: 'unfit', reason })
     }
@@ -674,10 +697,10 @@ describe('ShieldJudgmentEngine', () => {
         }, 30)
       },
     }), { status: 200, headers: { 'content-type': 'application/json' } })))
-    const ctx = new Context()
+    const ctx = engineContext()
     contexts.push(ctx)
     await ctx.plugin(ShieldJudgmentEngine, { endpoint: 'http://127.0.0.1:8765', models: MODELS })
-    const fitting = ctx.judgment.fitting
+    const fitting = engine(ctx).fitting
     if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
     const controller = new AbortController()
     const pending = fitting.ask(fittedAsk({ signal: controller.signal }))
@@ -697,11 +720,11 @@ describe('ShieldJudgmentEngine', () => {
         }, 30)
       },
     }), { status: 200, headers: { 'content-type': 'application/json' } })))
-    const ctx = new Context()
+    const ctx = engineContext()
     contexts.push(ctx)
     await ctx.plugin(ShieldJudgmentEngine, { endpoint: 'http://127.0.0.1:8765', models: MODELS })
     const controller = new AbortController()
-    const pending = ctx.judgment.ask(ask({ signal: controller.signal }))
+    const pending = engine(ctx).ask(ask({ signal: controller.signal }))
     setTimeout(() => { controller.abort() }, 5)
 
     expect((await failure(() => pending)).code).toBe('ABORTED')
@@ -714,7 +737,7 @@ describe('ShieldJudgmentEngine', () => {
     const addListener = vi.spyOn(controller.signal, 'addEventListener')
     const removeListener = vi.spyOn(controller.signal, 'removeEventListener')
 
-    await ctx.judgment.ask(ask({ signal: controller.signal }))
+    await engine(ctx).ask(ask({ signal: controller.signal }))
 
     expect(addListener).toHaveBeenCalledTimes(1)
     expect(removeListener).toHaveBeenCalledTimes(1)
@@ -723,7 +746,7 @@ describe('ShieldJudgmentEngine', () => {
   it('cancels a fitted ask while its redactor never resolves', async () => {
     const { ctx, server } = await harness([{ kind: 'json', body: fittedBody() }])
     await ctx.plugin(NeverResolvingRedactor)
-    const fitting = ctx.judgment.fitting
+    const fitting = engine(ctx).fitting
     if (fitting === undefined) throw new Error('Shield provider did not expose fitting')
     const controller = new AbortController()
     const pending = fitting.ask(fittedAsk({ signal: controller.signal }))
@@ -896,5 +919,26 @@ describe('judgment-shield response validation', () => {
       expect(() => readWireResponse(body, [BINARY, CHOICE, SCORE], MODELS.fast))
         .toThrow(/judgment-shield response/)
     }
+  })
+})
+
+describe('engine registration', () => {
+  it('registers as a ready local fitting engine and withdraws when its own fiber disposes', async () => {
+    const ctx = engineContext()
+    contexts.push(ctx)
+    const provider = await ctx.plugin(ShieldJudgmentEngine, { endpoint: 'http://127.0.0.1:8765', models: MODELS })
+
+    const entry = ctx.judgmentEngines.get(SHIELD_ENGINE_ID)
+    expect(entry?.engine).toBeInstanceOf(ShieldJudgmentEngine)
+    expect(entry?.engine.fitting).toBeDefined()
+    expect(entry?.descriptor).toBe(SHIELD_ENGINE_DESCRIPTOR)
+    expect(entry?.status()).toEqual({ state: 'ready' })
+    expect(ctx.judgmentEngines.list()).toEqual([
+      { id: 'shield', label: 'Shield (local gateway)', egress: 'local', calibration: 'calibrated', supportsFitting: true },
+    ])
+
+    await provider.dispose()
+
+    expect(ctx.judgmentEngines.get(SHIELD_ENGINE_ID)).toBeUndefined()
   })
 })

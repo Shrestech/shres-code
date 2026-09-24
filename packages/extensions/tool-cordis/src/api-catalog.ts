@@ -1058,11 +1058,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'judgment',
     summary: 'Abstract judgment service.',
-    description: 'Abstract judgment service. Load one implementation per context as `ctx.judgment`; it owns tier selection, credentials, transport, and the validation of every provider response it reads, and registers no session event, prompt, or tool of its own.\n\nMounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle exists only where an engine does. settings reads it live.',
+    description: 'Abstract judgment service. Load one implementation per context as `ctx.judgment`. A deployment loads `judgment-dispatch`, which routes each ask to a registered engine; a test can load a single-engine implementation directly. The service registers no session event, prompt, or tool of its own.\n\nThe service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle and the engine selection exist only where `ctx.judgment` does. settings reads it live.',
     methods: [
       {
-        signature: 'readonly fitting?: JudgmentFittingEngine',
-        description: 'Atomic tokenizer fitting and judgment, when the provider supports it.',
+        signature: 'declare readonly fitting?: JudgmentFittingEngine',
+        description: 'Atomic tokenizer fitting and judgment, when supported. Declared without an emitted field so a subclass can supply it as an assignment or as an accessor defined on the instance.',
         parameters: [],
       },
       {
@@ -1076,6 +1076,56 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
         returns: 'the answers with the engine and model identity and the ask\'s duration.',
         throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), oversized serialized input (`INPUT_TOO_LARGE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
+      },
+    ],
+  },
+  {
+    key: 'judgmentEngines',
+    summary: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks.',
+    description: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks. Registration is all-or-nothing and synchronous; subscribers are notified after every engine registration, removal, and announced status change, and when a consumer id becomes declared or stops being declared, and re-read list, consumers, and each entry\'s `status()` themselves.',
+    methods: [
+      {
+        signature: 'register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegistration',
+        description: 'Register one engine. Call it inside the provider\'s `ctx.effect` so the returned disposer runs with the provider\'s fiber.',
+        parameters: [{ name: 'id', description: 'the engine\'s registry id.' }, { name: 'entry', description: 'the engine, its descriptor, and its status read.' }],
+        returns: 'the disposer, carrying the status-change announcement.',
+        throws: ['Error when the descriptor names another id, when `supportsFitting` disagrees with the engine\'s `fitting` capability, or when the id is already registered.'],
+      },
+      {
+        signature: 'list(): readonly JudgmentEngineDescriptor[]',
+        description: 'Describe every registered engine.',
+        parameters: [],
+        returns: 'the descriptors, in registration order.',
+      },
+      {
+        signature: 'get(id: JudgmentEngineId): JudgmentEngineEntry | undefined',
+        description: 'Look up one registered engine.',
+        parameters: [{ name: 'id', description: 'the registry id.' }],
+        returns: 'the entry, or `undefined` when no provider registered the id.',
+      },
+      {
+        signature: 'declareConsumer(id: JudgmentConsumerId): () => void',
+        description: 'Declare that a consumer names itself with `id` on its asks, so a per-consumer override for it has an effect. Call it inside the consumer\'s `ctx.effect` so the returned disposer runs with the consumer\'s fiber; declareJudgmentConsumer does that. Several live declarations of one id are allowed, and the id stays declared until every one is disposed.',
+        parameters: [{ name: 'id', description: 'the consumer id the consumer\'s asks carry.' }],
+        returns: 'the disposer ending this declaration; repeated calls do nothing.',
+      },
+      {
+        signature: 'hasConsumer(id: string): boolean',
+        description: 'Whether a consumer currently names itself with `id` on its asks.',
+        parameters: [{ name: 'id', description: 'the consumer id.' }],
+        returns: 'true while at least one declaration of the id is live.',
+      },
+      {
+        signature: 'consumers(): readonly JudgmentConsumerId[]',
+        description: 'List the declared consumer ids.',
+        parameters: [],
+        returns: 'the ids, in first-declaration order.',
+      },
+      {
+        signature: 'subscribe(listener: () => unknown): () => void',
+        description: 'Observe registrations, removals, and announced status changes.',
+        parameters: [{ name: 'listener', description: 'called after each change; what it throws or rejects with is reported and does not reach the caller that caused the change.' }],
+        returns: 'the disposer ending this subscription.',
       },
     ],
   },
@@ -4139,6 +4189,50 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface JudgmentChoiceQuestion {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    options: JudgmentChoiceOption[];\n}',
   },
   {
+    name: 'JudgmentConsumerId',
+    declaration: 'export type JudgmentConsumerId = Branded<\'JudgmentConsumerId\'>;',
+  },
+  {
+    name: 'JudgmentEngine',
+    declaration: 'export interface JudgmentEngine {\n    readonly fitting?: JudgmentFittingEngine;\n    ask(input: JudgmentInput): Promise<JudgmentResult>;\n}',
+  },
+  {
+    name: 'JudgmentEngineCalibration',
+    declaration: 'export type JudgmentEngineCalibration = \'calibrated\' | \'logprob\' | \'verbalized\';',
+  },
+  {
+    name: 'JudgmentEngineDescriptor',
+    declaration: 'export interface JudgmentEngineDescriptor {\n    readonly id: JudgmentEngineId;\n    readonly label: string;\n    readonly egress: JudgmentEngineEgress;\n    readonly calibration: JudgmentEngineCalibration;\n    readonly supportsFitting: boolean;\n    readonly host?: JudgmentEngineHost;\n    readonly terms?: string;\n}',
+  },
+  {
+    name: 'JudgmentEngineEgress',
+    declaration: 'export type JudgmentEngineEgress = \'none\' | \'local\' | \'remote\';',
+  },
+  {
+    name: 'JudgmentEngineEntry',
+    declaration: 'export interface JudgmentEngineEntry {\n    readonly engine: JudgmentEngine;\n    readonly descriptor: JudgmentEngineDescriptor;\n    status(): JudgmentEngineStatus;\n}',
+  },
+  {
+    name: 'JudgmentEngineHost',
+    declaration: 'export type JudgmentEngineHost = \'darwin-arm64\' | \'any\';',
+  },
+  {
+    name: 'JudgmentEngineId',
+    declaration: 'export type JudgmentEngineId = Branded<\'JudgmentEngineId\'>;',
+  },
+  {
+    name: 'JudgmentEngineRegistration',
+    declaration: 'export interface JudgmentEngineRegistration {\n    (): void;\n    statusChanged(): void;\n}',
+  },
+  {
+    name: 'JudgmentEngineState',
+    declaration: 'export type JudgmentEngineState = \'ready\' | \'starting\' | \'unavailable\' | \'unconfigured\' | \'not-installed\' | \'unsupported-host\';',
+  },
+  {
+    name: 'JudgmentEngineStatus',
+    declaration: 'export interface JudgmentEngineStatus {\n    readonly state: JudgmentEngineState;\n    readonly detail?: string;\n}',
+  },
+  {
     name: 'JudgmentFittingEngine',
     declaration: 'export interface JudgmentFittingEngine {\n    ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>;\n}',
   },
@@ -4148,11 +4242,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentFittingResult',
-    declaration: 'export type JudgmentFittingResult = {\n    kind: \'answered\';\n    fit: JudgmentTokenFit;\n    result: JudgmentResult;\n} | {\n    kind: \'unfit\';\n    engine: string;\n    model: string;\n    limits: JudgmentTokenLimits;\n    reason: JudgmentTokenLimitReason;\n};',
+    declaration: 'export type JudgmentFittingResult = {\n    kind: \'answered\';\n    fit: JudgmentTokenFit;\n    result: JudgmentResult;\n} | {\n    kind: \'unfit\';\n    engine: string;\n    model: string;\n    limits: JudgmentTokenLimits;\n    reason: JudgmentTokenLimitReason;\n    engineId?: JudgmentEngineId;\n};',
   },
   {
     name: 'JudgmentInput',
-    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n}',
+    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n}',
   },
   {
     name: 'JudgmentQuestion',
@@ -4164,7 +4258,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentResult',
-    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n}',
+    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n    engineId?: JudgmentEngineId;\n}',
   },
   {
     name: 'JudgmentScoreAnswer',
@@ -4176,7 +4270,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentSettings',
-    declaration: 'export interface JudgmentSettings {\n    enabled: boolean;\n}',
+    declaration: 'export interface JudgmentSettings {\n    enabled: boolean;\n    engine?: string;\n    overrides?: Readonly<Record<string, string>> | null;\n}',
   },
   {
     name: 'JudgmentTier',
@@ -5064,11 +5158,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T, cause: SettingsValidationCause) => void;\n}',
   },
   {
     name: 'SettingsUpdateSource',
     declaration: 'export type SettingsUpdateSource = \'update\' | \'provider\';',
+  },
+  {
+    name: 'SettingsValidationCause',
+    declaration: 'export type SettingsValidationCause = \'register\' | \'write\' | \'reload\';',
   },
   {
     name: 'ShellExecRequest',

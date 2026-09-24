@@ -12,6 +12,16 @@ import type { Branded } from '@shres-code/shres-code-brand'
 /** Nominal id correlating one question with the answer it produced inside a single ask. */
 export type JudgmentQuestionId = Branded<'JudgmentQuestionId'>
 
+/** Nominal id of one engine registered in `ctx.judgmentEngines`, such as `typesafe` or `shield`. */
+export type JudgmentEngineId = Branded<'JudgmentEngineId'>
+
+/**
+ * Nominal id a consumer names itself with on each ask, such as
+ * `worker-escalation`. The `judgment` settings `overrides` map is keyed by
+ * it, so a deployment can route one consumer to a different engine.
+ */
+export type JudgmentConsumerId = Branded<'JudgmentConsumerId'>
+
 /**
  * Model tier an ask runs on. A provider maps each tier to its own model id, so a
  * consumer chooses speed against accuracy without naming a model.
@@ -145,6 +155,13 @@ export interface JudgmentInput {
    * through this obligation.
    */
   signal?: AbortSignal
+  /**
+   * The asking consumer. A dispatcher answers the ask with the engine the
+   * settings `overrides` map names for this id, and with the deployment-wide
+   * engine when the id is absent or has no override. Single-engine
+   * implementations ignore it.
+   */
+  consumer?: JudgmentConsumerId
 }
 
 /** One ask's answers and the identity of what produced them. */
@@ -161,6 +178,12 @@ export interface JudgmentResult {
   model: string
   /** Wall-clock duration of this ask in milliseconds. */
   latencyMs: number
+  /**
+   * Registry id of the engine the dispatcher routed the ask to. Present on
+   * every dispatched result; absent when a single-engine implementation served
+   * `ctx.judgment` directly.
+   */
+  engineId?: JudgmentEngineId
 }
 
 /** Ordered complete state alternatives for one atomic capacity check and judgment. */
@@ -203,7 +226,15 @@ export type JudgmentTokenLimitReason = 'state' | 'head' | 'option' | 'batch'
 /** One fitted judgment, or an explicit capacity rejection without inference. */
 export type JudgmentFittingResult =
   | { kind: 'answered'; fit: JudgmentTokenFit; result: JudgmentResult }
-  | { kind: 'unfit'; engine: string; model: string; limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+  | {
+    kind: 'unfit'
+    engine: string
+    model: string
+    limits: JudgmentTokenLimits
+    reason: JudgmentTokenLimitReason
+    /** Registry id of the engine a dispatcher routed the fitted ask to, as on {@link JudgmentResult}. */
+    engineId?: JudgmentEngineId
+  }
 
 /** Optional provider capability that measures and judges with one pinned tokenizer and model. */
 export interface JudgmentFittingEngine {
@@ -264,7 +295,93 @@ export interface JudgmentRedactor {
 export interface JudgmentSettings {
   /** Whether judgment is available to consumers in this deployment. */
   enabled: boolean
+  /**
+   * Registry id of the engine that answers every ask without an override.
+   * `judgment-dispatch` always supplies it from its required `defaultEngine`;
+   * it is absent only when a single-engine implementation serves
+   * `ctx.judgment` directly and there is nothing to select.
+   */
+  engine?: string
+  /**
+   * Engine per consumer, keyed by {@link JudgmentConsumerId}, overriding
+   * {@link engine} for that consumer's asks. A key no consumer names has no
+   * effect. Omitted, or `null` from a valueless YAML key, means no overrides.
+   */
+  overrides?: Readonly<Record<string, string>> | null
 }
 
 /** Stable failure classes of one judgment ask. */
 export type JudgmentErrorCode = 'UNCONFIGURED' | 'UNAVAILABLE' | 'INPUT_TOO_LARGE' | 'INVALID_ANSWER' | 'ABORTED'
+
+/**
+ * Where an engine sends the state it judges: `none` keeps it within the
+ * harness process and processes the engine's provider supervises on this host,
+ * `local` sends it to a service on this host that the deployment runs, and
+ * `remote` sends it off the host to a third party.
+ */
+export type JudgmentEngineEgress = 'none' | 'local' | 'remote'
+
+/**
+ * How an engine produces its probabilities: `calibrated` from a classifier
+ * trained to output them, `logprob` from a generative model's token
+ * log-probabilities, and `verbalized` from numbers a generative model writes out.
+ * Thresholds do not transfer between engines of different calibration.
+ */
+export type JudgmentEngineCalibration = 'calibrated' | 'logprob' | 'verbalized'
+
+/** Host an engine can run on: one platform-architecture pair, or `any`. */
+export type JudgmentEngineHost = 'darwin-arm64' | 'any'
+
+/** Static facts about one registered engine, which a configuration surface shows before selection. */
+export interface JudgmentEngineDescriptor {
+  /** Registry id; equals the id the engine registers under. */
+  readonly id: JudgmentEngineId
+  /** Human-readable name. */
+  readonly label: string
+  /** Where the engine sends the state it judges. */
+  readonly egress: JudgmentEngineEgress
+  /** How the engine produces its probabilities. */
+  readonly calibration: JudgmentEngineCalibration
+  /** Whether the engine exposes {@link JudgmentEngine.fitting}; must agree with it. */
+  readonly supportsFitting: boolean
+  /** Host the engine requires; omission means `any`. */
+  readonly host?: JudgmentEngineHost
+  /** URL of the terms that govern a remote engine's use. */
+  readonly terms?: string
+}
+
+/**
+ * Lifecycle state of one registered engine. Only `ready` answers asks; every
+ * other state makes a dispatched ask fail `UNAVAILABLE` with the state's detail.
+ */
+export type JudgmentEngineState = 'ready' | 'starting' | 'unavailable' | 'unconfigured' | 'not-installed' | 'unsupported-host'
+
+/** Current state of one registered engine. */
+export interface JudgmentEngineStatus {
+  /** Lifecycle state. */
+  readonly state: JudgmentEngineState
+  /** Diagnostic explaining a state other than `ready`. */
+  readonly detail?: string
+}
+
+/** One engine as its provider registers it. */
+export interface JudgmentEngineEntry {
+  /** The engine that answers asks routed to this id. */
+  readonly engine: JudgmentEngine
+  /** Static facts about the engine. */
+  readonly descriptor: JudgmentEngineDescriptor
+  /**
+   * Read the engine's current state. The provider calls
+   * {@link JudgmentEngineRegistration.statusChanged} whenever the value changes.
+   * @returns the current state and its detail.
+   */
+  status(): JudgmentEngineStatus
+}
+
+/** Disposer of one engine registration, carrying its status-change announcement. */
+export interface JudgmentEngineRegistration {
+  /** Remove the engine from the registry; repeated calls do nothing. */
+  (): void
+  /** Notify registry subscribers that {@link JudgmentEngineEntry.status} changed; does nothing once disposed. */
+  statusChanged(): void
+}

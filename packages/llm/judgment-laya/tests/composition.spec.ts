@@ -11,6 +11,7 @@ import AgentDefaultModel from '@shres-code/shres-code-agent-default-model'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import type { CommandResult } from '@shres-code/shres-code-commands'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
 import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
@@ -22,7 +23,7 @@ import SessionProjectionRegistry from '@shres-code/shres-code-session-projection
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
-import { LAYA_COMMAND, LayaJudgmentEngine } from '../src/index.ts'
+import { LAYA_COMMAND, LAYA_ENGINE_ID, LayaJudgmentEngine } from '../src/index.ts'
 import { cleanup, fakeInstallation, MODEL_ID, REPO, REVISION, tempRuntime, until, writeBehavior } from './helpers.ts'
 import type { FakeInstallation } from './helpers.ts'
 
@@ -35,7 +36,8 @@ vi.mock('../src/installation.ts', async importOriginal => ({
 
 /**
  * REAL composition of `@shres-code/shres-code-judgment-laya`: the shipping
- * agent spine, command registry, subprocess runtime, model router, and a real
+ * agent spine, command registry, subprocess runtime, judgment dispatcher
+ * selecting `laya`, model router, and a real
  * DeepSeek adapter pointed at the loopback stub server, booted from a
  * test-only `cordis.yml` through the real Loader. Only the external model
  * provider and the Python gateway are substituted (by the mock LLM server and
@@ -49,6 +51,7 @@ const CANDIDATE_ID = 'flash'
 const CANDIDATE_MODEL = 'deepseek-v4-flash'
 const COMPOSITION_TIMEOUT_MS = 60_000
 const JUDGMENT_SPECIFIER = '@shres-code/shres-code-judgment-laya'
+const DISPATCH_SPECIFIER = '@shres-code/shres-code-judgment-dispatch'
 
 let root: string
 let fake: FakeInstallation
@@ -101,6 +104,9 @@ async function boot(extraJudgmentRows: readonly string[] = [], startupTimeoutMs 
     "- name: '@shres-code/shres-code-llm-deepseek'",
     '  config:',
     `    baseURL: '${server.baseURL}/v1'`,
+    `- name: '${DISPATCH_SPECIFIER}'`,
+    '  config:',
+    '    defaultEngine: laya',
     `- name: '${JUDGMENT_SPECIFIER}'`,
     '  config:',
     '    model:',
@@ -146,6 +152,7 @@ async function boot(extraJudgmentRows: readonly string[] = [], startupTimeoutMs 
     ['@shres-code/shres-code-agent-default-model', AgentDefaultModel],
     ['@shres-code/shres-code-agent-loop', AgentLoop],
     ['@shres-code/shres-code-llm-deepseek', DeepSeekPlugin],
+    [DISPATCH_SPECIFIER, JudgmentDispatch],
     [JUDGMENT_SPECIFIER, LayaJudgmentEngine],
     ['@shres-code/shres-code-model-router', ModelRoutingController],
   ])
@@ -161,10 +168,10 @@ async function boot(extraJudgmentRows: readonly string[] = [], startupTimeoutMs 
   return context
 }
 
-/** The mounted Laya provider. */
+/** The mounted Laya provider, as registered in the dispatcher's engine registry. */
 function laya(loaded: Context): LayaJudgmentEngine {
-  const engine = loaded.get('judgment')
-  if (!(engine instanceof LayaJudgmentEngine)) throw new Error('ctx.judgment is not the Laya provider')
+  const engine = loaded.judgmentEngines.get(LAYA_ENGINE_ID)?.engine
+  if (!(engine instanceof LayaJudgmentEngine)) throw new Error('the laya engine is not registered')
   return engine
 }
 
@@ -194,12 +201,13 @@ function eventsOfType<T extends SessionEvent['type']>(events: readonly SessionEv
 }
 
 describe('judgment-laya real Loader composition', () => {
-  it('installs through /laya, then routes a turn with the local gateway as ctx.judgment', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+  it('installs through /laya, then routes a turn with the local gateway behind ctx.judgment', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
     const unloaded = [...loaded.loader.entries()]
       .filter(entry => entry.fiber === undefined && !entry.disabled)
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
+    expect(loaded.get('judgment')).toBeInstanceOf(JudgmentDispatch)
     const engine = laya(loaded)
     const agent = createAgent(loaded, 'laya-routing')
 
@@ -236,6 +244,7 @@ describe('judgment-laya real Loader composition', () => {
     expect(routed?.body.model).toBe(MODEL_ID)
     expect(routed?.body.states?.[0]).toContain('Rename total to sum in utils.py.')
     expect(routed?.body.questions[0]?.options?.map(option => option.option)).toEqual(['keep-current', CANDIDATE_ID])
+    expect((await loaded.judgment.ask({ state: 's', questions: [] })).engineId).toBe('laya')
   })
 
   it('keeps the manual model when the local gateway is not installed', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
@@ -300,7 +309,7 @@ describe('judgment-laya real Loader composition', () => {
     expect(status.text).toMatch(/\nLast exit: SIGTERM after the startup deadline\.$/)
   })
 
-  it('withdraws ctx.judgment when the Loader entry fiber disposes', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+  it('withdraws the laya engine and /laya when the Loader entry fiber disposes', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
     await until(() => laya(loaded).status().state === 'not-installed')
     const entry = [...loaded.loader.entries()].find(candidate => candidate.options.name === JUDGMENT_SPECIFIER)
@@ -308,7 +317,8 @@ describe('judgment-laya real Loader composition', () => {
 
     await entry?.fiber?.dispose()
 
-    expect(loaded.get('judgment')).toBeUndefined()
+    expect(loaded.judgmentEngines.get(LAYA_ENGINE_ID)).toBeUndefined()
+    await expect(loaded.judgment.ask({ state: 's', questions: [] })).rejects.toMatchObject({ code: 'UNCONFIGURED' })
     const agent = createAgent(loaded, 'laya-withdrawn')
     expect(loaded.commands.find(agent, LAYA_COMMAND)).toBeUndefined()
   })
