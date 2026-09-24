@@ -482,11 +482,11 @@ export interface ModelRoutingProjection {
    */
   lastStrong?: ModelRoutingEntryBaseView
   /**
-   * Whether the first `assistant/message` after the last ended streak — the
-   * return to the manual route — carried a reasoning block. An Anthropic route
-   * that thinks resumes without thinking after a routed segment when the
-   * provider refuses the foreign continuation, so this is the observed check.
-   * Absent until one such reply.
+   * Whether the first `assistant/message` after the last streak a decision
+   * ended — the return to the manual route — carried a reasoning block. Only a
+   * decision that ends a streak arms it: a streak ended by a mode switch to off
+   * or by the route-errors recovery leaves it unchanged. `absent` also covers
+   * a manual route that never reasons. Absent until one such reply.
    */
   returnThinking?: 'present' | 'absent'
 }

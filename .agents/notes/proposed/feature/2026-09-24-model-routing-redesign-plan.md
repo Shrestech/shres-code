@@ -291,7 +291,7 @@ Verified list prices (USD per million tokens, peak rates):
 - **Catalog check failure.** `verify-cordis-catalog` and `verify-doc-graphs` fail repository-wide.
   - Both branches: `ctx.clientModules.fetchBundle` references the unclassified types `Request` and `Response`, inherited from commit `02e374a19f`.
   - On origin/master only: `ctx.cursorCredential.managerFor` references `CursorSessionManager` and `CursorSessionOptions`, which are classified on #195 but not on master. Master therefore has four violations.
-  - PR 0 against master fixes both. It adds `Request` and `Response` to `FOUNDATION_TYPE_NAMES`, ports #195's `cursorCredential` classification byte-identical (commit `91b8a940a4`), and regenerates the catalogs.
+  - PR 0 (#202) was written against master to fix both: it added `Request` and `Response` to `FOUNDATION_TYPE_NAMES`, ported #195's `cursorCredential` classification byte-identical (commit `91b8a940a4`), and regenerated the catalogs. It closed unmerged, because the Jev branch already carries that classification and #203 fixed the remaining gates there.
 - **CI is off.** GitHub Actions are disabled at the repository level, and the CI workflow has been disabled manually since 2026-08-17, so nothing has enforced the documentation gates.
   - Baseline at origin/master `481ea66c52`: doc-sync passes 15 of 26 gates and fails 11. The failing gates are cordis catalog, doc graphs, config catalog, export jsdoc, type equivalence, markdown wrap, markdown links, package paths, package README model experience, package README limitations, and agent note format.
   - Baseline at #195 (`f0abff5519`): 14 pass and 12 fail, the same 11 gates plus doc refs.
@@ -423,9 +423,11 @@ Plus the e2e probe above.
 - bench: `cacheHitShare` excludes calls with absent fields and reports the unreported share.
 
 The plan's tests that remain valid under presence semantics carry over:
-- `llm-pi-ai/tests/stream.spec.ts`:
-  - `reports zero cache reads as reported-zero on a reported profile`;
-  - `reports unreported on an openai-completions profile without a declaration`.
+- llm-pi-ai (adapter, conversion, and profile-resolution specs):
+  - a route whose protocol reports cache counts emits a reported zero for a miss;
+  - a chat-completions route that declares `cacheUsage: reported` reports the parsed counts;
+  - a route that declares `unreported` omits both counts, even over a reporting protocol;
+  - a catalog protocol with no reporting guarantee resolves to unreported.
 - `llm-deepseek`: `absent prompt_cache_hit_tokens is unreported`.
 - The token-meter projection specs.
 
@@ -508,7 +510,7 @@ The owner edits one shared candidate pool and enables the strong routes routing 
 - `candidates` is the one shared pool: `{ id, provider, model, reasoningEffort?, description }`. Ids are unique, non-empty, and not `keep-current`. `description` is required and at most 160 characters, because every description is sent in every judgment question.
 - `routeFrom: [{ provider, model, objective, allowEveryTurn? }]` is a fail-closed allowlist of strong routes, matched on provider and model. `objective` is required on each entry (§4.5).
 
-**Load- and write-time validation.** Each case has a named error: a route listed twice; an unknown objective; a `latency` route with `judgmentDeadlineMs` above 200; a `quota` route under per-turn entry without `allowEveryTurn: true`; and an `initialMode` other than `off` with an empty `routeFrom` (`routeFrom is empty: routing can never run`). PR 8a's settings `validate` hook applies the same messages on write, and at write time also rejects a pool `provider` the llm runtime does not register.
+**Load- and write-time validation.** Each case has a named error: a route listed twice; an unknown objective; a `latency` route with `judgmentDeadlineMs` above 200; a `quota` route under per-turn entry without `allowEveryTurn: true`; and an `initialMode` other than `off` with an empty `routeFrom` (`routeFrom is empty: routing can never run`). The `model-router` settings namespace runs the same resolver on every write, so a write fails with the same messages. A write naming a pool `provider` the llm runtime does not register is rejected with `candidates["x"].provider "p" is not a registered route`. That check needs PR 8a's settings `validate` cause and `SettingsFieldError`, so PR 9b owns it, following 8a's rule: it runs on writes only, never at load, and checks only the fields a write changes.
 
 **Runtime.** Every fail-closed class keeps the strong route:
 - `base-unlisted`: the manual route is not in `routeFrom`. No judgment runs, and a held streak whose route is removed ends with `brokenBy: 'base-unlisted'`.
@@ -632,10 +634,10 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
 **Logging.** Unchanged: the summarizer already records the exact call envelope, including provider and model.
 
 **Tests.**
-- `summarizer.spec.ts`:
+- `compaction-basic/tests/compaction-basic.spec.ts`:
   - `summarizes on the manual route during a held streak by default`;
   - `summarizationRoute request uses the latest header`.
-- A Loader test composing compaction-basic with model-router.
+- A Loader test composing compaction-basic with model-router, in `model-router/tests/composition.spec.ts`.
 
 ### 3.9 Bug 9: thinking continuity
 
@@ -644,7 +646,7 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
   - claude-session ships only adaptive models, so this is dormant there.
   - The fact comes from prepared-call metadata: add `LlmModelInfo.thinkingMode?: 'adaptive' | 'budget' | 'none'`, declared by the pi-ai Anthropic profile compat.
 - **Observation, not a new event.** The trajectory and projection derive `returnThinking: 'present' | 'absent'` for the first strong `assistant/message` after a `brokenBy` decision, from its content blocks. This is the documented check.
-- **E2E.** `llm-claude-session/tests/e2e/foreign-return.e2e.spec.ts` sends a real mid-turn return to Opus 5.5 (a foreign tool_use segment shaped like DeepSeek output). It asserts no 400 and that thinking blocks are present, and self-skips without credentials.
+- **E2E.** `packages/llm/llm-claude-session/tests/foreign-return.e2e.ts` sends a real mid-turn return to Opus 5.5 (a foreign tool_use segment shaped like DeepSeek output). It asserts that the request is accepted and that the reply carries a reasoning block. It runs only with `SHRES_E2E_CLAUDE_FOREIGN_RETURN=1` and a readable Claude login, and self-skips otherwise.
 - Document the reasoning-continuity residual under the README's Known Limitations: another model's reasoning becomes plain text.
 
 **Tests.**
@@ -959,7 +961,7 @@ The design is **a new provider package that owns a supervised sidecar**. judgmen
     - `manifest mismatch is unavailable`;
     - `unsupported host never spawns`.
   - The HMR disposal test.
-  - E2E `laya.e2e.spec.ts`: real laya-mlx; self-skips unless the host is darwin-arm64 **and** Laya is installed.
+  - E2E `judgment-laya/tests/laya.e2e.ts`: real laya-mlx; self-skips unless the host is darwin-arm64 **and** Laya is installed.
 
 #### R2.4 Install path and offline behaviour
 
@@ -1204,8 +1206,8 @@ Every PR in this plan targets and merges into `feat/jev-judgment-foundation` (th
 | 8a | `judgment: engine registry and dispatcher` (R1 backend; branch `feat/judgment-engine-registry`; D-39) | not merged | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`endpointPolicy`), judgment-laya (migrated into the registry), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | 10a | `implemented/architecture/2026-09-24-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
 | 8b | `model-router: per-engine operating points` (D-39, D-48) | not merged | model-router (`operatingPoints` with `calibratedBy`, `engine-uncalibrated`, `selectedEngine` and `operatingPoint` on decisions) | 7, 8a | extends the 8a note | an engine without an operating point keeps strong as `engine-uncalibrated` |
 | 9a | `ui-settings-model-routing: mode, engine selector, enabled toggle, engine status` (R1 UI; D-48) | not merged | client/ui-settings-model-routing (new), ui-settings-models (Classifier card removed), api Typert gateway (`judgmentEngines` host API) | 8a | same as PR 8a (UI section) | 9a specs in §R1.5; browser-plugin disposal; GIF |
-| 9b | `ui-settings-model-routing: pool editor, route from, read-only thresholds` (D-46, D-48) | not merged | client/ui-settings-model-routing, api Typert gateway (`modelRouting.poolStatus()`) | 7, 8a, 9a | same as PR 8a (UI section) | 9b specs in §R1.5; Loader pool-edit test; GIF |
-| 10a | `judgment-laya: supervised local MLX gateway` as a `ctx.judgment` provider (R2, R3; D-9; #213) | merged as `a583c1c692` | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | — | `implemented/feature/2026-09-24-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.spec.ts`; notices check |
+| 9b | `ui-settings-model-routing: pool editor, route from, read-only thresholds` (D-46, D-48) | not merged | client/ui-settings-model-routing, api Typert gateway (`modelRouting.poolStatus()`), model-router (the write-time unregistered-provider check, §3.3) | 7, 8a, 9a | same as PR 8a (UI section) | 9b specs in §R1.5; Loader pool-edit test; GIF |
+| 10a | `judgment-laya: supervised local MLX gateway` as a `ctx.judgment` provider (R2, R3; D-9; #213) | merged as `a583c1c692` | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | — | `implemented/feature/2026-09-24-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.ts`; notices check |
 | 11 | `progress-signals: extract escalation folds` (#209) | merged as `4f4b9802c1` | team/progress-signals (new), worker-escalation | — | `implemented/architecture/2026-09-24-progress-signals-extraction.md` | moved unit tests; worker-escalation regression |
 | 12 | `model-router: cold-point entry, verification exits, plan-mode gate, shadow mode` ((b), (c), (d)) | not merged | model-router, plan-mode (read-only fold consumer), ui-trajectory (cold-point and shadow rows) | 1, 2, 7, 8b, 11 | a new proposed note for cold-point routing, moved to implemented when the PR lands; partially supersedes the 2026-09-17 proposal and the 2026-09-22 note | §4.3–4.6; `model-router-coldpoint` and `model-router-shadow` snapshots |
 | 13a | `subagent: child-route waterfall` ((a); D-51; #219) | merged as `fce43521e7` | subagent/subagent, tool-subagent, `docs/architecture.md` (extension-point list), `docs/subsystems/subagent.md` | — | `implemented/architecture/2026-09-24-subagent-child-route.md` | `child-route.spec.ts`; behaviour without a listener is byte-identical |
@@ -1249,7 +1251,7 @@ Every PR in this plan targets and merges into `feat/jev-judgment-foundation` (th
   - It also adds `Request` and `Response` classification lines identical to PR 0's. The catalog generator then works for the #195 stack PRs, and the #204 merge-forward stays conflict-free for that hunk.
   - Violations shared with master arrive through the merge-forward after #204 lands.
 - **D-12, D-13 PR 3 final and open.** PR 3 is `adb866aa45`, a single commit on #203 with real generator output and doc-sync at 26 of 26.
-  - It is open as #205 (`feat/system-prompt-prefix-stability`), based on `fix/master-doc-sync` (#203), and is retargeted to master after #204 merges. It is an independent sibling of PR 1, not part of stack #204.
+  - It opened as #205 (`feat/system-prompt-prefix-stability`), based on `fix/master-doc-sync` (#203), as an independent sibling of PR 1. Its planned retarget to master is superseded by D-60: #205 merged into the Jev branch.
   - Disabling the check fails exactly 5 rule tests.
   - Its implementation establishes the §2.3 correction: ordering conditional sections last protects only tools and static sections, and `ctx.systemPrompt.context()` is the cache-safe home for toggling text.
 - **D-14 PR 11 committed** as `2860a17910` on the #195 stack.
@@ -1257,7 +1259,7 @@ Every PR in this plan targets and merges into `feat/jev-judgment-foundation` (th
   - PR 11 is rebased onto #195 after the cleanup, so the catalog gate can run.
   - Follow-ups for PR 12: model-router consumes progress-signals, reuses its durable-failure check, and imports the argument-canonicalization duplicate from repeat-tool-reminder.
 - **D-15 Jev egress stopped.** A hot reload of the demo home's `initialMode: off` recorded `model-routing/configuration {active:false}` at 13:16:05. The last TypeSafe consult was at 13:11:52, making 22 in total, all kept-strong.
-- **D-16 #195 siblings.** PRs 4–7 form the official stack on #195. PRs 10a and 11 are siblings on #195: they open with base `feat/jev-judgment-foundation` for review, and are retargeted to master once #195 lands. They cannot join #195's stack, because GitHub stacks are linear.
+- **D-16 #195 siblings.** PRs 4–7 form the official stack on #195. PRs 10a and 11 are siblings on #195 with base `feat/jev-judgment-foundation`, because GitHub stacks are linear. Their planned retarget to master is superseded by D-60: both merged into the Jev branch.
 - **D-17 #195 cleanup done.** Commits `2b9bbfd58c`, `c8ef75b2fb`, and `cee6f55279` take #195 doc-sync from 14/12 to 17/9, and all 9 remaining failures are in master's baseline.
   - The regenerated catalog artifacts stay, because the #195 stack PRs need a working generator.
   - The four additive conflicts with #204 resolve by union plus regeneration.
@@ -1434,7 +1436,7 @@ Each entry gives the recommendation, followed by the resolution.
   - No automatic engine fallback exists.
   - The "Model routing" section renders engines and status, recorded as a GIF against the real server.
 - **R2.**
-  - On darwin-arm64 with Laya installed, `laya.e2e.spec.ts` passes, and `ready` is published only after the readiness line, `/healthz`, and a smoke ask.
+  - On darwin-arm64 with Laya installed, `judgment-laya/tests/laya.e2e.ts` passes, and `ready` is published only after the readiness line, `/healthz`, and a smoke ask.
   - The runtime runs offline.
   - The supervisor specs prove scrubbed environments and quiescent disposal.
   - The chosen pin is recorded with its `hub-publication.json` source revision and the local fidelity-check result, and the notices check covers every `uv.lock` top-level dependency.
