@@ -39,8 +39,11 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
- * @property {number | null} meanCacheHitShare - mean of per-trial cacheHitShare; null when no trial carried usage.
- * @property {number} cacheHitShareNullTrials - success trials with a null cacheHitShare: the pre-registered churn screen's input.
+ * @property {number | null} meanCacheHitShare - mean of the root-session `metrics.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a root cache-hit share (no usage record reported a
+ *   cache-read count): the pre-registered churn screen's input.
+ * @property {number | null} meanCacheUnreportedShare - mean of the root-session `metrics.cacheUnreportedShare`, rendered
+ *   beside `meanCacheHitShare` so unreported input is never read as a miss; null when no trial carried one.
  * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
  * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
  * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.
@@ -90,8 +93,11 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
- * @property {number | null} meanCacheHitShare - mean of per-trial cacheHitShare; null when no trial carried usage.
- * @property {number} cacheHitShareNullTrials - success trials with a null cacheHitShare: the pre-registered churn screen's input.
+ * @property {number | null} meanCacheHitShare - mean of the root-session `metrics.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a root cache-hit share (no usage record reported a
+ *   cache-read count): the pre-registered churn screen's input.
+ * @property {number | null} meanCacheUnreportedShare - mean of the root-session `metrics.cacheUnreportedShare`, rendered
+ *   beside `meanCacheHitShare` so unreported input is never read as a miss; null when no trial carried one.
  * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
  * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
  * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.
@@ -102,6 +108,9 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number} compactionVerificationTrials - success trials logging at least one compaction verification: the verification-adoption screen's input.
  * @property {number | null} totalJevCompactionAcceptedBelowThreshold - below-threshold acceptances summed over the trials that logged a verification; null when none did.
  * @property {number | null} totalJevSelectionDegraded - degraded selections summed over the trials that logged a selection; null when none did.
+ * @property {import('../runner/accounting.js').AccountingSummary | null} accounting - pooled priced accounting over the
+ *   arm's success trials: dollars and their upper bound, quota tokens, raw tokens by class, cache-hit and unreported
+ *   shares, judge calls and latency, and TTFT percentiles; null when no trial carries accounting.
  */
 
 /**

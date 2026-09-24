@@ -25,6 +25,7 @@ import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
 import { createSerialQueue, mapPool } from '../runner/pool.js'
 import { pairOutcomes } from '../stats/paired.js'
+import { writeFixturePricing } from './helpers/pricing.js'
 import {
   assertStuffedCompactionGuard,
   buildPlan,
@@ -669,6 +670,19 @@ describe('run.parseArgs', () => {
 
   it('treats --help as a flag, not an error', () => {
     assert.equal(parseArgs(['--help']).help, true)
+  })
+
+  it('parses --max-dollars and --price-snapshot, and leaves both unset by default', () => {
+    const options = parseArgs(['--experiment', 'w3', '--max-dollars', '12.5', '--price-snapshot', '2026-09-24'])
+    assert.equal(options.maxDollars, 12.5)
+    assert.equal(options.priceSnapshot, '2026-09-24')
+    const defaults = parseArgs(['--experiment', 'w3'])
+    assert.equal(defaults.maxDollars, undefined)
+    assert.equal(defaults.priceSnapshot, undefined)
+    for (const bad of ['0', '-1', 'abc', '', 'Infinity']) {
+      assert.throws(() => parseArgs(['--experiment', 'x', '--max-dollars', bad]), /--max-dollars must be a positive number/)
+    }
+    assert.throws(() => parseArgs(['--experiment', 'x', '--price-snapshot', 'latest']), /YYYY-MM-DD/)
   })
 })
 
@@ -1436,6 +1450,19 @@ if (taskText.includes('HANG')) {
     JSON.stringify({ type: 'step/end', seq: 1, time: 1000, data: { turn: 0, step: 0 } }),
     JSON.stringify({ type: 'assistant/message', seq: 2, time: 2000, data: { turn: 0, step: 0, usage: { inputTokens: 100, outputTokens: 20 } } }),
   ]
+  if (taskText.includes('PRICED')) {
+    // A priced call on the fixture pricing's acme-route/flat model: 1000 input
+    // at $2/1M plus 200 output at $10/1M is $0.004, a reported miss.
+    const usage = { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 0 }
+    lines.splice(1, lines.length - 1,
+      JSON.stringify({ type: 'request/context', seq: 1, time: 900, data: { provider: 'acme-route', model: 'flat', contextWindow: 1000 } }),
+      JSON.stringify({ type: 'step/start', seq: 2, time: 1000, data: { turn: 0, step: 0 } }),
+      JSON.stringify({ type: 'assistant/chunk', seq: 3, time: 1250, data: { turn: 0, step: 0, chunk: { type: 'text-delta', index: 0, text: 'ok' } } }),
+      JSON.stringify({ type: 'assistant/chunk', seq: 4, time: 1300, data: { turn: 0, step: 0, chunk: { type: 'usage', usage } } }),
+      JSON.stringify({ type: 'assistant/message', seq: 5, time: 1300, data: { turn: 0, step: 0, message: { role: 'assistant', source: { kind: 'model', provider: 'acme-route', model: 'flat' } }, usage } }),
+      JSON.stringify({ type: 'step/end', seq: 6, time: 1400, data: { turn: 0, step: 0 } }),
+    )
+  }
   if (taskText.includes('JSPACE_LEAK')) {
     lines.push(JSON.stringify({ type: 'jspace/card', seq: 3, time: 3000, data: {} }))
   }
@@ -1521,6 +1548,8 @@ async function runWorld(benchRoot, argv, arm, io = {}) {
     env: { DEEPSEEK_API_KEY: 'fake-key', ...io.env },
     print: line => lines.push(line),
     signal: io.signal,
+    ...(io.pricesDir === undefined ? {} : { pricesDir: io.pricesDir }),
+    ...(io.accountingConfigPath === undefined ? {} : { accountingConfigPath: io.accountingConfigPath }),
   })
   return { code, lines, trials: await readTrials(benchRoot, argv[1], arm) }
 }
@@ -1998,6 +2027,22 @@ describe('runner pool', () => {
     assert.equal(released, 2)
   })
 
+  it('stops launching at the first refused admission and lets in-flight workers settle', async () => {
+    /** @type {number[]} */
+    const started = []
+    /** @type {number[]} */
+    const asked = []
+    let settled = 0
+    await mapPool([1, 2, 3, 4, 5], 2, async n => {
+      started.push(n)
+      await new Promise(resolve => setTimeout(resolve, 10))
+      settled += 1
+    }, { admit: inFlight => { asked.push(inFlight); return started.length < 3 } })
+    assert.deepEqual(started, [1, 2, 3])
+    assert.equal(settled, 3)
+    assert.equal(asked.length, 4)
+  })
+
   it('serializes overlapping writes into whole lines', async () => {
     const root = await tempDir('bench-runner-serial-')
     try {
@@ -2010,6 +2055,120 @@ describe('runner pool', () => {
       })))
       const text = await readFile(path, 'utf8')
       assert.equal(text, '{0}\n{1}\n{2}\n')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('run.main priced accounting (fake harness)', () => {
+  /**
+   * A world of single-session PRICED tasks plus fixture pricing beside it.
+   * @param {string} root
+   * @param {number} count - number of tasks.
+   */
+  async function pricedWorld(root, count) {
+    const { benchRoot } = await writeBenchWorld(root, Array.from({ length: count }, (_, index) => ({
+      taskId: `priced-${index}`,
+      definition: { instruction: `PRICED task ${index}` },
+    })))
+    const pricing = await writeFixturePricing(await mkdtemp(join(root, 'pricing-')))
+    return { benchRoot, io: { pricesDir: pricing.pricesDir, accountingConfigPath: pricing.configPath } }
+  }
+
+  it('records the snapshot, the priced accounting, and the exact cost on every trial and pins them in run.json', async () => {
+    const root = await tempDir('bench-runner-priced-')
+    try {
+      const { benchRoot, io } = await pricedWorld(root, 1)
+      const { code, trials } = await runWorld(benchRoot, ['--experiment', 'priced', '--repeats', '1', '--arms', 'off'], 'off', io)
+      assert.equal(code, 0)
+      const [trial] = trials
+      validateTrial(trial)
+      assert.equal(trial.priceSnapshot, '2030-01-01')
+      assert.equal(trial.accounting.calls, 1)
+      assert.equal(trial.accounting.cacheHitShare, 0)
+      assert.deepEqual(trial.accounting.ttftSamplesMs, [250])
+      assert.ok(Math.abs(trial.accounting.dollars - 0.004) < 1e-12)
+      assert.equal(trial.metrics.costIncludingDescendants, trial.accounting.dollars)
+      const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'priced', 'off', 'run.json'), 'utf8'))
+      validateRunManifest(manifest)
+      assert.equal(manifest.priceSnapshot, '2030-01-01')
+      assert.equal(manifest.maxDollars, null)
+      assert.match(manifest.accountingConfigSha256, /^[0-9a-f]{64}$/)
+      assert.equal(manifest.budgetStop, undefined)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stops launching once --max-dollars would be exceeded, reports why, and records the stop', async () => {
+    const root = await tempDir('bench-runner-dollar-cap-')
+    try {
+      const { benchRoot, io } = await pricedWorld(root, 4)
+      // Each trial spends $0.004: after two, a third would reach $0.012 > $0.01.
+      const argv = ['--experiment', 'capped', '--repeats', '1', '--arms', 'off', '--max-dollars', '0.01']
+      const { code, lines, trials } = await runWorld(benchRoot, argv, 'off', io)
+      assert.equal(code, 3)
+      assert.equal(trials.length, 2)
+      assert.ok(lines.some(line => /stopped: --max-dollars 0\.01 would be exceeded: spent \$0\.0080 upper bound, projected \$0\.0040 per trial, 0 in flight; 2 planned trials not launched/.test(line)), lines.join('\n'))
+      const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'capped', 'off', 'run.json'), 'utf8'))
+      validateRunManifest(manifest)
+      assert.equal(manifest.maxDollars, 0.01)
+      assert.notEqual(manifest.endedAt, '')
+      assert.equal(manifest.budgetStop.reason, 'max-dollars')
+      assert.equal(manifest.budgetStop.notLaunched, 2)
+      assert.ok(Math.abs(manifest.budgetStop.spentDollars - 0.008) < 1e-12)
+
+      // A resume counts the recorded spend, so it stops before launching anything.
+      const resumed = await runWorld(benchRoot, [...argv, '--resume'], 'off', io)
+      assert.equal(resumed.code, 3)
+      assert.equal(resumed.trials.length, 2)
+      assert.ok(resumed.lines.some(line => /4 planned trials not launched/.test(line)), resumed.lines.join('\n'))
+
+      // Resuming under a different cap is a changed condition.
+      await assert.rejects(
+        () => runWorld(benchRoot, ['--experiment', 'capped', '--repeats', '1', '--arms', 'off', '--max-dollars', '1', '--resume'], 'off', io),
+        /pins differ \(maxDollars\)/,
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('warns that the cap cannot see calls the snapshot does not price', async () => {
+    const root = await tempDir('bench-runner-unpriced-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{ taskId: 'plain', definition: { instruction: 'no route named' } }])
+      const pricing = await writeFixturePricing(await mkdtemp(join(root, 'pricing-')))
+      const { code, lines, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'unpriced', '--repeats', '1', '--arms', 'off', '--max-dollars', '5'],
+        'off',
+        { pricesDir: pricing.pricesDir, accountingConfigPath: pricing.configPath },
+      )
+      assert.equal(code, 0)
+      assert.equal(trials[0].accounting.unpricedCalls, 1)
+      assert.deepEqual(trials[0].accounting.unpricedModels, ['(unknown)/(unknown)'])
+      assert.equal(trials[0].metrics.costIncludingDescendants, null)
+      assert.ok(lines.some(line => /warning: 1 calls had no price in snapshot 2030-01-01; --max-dollars did not count them/.test(line)), lines.join('\n'))
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('prints the snapshot and cap in a dry run and refuses a snapshot that does not exist', async () => {
+    const root = await tempDir('bench-runner-priced-dry-')
+    try {
+      const { benchRoot, io } = await pricedWorld(root, 1)
+      /** @type {string[]} */
+      const lines = []
+      const code = await main(['--experiment', 'dry', '--arms', 'off', '--max-dollars', '4000', '--dry-run'], { benchRoot, env: {}, print: line => lines.push(line), ...io })
+      assert.equal(code, 0)
+      assert.ok(lines.includes('priceSnapshot: 2030-01-01  maxDollars: 4000'), lines.join('\n'))
+      await assert.rejects(
+        () => main(['--experiment', 'dry', '--arms', 'off', '--price-snapshot', '2031-02-02', '--dry-run'], { benchRoot, env: {}, print: () => {}, ...io }),
+        /price accounting: price snapshot 2031-02-02 not found/,
+      )
     } finally {
       await rm(root, { recursive: true, force: true })
     }
