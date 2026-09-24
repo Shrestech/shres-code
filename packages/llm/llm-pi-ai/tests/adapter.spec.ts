@@ -1165,6 +1165,42 @@ describe('route prompt cache key', () => {
   })
 })
 
+describe('temperature refusal fact', () => {
+  /** Register one hand-declared route and resolve its single model. */
+  async function resolveOn(profile: Record<string, unknown>, serverUrl = 'http://127.0.0.1:9') {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['acme-gateway'], new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'acme-gateway': { baseURL: serverUrl, models: [{ id: 'acme-large' }], ...profile },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+    }))
+    return { ctx, info: await ctx.llm.resolveModelInfo('acme-gateway', 'acme-large') }
+  }
+
+  it('declares refusal for an Anthropic model whose compat drops a stated temperature', async () => {
+    const server = await mockServer([{ status: 500, body: '{}' }])
+    const { ctx, info } = await resolveOn({
+      api: 'anthropic-messages',
+      models: [{ id: 'acme-large', compat: { supportsTemperature: false } }],
+    }, server.url)
+    expect(info.acceptsTemperature).toBe(false)
+    // The declared fact matches what pi-ai sends: the stated temperature never reaches the wire.
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [], temperature: 0.2 })
+    expect(server.requests[0]).not.toHaveProperty('temperature')
+  })
+
+  it.each([
+    ['an Anthropic model without the switch', { api: 'anthropic-messages' }],
+    ['an Anthropic model that accepts temperature', { api: 'anthropic-messages', models: [{ id: 'acme-large', compat: { supportsTemperature: true } }] }],
+    ['another protocol', { api: 'openai-completions' }],
+  ])('makes no claim for %s', async (_case, profile) => {
+    const { info } = await resolveOn(profile)
+    expect(info).not.toHaveProperty('acceptsTemperature')
+  })
+})
+
 describe('cache-count reporting', () => {
   /** A chat-completions turn whose wire reports 2 of 5 prompt tokens as cached. */
   const cachedTextEvents = [

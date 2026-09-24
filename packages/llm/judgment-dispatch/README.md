@@ -17,7 +17,7 @@ The one `ctx.judgment` implementation in a deployment that composes judgment eng
     models: { fast: shield-fast@1, accurate: shield-accurate@1 }
 ```
 
-`defaultEngine` is required and names a registry id: `typesafe` for [judgment-typesafe](../judgment-typesafe/README.md), `shield` for [judgment-shield](../judgment-shield/README.md), or `laya` for [judgment-laya](../judgment-laya/README.md). The dispatcher never picks an engine by registration order. A missing or empty value, or an unknown config key, fails the load by name.
+`defaultEngine` is required and names a registry id: `typesafe` for [judgment-typesafe](../judgment-typesafe/README.md), `shield` for [judgment-shield](../judgment-shield/README.md), `laya` for [judgment-laya](../judgment-laya/README.md), or `llm:<provider>/<model>` for [judgment-llm](../judgment-llm/README.md). The dispatcher never picks an engine by registration order. A missing or empty value, or an unknown config key, fails the load by name.
 
 ## Routing
 

@@ -711,6 +711,13 @@ export class LlmRuntime extends Service {
         'INVALID_MODEL_MAX_TOKENS',
       )
     }
+    const acceptsTemperature = resolved.acceptsTemperature
+    if (acceptsTemperature !== undefined && typeof acceptsTemperature !== 'boolean') {
+      throw new LlmError(
+        `adapter returned invalid temperature metadata for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_INFO',
+      )
+    }
     const promptCacheTtlMs = resolved.promptCacheTtlMs
     if (!isPromptCacheTtl(promptCacheTtlMs)) {
       throw new LlmError(
@@ -734,6 +741,7 @@ export class LlmRuntime extends Service {
       ...hostedTools === undefined ? {} : { hostedTools },
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
+      ...acceptsTemperature === undefined ? {} : { acceptsTemperature },
       ...promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs },
       ...thinkingMode === undefined ? {} : { thinkingMode },
     }
