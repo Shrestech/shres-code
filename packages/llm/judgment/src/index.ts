@@ -159,6 +159,60 @@ export class JudgmentError extends Error {
   }
 }
 
+/**
+ * Fail an ask whose caller has already cancelled it. Engines honour
+ * `input.signal` at every await; this is the check before each step.
+ * @param signal - the ask's signal; absence means the ask cannot be cancelled.
+ * @param message - the diagnostic naming the engine.
+ * @throws JudgmentError code `ABORTED` when the signal has aborted.
+ */
+export function throwIfJudgmentAborted(signal: AbortSignal | undefined, message: string): void {
+  if (signal?.aborted === true) throw new JudgmentError('ABORTED', message)
+}
+
+/**
+ * Run one step of an ask so that it settles as soon as the caller cancels,
+ * which is how an engine honours `input.signal` while it awaits same-process
+ * work that cannot itself be cancelled, such as a credential lookup or the
+ * deployment's redaction hook. The step does not start when the signal has
+ * already aborted. A step running when the signal aborts keeps running, but the
+ * returned promise rejects at once, and the step's later settlement stays
+ * handled so it cannot surface as an unhandled rejection.
+ * @param operation - the step; its return value or promise is awaited.
+ * @param signal - the ask's signal; absence runs the step unchanged.
+ * @param message - the diagnostic naming the engine, used for `ABORTED`.
+ * @returns the step's result.
+ * @throws JudgmentError code `ABORTED` when the signal aborts before the step
+ *   settles, and whatever the step itself throws otherwise.
+ */
+export function abortableJudgmentStep<T>(
+  operation: () => T | PromiseLike<T>,
+  signal: AbortSignal | undefined,
+  message: string,
+): Promise<T> {
+  if (signal === undefined) return Promise.resolve().then(() => operation())
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener('abort', onAbort)
+      reject(new JudgmentError('ABORTED', message))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    void Promise.resolve().then(() => {
+      throwIfJudgmentAborted(signal, message)
+      return operation()
+    }).then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
+      },
+    )
+  })
+}
+
 declare module '@shres-code/cordis' {
   interface Context {
     judgment: JudgmentService

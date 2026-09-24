@@ -47,7 +47,7 @@ Failures are one `JudgmentError` each, and a consumer branches on `code`:
 | `UNCONFIGURED` | No credentials service is mounted, or the reference holds no value. Thrown before any request is sent. |
 | `UNAVAILABLE` | The request failed, the vendor answered non-2xx (401, 422, 429, 529 and any other status), a transient status outlasted `retry.maxRetries`, or the ask outlived `timeoutMs`. A non-2xx message carries the HTTP status and the provider's own message when its error body is JSON, and an exhausted retry carries the response that spent the budget. |
 | `INVALID_ANSWER` | The response body is not an object, carries no model id or answers, omits a probability for a requested choice option, or answers with a missing entry, another kind's discriminant, an unasked option, or a non-finite number. |
-| `ABORTED` | The caller's own `AbortSignal` ended the ask. Caller cancellation is classified before the deadline, so a cancelled ask is never reported as a timeout. |
+| `ABORTED` | The caller's own `AbortSignal` ended the ask: before it started, during the credential lookup or the redaction hook, or during the request, body read, or a retry wait. A lookup or redaction that cannot be cancelled is abandoned rather than awaited, so a hanging one never holds a cancelled ask. Caller cancellation is classified before the deadline, so a cancelled ask is never reported as a timeout. |
 
 ## Wire mapping
 

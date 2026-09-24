@@ -45,7 +45,7 @@ The capability is optional. Consumers that require atomic state selection check 
 
 ## Engines
 
-`ctx.judgmentEngines` is a `JudgmentEngineRegistry` that [judgment-dispatch](../judgment-dispatch/README.md) provides. An engine provider injects `judgmentEngines` and registers one engine from its constructor with `registerJudgmentEngine(ctx, entry)`; the registration is released with the provider's fiber, and the returned function announces a status change to the registry's subscribers.
+`ctx.judgmentEngines` is a `JudgmentEngineRegistry` that [judgment-dispatch](../judgment-dispatch/README.md) provides. An engine provider injects `judgmentEngines` and registers one engine from its constructor with `registerJudgmentEngine(ctx, entry)`; the registration is released with the provider's fiber, and the returned function announces a status change to the registry's subscribers. An engine honours `input.signal` at every await: `throwIfJudgmentAborted(signal, message)` is the check before each step, and `abortableJudgmentStep(operation, signal, message)` races same-process work that cannot be cancelled, such as a credential lookup or the redaction hook, so the ask fails `ABORTED` at once.
 
 ```ts
 import type {

@@ -476,7 +476,7 @@ The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, b
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:180`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:234`](../../packages/llm/judgment/src/index.ts)
 
 <a id="ctxjudgmentengines--judgmentengineregistry"></a>
 
