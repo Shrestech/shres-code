@@ -1072,7 +1072,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
-        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id.',
+        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id. An implementation must honour `input.signal` at every await, settling promptly with `ABORTED` once it aborts: a consumer\'s deadline bounds the answer it uses, but bounds its wait only when the engine aborts.',
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
         returns: 'the answers with the engine and model identity and the ask\'s duration.',
         throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), oversized serialized input (`INPUT_TOO_LARGE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
