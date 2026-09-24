@@ -130,6 +130,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/llm/token-meter': { kind: 'indirect', reason: 'The measurement service leaves model-visible changes to its consumers.' },
   'packages/llm/grok-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/llm/codex-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token and account-id requests; the consuming adapter owns the model-visible request.' },
+  'packages/llm/cursor-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/llm/claude-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/lsp/lsp': { kind: 'indirect', reason: 'The provider registry delegates model rendering to shres-tool-lsp.' },
   'packages/lsp/lsp-stdio': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-lsp.' },
@@ -189,6 +190,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/web/web-search-attached-cli': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
+  'packages/web/web-search-brave': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
 }
 
