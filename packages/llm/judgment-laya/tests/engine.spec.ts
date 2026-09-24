@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -187,7 +188,7 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     const { ctx: mounted, engine } = await mount()
     await until(() => engine.status().state === 'not-installed')
     const install = engine.install().catch((error: unknown) => error)
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await until(() => existsSync(join(runtimeDir, 'uv-sync-started')))
 
     await mounted.fiber.dispose()
     ctx = undefined
