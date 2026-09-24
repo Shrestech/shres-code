@@ -5,7 +5,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { createUserMessage, type TokenUsage } from '@shres-code/shres-code-llm'
+import { addTokenUsage, createUserMessage, type TokenUsage } from '@shres-code/shres-code-llm'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /** Result envelope consumed only by snapshot and composition tests. */
@@ -23,14 +23,7 @@ export interface FixtureTurnOptions {
 }
 
 function addUsage(total: TokenUsage | undefined, step: TokenUsage): TokenUsage {
-  const next: TokenUsage = {
-    inputTokens: (total?.inputTokens ?? 0) + step.inputTokens,
-    outputTokens: (total?.outputTokens ?? 0) + step.outputTokens,
-  }
-  for (const key of ['cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens'] as const) {
-    if (total?.[key] !== undefined || step[key] !== undefined) next[key] = (total?.[key] ?? 0) + (step[key] ?? 0)
-  }
-  return next
+  return total === undefined ? step : addTokenUsage(total, step)
 }
 
 function assistantText(event: Extract<SessionEvent, { type: 'assistant/message' }>): string | undefined {

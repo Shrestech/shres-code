@@ -89,6 +89,7 @@
       "@shres-code/shres-code-workflow/types": ["./packages/workflow/workflow/src/types.ts"],
       "@shres-code/shres-code-tool-workflow/types": ["./packages/workflow/tool-workflow/src/types.ts"],
       "@shres-code/shres-code-llm/message": ["./packages/llm/llm/src/message.ts"],
+      "@shres-code/shres-code-llm/usage": ["./packages/llm/llm/src/usage.ts"],
       "@shres-code/shres-code-commands/brand": ["./packages/interaction/commands/src/brand.ts"],
       "@shres-code/shres-code-commands/types": ["./packages/interaction/commands/src/types.ts"],
       "@shres-code/shres-code-jobs/brand": ["./packages/jobs/jobs/src/brand.ts"],

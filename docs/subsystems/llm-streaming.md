@@ -266,16 +266,30 @@ interface AppIdentity {
 
 ## `TokenUsage`
 
-Per-call token accounting. Counts are **disjoint**: `inputTokens` is uncached input only; cached input is reported separately, and billed input is the sum of the three. Adapters whose providers fold cache hits into a single prompt total (DeepSeek's `prompt_tokens`) subtract them back out. `reasoningTokens`, when present, is informational detail already included in `outputTokens`; totals must not add it again.
+Per-call token accounting. Counts are **disjoint**: `inputTokens` excludes every cache count the provider reported, and billed input is `inputTokens` plus those counts. Adapters whose providers fold cache hits into a single prompt total (DeepSeek's `prompt_tokens`) subtract them back out. `reasoningTokens`, when present, is informational detail already included in `outputTokens`; totals must not add it again.
+
+`cacheReadTokens` and `cacheWriteTokens` each record whether the provider reported that count. Present (including 0): the provider reported the count for this call. Absent: the provider did not report it; `inputTokens` may then include cached input. Adapters MUST emit a reported zero and MUST NOT emit an unreported count. The two fields are independent: a provider that reports cache hits but has no write concept omits `cacheWriteTokens`. The LLM stream invariant rejects a present count that is not a non-negative safe integer.
+
+Consumers read the fields through the dependency-minimal `@shres-code/shres-code-llm/usage` entry, which the package root re-exports. `cacheCount(usage, 'read' | 'write')` returns the reported count, or `undefined` when the provider did not report it; no consumer reads absence as 0. `promptTokens(usage)` returns `inputTokens` plus every reported cache count, which is the whole prompt whether or not the counts were reported. `addTokenUsage(total, next)` sums two usages under the same contract: a cache count stays present only when both operands reported it, and otherwise the sum folds every reported value of that count into `inputTokens`, so an aggregate never presents a partial count as a total.
+
+Time to first token is derived from the log rather than recorded in `TokenUsage`: it is the `time` of a step's first token-bearing `assistant/chunk` minus the `time` of that step's `step/start`. `request/header` cannot anchor the measurement, because the loop logs a header only when the header changes.
 
 ```ts type-equiv
 /**
- * Token accounting for one model call (cache fields are optional).
+ * Token accounting for one model call.
  *
- * Counts are DISJOINT: `inputTokens` is uncached input only; cached input is
- * reported separately as `cacheReadTokens`/`cacheWriteTokens` (billed input =
- * sum of the three). Adapters whose providers fold cache hits into a total
- * prompt count (DeepSeek's `prompt_tokens`) subtract them out.
+ * Counts are DISJOINT: `inputTokens` excludes every cache count the provider
+ * reported, so billed input is `inputTokens` plus the reported cache counts.
+ * Adapters whose providers fold cache hits into a total prompt count
+ * (DeepSeek's `prompt_tokens`) subtract them out.
+ *
+ * `cacheReadTokens` and `cacheWriteTokens` each record whether the provider
+ * reported that count. Present (including 0): the provider reported the count
+ * for this call. Absent: the provider did not report it; `inputTokens` may
+ * then include cached input. Adapters MUST emit a reported zero and MUST NOT
+ * emit an unreported count. The two fields are independent: a provider that
+ * reports cache hits but has no write concept omits `cacheWriteTokens`.
+ * Consumers read them through `cacheCount` and `promptTokens`.
  */
 interface TokenUsage {
   inputTokens: number
@@ -908,7 +922,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:287`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:288`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -957,5 +971,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:67`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:68`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

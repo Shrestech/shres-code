@@ -227,6 +227,8 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'anthropic-messages',
+    // Anthropic Messages reports cache reads and writes in every usage block.
+    cacheUsage: 'reported',
     baseURL,
     models: models.map(model => ({
       id: model.id,

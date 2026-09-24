@@ -54,7 +54,7 @@ Usage chunks carry Anthropic's reported input/output counts, with thinking token
 
 #### KV Cache effect
 
-Provider-side. Anthropic reports prompt-cache hits and writes inside its usage, and this adapter passes those counts through as `cacheReadTokens` / `cacheWriteTokens` unchanged; the adapter sends no cache controls of its own, so whether a prefix is cached and how long it lives remain the provider's and pi-ai's decisions.
+Provider-side. Anthropic reports prompt-cache hits and writes inside every usage block, so the route declares `cacheUsage: 'reported'` and every call carries both `cacheReadTokens` and `cacheWriteTokens`, a miss as 0; the adapter sends no cache controls of its own, so whether a prefix is cached and how long it lives remain the provider's and pi-ai's decisions.
 
 ## Known Limitations and Deferred Work
 

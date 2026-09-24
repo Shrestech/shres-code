@@ -153,6 +153,7 @@ describe('createFixtureApi', () => {
         goal: null,
         tokenUsage: {
           uncachedInputTokens: 0,
+          unreportedInputTokens: 0,
           outputTokens: 0,
           cacheReadTokens: 0,
           cacheWriteTokens: 0,
