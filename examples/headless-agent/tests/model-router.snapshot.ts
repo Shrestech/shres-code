@@ -266,6 +266,45 @@ describe('headless model-routing snapshots', () => {
     }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
+  it('retries a failed downgraded step on the manual model and breaks at the error limit', async () => {
+    const server = await startMockLlmServer({
+      sequence: ['auth_error', 'success', 'auth_error', 'success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-fallback.cordis.snapshot.yml'),
+        promptFixture: 'model-router-fallback',
+      }, server)
+      // Each failed candidate request is retried within its step on the manual
+      // model; the second failure reaches the error limit across streaks, so the
+      // third turn is the manual recovery turn.
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-pro',
+      ])
+      const durableEvents = parseJsonl(output.session)
+      const decisions = durableEvents.filter(event => event['type'] === 'model-routing/decision')
+        .map(event => event['data'] as Record<string, unknown>)
+      expect(decisions.map(decision => decision['reason'])).toEqual([
+        'gate-passed', 'route-failed', 'gate-passed', 'route-failed', 'route-errors',
+      ])
+      expect(decisions[1]).toMatchObject({
+        outcome: 'kept-strong',
+        failure: { code: expect.any(String), provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        failedChunkSeq: expect.any(Number),
+        sticky: { active: false, brokenBy: 'route-failed', entryBase: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } },
+      })
+      const ends = durableEvents.filter(event => event['type'] === 'turn/end')
+        .map(event => (event['data'] as { reason: { kind: string } }).reason.kind)
+      expect(ends).toEqual(['completed', 'completed', 'completed'])
+      await expectArmFixtures('model-router-fallback', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('downgrades in-transcript through the composed router', async () => {
     const server = await startMockLlmServer({
       sequence: ['success'],

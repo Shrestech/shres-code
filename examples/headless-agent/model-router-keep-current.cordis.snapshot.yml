@@ -1,6 +1,8 @@
 # Keyless model-routing composition for the keep-current decision snapshot:
 # the shipping `cordis.yml` spine with a loopback model endpoint, routing ON,
-# and a scripted judgment that selects the current model.
+# and a scripted judgment that selects the current model. The allowlist also
+# names the manual model at another effort: eligibility records it as
+# `equals-base`, and the route question omits it.
 
 - id: base
   name: '@shres-code/cordis-plugin-include'
@@ -20,7 +22,7 @@
           workspaceContext:
             maxBytes: 65536
           persona: |
-            You are headless-agent, a coding assistant powered by the {{model}} model.
+            You are headless-agent, a coding assistant.
 
             Verify your work by running the code or tests. Keep answers brief and
             factual.
@@ -38,6 +40,10 @@
                 - id: flash
                   provider: deepseek-official
                   model: deepseek-v4-flash
+                - id: pro-high
+                  provider: deepseek-official
+                  model: deepseek-v4-pro
+                  reasoningEffort: high
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
               minTurnsDowngraded: 3

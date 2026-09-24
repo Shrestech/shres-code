@@ -25,7 +25,7 @@
   name: '@shres-code/shres-code-persona'
   config:
     text: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+      You are a coding agent. Your working directory is {{cwd}}.
 
 - id: agent-instructions
   name: '@shres-code/shres-code-agent-instructions'

@@ -47,11 +47,16 @@ export interface ModelRoutingCandidate {
   description?: string
 }
 
-/** Stable result of one candidate capability check. */
+/**
+ * Stable result of one candidate check. `equals-base` marks a candidate naming
+ * the manual provider/model at any effort; every other reason is a capability
+ * result.
+ */
 export type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
   | 'base-unavailable'
   | 'base-context-unknown'
+  | 'equals-base'
   | 'candidate-unavailable'
   | 'candidate-invalid'
   | 'difficulty-effort-invalid'
@@ -165,7 +170,7 @@ export type ModelRoutingReason =
   | 'low-confidence'
   /** The route's top-two margin is below `downgradeMargin`. */
   | 'thin-margin'
-  /** The chosen candidate is the route already in force. */
+  /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
@@ -179,6 +184,8 @@ export type ModelRoutingReason =
   | 'manual-deviation'
   /** Durable route failures reached `maxRouteErrors`. */
   | 'route-errors'
+  /** The downgraded request failed, and the step retries on the manual route. */
+  | 'route-failed'
   /** Routing is off, so this turn was not judged. */
   | 'mode-off'
   /** The judgment call itself failed and `onUnavailable` is `error`. */
@@ -194,6 +201,7 @@ export type ModelRoutingBreakReason =
   | 'manual-deviation'
   | 'mode-off'
   | 'route-errors'
+  | 'route-failed'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -317,6 +325,20 @@ export interface ModelRoutingDecision {
   model?: string
   /** Duration of the judgment call in milliseconds, when one was made. */
   latencyMs?: number
+  /** The failed downgraded request a `route-failed` decision retries on the manual route. */
+  failure?: ModelRoutingFailure
+  /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
+  failedChunkSeq?: number
+}
+
+/** The downgraded request whose failure a `route-failed` decision records. */
+export interface ModelRoutingFailure {
+  /** Provider-neutral failure code the adapter reported. */
+  code: string
+  /** Registered provider route of the failed request. */
+  provider: string
+  /** Model id of the failed request. */
+  model: string
 }
 
 /**
@@ -377,8 +399,8 @@ export interface ModelRoutingProjection {
    * Manual route the last downgraded streak was entered on, retained after that
    * streak broke: the selection a routing-idle session restores. It is the
    * fold's entry base rather than the session's current selection, so it
-   * survives the manual pick of a downgrade candidate — the dead-end state
-   * whose every decision reports `candidate-equals-base`. Absent until one
+   * survives the manual pick of the only downgrade candidate — the dead-end
+   * state whose every decision reports `candidate-equals-base`. Absent until one
    * streak has been entered.
    */
   lastStrong?: ModelRoutingEntryBaseView

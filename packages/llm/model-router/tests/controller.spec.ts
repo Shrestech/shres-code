@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
-import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
+import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
 import type {
@@ -43,6 +43,7 @@ import LlmRuntime, {
 import type {
   GenerateOptions,
   LlmCallConfigAdapterDefaults,
+  LlmFailure,
   LlmResolvedModelInfo,
   ModelModality,
   StreamChunk,
@@ -211,6 +212,8 @@ interface Bench {
   engine: ScriptedJudgment
   adapter: RoutingCapabilityAdapter
   llmFiber?: { dispose(): Promise<void> }
+  /** The router's own plugin fiber, for disposal cases. */
+  routerFiber: { dispose(): Promise<void> }
   /** One consult for a turn, against the strong manual route by default. */
   resolve(turn?: number, base?: ModelSelection, signal?: AbortSignal, step?: number): Promise<ModelSelection | undefined>
   decisions(): ModelRoutingDecision[]
@@ -253,7 +256,7 @@ async function bench(options: BenchOptions = {}): Promise<Bench> {
     await ctx.plugin(CommandRuntime)
     await new Promise(resolve => setImmediate(resolve))
   }
-  await ctx.plugin(ModelRoutingController, config)
+  const routerFiber = await ctx.plugin(ModelRoutingController, config)
   const session = ctx.sessions.create()
   const agent = agentFor(session, ctx)
   ctx.agents.register(agent)
@@ -269,6 +272,7 @@ async function bench(options: BenchOptions = {}): Promise<Bench> {
     engine: ctx.judgment as ScriptedJudgment,
     adapter,
     ...llmFiber === undefined ? {} : { llmFiber },
+    routerFiber,
     resolve: (turn = 1, base = STRONG, requestSignal = signal, step = 1) =>
       ctx.modelRouting.resolveRequest(agent, turn, step, base, requestSignal, {
         config: base,
@@ -775,22 +779,67 @@ describe('the downgrade gate', () => {
     expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'unknown-candidate' })
   })
 
-  it('refuses the candidate already in force as the manual route', async () => {
+  it('reports candidate-equals-base without asking when every candidate is the manual route', async () => {
     const b = await bench()
     expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model })).toBeUndefined()
-    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-equals-base' })
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'candidate-equals-base',
+      candidateEligibility: { eligibleCandidates: [], assessments: [{ id: 'cheap', reason: 'equals-base' }] },
+    })
   })
 
-  it('refuses the candidate already in force at the same reasoning effort', async () => {
+  it('treats a same-model candidate at another reasoning effort as the manual route', async () => {
     const b = await bench({
       config: { ...CONFIG, candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }] },
     })
-    expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId('low') })).toBeUndefined()
-    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-equals-base' })
-    // A different effort on the same route is still a change of route, and the
-    // selected route runs at the candidate's own effort.
-    expect(await b.resolve(2, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId('high') }))
-      .toEqual({ ...CHEAP, reasoningEffort: 'low' })
+    // An effort change on the model already in force is no downgrade: on
+    // providers that render effort into the cached request it only re-prefills.
+    for (const effort of ['low', 'high']) {
+      expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId(effort) }))
+        .toBeUndefined()
+    }
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decisions().map(decision => decision.reason)).toEqual(['candidate-equals-base'])
+  })
+
+  it('route question omits the base-equal candidate', async () => {
+    const b = await bench({
+      config: {
+        ...CONFIG,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-low', provider: STRONG.provider, model: STRONG.model, reasoningEffort: 'low' },
+        ],
+      },
+    })
+
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    const route = b.engine.asks[0]?.questions[0]
+    if (route?.kind !== 'choice') throw new Error('the route question was not a choice question')
+    expect(route.options.map(option => option.option)).toEqual([KEEP_CURRENT_OPTION_ID, 'cheap'])
+    expect(b.decision().candidateEligibility?.assessments.map(assessment => [assessment.id, assessment.reason]))
+      .toEqual([['cheap', 'eligible'], ['strong-low', 'equals-base']])
+  })
+
+  it('keeps candidate-ineligible when another candidate fails a capability check', async () => {
+    const b = await bench({
+      config: {
+        ...CONFIG,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+        ],
+      },
+      capabilities: { [`${CHEAP.provider}/${CHEAP.model}`]: { context: { contextWindow: 1_000 } } },
+    })
+
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-ineligible' })
+    expect(b.decision().candidateEligibility?.assessments.map(assessment => assessment.reason))
+      .toEqual(['context-too-small', 'equals-base'])
   })
 
   it('answers no-candidates without asking the engine', async () => {
@@ -1006,6 +1055,104 @@ describe('the sticky streak', () => {
       reason: 'current-preferred',
       sticky: { active: false, turnsElapsed: 0, brokenBy: 'current-preferred' },
     })
+  })
+
+  it('held streak: an answer naming the base-equal candidate ends the streak as current-preferred', async () => {
+    const b = await entered({
+      config: {
+        ...config,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+        ],
+      },
+    })
+    // The question never offered the manual route's own entry. An answer naming
+    // it chose the current model, so it must not fail the gate into sticky-hold.
+    b.engine.choice = { ...PASSING, option: 'strong-copy', probabilities: { 'strong-copy': 0.9, cheap: 0.05 } }
+
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'current-preferred',
+      route: { choice: 'strong-copy' },
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'current-preferred' },
+    })
+    expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'current-preferred' })
+  })
+
+  it('difficultyToEffort applies at entry and is frozen for the streak', async () => {
+    const liftConfig = (): ModelRouterConfig => ({
+      ...config,
+      escalateBack: { scoreThreshold: 3 },
+      difficultyToEffort: { scoreThreshold: 2, reasoningEffort: 'high' },
+    })
+
+    // Entered on a hard step: a later easy step keeps the lifted effort.
+    const lifted = await bench({ config: liftConfig() })
+    openTurn(lifted.session, 1)
+    user(lifted.session, 'a small change')
+    lifted.engine.score = { ...EASY, score: 2 }
+    expect(await lifted.resolve(1)).toEqual({ ...CHEAP, reasoningEffort: 'high' })
+    closeTurn(lifted.session, 1)
+    openTurn(lifted.session, 2)
+    lifted.engine.score = { ...EASY, score: 1 }
+    expect(await lifted.resolve(2)).toEqual({ ...CHEAP, reasoningEffort: 'high' })
+    expect(lifted.decision(1)).toMatchObject({
+      reason: 'gate-passed',
+      selection: { candidateId: 'cheap', reasoningEffort: 'high' },
+      sticky: { active: true, turnsElapsed: 1, enteredTurn: 1 },
+    })
+
+    // Entered on an easy step: a later hard step does not lift the streak.
+    const plain = await bench({ config: liftConfig() })
+    openTurn(plain.session, 1)
+    user(plain.session, 'a small change')
+    expect(await plain.resolve(1)).toEqual(CHEAP)
+    closeTurn(plain.session, 1)
+    openTurn(plain.session, 2)
+    plain.engine.score = { ...EASY, score: 2.5 }
+    expect(await plain.resolve(2)).toEqual(CHEAP)
+    expect(plain.decision(1)).toMatchObject({ reason: 'gate-passed', sticky: { turnsElapsed: 1, enteredTurn: 1 } })
+    expect(plain.decision(1).selection).not.toHaveProperty('reasoningEffort')
+  })
+
+  it('an effort change mid-streak is treated as a candidate change', async () => {
+    // With and without a lift: the held effort is reachable under neither.
+    for (const difficultyToEffort of [undefined, { scoreThreshold: 2, reasoningEffort: 'high' }]) {
+      const b = await bench({
+        settings: true,
+        config: {
+          ...config,
+          escalateBack: { scoreThreshold: 3 },
+          candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }],
+          ...difficultyToEffort === undefined ? {} : { difficultyToEffort },
+        },
+      })
+      openTurn(b.session, 1)
+      user(b.session, 'a small change')
+      expect(await b.resolve(1)).toEqual({ ...CHEAP, reasoningEffort: 'low' })
+      closeTurn(b.session, 1)
+      openTurn(b.session, 2)
+      await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'medium' }],
+      })
+
+      // Below the horizon the held effort stands, as for any candidate change.
+      expect(await b.resolve(2)).toEqual({ ...CHEAP, reasoningEffort: 'low' })
+      expect(b.decision(1)).toMatchObject({ reason: 'sticky-hold', sticky: { turnsElapsed: 1, enteredTurn: 1 } })
+
+      // After the horizon the new effort enters as a new streak.
+      closeTurn(b.session, 2)
+      openTurn(b.session, 3)
+      expect(await b.resolve(3)).toEqual({ ...CHEAP, reasoningEffort: 'medium' })
+      expect(b.decision(2)).toMatchObject({
+        reason: 'gate-passed',
+        selection: { candidateId: 'cheap', reasoningEffort: 'medium' },
+        sticky: { active: true, turnsElapsed: 0, enteredTurn: 3 },
+      })
+      expect(stickyState(b.session.events)).toMatchObject({ enteredTurn: 3, candidate: { reasoningEffort: 'medium' } })
+    }
   })
 
   it('holds the entered candidate through the horizon and starts a new streak afterward', async () => {
@@ -2080,6 +2227,7 @@ describe('configuration at plugin load', () => {
       escalateBackScoreThreshold: 3,
       maxRouteErrors: 2,
       onUnavailable: 'fallback',
+      inTurnFallback: 'manual',
       tier: 'fast',
       state: { contextTurns: 2, maxChars: 12_000, maxFitCandidates: 8 },
     })
@@ -2145,6 +2293,208 @@ describe('configuration at plugin load', () => {
     await missing.plugin(SessionStore)
     await expect(missing.plugin(ModelRoutingController, { ...CONFIG, routeInstructions: '' }))
       .rejects.toThrow(/ModelRouterConfig.routeInstructions must be a non-empty string/)
+  })
+})
+
+describe('in-turn fallback', () => {
+  /** A failure the loop reports for one attempt on a route. */
+  function failure(code = 'AUTH'): LlmFailure {
+    return { message: 'the route failed', code }
+  }
+
+  /**
+   * Dispatch the loop's request-error waterfall for one failed attempt; the
+   * terminal `next` is what the loop supplies when no listener recovers.
+   */
+  function requestError(
+    b: Bench,
+    options: { turn?: number; step?: number; provider?: string; code?: string; signal?: AbortSignal } = {},
+  ): Promise<RequestErrorAction> {
+    return agentEvents(b.ctx, b.agent).waterfall(
+      'agent/request-error',
+      {
+        turn: options.turn ?? 1,
+        step: options.step ?? 1,
+        provider: options.provider ?? CHEAP.provider,
+        failure: failure(options.code),
+        retryPolicy: undefined,
+        signal: options.signal ?? b.signal,
+      },
+      () => Promise.resolve(undefined),
+    )
+  }
+
+  /** Route turn 1 step 1 to the candidate and log the request header and error chunk the loop would. */
+  async function routedAndFailed(options: BenchOptions = {}): Promise<Bench> {
+    const b = await bench(options)
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    header(b.session, CHEAP.provider, CHEAP.model)
+    b.session.append('assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'finish', reason: { kind: 'error', failure: failure() } },
+    })
+    return b
+  }
+
+  it('candidate stream error retries the same step on the manual route', async () => {
+    const b = await routedAndFailed()
+    const failedChunkSeq = b.session.events.at(-1)?.seq
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(b.decision(1)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      stateHash: b.decision(0).stateHash,
+      stateSeqs: b.decision(0).stateSeqs,
+      failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model },
+      failedChunkSeq,
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG },
+    })
+
+    // The retried request resolves the manual route without a second judgment,
+    // including when the caller's manual base is the failed header's route.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(await b.resolve(1, CHEAP)).toEqual(STRONG)
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decisions()).toHaveLength(2)
+    expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'route-failed' })
+
+    // A second failure in that step, now on the manual route, stays terminal.
+    header(b.session, STRONG.provider, STRONG.model)
+    expect(await requestError(b, { provider: STRONG.provider })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(2)
+  })
+
+  it('defers to llm-retry when it schedules a retry', async () => {
+    const b = await routedAndFailed()
+    // A downstream listener standing in for llm-retry: it owns a transient retry.
+    let downstreamCalls = 0
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      downstreamCalls += 1
+      const action = await next()
+      return action ?? { kind: 'retry' }
+    })
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(downstreamCalls).toBe(1)
+    expect(b.decisions()).toHaveLength(1)
+    // The candidate's retry keeps the downgraded pin.
+    expect(await b.resolve(1)).toEqual(CHEAP)
+  })
+
+  it('inTurnFallback off leaves the failure terminal', async () => {
+    const b = await routedAndFailed({ config: { ...CONFIG, inTurnFallback: 'off' } })
+
+    expect(await requestError(b)).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('aborted failure is not converted', async () => {
+    const b = await routedAndFailed()
+    const controller = new AbortController()
+    controller.abort()
+
+    expect(await requestError(b, { code: 'ABORTED' })).toBeUndefined()
+    expect(await requestError(b, { signal: controller.signal })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('converts only the request this controller routed', async () => {
+    const b = await routedAndFailed()
+
+    // Another step, another turn, or another provider did not run the downgrade.
+    expect(await requestError(b, { step: 2 })).toBeUndefined()
+    expect(await requestError(b, { turn: 2 })).toBeUndefined()
+    expect(await requestError(b, { provider: STRONG.provider })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+
+    // A manual decision for the step, or no request header yet, is not a downgrade that failed.
+    const kept = await bench()
+    openTurn(kept.session, 1)
+    kept.engine.choice = LOW_CONFIDENCE
+    expect(await kept.resolve(1)).toBeUndefined()
+    header(kept.session, STRONG.provider, STRONG.model)
+    expect(await requestError(kept, { provider: STRONG.provider })).toBeUndefined()
+    const unsent = await bench()
+    openTurn(unsent.session, 1)
+    expect(await unsent.resolve(1)).toEqual(CHEAP)
+    expect(await requestError(unsent)).toBeUndefined()
+    expect(unsent.decisions()).toHaveLength(1)
+    // A header from an earlier turn that ran the selection's provider with
+    // another model is not the failed attempt either.
+    const stale = await bench()
+    openTurn(stale.session, 1)
+    header(stale.session, CHEAP.provider, 'cheap-model-previous')
+    closeTurn(stale.session, 1)
+    openTurn(stale.session, 2)
+    expect(await stale.resolve(2)).toEqual(CHEAP)
+    expect(await requestError(stale, { turn: 2 })).toBeUndefined()
+    expect(stale.decisions()).toHaveLength(1)
+  })
+
+  it('records no failed chunk when the failed attempt logged none', async () => {
+    const b = await bench()
+    openTurn(b.session, 1)
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    header(b.session, CHEAP.provider, CHEAP.model)
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(b.decision(1)).not.toHaveProperty('failedChunkSeq')
+    // An unrelated route in force for the retry keeps its own manual choice.
+    expect(await b.resolve(1, MID)).toBeUndefined()
+  })
+
+  it('only delegates after the plugin fiber is disposed', async () => {
+    const b = await routedAndFailed()
+    // Capture the router's callback mid-dispatch, as a waterfall in flight holds it.
+    const captured = Promise.withResolvers<undefined>()
+    let resume: (() => void) | undefined
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      await new Promise<void>((resolve) => {
+        resume = resolve
+        captured.resolve(undefined)
+      })
+      return next()
+    })
+    const pending = requestError(b)
+    await captured.promise
+    await b.routerFiber.dispose()
+    resume?.()
+
+    expect(await pending).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('a callback entered after disposal only delegates', async () => {
+    const b = await routedAndFailed()
+    // A waterfall captured the router's listener before its fiber was disposed
+    // and enters it afterwards: the stale callback must not append a decision.
+    let downstreamCalls = 0
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      downstreamCalls += 1
+      return next()
+    })
+    const upstream = Promise.withResolvers<undefined>()
+    const entered = Promise.withResolvers<undefined>()
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      entered.resolve(undefined)
+      await upstream.promise
+      return next()
+    }, { prepend: true })
+    const pending = requestError(b)
+    await entered.promise
+    await b.routerFiber.dispose()
+    upstream.resolve(undefined)
+
+    expect(await pending).toBeUndefined()
+    expect(downstreamCalls).toBe(1)
+    expect(b.decisions()).toHaveLength(1)
+    // A fresh dispatch after disposal no longer reaches the router at all.
+    expect(await requestError(b)).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
   })
 })
 
