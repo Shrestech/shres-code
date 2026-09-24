@@ -10,7 +10,13 @@
  */
 
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
-import type { ModelRoutingCandidate, ModelRoutingCandidateConfig } from './types.ts'
+import type {
+  ModelRoutingCandidate,
+  ModelRoutingCandidateConfig,
+  ModelRoutingObjective,
+  ModelRoutingRouteFrom,
+  ModelRoutingRouteFromConfig,
+} from './types.ts'
 
 /** Whether routing starts in force. */
 export type ModelRoutingInitialMode = 'off' | 'on'
@@ -112,10 +118,17 @@ export interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist whose relative capability and cost the deployment owns.
-   * An empty list leaves every turn on the manual route with `no-candidates`.
+   * The one shared pool of downgrade candidates, whose relative capability and
+   * cost the deployment owns. An empty pool leaves every turn on the manual
+   * route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
+  /**
+   * Strong routes routing may start from, each with its billing objective. A
+   * manual route not listed here keeps its model with `base-unlisted` and no
+   * judgment call. Must be non-empty unless `initialMode` is `off`.
+   */
+  routeFrom?: ModelRoutingRouteFromConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
@@ -200,8 +213,10 @@ export interface ResolvedModelRoutingState {
 export interface ResolvedModelRouterConfig {
   /** Deployment mode applied until the session records an explicit user choice. */
   readonly initialMode: ModelRoutingInitialMode
-  /** Detached allowlist in configuration order. */
+  /** Detached candidate pool in configuration order. */
   readonly candidates: readonly Readonly<ModelRoutingCandidate>[]
+  /** Detached `routeFrom` allowlist in configuration order. */
+  readonly routeFrom: readonly ModelRoutingRouteFrom[]
   /** Route-confidence floor. */
   readonly downgradeThreshold: number
   /** Top-two margin floor. */
@@ -273,6 +288,15 @@ export const DEFAULT_ENTRY_SCORE_CEILING = 2
 /** Default number of turns after a quality exit that keep the manual route without judgment. */
 export const DEFAULT_REENTRY_COOLDOWN_TURNS = 2
 
+/** Longest candidate description, in characters: every description is sent in every judgment question. */
+export const MAX_CANDIDATE_DESCRIPTION_CHARS = 160
+
+/** Largest judgment deadline a `latency` route accepts, in milliseconds. */
+export const MAX_LATENCY_JUDGMENT_DEADLINE_MS = 200
+
+/** Billing objectives a `routeFrom` entry may name. */
+const OBJECTIVES: ReadonlySet<string> = new Set<ModelRoutingObjective>(['quota', 'dollars', 'latency'])
+
 /** Default escalate-back difficulty threshold: the fourth level (index 3) of the five-level rubric. */
 export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
 
@@ -314,6 +338,7 @@ export const DEFAULT_DIFFICULTY_LEVELS: readonly string[] = Object.freeze([
 const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'initialMode',
   'candidates',
+  'routeFrom',
   'downgradeThreshold',
   'downgradeMargin',
   'hold',
@@ -394,8 +419,11 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].model`, candidate.model)
     if (seen.has(id)) throw new Error(`ModelRouterConfig.candidates lists "${id}" more than once`)
     seen.add(id)
-    if (candidate.description !== undefined) {
-      assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].description`, candidate.description)
+    assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].description`, candidate.description)
+    if (candidate.description.length > MAX_CANDIDATE_DESCRIPTION_CHARS) {
+      throw new Error(
+        `ModelRouterConfig.candidates["${id}"].description must be at most ${MAX_CANDIDATE_DESCRIPTION_CHARS} characters`,
+      )
     }
     return Object.freeze({
       id,
@@ -404,7 +432,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
       ...candidate.reasoningEffort === undefined
         ? {}
         : { reasoningEffort: ReasoningEffortId(candidate.reasoningEffort) },
-      ...candidate.description === undefined ? {} : { description: candidate.description },
+      description: candidate.description,
     })
   })
   const minSteps = config.hold?.minSteps ?? DEFAULT_HOLD_MIN_STEPS
@@ -470,6 +498,10 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   if (!Number.isInteger(breakerOpenTurns) || breakerOpenTurns < 0) {
     throw new Error('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
   }
+  const routeFrom = resolveRouteFrom(config.routeFrom ?? [], judgmentDeadlineMs)
+  if (config.initialMode !== 'off' && routeFrom.length === 0) {
+    throw new Error('ModelRouterConfig.routeFrom is empty: routing can never run')
+  }
   const onUnavailable = config.onUnavailable ?? 'fallback'
   const inTurnFallback = config.inTurnFallback ?? 'manual'
   const tier = config.tier ?? 'fast'
@@ -514,6 +546,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   return Object.freeze({
     initialMode: config.initialMode,
     candidates: Object.freeze(candidates),
+    routeFrom,
     downgradeThreshold: config.downgradeThreshold,
     downgradeMargin: config.downgradeMargin,
     hold: Object.freeze({ minSteps, maxSteps }),
@@ -540,6 +573,50 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     state: Object.freeze({ contextTurns, maxChars, maxFitCandidates }),
     tier,
   })
+}
+
+/**
+ * Resolve the `routeFrom` allowlist: each entry names a strong route and its
+ * billing objective once.
+ * @param entries - the configured entries.
+ * @param judgmentDeadlineMs - the resolved judgment deadline, which a `latency` route bounds.
+ * @returns the frozen entries in configuration order.
+ * @throws Error naming the entry when a route is empty or listed twice, the
+ *   objective is unknown, a `latency` route has a deadline above 200 ms, or a
+ *   `quota` route lacks `allowEveryTurn` under the per-turn entry policy.
+ */
+function resolveRouteFrom(
+  entries: readonly ModelRoutingRouteFromConfig[],
+  judgmentDeadlineMs: number,
+): readonly ModelRoutingRouteFrom[] {
+  const seen = new Set<string>()
+  return Object.freeze(entries.map((entry, index) => {
+    assertNonEmptyString(`ModelRouterConfig.routeFrom[${index}].provider`, entry.provider)
+    assertNonEmptyString(`ModelRouterConfig.routeFrom[${index}].model`, entry.model)
+    const name = `ModelRouterConfig.routeFrom["${entry.provider}/${entry.model}"]`
+    const key = JSON.stringify([entry.provider, entry.model])
+    if (seen.has(key)) throw new Error(`ModelRouterConfig.routeFrom lists "${entry.provider}/${entry.model}" more than once`)
+    seen.add(key)
+    // Read through an unknown-typed view: programmatic construction bypasses the schema.
+    const raw = entry as { objective?: unknown; allowEveryTurn?: unknown }
+    if (typeof raw.objective !== 'string' || !OBJECTIVES.has(raw.objective)) {
+      throw new Error(`${name}.objective must be "quota", "dollars", or "latency"`)
+    }
+    if (raw.allowEveryTurn !== undefined && typeof raw.allowEveryTurn !== 'boolean') {
+      throw new Error(`${name}.allowEveryTurn must be a boolean`)
+    }
+    const allowEveryTurn = entry.allowEveryTurn ?? false
+    if (entry.objective === 'latency' && judgmentDeadlineMs > MAX_LATENCY_JUDGMENT_DEADLINE_MS) {
+      throw new Error(
+        `${name}.objective "latency" requires judgmentDeadlineMs of at most ${MAX_LATENCY_JUDGMENT_DEADLINE_MS}`,
+      )
+    }
+    // Per-turn entry is the only entry policy, so a quota route opts into it.
+    if (entry.objective === 'quota' && !allowEveryTurn) {
+      throw new Error(`${name}.objective "quota" requires allowEveryTurn: true under the per-turn entry policy`)
+    }
+    return Object.freeze({ provider: entry.provider, model: entry.model, objective: entry.objective, allowEveryTurn })
+  }))
 }
 
 /** Require one probability-shaped threshold inside [0, 1]. */

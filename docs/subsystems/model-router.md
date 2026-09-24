@@ -10,6 +10,10 @@ Source: [`packages/llm/model-router/src/index.ts`](../../packages/llm/model-rout
 
 The latest explicit `agent/model-selection` event is the manual selection authority, even when no request header exists or its provider/model/effort matches a routed header byte for byte. Resume and fork therefore recover manual intent before consulting the router's sticky base or a logged request header. Routing policy is unchanged: the consult may select only an eligible configured candidate for the current request, and the manual selection remains the fallback when the consult returns no route.
 
+## Where routing may start and go
+
+`candidates` is the one shared pool of downgrade targets, and `routeFrom` is the fail-closed allowlist of strong routes routing may start from, each with a required billing `objective` (`quota`, `dollars`, or `latency`). A consult whose manual provider/model is not listed records `kept-strong` / `base-unlisted` without assessing a candidate or asking the judgment engine, and a held streak whose route is removed from the list ends the same way with `brokenBy: 'base-unlisted'`. Every decision resolved against a listed route records its `objective`. The two lists impose no cost or strength order: a pool model can be a lateral or upward move from some listed route, which the equals-base rule and the capability checks below do not prevent.
+
 ## Candidate eligibility and fitted state
 
 Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task.
@@ -133,6 +137,8 @@ type ModelRoutingReason =
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
   | 'no-candidates'
+  /** The manual route is not listed in `routeFrom`, so routing never starts from it and no judgment runs. */
+  | 'base-unlisted'
   /** No generation runtime is available to validate candidate routes. */
   | 'model-unavailable'
   /** Candidate capabilities cannot preserve the current request's requirements. */
@@ -234,6 +240,8 @@ interface ModelRoutingDecision {
   failedChunkSeq?: number
   /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
   engineFailure?: ModelRoutingEngineFailure
+  /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
+  objective?: ModelRoutingObjective
 }
 ```
 
@@ -288,6 +296,7 @@ type ModelRoutingBreakReason =
   | 'route-errors'
   | 'route-failed'
   | 'hold-cap'
+  | 'base-unlisted'
 ```
 
 ```ts type-equiv
@@ -404,6 +413,32 @@ interface ModelRoutingStateConfig {
 ```
 
 ```ts type-equiv
+/** One strong route that routing may start from, as configuration states it. */
+interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route. The per-turn entry policy
+   * refuses a quota route without it.
+   */
+  allowEveryTurn?: boolean
+}
+```
+
+```ts type-equiv
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+```
+
+```ts type-equiv
 /**
  * The streak horizon, counted in model steps: every `step/start` the loop logs
  * while a downgrade is held advances it, including later steps of the turn that
@@ -467,10 +502,17 @@ interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist whose relative capability and cost the deployment owns.
-   * An empty list leaves every turn on the manual route with `no-candidates`.
+   * The one shared pool of downgrade candidates, whose relative capability and
+   * cost the deployment owns. An empty pool leaves every turn on the manual
+   * route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
+  /**
+   * Strong routes routing may start from, each with its billing objective. A
+   * manual route not listed here keeps its model with `base-unlisted` and no
+   * judgment call. Must be non-empty unless `initialMode` is `off`.
+   */
+  routeFrom?: ModelRoutingRouteFromConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
@@ -542,7 +584,7 @@ interface ModelRouterConfig {
 }
 ```
 
-`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, and model, and no two candidates may share an id; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
+`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, model, and description of at most 160 characters, and no two candidates may share an id; a `routeFrom` route is listed once with a known objective, a `latency` route requires `judgmentDeadlineMs` of at most 200, a `quota` route requires `allowEveryTurn: true` under the per-turn entry policy, and an empty `routeFrom` is refused unless `initialMode` is `off`; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
 
 `/route` reports the mode in force and any held streak; `/route on` and `/route off` select a persistent user mode. A same-valued choice records user authority immediately. A changed value during an open turn waits for the next accepted pre-step; rejection or cancellation does not commit it. Deployment defaults use `model-routing/configuration` and stop affecting a session after its first explicit `model-routing/mode`. Cold sessions retain their log-derived mode until they acquire a live routing owner. Status and invalid commands never create a pending mode indication.
 
@@ -645,5 +687,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:362`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:377`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -72,6 +72,7 @@ import {
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   DEFAULT_DIFFICULTY_LEVELS,
   KEEP_CURRENT_OPTION_ID,
+  MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
@@ -96,6 +97,7 @@ import type {
   ModelRoutingLastDecision,
   ModelRoutingProjection,
   ModelRoutingReason,
+  ModelRoutingRouteFrom,
   ModelRoutingSelection,
   ModelRoutingSelectionView,
 } from './types.ts'
@@ -119,7 +121,9 @@ export {
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   KEEP_CURRENT_OPTION_ID,
+  MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
+  MAX_LATENCY_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
@@ -262,6 +266,17 @@ function entryBaseOf(sticky: ModelRoutingStickyState, base: ModelSelection): Mod
 }
 
 /**
+ * The `routeFrom` entry for one manual route: provider and model match, and
+ * the reasoning effort is not compared.
+ * @param config - the resolved configuration.
+ * @param base - the manual route in force.
+ * @returns the matching entry, or undefined when routing never starts from this route.
+ */
+function routeFromFor(config: ResolvedModelRouterConfig, base: ModelSelection): ModelRoutingRouteFrom | undefined {
+  return config.routeFrom.find(entry => entry.provider === base.provider && entry.model === base.model)
+}
+
+/**
  * The entry position a decision continuing a held streak records: the turn and
  * step the fold carries for it, each omitted when the entering record lacked it.
  * @param sticky - the sticky state of the held streak.
@@ -371,7 +386,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       provider: z.string().required(),
       model: z.string().required(),
       reasoningEffort: z.string(),
-      description: z.string(),
+      description: z.string().max(MAX_CANDIDATE_DESCRIPTION_CHARS).required(),
+    })).default([]),
+    routeFrom: z.array(z.object({
+      provider: z.string().required(),
+      model: z.string().required(),
+      objective: z.union(['quota', 'dollars', 'latency']).required(),
+      allowEveryTurn: z.boolean(),
     })).default([]),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
@@ -751,8 +772,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     state ??= this.buildState(session, config)
     const sticky = stickyState(session.events)
     const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request)
+    const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
+      ...from === undefined ? {} : { objective: from.objective },
       stateProjection: resolved.stateProjection ?? {
         renderer: 'conversation-v1' as const,
         contextTurns: config.state.contextTurns,
@@ -806,6 +829,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       stateSeqs: routed.stateSeqs,
       failure: { code: failure.code, provider: selection.provider, model: selection.model },
       ...failedChunk === undefined ? {} : { failedChunkSeq: failedChunk.seq },
+      /* v8 ignore next -- a downgrade is only resolved against a listed route, which records its objective */
+      ...routed.objective === undefined ? {} : { objective: routed.objective },
       sticky: {
         active: false,
         stepsElapsed: 0,
@@ -968,6 +993,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         stateHash: observed.hash,
         stateSeqs: observed.seqs,
         sticky: { active: false, stepsElapsed: 0, brokenBy: 'manual-deviation' },
+      }
+    }
+    // Routing starts only from a listed strong route: an unlisted one is never
+    // judged, and a held streak ends when its route is removed from the list.
+    if (routeFromFor(config, base) === undefined) {
+      return {
+        ...keep('base-unlisted'),
+        sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'base-unlisted' as const } },
       }
     }
     // The cap bounds every hold, including one inside its entering turn, and
@@ -1376,7 +1409,7 @@ function routeQuestion(config: ResolvedModelRouterConfig, base: ModelSelection):
       },
       ...config.candidates.map(candidate => ({
         option: candidate.id,
-        description: `Use ${routeDescription(candidate)}.${candidate.description === undefined ? '' : ` ${candidate.description}`}`,
+        description: `Use ${routeDescription(candidate)}. ${candidate.description}`,
       })),
     ],
   }

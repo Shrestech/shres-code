@@ -71,6 +71,7 @@ test('shared routing tier composes both providers and preserves route-off absenc
       model: 'deepseek-v4-flash:cloud',
       description: 'a routine, bounded task with a known safe fit',
     }], arm)
+    assert.deepEqual(router?.config?.routeFrom, [{ provider: 'zai', model: 'glm-5.3', objective: 'dollars' }], arm)
     assert.equal(router?.config?.downgradeThreshold, 0.8)
     assert.equal(router?.config?.downgradeMargin, 0.1)
     assert.deepEqual(router?.config?.hold, { minSteps: 20, maxSteps: 40 })

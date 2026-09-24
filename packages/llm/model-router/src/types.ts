@@ -27,8 +27,33 @@ export interface ModelRoutingCandidateConfig {
   model: string
   /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
   reasoningEffort?: string
-  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
-  description?: string
+  /**
+   * Tasks this candidate can handle, included with its model identity in every
+   * judgment question. Required, at most 160 characters.
+   */
+  description: string
+}
+
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+
+/** One strong route that routing may start from, as configuration states it. */
+export interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route. The per-turn entry policy
+   * refuses a quota route without it.
+   */
+  allowEveryTurn?: boolean
 }
 
 /** One resolved allowlisted downgrade candidate. */
@@ -46,7 +71,19 @@ export interface ModelRoutingCandidate {
    */
   reasoningEffort?: ReasoningEffortId
   /** Tasks this candidate can handle, included with its model identity in the judgment question. */
-  description?: string
+  description: string
+}
+
+/** One resolved strong route that routing may start from. */
+export interface ModelRoutingRouteFrom {
+  /** Registered provider route of the strong model. */
+  readonly provider: string
+  /** Provider-owned model id of the strong model. */
+  readonly model: string
+  /** How this strong route is billed. */
+  readonly objective: ModelRoutingObjective
+  /** Whether per-turn entry from a `quota` route is allowed. */
+  readonly allowEveryTurn: boolean
 }
 
 /**
@@ -162,6 +199,8 @@ export type ModelRoutingReason =
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
   | 'no-candidates'
+  /** The manual route is not listed in `routeFrom`, so routing never starts from it and no judgment runs. */
+  | 'base-unlisted'
   /** No generation runtime is available to validate candidate routes. */
   | 'model-unavailable'
   /** Candidate capabilities cannot preserve the current request's requirements. */
@@ -213,6 +252,7 @@ export type ModelRoutingBreakReason =
   | 'route-errors'
   | 'route-failed'
   | 'hold-cap'
+  | 'base-unlisted'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -347,6 +387,8 @@ export interface ModelRoutingDecision {
   failedChunkSeq?: number
   /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
   engineFailure?: ModelRoutingEngineFailure
+  /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
+  objective?: ModelRoutingObjective
 }
 
 /** A failed judgment call as a decision records it. */

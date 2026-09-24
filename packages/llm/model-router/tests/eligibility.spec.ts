@@ -45,6 +45,7 @@ function candidate(id: string, overrides: Partial<ModelRoutingCandidate> = {}): 
     id,
     provider: `${id}-provider`,
     model: `${id}-model`,
+    description: `the ${id} test candidate`,
     ...overrides,
   }
 }

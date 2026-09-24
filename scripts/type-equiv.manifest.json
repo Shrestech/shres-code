@@ -2522,6 +2522,16 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingRouteFromConfig",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingObjective",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingHoldConfig",
       "source": "packages/llm/model-router/src/config.ts"
     },

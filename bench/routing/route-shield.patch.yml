@@ -27,6 +27,7 @@
         initialMode: "on"
         tier: "fast"
         candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
+        routeFrom: [{"provider":"deepseek-official","model":"deepseek-v4-pro","objective":"dollars"}]
         downgradeThreshold: 0.8
         downgradeMargin: 0.1
         hold: {"minSteps":20,"maxSteps":40}
