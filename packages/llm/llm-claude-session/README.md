@@ -29,6 +29,7 @@ The optional `llm-claude-session` settings section overlays the composition entr
 | `displayName` | `Claude (subscription)` | Selector label. |
 | `models` | `claude-opus-5-5`, `claude-opus-5`, `claude-sonnet-5` (each `text`+`image`, 1,000,000 context, 128,000 output; efforts `low`/`medium`/`high`/`xhigh`/`max`) | Catalog; a new release is a settings entry, not a code change. |
 | `refreshLeewayMs` | `300000` | Refresh when the token is at or within this distance of expiry. |
+| `cacheRetention` | `short` | Prompt-cache retention every request asks for: `short` is Anthropic's five-minute ephemeral cache, `long` asks for the one-hour cache, and `none` sends no cache control. The route always states it, so pi-ai's process-wide `PI_CACHE_RETENTION` never applies. Each model declares the matching `promptCacheTtlMs`: `300000`, `3600000`, or `0`. |
 
 The section declares no `headers` field: pi-ai builds the OAuth request's header set (the `claude-code` and `oauth` betas, the pinned CLI user-agent, `x-app`) and merges configured headers over it later-wins, so a route header would replace the beta set the subscription login needs rather than add to it.
 
@@ -54,7 +55,7 @@ Usage chunks carry Anthropic's reported input/output counts, with thinking token
 
 #### KV Cache effect
 
-Provider-side. Anthropic reports prompt-cache hits and writes inside its usage, and this adapter passes those counts through as `cacheReadTokens` / `cacheWriteTokens` unchanged; the adapter sends no cache controls of its own, so whether a prefix is cached and how long it lives remain the provider's and pi-ai's decisions.
+Provider-side. pi-ai places up to four Anthropic `cache_control` breakpoints — the Claude Code identity block, the harness system prompt, the last tool, and the final block of the last user message — in the retention `cacheRetention` names: `{type: 'ephemeral'}` for `short`, `{type: 'ephemeral', ttl: '1h'}` for `long`, and no breakpoints for `none`. A cached prefix stays readable for the declared `promptCacheTtlMs`, counted from the start of the request that wrote or last read it; an idle gap longer than that makes the next request re-write the whole prefix. Anthropic reports prompt-cache hits and writes inside every usage block, so the route declares `cacheUsage: 'reported'` and every call carries both `cacheReadTokens` and `cacheWriteTokens`, a miss as 0; the usage chunk carries no split between five-minute and one-hour writes.
 
 ## Known Limitations and Deferred Work
 
@@ -64,4 +65,5 @@ Provider-side. Anthropic reports prompt-cache hits and writes inside its usage, 
 - **`expires_at` unit assumed** — the grant parser reads `expires_at` as epoch milliseconds, matching the store's own convention, and falls back to `expires_in` seconds; a live rotation that states the other unit would persist a wrong expiry.
 - **Refresh races are resolved by adoption, not prevention** — a sibling that refreshes concurrently wins the store; this adapter adopts its session rather than clobbering it. The refresh token is single-use, so a grant this process already started cannot be un-spent.
 - **Keychain account mismatch** — a rotation writes its item under the configured `keychainAccount` (the OS user name by default); a CLI whose item lives under a different account keeps its own value, which `keychainAccount` corrects.
+- **One-hour cache on the subscription is unverified** — `cacheRetention: long` sends `ttl: '1h'` (pi-ai gates it on the model's `supportsLongCacheRetention` compat, not on the base URL), but whether the subscription OAuth endpoint honours it has not been measured, so the default stays `short`. The opt-in live probe [`tests/cache-retention.e2e.ts`](tests/cache-retention.e2e.ts) settles it: it runs only with `SHRES_E2E_CLAUDE_CACHE_TTL=1` and a signed-in login, waits six and a half minutes, and spends subscription quota.
 - **No silent first-run onboarding** — the route is usable without a login in the Models picker; the failure arrives at first use by design (fail loud at the earliest resolvable point).

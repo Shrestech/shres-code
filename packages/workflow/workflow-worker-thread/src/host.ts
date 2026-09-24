@@ -11,7 +11,7 @@ import { Worker } from 'node:worker_threads'
 import type { WorkerOptions } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@shres-code/cordis'
-import type { Agent } from '@shres-code/shres-code-agent'
+import type { Agent, AgentOptions } from '@shres-code/shres-code-agent'
 import { assertNever } from '@shres-code/shres-code-llm'
 import { snapshotJsonValue } from '@shres-code/shres-code-session'
 import type SubagentRuntime from '@shres-code/shres-code-subagent'
@@ -349,19 +349,33 @@ export class WorkerRun implements WorkflowRun {
   private async startChild(callId: number, request: ChildStartRequest): Promise<void> {
     let run: SubagentRun
     try {
+      const requested: AgentOptions | undefined = request.provider !== undefined || request.model !== undefined
+        ? {
+          ...request.provider !== undefined ? { provider: request.provider } : {},
+          ...request.model !== undefined ? { model: request.model } : {},
+        }
+        : undefined
+      // A script's provider/model override is explicit and skips routing; an
+      // unrouted child starts with exactly `requested`.
+      const agentOptions = await this.subagents.resolveChildRoute(this.provider, {
+        parent: this.parent,
+        kind: 'workflow',
+        prompt: request.prompt,
+        signal: this.controller.signal,
+        ...requested !== undefined ? { requested } : {},
+      })
+      // Routing awaited: the run may have reached its terminal boundary meanwhile.
+      const refused = this.childAdmissionFailure()
+      if (refused !== undefined) {
+        this.post(HostToWorkerType.ChildStartError, { callId, rendered: refused.rendered })
+        return
+      }
       run = await this.subagents.start(this.provider, {
         prompt: [{ type: 'text', text: request.prompt }],
         parent: this.parent,
         signal: this.controller.signal,
         ...request.schema !== undefined ? { outputSchema: request.schema } : {},
-        ...request.provider !== undefined || request.model !== undefined
-          ? {
-            agentOptions: {
-              ...request.provider !== undefined ? { provider: request.provider } : {},
-              ...request.model !== undefined ? { model: request.model } : {},
-            },
-          }
-          : {},
+        ...agentOptions !== undefined ? { agentOptions } : {},
       })
     } catch (error: unknown) {
       const failure = this.childAdmissionFailure()

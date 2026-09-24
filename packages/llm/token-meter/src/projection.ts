@@ -7,13 +7,21 @@
 /**
  * Durable cumulative provider usage for a complete session log.
  *
- * The four buckets are disjoint. In particular, reasoning tokens are already
- * included in `outputTokens` and are not accumulated again.
+ * The five buckets are disjoint. In particular, reasoning tokens are already
+ * included in `outputTokens` and are not accumulated again. A call's input
+ * lands in `uncachedInputTokens` only when its provider reported cache reads;
+ * otherwise the input may include cache hits and lands in
+ * `unreportedInputTokens`. The cache buckets sum reported counts only.
  */
 export interface TokenUsageProjection {
+  /** Input of calls whose provider reported cache reads, excluding those reads. */
   uncachedInputTokens: number
+  /** Input of calls whose provider did not report cache reads; it may include cache hits. */
+  unreportedInputTokens: number
   outputTokens: number
+  /** Sum of reported cache reads. */
   cacheReadTokens: number
+  /** Sum of reported cache writes. */
   cacheWriteTokens: number
 }
 

@@ -476,7 +476,7 @@ Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/comp
 'escalation/decision': EscalationDecision
 ```
 
-Source: [`packages/team/worker-escalation/src/types.ts:268`](../packages/team/worker-escalation/src/types.ts)
+Source: [`packages/team/worker-escalation/src/types.ts:230`](../packages/team/worker-escalation/src/types.ts)
 
 ### `feedback/*`
 
@@ -836,7 +836,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/configuration': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:394`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:440`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -851,7 +851,7 @@ Source: [`packages/llm/model-router/src/types.ts:394`](../packages/llm/model-rou
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:406`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:452`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -866,7 +866,7 @@ Source: [`packages/llm/model-router/src/types.ts:406`](../packages/llm/model-rou
 'model-routing/mode': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:400`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:446`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

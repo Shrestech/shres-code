@@ -6,7 +6,16 @@ import type { ContentBlock, StreamChunk } from '@shres-code/shres-code-llm'
 import type { AssistantMessage, AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
 import { toPiContext } from '../src/context.ts'
 import { toPiReplayState } from '../src/replay.ts'
+import type { PiAiCacheUsage } from '../src/config.ts'
 import { mapStopReason, mapUsage, toStreamChunks } from '../src/stream.ts'
+
+/** Translate under a reported route; the non-usage cases do not depend on the reporting mode. */
+function translate(
+  events: AsyncIterable<AssistantMessageEvent>,
+  contextWindow?: number,
+): AsyncGenerator<StreamChunk> {
+  return toStreamChunks(events, 'reported', contextWindow)
+}
 
 function usage(input = 0, output = 0, cacheRead = 0, cacheWrite = 0): Usage {
   return {
@@ -595,7 +604,7 @@ describe('toStreamChunks', () => {
 
   it('maps text events to text blocks', async () => {
     const done = assistant({ content: [{ type: 'text', text: 'hi' }], usage: usage(3, 2) })
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'start', partial: assistant() },
       { type: 'text_start', contentIndex: 0, partial: assistant() },
       { type: 'text_delta', contentIndex: 0, delta: 'hi', partial: assistant() },
@@ -606,7 +615,7 @@ describe('toStreamChunks', () => {
       { type: 'block-start', index: 0, blockType: 'text' },
       { type: 'text-delta', index: 0, text: 'hi' },
       { type: 'block-end', index: 0, block: { type: 'text', text: 'hi' } },
-      { type: 'usage', usage: { inputTokens: 3, outputTokens: 2 } },
+      { type: 'usage', usage: { inputTokens: 3, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 } },
       {
         type: 'finish',
         reason: { kind: 'stop' },
@@ -626,7 +635,7 @@ describe('toStreamChunks', () => {
   })
 
   it('maps thinking events to reasoning blocks', async () => {
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'thinking_start', contentIndex: 0, partial: assistant() },
       { type: 'thinking_delta', contentIndex: 0, delta: 'mull', partial: assistant() },
       { type: 'thinking_end', contentIndex: 0, content: 'mull', partial: assistant() },
@@ -640,7 +649,7 @@ describe('toStreamChunks', () => {
   })
 
   it('maps tool-call events, re-stringifying parsed arguments', async () => {
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'toolcall_start', contentIndex: 0, partial: partialWithToolCall },
       { type: 'toolcall_delta', contentIndex: 0, delta: '{"a"', partial: partialWithToolCall },
       { type: 'toolcall_delta', contentIndex: 0, delta: ':1}', partial: partialWithToolCall },
@@ -657,7 +666,7 @@ describe('toStreamChunks', () => {
       { type: 'tool-call-delta', index: 0, id: 'call-1', name: 'f', argumentsDelta: '{"a"' },
       { type: 'tool-call-delta', index: 0, id: 'call-1', name: 'f', argumentsDelta: ':1}' },
       { type: 'block-end', index: 0, block: { type: 'tool-call', id: 'call-1', name: 'f', arguments: '{"a":1}' } },
-      { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } },
+      { type: 'usage', usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 } },
       {
         type: 'finish',
         reason: { kind: 'tool-calls' },
@@ -677,7 +686,7 @@ describe('toStreamChunks', () => {
   })
 
   it('tolerates toolcall_start with a missing partial entry', async () => {
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'toolcall_start', contentIndex: 0, partial: assistant() },
       { type: 'toolcall_delta', contentIndex: 0, delta: '{}', partial: assistant() },
       { type: 'done', reason: 'stop', message: assistant() },
@@ -687,18 +696,18 @@ describe('toStreamChunks', () => {
 
   it('maps error events to error finish chunks (in-stream error style)', async () => {
     const error = assistant({ stopReason: 'error', errorMessage: 'boom', usage: usage(1, 0) })
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'error', reason: 'error', error },
     )))
     expect(chunks).toEqual([
-      { type: 'usage', usage: { inputTokens: 1, outputTokens: 0 } },
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 } },
       { type: 'finish', reason: { kind: 'error', failure: { message: 'boom', code: 'PI_AI_ERROR' } } },
     ])
   })
 
   it('maps aborted error events to aborted finish', async () => {
     const error = assistant({ stopReason: 'aborted' })
-    const chunks = await collect(toStreamChunks(feed({ type: 'error', reason: 'aborted', error })))
+    const chunks = await collect(translate(feed({ type: 'error', reason: 'aborted', error })))
     expect(chunks.at(-1)).toEqual({
       type: 'finish',
       reason: { kind: 'aborted', failure: { message: 'pi-ai stream aborted', code: 'ABORTED' } },
@@ -706,7 +715,7 @@ describe('toStreamChunks', () => {
   })
 
   it('rejects a stream that ends without done or error', async () => {
-    await expect(collect(toStreamChunks(feed({ type: 'start', partial: assistant() }))))
+    await expect(collect(translate(feed({ type: 'start', partial: assistant() }))))
       .rejects.toThrow(/without done\/error/)
   })
 
@@ -716,7 +725,7 @@ describe('toStreamChunks', () => {
       throw original
     }
 
-    await expect(collect(toStreamChunks(failedSdkStream()))).rejects.toBe(original)
+    await expect(collect(translate(failedSdkStream()))).rejects.toBe(original)
   })
 })
 
@@ -833,21 +842,35 @@ describe('mapStopReason / mapUsage', () => {
     })
   })
 
-  it('maps cache fields only when nonzero', () => {
-    expect(mapUsage(usage(10, 5, 8, 2))).toEqual({
+  it('maps both cache counts, zeros included, on a reported route', () => {
+    expect(mapUsage(usage(10, 5, 8, 2), 'reported')).toEqual({
       inputTokens: 10,
       outputTokens: 5,
       cacheReadTokens: 8,
       cacheWriteTokens: 2,
     })
-    expect(mapUsage(usage(10, 5))).toEqual({ inputTokens: 10, outputTokens: 5 })
+    expect(mapUsage(usage(10, 5), 'reported')).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
+  it('omits both cache counts on an unreported route and restores the whole prompt', () => {
+    expect(mapUsage(usage(10, 5, 8, 2), 'unreported')).toEqual({ inputTokens: 20, outputTokens: 5 })
+    expect(mapUsage(usage(10, 5), 'unreported')).toEqual({ inputTokens: 10, outputTokens: 5 })
+  })
+
+  it('rejects an unknown reporting mode', () => {
+    expect(() => mapUsage(usage(1, 1), 'maybe' as PiAiCacheUsage)).toThrow()
   })
 })
 
 describe('toStreamChunks edge branches', () => {
   it('omits the name field for tool calls whose partial carried an empty name', async () => {
     const blank = assistant({ content: [{ type: 'toolCall', id: 'x', name: '', arguments: {} }] })
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'toolcall_start', contentIndex: 0, partial: blank },
       { type: 'toolcall_delta', contentIndex: 0, delta: '{}', partial: blank },
       { type: 'done', reason: 'stop', message: assistant() },
@@ -858,7 +881,7 @@ describe('toStreamChunks edge branches', () => {
 
 describe('toStreamChunks defensive branches', () => {
   it('tolerates a toolcall_delta with no preceding toolcall_start', async () => {
-    const chunks = await collect(toStreamChunks(feed(
+    const chunks = await collect(translate(feed(
       { type: 'toolcall_delta', contentIndex: 0, delta: '{}', partial: assistant() },
       { type: 'done', reason: 'stop', message: assistant() },
     )))

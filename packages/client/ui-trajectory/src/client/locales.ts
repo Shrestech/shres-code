@@ -34,6 +34,8 @@ export type TrajectoryKey =
   | 'routing.reason.engineAbsent'
   | 'routing.reason.engineDisabled'
   | 'routing.reason.engineUnavailable'
+  | 'routing.reason.judgmentFailureHeld'
+  | 'routing.reason.breakerOpen'
   | 'routing.reason.invalidAnswer'
   | 'routing.reason.noCandidates'
   | 'routing.reason.modelUnavailable'
@@ -47,9 +49,12 @@ export type TrajectoryKey =
   | 'routing.reason.currentPreferred'
   | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
+  | 'routing.reason.holdCap'
+  | 'routing.reason.reentryCooldown'
   | 'routing.reason.escalated'
   | 'routing.reason.manualDeviation'
   | 'routing.reason.routeErrors'
+  | 'routing.reason.routeFailed'
   | 'routing.reason.modeOff'
   | 'routing.reason.judgmentError'
   | 'routing.confidence'
@@ -91,6 +96,8 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.engineAbsent': 'engine absent',
   'routing.reason.engineDisabled': 'engine disabled',
   'routing.reason.engineUnavailable': 'engine unavailable',
+  'routing.reason.judgmentFailureHeld': 'judgment failed, streak held',
+  'routing.reason.breakerOpen': 'judgment paused after repeated failures',
   'routing.reason.invalidAnswer': 'invalid answer',
   'routing.reason.noCandidates': 'no candidates configured',
   'routing.reason.modelUnavailable': 'model capabilities unavailable',
@@ -104,9 +111,12 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.currentPreferred': 'current model preferred',
   'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
+  'routing.reason.holdCap': 'streak reached its step cap',
+  'routing.reason.reentryCooldown': 'cooling down after a streak exit',
   'routing.reason.escalated': 'escalated to the stronger model',
   'routing.reason.manualDeviation': 'model switched manually',
   'routing.reason.routeErrors': 'route failures',
+  'routing.reason.routeFailed': 'route failed, retried on the manual model',
   'routing.reason.modeOff': 'routing off',
   'routing.reason.judgmentError': 'judgment failed',
   'routing.confidence': 'confidence {value}',
@@ -130,6 +140,8 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'engine-absent': 'routing.reason.engineAbsent',
   'engine-disabled': 'routing.reason.engineDisabled',
   'engine-unavailable': 'routing.reason.engineUnavailable',
+  'judgment-failure-held': 'routing.reason.judgmentFailureHeld',
+  'breaker-open': 'routing.reason.breakerOpen',
   'invalid-answer': 'routing.reason.invalidAnswer',
   'no-candidates': 'routing.reason.noCandidates',
   'model-unavailable': 'routing.reason.modelUnavailable',
@@ -143,9 +155,12 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'current-preferred': 'routing.reason.currentPreferred',
   'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',
+  'hold-cap': 'routing.reason.holdCap',
+  'reentry-cooldown': 'routing.reason.reentryCooldown',
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
   'route-errors': 'routing.reason.routeErrors',
+  'route-failed': 'routing.reason.routeFailed',
   'mode-off': 'routing.reason.modeOff',
   'judgment-error': 'routing.reason.judgmentError',
 }
@@ -154,10 +169,12 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
 export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> = {
   'candidate-ineligible': 'routing.reason.candidateIneligible',
   'gate-failed': 'routing.reason.gateFailed',
+  'hold-cap': 'routing.reason.holdCap',
   'current-preferred': 'routing.reason.currentPreferred',
   'unknown-candidate': 'routing.reason.unknownCandidate',
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
   'mode-off': 'routing.reason.modeOff',
   'route-errors': 'routing.reason.routeErrors',
+  'route-failed': 'routing.reason.routeFailed',
 }

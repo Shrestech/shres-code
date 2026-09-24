@@ -57,6 +57,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/core/first-run-setup': { kind: 'indirect', reason: 'The picker writes a ModelSelection and credentials; request assembly and adapters own the model-visible request.' },
   'packages/preset/agent-presets': { kind: 'indirect', reason: 'The mount installs a preset\'s own plugins, which own every model-facing registration it makes visible.' },
   'packages/team/agent-team': { kind: 'indirect', reason: 'The package registers team_list and team_send on ctx.tools and teammate-only team:policy and deployment:environment sections; those are the model-visible contract.' },
+  'packages/team/progress-signals': { kind: 'indirect', reason: 'Pure log folds; worker-escalation renders the tool window into its Lead report and the progress facts into its judgment ask.' },
   'packages/jspace/jspace': { kind: 'none', reason: 'The seat stores logged card state; the prompt Consumer owns request text.' },
 
   'packages/wiki/wiki': { kind: 'none', reason: 'The seat stores project markdown and ranked search results; the tool Consumer owns every model-visible byte.' },
@@ -129,6 +130,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/llm/token-meter': { kind: 'indirect', reason: 'The measurement service leaves model-visible changes to its consumers.' },
   'packages/llm/grok-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/llm/codex-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token and account-id requests; the consuming adapter owns the model-visible request.' },
+  'packages/llm/cursor-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/llm/claude-credential': { kind: 'indirect', reason: 'The credential engine answers bearer-token requests; the consuming adapter owns the model-visible request.' },
   'packages/lsp/lsp': { kind: 'indirect', reason: 'The provider registry delegates model rendering to shres-tool-lsp.' },
   'packages/lsp/lsp-stdio': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-lsp.' },
@@ -188,6 +190,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/web/web-search-attached-cli': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
+  'packages/web/web-search-brave': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
 }
 

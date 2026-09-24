@@ -9,7 +9,9 @@
  */
 
 import type { HostedTool, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
-import type { JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits } from '@shres-code/shres-code-judgment'
+import type {
+  JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
+} from '@shres-code/shres-code-judgment'
 
 /**
  * One allowlisted downgrade candidate as configuration states it: plain
@@ -47,11 +49,16 @@ export interface ModelRoutingCandidate {
   description?: string
 }
 
-/** Stable result of one candidate capability check. */
+/**
+ * Stable result of one candidate check. `equals-base` marks a candidate naming
+ * the manual provider/model at any effort; every other reason is a capability
+ * result.
+ */
 export type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
   | 'base-unavailable'
   | 'base-context-unknown'
+  | 'equals-base'
   | 'candidate-unavailable'
   | 'candidate-invalid'
   | 'difficulty-effort-invalid'
@@ -145,8 +152,12 @@ export type ModelRoutingReason =
   | 'engine-absent'
   /** A judgment engine is composed and the deployment turned it off. */
   | 'engine-disabled'
-  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  /** The engine could not be reached, refused the ask, or did not answer within `judgmentDeadlineMs`. */
   | 'engine-unavailable'
+  /** A held streak kept its candidate through a failed judgment call within `judgmentFailures.holdTolerance`. */
+  | 'judgment-failure-held'
+  /** Consecutive failed judgment calls opened the breaker, so no judgment runs. */
+  | 'breaker-open'
   /** The engine answered with a body this provider could not use. */
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
@@ -165,7 +176,7 @@ export type ModelRoutingReason =
   | 'low-confidence'
   /** The route's top-two margin is below `downgradeMargin`. */
   | 'thin-margin'
-  /** The chosen candidate is the route already in force. */
+  /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
@@ -173,12 +184,18 @@ export type ModelRoutingReason =
   | 'difficulty-too-high'
   /** The turn failed the gate after the streak reached its horizon. */
   | 'gate-failed'
+  /** The held streak reached `hold.maxSteps`, so the manual route returns without judgment. */
+  | 'hold-cap'
+  /** A quality exit ended a streak within `reentryCooldownTurns`, so no judgment runs. */
+  | 'reentry-cooldown'
   /** The difficulty answer reached `escalateBack.scoreThreshold`. */
   | 'escalated'
   /** The manual provider/model changed away from the streak's entry route. */
   | 'manual-deviation'
   /** Durable route failures reached `maxRouteErrors`. */
   | 'route-errors'
+  /** The downgraded request failed, and the step retries on the manual route. */
+  | 'route-failed'
   /** Routing is off, so this turn was not judged. */
   | 'mode-off'
   /** The judgment call itself failed and `onUnavailable` is `error`. */
@@ -194,6 +211,8 @@ export type ModelRoutingBreakReason =
   | 'manual-deviation'
   | 'mode-off'
   | 'route-errors'
+  | 'route-failed'
+  | 'hold-cap'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -215,10 +234,15 @@ export interface ModelRoutingEntryBaseView {
 export interface ModelRoutingActiveStickyView {
   /** A downgraded streak is in force after this decision. */
   active: true
-  /** Turns elapsed since the streak was entered. */
-  turnsElapsed: number
+  /**
+   * Model steps logged since the streak was entered, counting every
+   * `step/start` after the entering decision; 0 on the entering step.
+   */
+  stepsElapsed: number
   /** Turn the streak was entered; absent only for malformed external records. */
   enteredTurn?: number
+  /** Step of {@link enteredTurn} the streak was entered on; absent only for records that predate it. */
+  enteredStep?: number
   /**
    * Manual route the streak was entered on. The consult records it because the
    * manual route is only in the log while the state is strong.
@@ -233,7 +257,7 @@ export interface ModelRoutingInactiveStickyView {
   /** No downgraded streak is in force after this decision. */
   active: false
   /** Zero while strong. */
-  turnsElapsed: number
+  stepsElapsed: number
   /** Why the streak ended, when this decision ended one. */
   brokenBy?: ModelRoutingBreakReason
   /**
@@ -317,6 +341,28 @@ export interface ModelRoutingDecision {
   model?: string
   /** Duration of the judgment call in milliseconds, when one was made. */
   latencyMs?: number
+  /** The failed downgraded request a `route-failed` decision retries on the manual route. */
+  failure?: ModelRoutingFailure
+  /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
+  failedChunkSeq?: number
+  /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
+  engineFailure?: ModelRoutingEngineFailure
+}
+
+/** A failed judgment call as a decision records it. */
+export interface ModelRoutingEngineFailure {
+  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  code: JudgmentErrorCode | 'DEADLINE'
+}
+
+/** The downgraded request whose failure a `route-failed` decision records. */
+export interface ModelRoutingFailure {
+  /** Provider-neutral failure code the adapter reported. */
+  code: string
+  /** Registered provider route of the failed request. */
+  provider: string
+  /** Model id of the failed request. */
+  model: string
 }
 
 /**
@@ -348,12 +394,12 @@ export interface ModelRoutingLastDecision {
   hint?: 'consider-stronger'
 }
 
-/** The sticky state a UI renders: `auto: <model>, turn 3 of >=5` (PR5). */
+/** The sticky state a UI renders. */
 export interface ModelRoutingStickyViewForUi {
   /** Whether a downgraded streak is in force. */
   active: boolean
-  /** Turns elapsed since the streak was entered. */
-  turnsElapsed: number
+  /** Model steps logged since the streak was entered. */
+  stepsElapsed: number
   /** Route the streak holds, when active. */
   selection?: ModelRoutingSelectionView
 }
@@ -377,8 +423,8 @@ export interface ModelRoutingProjection {
    * Manual route the last downgraded streak was entered on, retained after that
    * streak broke: the selection a routing-idle session restores. It is the
    * fold's entry base rather than the session's current selection, so it
-   * survives the manual pick of a downgrade candidate — the dead-end state
-   * whose every decision reports `candidate-equals-base`. Absent until one
+   * survives the manual pick of the only downgrade candidate — the dead-end
+   * state whose every decision reports `candidate-equals-base`. Absent until one
    * streak has been entered.
    */
   lastStrong?: ModelRoutingEntryBaseView

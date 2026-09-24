@@ -4,7 +4,8 @@ This document fixes the Jev routing and compaction experiment before any real
 (non-dry) trial runs. Every claim below is a decision rule stated before the
 data exists; a changed decision rule is a new experiment name. The arms, the
 tasks, and the command are frozen here; the metrics are implemented in
-`bench/runner/metrics.js` and aggregated by `bench/report/build.js`.
+`bench/runner/metrics.js` and `bench/runner/accounting.js` and aggregated by
+`bench/report/build.js`.
 
 ## Job definition
 
@@ -32,9 +33,20 @@ own):
 
 The router's config in `route-on` is frozen here: `tier: "fast"`,
 `downgradeThreshold: 0.8`, `downgradeMargin: 0.1`,
-`minTurnsDowngraded: 5`, `escalateBack: { scoreThreshold: 4 }`,
-`maxRouteErrors: 2`, `onUnavailable: "fallback"`, and exactly one
-candidate (the weak route). The judgment engine is the TypeSafe provider on its
+`hold: { minSteps: 20, maxSteps: 40 }`, `difficulty: { entryScoreCeiling: 2 }`,
+`reentryCooldownTurns: 2`, `escalateBack: { scoreThreshold: 4 }`,
+`maxRouteErrors: 2`, `onUnavailable: "fallback"`, `judgmentDeadlineMs: 1500`,
+`judgmentFailures: { holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 }`,
+and exactly one candidate (the weak route). Amendment: the step-counted
+`hold`, the entry ceiling, and the re-entry cooldown replace the turn-counted
+`minTurnsDowngraded: 5` this arm was first frozen with, which the router no
+longer accepts, and the judgment deadline and failure handling are pinned at
+their defaults. No trial was recorded under the original rule: the repository
+holds no `route-on` or `route-off` run, and the stored runs in
+`bench/analysis/out-of-loop-stored-runs.json` cover only the J-Space
+experiments. The confirmatory routing preregistration is PR 16 of the
+[routing redesign plan](../.agents/notes/proposed/feature/2026-09-24-model-routing-redesign-plan.md).
+The judgment engine is the TypeSafe provider on its
 `fast` tier (`jev-preview`, measured at 273 ms against 685 ms for
 `accurate` on a 1.7k-token state), the tier both consumers use here.
 
@@ -64,7 +76,7 @@ effect, and every report pins the `run.json` that produced it.
   intervention and H2 is not-evaluable rather than confirmed.
 - **H4 — The churn screen.** `cacheHitShare(route-on) ≥
   cacheHitShare(route-off) − 5 points`, applied **only when ≥80% of trials in
-  both arms carry usage data**. Otherwise this file declares it
+  both arms carry a reported cache-read count**. Otherwise this file declares it
   **NOT-EVALUABLE** — never silently skipped — and the economic case rests on
   H2's token delta alone.
 - **H5 — Compaction improves the verifier-passed rate at comparable cost.** On
@@ -90,7 +102,7 @@ point loses the saving it was built for. The sticky horizon is the protection:
 with **±0.06 judgment-score wobble** around the 0.8 gate, a non-sticky policy
 flaps across the boundary and re-prefills on nearly every flip, which is
 **sub-break-even flapping** by construction rather than a measurable effect.
-`minTurnsDowngraded: 0` keeps the non-sticky design reachable in Config,
+`hold.minSteps: 0` keeps the non-sticky design reachable in Config,
 so the claim stays falsifiable: a future run may disable stickiness
 deliberately and measure the flapping directly. It is not measured here because
 it is expected to lose, and a losing arm still costs real spend.
@@ -101,16 +113,20 @@ it is expected to lose, and a losing arm still costs real spend.
 `tokensIncludingDescendants` per resolved trial. Compaction adds the
 verifier-passed rate on `pressureFired` trials.
 
-**DIAGNOSTIC-ONLY** (never a pass/fail gate): `cacheHitShare` (nullable),
+**DIAGNOSTIC-ONLY** (never a pass/fail gate): `cacheHitShare` and
+`cacheUnreportedShare` (nullable),
 `modelTransitions`, `downgradedStreaks`, `downgradedShare`,
 `keptStrongShare`, `routingHintCount` (only if the router logs
 hints), `jevCompactionAcceptedBelowThreshold`, `jevSelectionDegraded`,
 and the existing compaction forensics.
 
 Every metric is derived from the session log and the reported usage, never from
-a model self-report. `cacheHitShare` is **null** when a trial carries no
-usage data or its token denominator is zero; the aggregate reports how many
-trials were null, because H4 depends on that count.
+a model self-report. `cacheHitShare` is the root session's cache reads over
+the prompt tokens of its usage records that report a cache-read count. A record
+with no reported count is excluded rather than read as a miss, and
+`cacheUnreportedShare` reports the share of prompt tokens such records
+carried. The share is **null** when no record reported a cache-read count; the
+aggregate reports how many trials were null, because H4 depends on that count.
 
 ## Statistics
 

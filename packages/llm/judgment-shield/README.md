@@ -49,6 +49,10 @@ When the selected engine is this provider, `ctx.judgment.fitting` routes to its 
 
 An answered fit reports `selectedIndex`, `stateTokens`, one `sequenceTokens` count per question, `paddedTokens`, and tokenizer limits containing `maxSequenceTokens`, `maxHeadTokens`, `maxBatchTokens`, and a 64-character `manifestSha256`. The wire fit omits state text; the provider restores the exact redacted state at `selectedIndex` before returning it. It rejects out-of-range indexes, non-finite or inconsistent counts, limit violations, malformed hashes, identity mismatches, and invalid nested answers. The same deadline, response-size cap, and caller-cancellation rules apply to fitted requests, including cancellation after the gateway has produced a response.
 
+## Wire client
+
+`createShieldWireEngine(options)` is the one client for `/v1/judgments` and `/v1/judgments/fitted`. It takes a resolved configuration (`resolveConfig` output), a `redact` function the client calls exactly once per state before serialization, and a `label` that prefixes diagnostics, and returns an engine with `ask` and `fitting.ask`. Request caps, deadline and caller-cancellation classification, bounded response reads, and answer validation behave exactly as described above. The client owns no configuration resolution and no process: this provider binds it to a deployment-run gateway, and [`@shres-code/shres-code-judgment-laya`](../judgment-laya/README.md) binds it to the gateway it supervises.
+
 ## Model Experience
 
 ### Judgment ask
@@ -67,7 +71,7 @@ The ask is independent of the conversation model request. Repeated state and que
 
 ## Known Limitations and Deferred Work
 
-- **Gateway availability is deployment-owned** — the package requires a live loopback `/v1/judgments` service and reports it unavailable when that service is absent; it does not start, supervise, or reload the model runtime.
+- **Gateway availability is deployment-owned** — the package requires a live loopback `/v1/judgments` service and reports it unavailable when that service is absent; it does not start, supervise, or reload the model runtime. [`@shres-code/shres-code-judgment-laya`](../judgment-laya/README.md) is the provider that supervises its own gateway.
 - **Artifact trust is gateway-owned** — model manifests, hashes, device selection, and runtime resource policy are validated by the owned service before it serves requests; this adapter validates only the returned identity and typed answer.
 - **No routing or guardrail policy** — this provider returns typed answers and applies no threshold, downgrade decision, Shield posture, or blocking action. Consumers remain responsible for those decisions.
 - **No retry** — one ask makes one bounded request. A deployment that retries owns that policy outside the typed provider so repeated judgments remain visible to the caller.

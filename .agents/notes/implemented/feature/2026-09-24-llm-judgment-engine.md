@@ -31,7 +31,7 @@ A text reply, a second tool call, or an answer cut off at the output limit is `I
 
 **One request, no retry.** Each ask consults the redactor exactly once, bounds the redacted state by `maxStateTokens` counted as UTF-8 bytes (no tokenizer emits more tokens than bytes), and makes one request bounded by `timeoutMs`. The caller's signal cancels it, and a cancelled ask fails `ABORTED` even when the route finished anyway. A failed request fails `UNAVAILABLE`, and its `LlmFailure` becomes the cause.
 
-**Usage rides on the result.** `JudgmentResult.usage?: TokenUsage` carries the judge request's usage exactly as the adapter reported it. `inputTokens` is uncached input only, and a cache count is present only when the adapter reported one. The field is absent when the route reported nothing. That is the presence rule of `TokenUsage` on this base: the optional cache fields are present only when reported. The dispatcher's spread keeps the field on a routed result.
+**Usage rides on the result.** `JudgmentResult.usage?: TokenUsage` carries the judge request's usage exactly as the adapter reported it, so `TokenUsage`'s presence contract holds unchanged: a cache count is present exactly when the provider reported it, and a reader uses `cacheCount`. The field is absent when the route reported nothing. The dispatcher's spread keeps the field on a routed result.
 
 The provider contract the plan lists is now part of the `JudgmentEngine` JSDoc and [the subsystem page](../../../../docs/subsystems/judgment.md#the-engine-contract). Both existing providers already reject an omitted choice option; TypeSafe keeps its documented sparse score levels.
 

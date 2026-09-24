@@ -28,7 +28,7 @@ import BasicCompactionEngine, { summarizeWithLlm } from '@shres-code/shres-code-
 import type { BasicCompactionConfig, SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic'
 import { toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
 import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
-import { judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { declareJudgmentConsumer, judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
   JudgmentInput,
@@ -92,8 +92,9 @@ export {
 export type { JevCompactionConfig, JevOnVerifyFailure, JevVerifyCheckConfig, ResolvedJevConfig, ResolvedJevFacts } from './config.ts'
 
 /**
- * The consumer id every compaction ask carries; a `judgment.overrides` entry
- * under this key routes the asks to another engine.
+ * The consumer id every compaction ask carries, declared in
+ * `ctx.judgmentEngines` while the engine is mounted; a `judgment.overrides`
+ * entry under this key routes the asks to another engine.
  */
 export const COMPACTION_JEV_JUDGMENT_CONSUMER = judgmentConsumerId('compaction-jev')
 
@@ -357,6 +358,7 @@ export class JevCompactionEngine extends BasicCompactionEngine {
     // so it sees only the inherited fields; the judgment fields stay here.
     super(ctx, inheritedBasicConfig(config))
     this.raw = config
+    declareJudgmentConsumer(ctx, COMPACTION_JEV_JUDGMENT_CONSUMER)
   }
 
   /** The judgment facts in force; resolution fails loud on a bad config. */

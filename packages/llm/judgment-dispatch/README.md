@@ -17,11 +17,11 @@ The one `ctx.judgment` implementation in a deployment that composes judgment eng
     models: { fast: shield-fast@1, accurate: shield-accurate@1 }
 ```
 
-`defaultEngine` is required and names a registry id: `typesafe` for [judgment-typesafe](../judgment-typesafe/README.md), `shield` for [judgment-shield](../judgment-shield/README.md), and `llm:<provider>/<model>` for [judgment-llm](../judgment-llm/README.md). The dispatcher never picks an engine by registration order. A missing or empty value, or an unknown config key, fails the load by name.
+`defaultEngine` is required and names a registry id: `typesafe` for [judgment-typesafe](../judgment-typesafe/README.md), `shield` for [judgment-shield](../judgment-shield/README.md), `laya` for [judgment-laya](../judgment-laya/README.md), or `llm:<provider>/<model>` for [judgment-llm](../judgment-llm/README.md). The dispatcher never picks an engine by registration order. A missing or empty value, or an unknown config key, fails the load by name.
 
 ## Routing
 
-Each ask resolves one engine id: the `judgment.overrides` entry for the ask's `consumer`, else `judgment.engine`, whose composition layer is `defaultEngine`. Then:
+Each ask resolves one engine id: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition layer is `defaultEngine`. Then:
 
 - An id no provider registered fails `UNCONFIGURED` with `judgment engine "<id>" is not composed`.
 - A registered engine whose `status()` is not `ready` fails `UNAVAILABLE` with the state and its detail.
@@ -33,7 +33,11 @@ The engine's own failures reach the caller unchanged. Consumers treat every fail
 
 ## Settings
 
-The dispatcher installs the `judgment` section with the composition layer `{ enabled: true, engine: <defaultEngine> }`. A write is rejected, naming the field, when it selects an id no provider registered or an engine whose descriptor names another host (`judgment: engine "laya" requires darwin-arm64`). A stored selection is not checked while the section registers, because its engine can register later in the same load; after the Loader settles, the dispatcher logs each selected id that is still unregistered, once per id, and the first ask routed to it fails `UNCONFIGURED`.
+The dispatcher installs the `judgment` section with the composition layer `{ enabled: true, engine: <defaultEngine> }`.
+
+Live-service checks apply only to what a configuration write changes. A write is rejected, naming the field it writes, when it changes `engine` to, or adds or changes an override to, an id no provider registered or an engine whose descriptor names another host (`judgment: engine "laya" requires darwin-arm64`), or when it adds or changes an override for an undeclared consumer. An entry the write leaves unchanged is not re-judged, so a stale override never blocks an unrelated write.
+
+A document the settings file loads or reloads is applied as written, whatever the state of the registry. Rejecting it would keep the previous engine answering with only a warning in the log, which is how a switch away from a remote engine could silently fail. An unregistered selection then fails every ask routed to it with `UNCONFIGURED`, with no fallback, and an override for an undeclared consumer is ignored. After the Loader settles, the dispatcher logs each such condition once at error level, again whenever a later change introduces one, and at info level when one resolves: an engine that registers, or a consumer that declares and whose stored override is then honoured.
 
 ```yaml
 judgment:
@@ -42,7 +46,7 @@ judgment:
     worker-escalation: typesafe
 ```
 
-Consumers name themselves with `worker-escalation`, `compaction-jev`, and `judgment-guardrails`. A key no consumer sends has no effect.
+An override key must be a consumer id that a mounted consumer declared in the registry with `declareJudgmentConsumer`; a write adding or changing any other key is rejected with `judgment: consumer "<key>" does not name itself in judgment asks; this override would have no effect` at `['overrides', <key>]`, and asks ignore a stored override for an undeclared consumer. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves. The model router declares `model-router` once its asks carry that consumer id.
 
 ## Model Experience
 
@@ -65,4 +69,4 @@ A judgment ask is independent of the conversation model request, and the dispatc
 - **No automatic engine fallback** — a failing selected engine fails the ask; answering with another engine would change decisions under a different calibration. A deployment that wants another engine selects it.
 - **Consumers record the answering engine separately** — the result's `engineId` identifies the engine, and the model router does not yet record the selected engine or its operating point on its decisions.
 - **Host matching covers one pair** — a descriptor can require `darwin-arm64` or `any`; the check compares `process.platform` and `process.arch` when a selection is written.
-- **The model router does not name itself** — its asks carry no `consumer` id yet, so a `model-router` override has no effect; the router follows `judgment.engine`.
+- **The model router does not name itself** — its asks carry no `consumer` id and it declares none, so a `model-router` override is rejected and the router follows `judgment.engine`. It declares `model-router` when its asks carry that id.

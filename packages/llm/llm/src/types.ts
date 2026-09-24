@@ -169,12 +169,20 @@ export interface FinishReasonMap {
 export type FinishReason = FinishReasonMap[keyof FinishReasonMap]
 
 /**
- * Token accounting for one model call (cache fields are optional).
+ * Token accounting for one model call.
  *
- * Counts are DISJOINT: `inputTokens` is uncached input only; cached input is
- * reported separately as `cacheReadTokens`/`cacheWriteTokens` (billed input =
- * sum of the three). Adapters whose providers fold cache hits into a total
- * prompt count (DeepSeek's `prompt_tokens`) subtract them out.
+ * Counts are DISJOINT: `inputTokens` excludes every cache count the provider
+ * reported, so billed input is `inputTokens` plus the reported cache counts.
+ * Adapters whose providers fold cache hits into a total prompt count
+ * (DeepSeek's `prompt_tokens`) subtract them out.
+ *
+ * `cacheReadTokens` and `cacheWriteTokens` each record whether the provider
+ * reported that count. Present (including 0): the provider reported the count
+ * for this call. Absent: the provider did not report it; `inputTokens` may
+ * then include cached input. Adapters MUST emit a reported zero and MUST NOT
+ * emit an unreported count. The two fields are independent: a provider that
+ * reports cache hits but has no write concept omits `cacheWriteTokens`.
+ * Consumers read them through `cacheCount` and `promptTokens`.
  */
 export interface TokenUsage {
   inputTokens: number
@@ -337,6 +345,14 @@ export interface LlmModelInfo {
    * absent declares none, so the local tool catalog applies unchanged.
    */
   hostedTools?: readonly HostedTool[]
+  /**
+   * Prompt-cache lifetime this route requests, in milliseconds: how long a
+   * cached prefix stays readable after the start of the request that wrote or
+   * last read it, generation time included. `0` declares that the route writes
+   * no prompt cache. The value states what the adapter asks for; an upstream
+   * may retain a prefix for less. Absent means the adapter does not know.
+   */
+  promptCacheTtlMs?: number
 }
 
 /** Provider-owned context capacity for one exact provider/model route. */

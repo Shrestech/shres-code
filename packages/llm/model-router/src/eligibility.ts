@@ -138,6 +138,10 @@ function hasHostedToolFloor(
  * Check configured routes before a judgment can select one.
  * The helper performs metadata and call preparation only; it never dispatches
  * a model request. Unknown capacity or capability is conservatively excluded.
+ * A candidate naming the manual provider/model is excluded as `equals-base`
+ * before any lookup, whatever its effort: it is no downgrade, and a same-model
+ * effort change invalidates the prompt cache on providers that render effort
+ * into the cached request.
  * @param runtime - exact LLM runtime owning provider registrations.
  * @param base - manual route and request controls to preserve on candidates.
  * @param messages - request messages used only for nested image detection.
@@ -196,6 +200,10 @@ export async function assessModelRoutingCandidates(
 
   for (const candidate of candidates) {
     signal?.throwIfAborted()
+    if (candidate.provider === base.provider && candidate.model === base.model) {
+      addAssessment(candidate, 'equals-base')
+      continue
+    }
     let info: LlmResolvedModelInfo
     try {
       info = await runtime.resolveModelInfo(candidate.provider, candidate.model, signal)

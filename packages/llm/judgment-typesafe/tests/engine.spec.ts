@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
 import { credentialRef } from '@shres-code/shres-code-credentials'
+import type { ResolvedCredential } from '@shres-code/shres-code-credentials'
 import { JudgmentEngineRegistry, JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
@@ -83,6 +84,46 @@ class StubRedactor extends Service {
     redactions.count += 1
     await Promise.resolve()
     return state.replaceAll('secret', '[redacted]')
+  }
+}
+
+/** A promise with its settle functions, for steps a test holds open. */
+interface Deferred<T> {
+  promise: Promise<T>
+  resolve(value: T): void
+  reject(error: Error): void
+}
+
+/** Create one {@link Deferred}. */
+function deferred<T>(): Deferred<T> {
+  const settle: { resolve?: (value: T) => void; reject?: (error: Error) => void } = {}
+  const promise = new Promise<T>((resolve, reject) => {
+    settle.resolve = resolve
+    settle.reject = reject
+  })
+  return {
+    promise,
+    resolve: (value) => {
+      settle.resolve!(value)
+    },
+    reject: (error) => {
+      settle.reject!(error)
+    },
+  }
+}
+
+/** Deployment egress hook that answers from a deferred the test settles. */
+class HangingRedactor extends Service {
+  static calls = 0
+
+  constructor(ctx: Context, private readonly pending: Deferred<string>) {
+    super(ctx, 'judgmentRedactor')
+    HangingRedactor.calls = 0
+  }
+
+  redactState(_state: string): Promise<string> {
+    HangingRedactor.calls += 1
+    return this.pending.promise
   }
 }
 
@@ -897,8 +938,9 @@ describe('deadline and cancellation', () => {
     expect(failure.message).toContain('within timeoutMs 50')
   })
 
-  it('fails ABORTED when the caller aborted before the ask', async () => {
-    const { ctx } = await harness([{ kind: 'stall' }])
+  it('fails ABORTED when the caller aborted before the ask, consulting neither credentials nor redactor', async () => {
+    const { ctx, server } = await harness([{ kind: 'stall' }], { redactor: true })
+    const resolve = vi.spyOn(ctx.credentials, 'resolve')
     const controller = new AbortController()
     controller.abort()
 
@@ -909,7 +951,73 @@ describe('deadline and cancellation', () => {
     }))
 
     expect(failure.code).toBe('ABORTED')
-    expect(failure.message).toContain('cancelled by the caller')
+    expect(failure.message).toBe('TypeSafe judgment ask was cancelled by the caller')
+    expect(resolve).not.toHaveBeenCalled()
+    expect(redactions.count).toBe(0)
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it('fails ABORTED at once when the caller aborts during a credential lookup that never settles', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }], { redactor: true })
+    const lookup = deferred<ResolvedCredential | undefined>()
+    const resolve = vi.spyOn(ctx.credentials, 'resolve').mockImplementation(() => lookup.promise)
+    const controller = new AbortController()
+
+    const pending = askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal }))
+    await vi.waitFor(() => {
+      expect(resolve).toHaveBeenCalledTimes(1)
+    })
+    controller.abort()
+    const failure = await pending
+
+    expect(failure.code).toBe('ABORTED')
+    expect(redactions.count).toBe(0)
+    expect(server.requests).toHaveLength(0)
+    // The abandoned lookup settling later, even by failing, reaches no caller.
+    lookup.reject(new Error('credential store went away'))
+    await new Promise(resolveTick => setTimeout(resolveTick, 0))
+  })
+
+  it('fails ABORTED at once when the caller aborts during a redaction that never settles', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }])
+    const redaction = deferred<string>()
+    await ctx.plugin(HangingRedactor, redaction)
+    const controller = new AbortController()
+
+    const pending = askFailure(() => engine(ctx).ask({ state: 'a secret', questions: [BINARY], signal: controller.signal }))
+    await vi.waitFor(() => {
+      expect(HangingRedactor.calls).toBe(1)
+    })
+    controller.abort()
+    const failure = await pending
+
+    expect(failure.code).toBe('ABORTED')
+    expect(server.requests).toHaveLength(0)
+    redaction.reject(new Error('redactor crashed'))
+    await new Promise(resolveTick => setTimeout(resolveTick, 0))
+  })
+
+  it('completes an ask whose slow credential lookup and redaction settle while the caller waits', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }])
+    const lookup = deferred<ResolvedCredential | undefined>()
+    const redaction = deferred<string>()
+    vi.spyOn(ctx.credentials, 'resolve').mockImplementation(() => lookup.promise)
+    await ctx.plugin(HangingRedactor, redaction)
+    const controller = new AbortController()
+
+    const pending = engine(ctx).ask({ state: 'a secret', questions: [BINARY], signal: controller.signal })
+    setTimeout(() => {
+      lookup.resolve({ value: 'slow-key', source: 'memory' })
+    }, 20)
+    await vi.waitFor(() => {
+      expect(HangingRedactor.calls).toBe(1)
+    })
+    redaction.resolve('a [redacted]')
+    const result = await pending
+
+    expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.5 }])
+    expect(server.requests[0]?.headers.authorization).toBe('Bearer slow-key')
+    expect(wireBody(server)['state']).toBe('a [redacted]')
   })
 
   it('fails ABORTED when the caller aborts while the request is outstanding', async () => {

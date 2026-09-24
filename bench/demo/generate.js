@@ -79,6 +79,7 @@ const MARKER_FILE = 'demo'
  */
 const JEV_NULL_FIELDS = Object.freeze({
   cacheHitShare: null,
+  cacheUnreportedShare: null,
   modelTransitions: null,
   downgradedStreaks: null,
   downgradedShare: null,

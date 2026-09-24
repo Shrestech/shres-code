@@ -10,9 +10,9 @@
  * microtask-scheduled evaluation production runs.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
-import { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
+import { JUDGMENT_SETTINGS_NAMESPACE, JudgmentEngineRegistry, JudgmentError } from '@shres-code/shres-code-judgment'
 import JspaceService, { CharterEntryId } from '@shres-code/shres-code-jspace'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
@@ -470,6 +470,25 @@ async function fire(booted: Booted, id: string): Promise<Session> {
   await settle()
   return worker
 }
+
+describe('the judgment consumer declaration', () => {
+  it('declares worker-escalation in the engine registry while the registry is provided', async () => {
+    const booted = await boot({ enabled: true })
+    const engines = new JudgmentEngineRegistry(() => {})
+    const provider = await booted.ctx.plugin({
+      name: 'judgment-engine-registry',
+      apply: (inner: Context) => {
+        inner.provide('judgmentEngines', engines)
+      },
+    })
+
+    await vi.waitFor(() => {
+      expect(engines.consumers()).toEqual([WorkerEscalation.WORKER_ESCALATION_JUDGMENT_CONSUMER])
+    })
+    await provider.dispose()
+    expect(engines.hasConsumer('worker-escalation')).toBe(false)
+  })
+})
 
 describe('the Stage 1 judgment consult', () => {
   it('asks the configured question at the configured tier and logs the ask\'s own choice', async () => {

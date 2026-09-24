@@ -42,6 +42,7 @@ export * from './content.ts'
 export * from './message.ts'
 export * from './retry-policy.ts'
 export * from './server-tool-call.ts'
+export * from './usage.ts'
 export { BlockAssembler } from './assembler.ts'
 export { callConfigEquals, deepFreeze, isAgentLoopRequest, markAgentLoopRequest } from './call-config.ts'
 export type { LlmCallConfig, LlmCallConfigAdapterDefaults } from './call-config.ts'
@@ -278,6 +279,16 @@ export interface DirectoryRegistrationHandle {
    * has been disposed.
    */
   replace(entries: readonly LlmConfigurableProvider[]): void
+}
+
+/**
+ * Whether an adapter-reported prompt-cache lifetime is absent or a
+ * non-negative whole number of milliseconds.
+ * @param value - the adapter's `promptCacheTtlMs` field.
+ * @returns true for a value the seam may pass through.
+ */
+function isPromptCacheTtl(value: number | undefined): boolean {
+  return value === undefined || (Number.isSafeInteger(value) && value >= 0)
 }
 
 /**
@@ -608,6 +619,7 @@ export class LlmRuntime extends Service {
         || typeof model.name !== 'string'
         || model.name.length === 0
         || (model.description !== undefined && typeof model.description !== 'string')
+        || !isPromptCacheTtl(model.promptCacheTtlMs)
         || seen.has(model.id)
       ) {
         throw new LlmError(`adapter returned invalid or duplicate model metadata for provider "${provider}"`, 'INVALID_CATALOG')
@@ -622,6 +634,7 @@ export class LlmRuntime extends Service {
         ...model.description === undefined ? {} : { description: model.description },
         ...inputModalities === undefined ? {} : { inputModalities },
         ...hostedTools === undefined ? {} : { hostedTools },
+        ...model.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: model.promptCacheTtlMs },
       }
     })
   }
@@ -690,6 +703,13 @@ export class LlmRuntime extends Service {
         'INVALID_MODEL_INFO',
       )
     }
+    const promptCacheTtlMs = resolved.promptCacheTtlMs
+    if (!isPromptCacheTtl(promptCacheTtlMs)) {
+      throw new LlmError(
+        `adapter returned invalid prompt-cache TTL for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_CACHE_TTL',
+      )
+    }
     const info: LlmResolvedModelInfo = {
       provider,
       id: model,
@@ -700,6 +720,7 @@ export class LlmRuntime extends Service {
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
       ...acceptsTemperature === undefined ? {} : { acceptsTemperature },
+      ...promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs },
     }
     const reasoning = resolved.reasoning
     if (reasoning === undefined) return info

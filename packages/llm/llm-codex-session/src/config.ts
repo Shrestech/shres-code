@@ -170,6 +170,8 @@ export function resolveRoute(config: Config, accountId: string): Omit<PiAiProvid
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'openai-responses',
+    // The ChatGPT Responses backend reports cached input under input_tokens_details.
+    cacheUsage: 'reported',
     baseURL,
     headers: {
       'chatgpt-account-id': accountId,

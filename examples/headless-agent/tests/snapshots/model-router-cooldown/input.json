@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Inspect the supplied evidence with the bash tool, then answer briefly."
+    },
+    {
+      "op": "prompt",
+      "text": "Reply with exactly: ROUTED_OK"
+    }
+  ]
+}

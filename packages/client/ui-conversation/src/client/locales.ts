@@ -59,6 +59,7 @@ export const en = {
   'stats.ttftAverage': 'TTFT avg {duration}',
   'stats.tokensPerSecond': '{throughput} tok/s',
   'stats.cacheHit': 'Cache hit {percent}%',
+  'stats.cacheNotReported': 'Cache not reported',
   'stats.tokens': 'Input {input} tok · Output {output} tok',
   'settings.enter.title': 'Enter while busy',
   'settings.enter.description': 'Busy only; Cmd/Ctrl+Enter uses the other behavior.',

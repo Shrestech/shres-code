@@ -65,6 +65,7 @@ describe('real Loader composition', () => {
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
     expect(loaded.get('judgment')).toBeInstanceOf(JudgmentDispatch)
+    expect(loaded.judgmentEngines.consumers()).toEqual(['compaction-jev'])
     expect(loaded.judgmentEngines.get(judgmentEngineId('typesafe'))?.engine).toBeInstanceOf(TypesafeJudgmentEngine)
     expect(loaded.get('compaction')).toBeInstanceOf(JevCompactionEngine)
     expect(loaded.agents).toBeInstanceOf(AgentRegistry)

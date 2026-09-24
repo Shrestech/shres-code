@@ -11,7 +11,10 @@
  * state is serialized — the provider is that hook's one home, so the state a
  * consumer passes arrives unredacted; and `timeoutMs` bounds the request, so a request that outlives its
  * deadline fails with `UNAVAILABLE` naming that figure while the caller's own
- * `AbortSignal` fails with `ABORTED`.
+ * `AbortSignal` fails with `ABORTED`. The engine honours that signal at every
+ * await, as the judgment engine contract requires: it is checked before each
+ * step, and the credential lookup and the redaction hook, which cannot be
+ * cancelled, are raced against it so a hanging one never holds a cancelled ask.
  *
  * A refused response is repeated only when its status is one of the configured
  * `retry.statuses` — the vendor's documented transient 429 and 529 by default —
@@ -27,7 +30,13 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import {
+  abortableJudgmentStep,
+  JudgmentError,
+  judgmentEngineId,
+  registerJudgmentEngine,
+  throwIfJudgmentAborted,
+} from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentEngineDescriptor,
@@ -89,6 +98,9 @@ export const TYPESAFE_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freez
 
 /** Status of an engine that resolves its credential and endpoint on each ask. */
 const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
+
+/** Diagnostic of every caller cancellation this engine reports. */
+const CANCELLED = 'TypeSafe judgment ask was cancelled by the caller'
 
 /** Vendor path one ask posts to, below the configured endpoint. */
 const SYSTEMONE_PATH = '/v1/systemone'
@@ -176,13 +188,19 @@ export class TypesafeJudgmentEngine implements JudgmentEngine {
    *   fails, is refused — including a transient refusal that outlasts
    *   `retry.maxRetries` — or outlives `timeoutMs`, code `INVALID_ANSWER` when
    *   the response cannot answer the questions asked, or code `ABORTED` when the
-   *   caller cancelled the ask, during a retry wait included.
+   *   caller cancelled the ask: before it started, during the credential lookup
+   *   or the redaction hook (without waiting for either to finish), or during
+   *   the request, the body read, or a retry wait.
    */
   async ask(input: JudgmentInput): Promise<JudgmentResult> {
     const startedAt = performance.now()
     const config = this.config
-    const apiKey = await this.resolveApiKey()
-    const state = await this.redactState(input.state)
+    const signal = input.signal
+    throwIfJudgmentAborted(signal, CANCELLED)
+    const apiKey = await abortableJudgmentStep(() => this.resolveApiKey(), signal, CANCELLED)
+    throwIfJudgmentAborted(signal, CANCELLED)
+    const state = await abortableJudgmentStep(() => this.redactState(input.state), signal, CANCELLED)
+    throwIfJudgmentAborted(signal, CANCELLED)
     const model = resolveTierModel(config.models, input.tier)
     const cancellation = askCancellation(input.signal, config.timeoutMs)
     const response = await this.post(toWireRequest(state, model, input.questions), apiKey, cancellation)
@@ -396,7 +414,7 @@ function stepFailure(
   message: string,
 ): JudgmentError {
   if (cancellation.caller?.aborted === true) {
-    return new JudgmentError('ABORTED', 'TypeSafe judgment ask was cancelled by the caller', { cause: failure })
+    return new JudgmentError('ABORTED', CANCELLED, { cause: failure })
   }
   if (cancellation.deadline.aborted) {
     return new JudgmentError(

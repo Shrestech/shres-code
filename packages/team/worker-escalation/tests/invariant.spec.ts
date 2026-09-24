@@ -33,7 +33,6 @@ import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { SettingsProvider } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
-import { triggerSatisfiedAt } from '../src/fold.ts'
 import * as WorkerEscalationInvariant from '../src/invariant.ts'
 import { Config, WORKER_ESCALATION_SETTINGS_NAMESPACE } from '../src/index.ts'
 import type { EscalationDecision, EscalationEngineClass } from '../src/types.ts'
@@ -621,37 +620,5 @@ describe('nothing is written while the settings section is off', () => {
     await ctx.settings.replace(WORKER_ESCALATION_SETTINGS_NAMESPACE, { enabled: true })
     appendDecision(session, data)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
-  })
-})
-
-describe('triggerSatisfiedAt', () => {
-  it('reports whether one event proves one trigger family', async () => {
-    const ctx = await setup()
-    const session = ctx.sessions.create(SessionId('invariant-predicate'))
-    const callEvent = call(session, 1)
-    const failed = result(session, 1, true, callEvent.seq)
-    const ok = result(session, 2, false, callEvent.seq)
-    const stop = stepBudgetStop(session)
-    const failedTurn = turnEnd(session, { kind: 'error', error: { message: 'the route failed', code: 'RATE_LIMIT' } })
-    const events = session.events
-    expect(triggerSatisfiedAt(events, failed.seq, 'errorBurst')).toBe(true)
-    expect(triggerSatisfiedAt(events, failed.seq, 'attemptCount')).toBe(true)
-    expect(triggerSatisfiedAt(events, ok.seq, 'errorBurst')).toBe(false)
-    expect(triggerSatisfiedAt(events, callEvent.seq, 'repeatRunLength')).toBe(true)
-    expect(triggerSatisfiedAt(events, failed.seq, 'repeatRunLength')).toBe(false)
-    expect(triggerSatisfiedAt(events, stop.seq, 'stepBudgetExhausted')).toBe(true)
-    expect(triggerSatisfiedAt(events, failedTurn.seq, 'turnFailureStreak')).toBe(true)
-    expect(triggerSatisfiedAt(events, failed.seq, 'turnFailureStreak')).toBe(false)
-    expect(triggerSatisfiedAt(events, 999, 'errorBurst')).toBe(false)
-  })
-
-  it('throws on a trigger family the vocabulary does not carry', async () => {
-    const ctx = await setup()
-    const session = ctx.sessions.create(SessionId('invariant-unknown-trigger'))
-    const callEvent = call(session, 1)
-    // The event must resolve first: an unknown family over a real event is the
-    // unreachable branch, an unknown family over no event is just no evidence.
-    expect(triggerSatisfiedAt(session.events, 99, 'bogus' as never)).toBe(false)
-    expect(() => triggerSatisfiedAt(session.events, callEvent.seq, 'bogus' as never)).toThrow(/unreachable variant/)
   })
 })

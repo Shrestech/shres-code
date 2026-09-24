@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { ConversationSnapshot, RequestView } from '@shres-code/shres-code-client-runtime/client'
 import type { TrajectoryRoutingDecision } from '../src/client/trajectory-contract.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
+import { ROUTING_BREAK_KEYS, ROUTING_REASON_KEYS, en } from '../src/client/locales.ts'
 import {
   trajectoryRequestRoute, trajectoryRoutingRow, trajectoryRoutingStreak,
 } from '../src/client/trajectory-routing.ts'
@@ -46,7 +47,7 @@ function decision(
     sticky: {
       active: true,
       routeErrorLimit: 2,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       enteredTurn: 1,
       entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
     },
@@ -82,28 +83,96 @@ function nodes(): ConversationSnapshot['nodes'] {
 describe('trajectoryRoutingStreak', () => {
   it('reads the entering turn, a held streak, and a broken one', () => {
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 5 },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 5 },
     }))).toEqual({ kind: 'entered', turn: 5 })
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 3, enteredTurn: 1 },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 3, enteredTurn: 1 },
     }))).toBeUndefined()
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0 },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0 },
     }))).toBeUndefined()
     expect(trajectoryRoutingStreak(decision({
       outcome: 'kept-strong',
       reason: 'gate-failed',
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
     }, ['selection']))).toEqual({ kind: 'exited', reason: 'gate-failed' })
     expect(trajectoryRoutingStreak(decision({
       outcome: 'kept-strong',
       reason: 'thin-margin',
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }, ['selection']))).toBeUndefined()
   })
 })
 
 describe('trajectoryRoutingRow', () => {
+  it('shows an in-turn fallback as a visible streak exit, not a quiet marker', () => {
+    const fallback = decision({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      failure: { code: 'AUTH', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      failedChunkSeq: 9,
+      sticky: {
+        active: false,
+        stepsElapsed: 0,
+        brokenBy: 'route-failed',
+        entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    }, ['selection', 'route'])
+
+    expect(trajectoryRoutingRow(fallback)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      streak: { kind: 'exited', reason: 'route-failed' },
+      quiet: false,
+    })
+  })
+
+  it('shows a hold-cap exit as a visible streak exit and a re-entry cooldown as the quiet marker', () => {
+    const capped = decision({
+      outcome: 'kept-strong',
+      reason: 'hold-cap',
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'hold-cap' },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(capped)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'hold-cap',
+      streak: { kind: 'exited', reason: 'hold-cap' },
+      quiet: false,
+    })
+    const cooling = decision({
+      outcome: 'kept-strong',
+      reason: 'reentry-cooldown',
+      sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(cooling)).toEqual({ outcome: 'kept-strong', reason: 'reentry-cooldown', quiet: true })
+    expect(ROUTING_REASON_KEYS['hold-cap']).toBe('routing.reason.holdCap')
+    expect(ROUTING_BREAK_KEYS['hold-cap']).toBe('routing.reason.holdCap')
+    expect(en[ROUTING_REASON_KEYS['reentry-cooldown']]).toBe('cooling down after a streak exit')
+  })
+
+  it('shows a judgment failure a streak survived as a held downgrade and an open breaker as the quiet marker', () => {
+    const held = decision({
+      reason: 'judgment-failure-held',
+      engineFailure: { code: 'DEADLINE' },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 3, enteredTurn: 1, enteredStep: 1 },
+    }, ['route'])
+    expect(trajectoryRoutingRow(held, decision())).toEqual({
+      outcome: 'downgraded',
+      reason: 'judgment-failure-held',
+      selection: {
+        candidateId: 'flash',
+        provider: 'deepseek-official',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+      quiet: false,
+    })
+    const open = decision({ outcome: 'kept-strong', reason: 'breaker-open', sticky: { active: false, stepsElapsed: 0 } }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(open)).toEqual({ outcome: 'kept-strong', reason: 'breaker-open', quiet: true })
+    expect(en[ROUTING_REASON_KEYS['judgment-failure-held']]).toBe('judgment failed, streak held')
+    expect(en[ROUTING_REASON_KEYS['breaker-open']]).toBe('judgment paused after repeated failures')
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',
@@ -127,7 +196,7 @@ describe('trajectoryRoutingRow', () => {
       sticky: {
         active: true,
         routeErrorLimit: 2,
-        turnsElapsed: 2,
+        stepsElapsed: 2,
         enteredTurn: 1,
         entryBase: { provider: 'p', model: 'strong' },
       },
@@ -141,7 +210,7 @@ describe('trajectoryRoutingRow', () => {
     const row = trajectoryRoutingRow(decision({
       outcome: 'kept-strong',
       reason: 'thin-margin',
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }, ['selection']))
     expect(row).toEqual({
       outcome: 'kept-strong',
@@ -154,7 +223,7 @@ describe('trajectoryRoutingRow', () => {
     const row = trajectoryRoutingRow(decision({
       outcome: 'kept-strong',
       reason: 'gate-failed',
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
     }, ['selection']))
     expect(row).toEqual({
       outcome: 'kept-strong',
@@ -169,7 +238,7 @@ describe('trajectoryRoutingRow', () => {
     const row = trajectoryRoutingRow(decision({
       outcome: 'error',
       reason: 'judgment-error',
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }, ['selection', 'route']))
     expect(row).toEqual({ outcome: 'error', reason: 'judgment-error', quiet: false })
   })
@@ -199,7 +268,7 @@ describe('trajectoryRequestRoute', () => {
     const strong = decision({
       outcome: 'kept-strong',
       reason: 'thin-margin',
-      sticky: { active: false, turnsElapsed: 0 },
+      sticky: { active: false, stepsElapsed: 0 },
     }, ['selection'])
     expect(trajectoryRequestRoute(1, 1, 7, 'p', 'cheap', [strong])).toEqual({
       provider: 'p',
@@ -215,7 +284,7 @@ describe('trajectoryRequestRoute', () => {
       step: 2,
       outcome: 'kept-strong',
       reason: 'gate-failed',
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
     }, ['selection'])
     expect(trajectoryRequestRoute(1, 2, 23, 'p', 'cheap', [entered])).toEqual({
       provider: 'p',
@@ -247,7 +316,7 @@ describe('trajectoryRequestRoute', () => {
       step: 2,
       outcome: 'kept-strong',
       reason: 'gate-failed',
-      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
     }, ['selection'])
     expect(trajectoryRequestRoute(1, 1, 3, 'p', 'cheap', [entered, later])).toEqual({
       provider: 'p',

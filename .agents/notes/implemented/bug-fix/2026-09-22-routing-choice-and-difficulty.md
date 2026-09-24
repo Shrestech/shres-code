@@ -8,7 +8,7 @@ A routing judge offered only downgrade candidates cannot choose to retain the ma
 
 ## Decision
 
-The route question contains the reserved `keep-current` option and the configured candidates, with provider/model identities, explicit effort, and candidate task descriptions. Choosing the current model ends a downgrade immediately. Difficulty at or above the configured threshold prevents entry and ends a held streak. Scores use the judgment service's zero-based level indices; the default five-level rubric's hard threshold is `3`. The controller reads answers by question id and requires every configured question to be answered.
+The route question contains the reserved `keep-current` option and the eligible configured candidates, with provider/model identities, explicit effort, and candidate task descriptions. A candidate naming the manual provider/model is never eligible ([routing correctness after the live review](2026-09-24-routing-correctness-after-live-review.md)). Choosing the current model ends a downgrade immediately. Difficulty at or above the configured threshold prevents entry and ends a held streak. Scores use the judgment service's zero-based level indices; the default five-level rubric's hard threshold is `3`. The controller reads answers by question id and requires every configured question to be answered.
 
 The TypeSafe provider requires a probability for every requested choice option. An omitted competitor is an invalid answer, not an implicit zero that enlarges the routing margin. Score distributions may remain sparse, and the provider does not renormalize vendor probabilities.
 

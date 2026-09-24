@@ -153,6 +153,45 @@ describe('assessModelRoutingCandidates', () => {
     expect(JSON.stringify(result.assessments)).not.toContain('messages')
   })
 
+  it('excludes a candidate equal to the manual provider/model with reason equals-base', async () => {
+    const configured = [candidate('same', { provider: 'manual', model: 'strong' }), candidate('cheap')]
+    const { runtime, resolveModelInfo } = fakeRuntime({
+      models: [
+        model('manual', 'strong', { contextWindow: 1_000 }),
+        model('cheap-provider', 'cheap-model', { contextWindow: 2_000 }),
+      ],
+    })
+
+    const result = await assessModelRoutingCandidates(runtime, BASE, [], configured)
+
+    expect(result.eligibleCandidates).toEqual([configured[1]])
+    expect(result.assessments).toEqual([
+      { id: 'same', provider: 'manual', model: 'strong', reason: 'equals-base' },
+      expect.objectContaining({ id: 'cheap', reason: 'eligible' }),
+    ])
+    // The identity comparison needs no candidate metadata: only the manual route
+    // and the other candidate are resolved.
+    expect(resolveModelInfo.mock.calls.map(call => `${String(call[0])}/${String(call[1])}`))
+      .toEqual(['manual/strong', 'cheap-provider/cheap-model'])
+  })
+
+  it('excludes a same-model different-effort candidate as equals-base', async () => {
+    const configured = [candidate('lower', { provider: 'manual', model: 'strong', reasoningEffort: ReasoningEffortId('low') })]
+    const { runtime } = fakeRuntime({ models: [model('manual', 'strong', { contextWindow: 1_000 })] })
+
+    const result = await assessModelRoutingCandidates(
+      runtime,
+      { ...BASE, reasoningEffort: ReasoningEffortId('high') },
+      [],
+      configured,
+    )
+
+    expect(result.eligibleCandidates).toEqual([])
+    expect(result.assessments).toEqual([
+      { id: 'lower', provider: 'manual', model: 'strong', reasoningEffort: 'low', reason: 'equals-base' },
+    ])
+  })
+
   it('requires declared image capability, including nested tool-result images', async () => {
     const configured = [candidate('unknown'), candidate('text'), candidate('vision')]
     const nestedImage = messageWithContent([{

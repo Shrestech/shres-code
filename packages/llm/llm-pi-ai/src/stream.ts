@@ -8,23 +8,44 @@
  * @module shres-llm-pi-ai/stream
  */
 
-import { CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExceededError, isQuotaExceededError, LlmError, QUOTA_EXCEEDED_CODE } from '@shres-code/shres-code-llm'
+import { assertNever, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExceededError, isQuotaExceededError, LlmError, QUOTA_EXCEEDED_CODE } from '@shres-code/shres-code-llm'
 import type { FinishReason, StreamChunk, TokenUsage } from '@shres-code/shres-code-llm'
 import { isContextOverflow } from '@earendil-works/pi-ai'
 import type { AssistantMessage, AssistantMessageEvent, Usage as PiUsage } from '@earendil-works/pi-ai'
+import type { PiAiCacheUsage } from './config.ts'
 import { toPiReplayState } from './replay.ts'
 
+// XXX(pi-ai upstream): pi-ai's `Usage` always carries numeric `cacheRead` and
+// `cacheWrite`, defaulting a count the provider omitted to 0, so a miss and a
+// response without cache counts arrive identically. The route's declared
+// `cacheUsage` stands in for the missing signal. If pi-ai ever exposes the raw
+// provider usage, map presence from the wire instead of the declaration.
+
 /**
- * Map pi-ai usage (reasoning folded into output by pi-ai).
+ * Map pi-ai usage (reasoning folded into output by pi-ai) under the route's
+ * cache-count reporting. pi-ai subtracts the cache counts it parsed from
+ * `input`, so an unreported mapping adds them back: without a trustworthy cache
+ * report, `inputTokens` is the whole prompt.
  * @param usage - cumulative usage from the terminal pi-ai event.
- * @returns harness counts; cache fields appear only when non-zero (pi-ai reports zeros, not absence).
+ * @param cacheUsage - whether the route's provider reports cache counts.
+ * @returns harness counts: both cache fields, zeros included, when reported; neither when not.
  */
-export function mapUsage(usage: PiUsage): TokenUsage {
-  return {
-    inputTokens: usage.input,
-    outputTokens: usage.output,
-    ...usage.cacheRead > 0 ? { cacheReadTokens: usage.cacheRead } : {},
-    ...usage.cacheWrite > 0 ? { cacheWriteTokens: usage.cacheWrite } : {},
+export function mapUsage(usage: PiUsage, cacheUsage: PiAiCacheUsage): TokenUsage {
+  switch (cacheUsage) {
+    case 'reported':
+      return {
+        inputTokens: usage.input,
+        outputTokens: usage.output,
+        cacheReadTokens: usage.cacheRead,
+        cacheWriteTokens: usage.cacheWrite,
+      }
+    case 'unreported':
+      return {
+        inputTokens: usage.input + usage.cacheRead + usage.cacheWrite,
+        outputTokens: usage.output,
+      }
+    default:
+      return assertNever(cacheUsage)
   }
 }
 
@@ -139,6 +160,7 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  * mid-stream — failures arrive as `error` events, which become error/aborted
  * `finish` chunks (the harness protocol's other error-delivery style).
  * @param events - one assistant turn's pi-ai event stream.
+ * @param cacheUsage - the request's resolved cache-count reporting; see {@link mapUsage}.
  * @param contextWindow - resolved catalog capacity for usage-based overflow
  *   detection, or `undefined` to classify only explicit provider errors; see
  *   {@link mapStopReason}.
@@ -147,6 +169,7 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  */
 export async function* toStreamChunks(
   events: AsyncIterable<AssistantMessageEvent>,
+  cacheUsage: PiAiCacheUsage,
   contextWindow?: number,
 ): AsyncGenerator<StreamChunk> {
   // pi-ai contentIndex ↔ our block index map 1:1 (both count blocks from 0
@@ -210,7 +233,7 @@ export async function* toStreamChunks(
         }
         break
       case 'done':
-        yield { type: 'usage', usage: mapUsage(event.message.usage) }
+        yield { type: 'usage', usage: mapUsage(event.message.usage, cacheUsage) }
         yield {
           type: 'finish',
           reason: mapStopReason(event.message, contextWindow),
@@ -220,7 +243,7 @@ export async function* toStreamChunks(
       case 'error':
         // In-stream error delivery (pi-ai's style) → error finish chunk
         // (the harness's other sanctioned error path besides throwing).
-        yield { type: 'usage', usage: mapUsage(event.error.usage) }
+        yield { type: 'usage', usage: mapUsage(event.error.usage, cacheUsage) }
         yield { type: 'finish', reason: mapStopReason(event.error, contextWindow) }
         return
       // no default: AssistantMessageEvent is pi-ai's closed union; a new

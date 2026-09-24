@@ -172,3 +172,9 @@ describe('resolveCredentialSpec', () => {
       .toThrow(/refreshLeewayMs must be a non-negative finite number/)
   })
 })
+
+describe('cache-count reporting', () => {
+  it('declares reported cache counts for Anthropic Messages', () => {
+    expect(resolveRoute({}).cacheUsage).toBe('reported')
+  })
+})

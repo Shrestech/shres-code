@@ -1401,6 +1401,26 @@
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentChildRoute",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentChildRouteKind",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentChildRouteInput",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "SubagentChildRouteRequest",
+      "source": "packages/subagent/subagent/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/web.md",
       "symbol": "WebSearchRequest",
       "source": "packages/web/web/src/types.ts"
@@ -1743,6 +1763,11 @@
     {
       "doc": "docs/subsystems/settings.md",
       "symbol": "SettingsRegisterOptions",
+      "source": "packages/settings/settings/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/settings.md",
+      "symbol": "SettingsValidationCause",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
@@ -2527,12 +2552,42 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingFailure",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingEngineFailure",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStickyState",
       "source": "packages/llm/model-router/src/folds.ts"
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingJudgmentFailures",
+      "source": "packages/llm/model-router/src/folds.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStateConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingHoldConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingDifficultyConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingJudgmentFailuresConfig",
       "source": "packages/llm/model-router/src/config.ts"
     },
     {

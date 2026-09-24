@@ -1255,6 +1255,77 @@ Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
 Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
 
+<a id="shres-codeshres-code-judgment-laya"></a>
+
+## `@shres-code/shres-code-judgment-laya`
+
+Requires: `subprocess` · `judgmentEngines`
+
+```ts config-catalog
+/** Configuration for the supervised local Laya judgment gateway. */
+export interface LayaJudgmentConfig {
+  /** The pinned checkpoint and its manifest digest. */
+  model: LayaJudgmentModel
+  /** Token window of the pinned checkpoint; the gateway must report the same limit. */
+  checkpointContext: 512 | 1024
+  /** Inference precision passed to laya-mlx. */
+  dtype?: 'float16' | 'float32'
+  /** Absolute directory holding the virtual environment, its uv-managed Python, the uv package cache, and the install marker. */
+  runtimeDir?: string
+  /** Absolute Hugging Face home holding downloaded checkpoints. */
+  hfHome?: string
+  /** Absolute path of the `python/laya-gateway` project. */
+  gatewayProject?: string
+  /** `uv` executable: an absolute path or a name on PATH. */
+  uvPath?: string
+  /** Version of the uv-managed CPython the virtual environment uses, `major.minor`. */
+  python?: string
+  /** Questions per gateway inference batch. */
+  batchSize?: number
+  /** Deadline for the first readiness line, health check, and smoke ask, in milliseconds. */
+  startupTimeoutMs?: number
+  /** Deadline for one judgment request, in milliseconds. */
+  requestTimeoutMs?: number
+  /** SIGTERM-to-SIGKILL grace when stopping the gateway, in milliseconds. */
+  shutdownGraceMs?: number
+  /** Deadline for each install step, in milliseconds. */
+  installTimeoutMs?: number
+  /** Maximum serialized UTF-8 request body, enforced by both the provider and the gateway. */
+  maxRequestBytes?: number
+  /** Maximum response body accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Crash-restart budget. */
+  restart?: LayaRestartPolicy
+}
+
+/** The pinned checkpoint the local gateway serves. */
+export interface LayaJudgmentModel {
+  /** Hugging Face repository, `owner/name`. */
+  repo: string
+  /** 40-character commit sha of the pinned revision. */
+  revision: string
+  /**
+   * SHA-256 of the exact bytes of the gateway project's
+   * `manifests/<revision>.json`, which pins every checkpoint file's digest.
+   */
+  manifestSha256: string
+}
+
+/** Crash-restart budget for the supervised gateway. */
+export interface LayaRestartPolicy {
+  /** Restarts allowed inside one {@link windowMs}; one more leaves the gateway unavailable. */
+  maxRestarts?: number
+  /** Sliding window over which restarts are counted, in milliseconds. */
+  windowMs?: number
+  /** First restart delay; each consecutive failure doubles it. */
+  backoffMs?: number
+  /** Largest restart delay. */
+  maxBackoffMs?: number
+}
+```
+
+Source: [`packages/llm/judgment-laya/src/types.ts:33`](../packages/llm/judgment-laya/src/types.ts)
+
 <a id="shres-codeshres-code-judgment-llm"></a>
 
 ## `@shres-code/shres-code-judgment-llm`
@@ -1447,6 +1518,12 @@ export interface Config {
   models?: ClaudeSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to `DEFAULT_REFRESH_LEEWAY_MS`. */
   refreshLeewayMs?: number
+  /**
+   * Prompt-cache retention every request asks for; defaults to
+   * `DEFAULT_CACHE_RETENTION`. `long` asks for the one-hour cache and `none`
+   * disables prompt caching.
+   */
+  cacheRetention?: ClaudeSessionCacheRetention
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -1478,11 +1555,14 @@ export interface ClaudeSessionModelConfig {
     supportsTemperature?: boolean
   }
 }
+
+/** Prompt-cache retention the route requests: pi-ai's `none`, `short`, or `long`. */
+export type ClaudeSessionCacheRetention = NonNullable<PiAiProviderProfile['cacheRetention']>
 ```
 
-Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts) · [`PiAiProviderProfile`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:139`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -1902,6 +1982,13 @@ export interface PiAiProviderProfile {
   thinkingBudgets?: ThinkingBudgets
   /** Prompt-cache retention preference. */
   cacheRetention?: CacheRetention
+  /**
+   * Whether this route's provider reports prompt-cache counts on every call.
+   * pi-ai reports 0 both for a cache miss and for a response that carried no
+   * cache counts, so only the route can say which a 0 means. Omission resolves
+   * per model from its protocol through {@link resolveCacheUsage}.
+   */
+  cacheUsage?: PiAiCacheUsage
   /** Streaming transport preference. */
   transport?: Transport
   /** HTTP/provider SDK timeout in milliseconds. */
@@ -2049,6 +2136,13 @@ export type PiAiModality = Model<Api>['input'][number]
 export type PiAiPromptCacheKey = 'session' | 'off'
 
 /**
+ * Whether a route's provider reports prompt-cache counts on every call.
+ * `reported`: usage carries both cache counts, zeros included. `unreported`:
+ * usage carries neither, and `inputTokens` is the whole prompt.
+ */
+export type PiAiCacheUsage = 'reported' | 'unreported'
+
+/**
  * Selectable reasoning efforts for one model: each key is a level the model
  * offers (and selectors show), and its value is the wire spelling dispatch
  * sends for it. `off` alone may leave its value empty — "supported, send
@@ -2074,7 +2168,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template' | 'baseten'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:233`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:247`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -2368,18 +2462,23 @@ export interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -2387,17 +2486,34 @@ export interface ModelRouterConfig {
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
   /**
-   * Consecutive candidate failures that require a manual-model turn. Recorded
-   * on each held decision; settings changes affect subsequent decisions.
-   * Defaults to 2.
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
    */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
-   * Optional effort lift for a selected route on a hard turn. Omitted — or
-   * written as a valueless key, which the schema resolves to null — means not
-   * configured; the group is never implied by a default.
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /**
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
+  /**
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
    */
   difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
   /**
@@ -2433,6 +2549,36 @@ export interface ModelRoutingCandidateConfig {
   description?: string
 }
 
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
 /** The escalation operating point. */
 export interface ModelRoutingEscalateBackConfig {
   /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
@@ -2442,11 +2588,40 @@ export interface ModelRoutingEscalateBackConfig {
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
+/** What a failed downgraded request means for its step. */
+export type ModelRoutingInTurnFallback = 'manual' | 'off'
+
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
   scoreThreshold: number
-  /** Effort the selected downgraded route runs at above the threshold. */
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
 }
 
@@ -2467,7 +2642,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:52`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:111`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 
@@ -3491,7 +3666,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:184`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:218`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 
@@ -3762,7 +3937,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:186`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:211`](../packages/core/system-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-terminal-bash"></a>
 
@@ -4946,7 +5121,7 @@ export interface EscalationTurnFailureStreakConfig {
 
 Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
-Source: [`packages/team/worker-escalation/src/config.ts:160`](../packages/team/worker-escalation/src/config.ts)
+Source: [`packages/team/worker-escalation/src/config.ts:153`](../packages/team/worker-escalation/src/config.ts)
 
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
@@ -5112,6 +5287,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
 - `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-progress-signals` ([`packages/team/progress-signals/src/index.ts`](../packages/team/progress-signals/src/index.ts))
 - `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
 - `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))

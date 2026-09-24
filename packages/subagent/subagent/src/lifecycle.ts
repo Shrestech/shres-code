@@ -259,8 +259,13 @@ function epochStopReason(events: readonly SessionEvent[]): SubagentResult['stopR
   }
 }
 
-/** Render any listener-thrown value without letting coercion escape containment. */
-function renderThrown(value: unknown): string {
+/**
+ * Render any listener-thrown value without letting coercion escape containment.
+ * @param value - the value a listener threw.
+ * @returns the error name and message, the value's string form, or a fixed
+ *   placeholder when rendering itself throws.
+ */
+export function renderThrown(value: unknown): string {
   try {
     return value instanceof Error ? `${value.name}: ${value.message}` : String(value)
   } catch {

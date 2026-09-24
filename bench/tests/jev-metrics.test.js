@@ -1,7 +1,8 @@
 /**
  * Jev bench metrics: the routing/compaction fold over synthetic session logs —
  * including the cases where a missing datum must stay null instead of reading
- * as zero — the trial schema's contract for those fields, and the aggregate
+ * as zero — the root-session cache shares read by the `TokenUsage` presence
+ * contract, the trial schema's contract for those fields, and the aggregate
  * flow from trial records to the per-arm report payload.
  *
  * @module bench/tests/jev-metrics.test
@@ -12,6 +13,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
+import { foldSessionAccounting, priceAccounting } from '../runner/accounting.js'
 import { emptyMetrics, foldSessionLog } from '../runner/metrics.js'
 import { validateTrial } from '../schema/trial.js'
 import { summarizeArm, summarizeCell } from '../stats/aggregate.js'
@@ -21,6 +23,7 @@ import { buildExperiment } from '../report/build.js'
 /** Metric fields this change adds, in TrialMetrics order. */
 const JEV_FIELDS = [
   'cacheHitShare',
+  'cacheUnreportedShare',
   'modelTransitions',
   'downgradedStreaks',
   'downgradedShare',
@@ -30,8 +33,8 @@ const JEV_FIELDS = [
   'jevSelectionDegraded',
 ]
 
-/** The routing/compaction subset: every Jev field except the usage-derived share. */
-const JEV_EVENT_FIELDS = JEV_FIELDS.filter(field => field !== 'cacheHitShare')
+/** The routing/compaction subset: every Jev field except the two usage-derived shares. */
+const JEV_EVENT_FIELDS = JEV_FIELDS.filter(field => field !== 'cacheHitShare' && field !== 'cacheUnreportedShare')
 
 /**
  * Render one session-log event line.
@@ -70,7 +73,7 @@ function decisionEvent(outcome, time, extra = {}) {
     reason: 'gate-passed',
     stateHash: 'state-hash',
     stateSeqs: [1],
-    sticky: { active: outcome === 'downgraded', turnsElapsed: 0 },
+    sticky: { active: outcome === 'downgraded', stepsElapsed: 0 },
     ...extra,
   }, time)
 }
@@ -111,18 +114,45 @@ function assertNull(metrics, fields) {
   }
 }
 
-describe('metrics.foldSessionLog: cacheHitShare', () => {
-  it('reads the cache-read fraction of billed input', () => {
-    const metrics = foldSessionLog(log([usageEvent({ inputTokens: 100, outputTokens: 10, cacheReadTokens: 300, cacheWriteTokens: 100 }, 1)]))
-    assert.equal(metrics.cacheHitShare, 0.6)
+/** An accounting context that prices nothing: the shares need no prices. */
+const UNPRICED = {
+  snapshot: { id: '2026-09-24', entries: new Map() },
+  config: {
+    subscriptionProviders: [], localProviders: [], priceProviders: {},
+    judgeEnginePriceProviders: {}, vendorPlanJudgeEngines: [], localJudgeEngines: [],
+  },
+  configSha256: '',
+}
+
+/**
+ * Fold usage records into one root session log.
+ * @param {Record<string, unknown>[]} usages - one usage record per assistant message.
+ * @returns {string} the log text.
+ */
+function usageLog(usages) {
+  return log(usages.map((usage, index) => usageEvent(usage, index + 1)))
+}
+
+/**
+ * The root-session cache fields of one log.
+ * @param {Record<string, unknown>[]} usages
+ * @returns {{ cacheHitShare: number | null, cacheUnreportedShare: number | null }}
+ */
+function rootShares(usages) {
+  const metrics = foldSessionLog(usageLog(usages))
+  return { cacheHitShare: metrics.cacheHitShare, cacheUnreportedShare: metrics.cacheUnreportedShare }
+}
+
+describe('metrics.foldSessionLog: root-session cache shares, read by presence', () => {
+  it('reads cache reads over the prompt tokens of records that reported them', () => {
+    assert.deepEqual(rootShares([{ inputTokens: 100, outputTokens: 10, cacheReadTokens: 300, cacheWriteTokens: 100 }]), { cacheHitShare: 0.6, cacheUnreportedShare: 0 })
   })
 
-  it('sums cache and billed input across usage records', () => {
-    const metrics = foldSessionLog(log([
-      usageEvent({ inputTokens: 100, outputTokens: 10, cacheReadTokens: 40 }, 1),
-      usageEvent({ inputTokens: 200, outputTokens: 20, cacheReadTokens: 160 }, 2),
-    ]))
-    assert.equal(metrics.cacheHitShare, 200 / 500)
+  it('sums reads and prompt tokens across records', () => {
+    assert.equal(rootShares([
+      { inputTokens: 100, outputTokens: 10, cacheReadTokens: 40 },
+      { inputTokens: 200, outputTokens: 20, cacheReadTokens: 160 },
+    ]).cacheHitShare, 200 / 500)
   })
 
   it('is null, not zero, when the log reports no usage', () => {
@@ -131,20 +161,45 @@ describe('metrics.foldSessionLog: cacheHitShare', () => {
       event('tool/call', { turn: 0, step: 0, callId: 'c1', name: 'bash', arguments: '{}' }, 2),
     ]))
     assert.equal(metrics.inputTokens, 0)
-    assert.equal(metrics.cacheHitShare, null)
+    assertNull(metrics, ['cacheHitShare', 'cacheUnreportedShare'])
   })
 
-  it('is null when the billed-input denominator is zero', () => {
-    const metrics = foldSessionLog(log([usageEvent({ inputTokens: 0, outputTokens: 12 }, 1)]))
-    assert.equal(metrics.cacheHitShare, null)
+  it('is null when the reported prompt is zero', () => {
+    assert.deepEqual(rootShares([{ inputTokens: 0, outputTokens: 12, cacheReadTokens: 0 }]), { cacheHitShare: null, cacheUnreportedShare: null })
   })
 
-  it('reads a usage record carrying no cache count as a full miss', () => {
-    // The denominator is billed input, so a provider that reports usage without
-    // the optional cache counts still yields a share: this is the case H4's
-    // "trials carry usage data" screen counts as measurable.
-    const metrics = foldSessionLog(log([usageEvent({ inputTokens: 500, outputTokens: 20 }, 1)]))
-    assert.equal(metrics.cacheHitShare, 0)
+  it('never reads an absent cache count as a miss', () => {
+    // The provider did not report cache counts, so the input may include cached
+    // tokens: the share is not measured, and the unreported share says how much.
+    assert.deepEqual(rootShares([{ inputTokens: 500, outputTokens: 20 }]), { cacheHitShare: null, cacheUnreportedShare: 1 })
+  })
+
+  it('keeps a reported zero as a measured miss', () => {
+    assert.deepEqual(rootShares([{ inputTokens: 500, outputTokens: 20, cacheReadTokens: 0 }]), { cacheHitShare: 0, cacheUnreportedShare: 0 })
+  })
+
+  it('excludes unreported records from the denominator and reports their share', () => {
+    assert.deepEqual(rootShares([
+      { inputTokens: 100, outputTokens: 10, cacheReadTokens: 100 },
+      { inputTokens: 300, outputTokens: 10 },
+    ]), { cacheHitShare: 0.5, cacheUnreportedShare: 300 / 500 })
+  })
+
+  it('counts a write on a record without a reported read as unreported prompt', () => {
+    assert.deepEqual(rootShares([
+      { inputTokens: 100, outputTokens: 1, cacheWriteTokens: 100 },
+      { inputTokens: 100, outputTokens: 1, cacheReadTokens: 100 },
+    ]), { cacheHitShare: 0.5, cacheUnreportedShare: 0.5 })
+  })
+
+  it('agrees with the closure accounting on a single-session log', () => {
+    const usages = [
+      { inputTokens: 100, outputTokens: 10, cacheReadTokens: 300, cacheWriteTokens: 100 },
+      { inputTokens: 250, outputTokens: 10, cacheWriteTokens: 50 },
+      { inputTokens: 40, outputTokens: 10, cacheReadTokens: 0 },
+    ]
+    const accounting = priceAccounting([foldSessionAccounting(usageLog(usages))], UNPRICED)
+    assert.deepEqual(rootShares(usages), { cacheHitShare: accounting.cacheHitShare, cacheUnreportedShare: accounting.unreportedShare })
   })
 })
 
@@ -257,6 +312,7 @@ describe('metrics.foldSessionLog: a log with no routing or compaction events', (
     ]))
     assertNull(metrics, JEV_EVENT_FIELDS)
     assert.equal(metrics.cacheHitShare, 0.5)
+    assert.equal(metrics.cacheUnreportedShare, 0)
     assert.equal(metrics.inputTokens, 100)
     assert.equal(metrics.turns, 1)
     assert.equal(metrics.toolCalls, 1)
@@ -306,7 +362,7 @@ describe('schema: Jev metric fields', () => {
   it('accepts an all-null record and an empty streak list', () => {
     validateTrial(trialRecord())
     validateTrial(trialRecord({ metrics: { downgradedStreaks: [] } }))
-    validateTrial(trialRecord({ metrics: { cacheHitShare: 0, downgradedStreaks: [3, 1] } }))
+    validateTrial(trialRecord({ metrics: { cacheHitShare: 0, cacheUnreportedShare: 0, downgradedStreaks: [3, 1] } }))
   })
 
   it('keeps the runner empty record schema-valid and explicitly null, not absent', () => {
@@ -334,6 +390,7 @@ describe('schema: Jev metric fields', () => {
 
   it('rejects a wrong-typed share, transition count, or hint count', () => {
     assert.throws(() => validateTrial(trialRecord({ metrics: { cacheHitShare: '0.5' } })), /cacheHitShare must be a finite number or null/)
+    assert.throws(() => validateTrial(trialRecord({ metrics: { cacheUnreportedShare: '1' } })), /cacheUnreportedShare must be a finite number or null/)
     assert.throws(() => validateTrial(trialRecord({ metrics: { modelTransitions: Number.POSITIVE_INFINITY } })), /modelTransitions must be a finite number or null/)
     assert.throws(() => validateTrial(trialRecord({ metrics: { routingHintCount: '2' } })), /routingHintCount must be a finite number or null/)
   })
@@ -351,6 +408,7 @@ describe('aggregate: Jev fields over trials', () => {
     trialIndex: 0,
     metrics: {
       cacheHitShare: 0.5,
+      cacheUnreportedShare: 0.2,
       modelTransitions: 2,
       downgradedStreaks: [2, 1],
       downgradedShare: 0.75,
@@ -363,7 +421,8 @@ describe('aggregate: Jev fields over trials', () => {
   // A judged trial that never downgraded: measured zeros, not nulls.
   const judged = trialRecord({
     trialIndex: 1,
-    metrics: { cacheHitShare: null, modelTransitions: 1, downgradedStreaks: [], downgradedShare: 0, keptStrongShare: 1, routingHintCount: 0 },
+    // Usage with no reported cache-read count: no share, and all of its input unreported.
+    metrics: { cacheHitShare: null, cacheUnreportedShare: 1, modelTransitions: 1, downgradedStreaks: [], downgradedShare: 0, keptStrongShare: 1, routingHintCount: 0 },
   })
   // The route-off arm composes no router: every routing datum is absent.
   const absent = trialRecord({ trialIndex: 2, arm: 'route-off' })
@@ -372,6 +431,8 @@ describe('aggregate: Jev fields over trials', () => {
     const summary = summarizeArm('route-on', [measured, judged, absent])
     assert.equal(summary.meanCacheHitShare, 0.5)
     assert.equal(summary.cacheHitShareNullTrials, 2)
+    // The unreported input stays visible beside the share instead of reading as a miss.
+    assert.equal(summary.meanCacheUnreportedShare, 0.6)
     assert.equal(summary.meanModelTransitions, 1.5)
     assert.equal(summary.routingDecisionTrials, 2)
     assert.equal(summary.meanDowngradedShare, 0.375)
@@ -404,7 +465,7 @@ describe('aggregate: Jev fields over trials', () => {
 
   it('keeps every mean and total null for an arm that never composed the surfaces', () => {
     const summary = summarizeArm('route-off', [absent, trialRecord({ trialIndex: 1, arm: 'route-off' })])
-    assertNull(summary, ['meanCacheHitShare', 'meanModelTransitions', 'meanDowngradedShare', 'meanKeptStrongShare', 'meanDowngradedStreakLongest', 'totalRoutingHintCount', 'totalJevCompactionAcceptedBelowThreshold', 'totalJevSelectionDegraded'])
+    assertNull(summary, ['meanCacheHitShare', 'meanCacheUnreportedShare', 'meanModelTransitions', 'meanDowngradedShare', 'meanKeptStrongShare', 'meanDowngradedStreakLongest', 'totalRoutingHintCount', 'totalJevCompactionAcceptedBelowThreshold', 'totalJevSelectionDegraded'])
     assert.equal(summary.cacheHitShareNullTrials, 2)
     assert.equal(summary.routingDecisionTrials, 0)
     assert.equal(summary.compactionVerificationTrials, 0)
@@ -451,13 +512,14 @@ describe('report: Jev aggregates reach the per-arm payload', () => {
     try {
       const dir = join(root, 'jev-pair')
       await writeArm(dir, 'route-off', [
-        trialRecord({ arm: 'route-off', metrics: { inputTokens: 4000, cacheHitShare: 0.4 } }),
+        trialRecord({ arm: 'route-off', metrics: { inputTokens: 4000, cacheHitShare: 0.4, cacheUnreportedShare: 0 } }),
       ])
       await writeArm(dir, 'route-on', [
         trialRecord({
           metrics: {
             inputTokens: 3000,
             cacheHitShare: 0.3,
+            cacheUnreportedShare: 0.25,
             modelTransitions: 3,
             downgradedStreaks: [4],
             downgradedShare: 0.5,
@@ -483,6 +545,7 @@ describe('report: Jev aggregates reach the per-arm payload', () => {
       const routeOn = report.arms.find(a => a.arm === 'route-on')
       assert.equal(routeOn.meanCacheHitShare, 0.3)
       assert.equal(routeOn.cacheHitShareNullTrials, 0)
+      assert.equal(routeOn.meanCacheUnreportedShare, 0.25)
       assert.equal(routeOn.routingDecisionTrials, 1)
       assert.equal(routeOn.meanModelTransitions, 3)
       assert.equal(routeOn.meanDowngradedStreakLongest, 4)

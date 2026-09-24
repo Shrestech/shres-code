@@ -6,7 +6,7 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { BlockAssembler, deepFreeze } from '@shres-code/shres-code-llm'
+import { BlockAssembler, deepFreeze, promptTokens } from '@shres-code/shres-code-llm'
 import type { Message, TokenUsage } from '@shres-code/shres-code-llm'
 import type { EpochHeader, Session, SessionEvent } from '@shres-code/shres-code-session'
 import { canonicalHeader, headerEquals, isSurfaceEvent } from '@shres-code/shres-code-session'
@@ -42,10 +42,7 @@ interface ReplayState {
 
 /** Sum disjoint provider usage buckets without double-counting reasoning output. */
 function usageTokens(usage: TokenUsage): number {
-  return usage.inputTokens
-    + (usage.cacheReadTokens ?? 0)
-    + (usage.cacheWriteTokens ?? 0)
-    + usage.outputTokens
+  return promptTokens(usage) + usage.outputTokens
 }
 
 /** Compare optional envelopes so a headerless estimate can track later surface deltas. */

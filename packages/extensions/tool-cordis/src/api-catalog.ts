@@ -1072,7 +1072,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
-        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id.',
+        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id. An implementation must honour `input.signal` at every await, settling promptly with `ABORTED` once it aborts: a consumer\'s deadline bounds the answer it uses, but bounds its wait only when the engine aborts.',
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
         returns: 'the answers with the engine and model identity and the ask\'s duration.',
         throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), oversized serialized input (`INPUT_TOO_LARGE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
@@ -1081,8 +1081,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'judgmentEngines',
-    summary: 'Engines a deployment composes, keyed by id.',
-    description: 'Engines a deployment composes, keyed by id. Registration is all-or-nothing and synchronous; subscribers are notified after every registration, removal, and announced status change, and re-read list and each entry\'s `status()` themselves.',
+    summary: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks.',
+    description: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks. Registration is all-or-nothing and synchronous; subscribers are notified after every engine registration, removal, and announced status change, and when a consumer id becomes declared or stops being declared, and re-read list, consumers, and each entry\'s `status()` themselves.',
     methods: [
       {
         signature: 'register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegistration',
@@ -1102,6 +1102,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Look up one registered engine.',
         parameters: [{ name: 'id', description: 'the registry id.' }],
         returns: 'the entry, or `undefined` when no provider registered the id.',
+      },
+      {
+        signature: 'declareConsumer(id: JudgmentConsumerId): () => void',
+        description: 'Declare that a consumer names itself with `id` on its asks, so a per-consumer override for it has an effect. Call it inside the consumer\'s `ctx.effect` so the returned disposer runs with the consumer\'s fiber; declareJudgmentConsumer does that. Several live declarations of one id are allowed, and the id stays declared until every one is disposed.',
+        parameters: [{ name: 'id', description: 'the consumer id the consumer\'s asks carry.' }],
+        returns: 'the disposer ending this declaration; repeated calls do nothing.',
+      },
+      {
+        signature: 'hasConsumer(id: string): boolean',
+        description: 'Whether a consumer currently names itself with `id` on its asks.',
+        parameters: [{ name: 'id', description: 'the consumer id.' }],
+        returns: 'true while at least one declaration of the id is live.',
+      },
+      {
+        signature: 'consumers(): readonly JudgmentConsumerId[]',
+        description: 'List the declared consumer ids.',
+        parameters: [],
+        returns: 'the ids, in first-declaration order.',
       },
       {
         signature: 'subscribe(listener: () => unknown): () => void',
@@ -2203,6 +2221,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'name', description: 'the provider to use.' }, { name: 'request', description: 'child label, prompt, parent, signal, and optional capabilities.' }],
         returns: 'the published holder-owned run.',
       },
+      {
+        signature: 'async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>',
+        description: 'Resolve the `agentOptions` a delegation consumer starts one fresh child with, dispatching `subagent/child-route` at most once. Consumers pass the result as the start request\'s `agentOptions` and derive any reported route from the same value with `effectiveChildRoute`, so the reported route and the run route cannot diverge.\n\n`input.requested` returns unchanged, without dispatch, when it names a provider or model (explicit routes win), when the provider seeds the child with parent history (fork), when the provider does not run requested routes, when no listener answers, or when the answer equals the inherited route. A throwing listener is logged and the child keeps its inherited route: routing is an optional cost policy, and a broken policy must not fail the delegation it would only have made cheaper. An `InvariantError` raised during the dispatch is not contained: a violated invariant means the durable log is about to become inconsistent, so it rejects the delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the inherited route and resolved against its registered model before return, so an unregistered route rejects before any child exists; agent creation itself does not validate a route.',
+        parameters: [{ name: 'name', description: 'the subagent provider the child will start on.' }, { name: 'input', description: 'the parent, consumer kind, requested options, task, and signal.' }],
+        returns: 'the options to start the child with, or `undefined` when none apply.',
+        throws: ['{SubagentError} `NO_PROVIDER` for an unregistered subagent provider, or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not resolve to a registered model.', '{InvariantError} when a registered invariant fails during the dispatch.'],
+      },
     ],
   },
   {
@@ -2267,7 +2292,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async assemble(context: AssembleContext = {}): Promise<PromptAssembly>',
-        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
+        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section. Rejects more than one effective complete section and, while none is active, an effective conditional section that is not ordered after every static section.',
         parameters: [{ name: 'context', description: 'the optional scope and plugin-defined assembly fields.' }],
         returns: 'the post-waterfall assembly with any complete prompt enforced.',
       },
@@ -3206,6 +3231,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A skill provider, runtime contribution, or provider-backed catalog may have changed.',
     description: 'A skill provider, runtime contribution, or provider-backed catalog may have changed. This is an unfiltered invalidation notification; consumers refetch the catalog for their own lookup options. Listener failures are contained and cannot veto the registry mutation.',
     parameters: [],
+  },
+  {
+    name: 'subagent/child-route',
+    mode: 'waterfall',
+    signature: '\'subagent/child-route\'( this: Scoped<SubagentRuntime>, request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>',
+    summary: 'Choose the provider/model route of one fresh child before its delegation consumer starts it.',
+    description: 'Choose the provider/model route of one fresh child before its delegation consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this at most once per child, and only when the request names neither a provider nor a model, the subagent provider runs requested routes, and the provider does not seed the child with parent history: a fork child keeps its parent\'s warm cached prefix and is never routed. Team seats always name their route, so no seat reaches a listener. The returned route is merged over `request.inherited`; `undefined` keeps it.\n\nThe waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child\'s creation. A throwing listener is logged and the child keeps its inherited route, except that an `InvariantError` raised during the dispatch propagates; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent\'s context answers only its delegations.',
+    parameters: [{ name: 'request', description: 'the fresh child\'s route question.' }],
   },
   {
     name: 'subagent/end',
@@ -4341,7 +4374,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -4544,6 +4577,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingInitialMode = \'off\' | \'on\';',
   },
   {
+    name: 'ModelRoutingInTurnFallback',
+    declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
   },
@@ -4641,7 +4678,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptSection',
-    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n}',
+    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n    readonly stability?: \'static\' | \'conditional\';\n}',
   },
   {
     name: 'ProviderRequestId',
@@ -4713,7 +4750,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly minTurnsDowngraded: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',
@@ -5121,11 +5158,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T, cause: SettingsValidationCause) => void;\n}',
   },
   {
     name: 'SettingsUpdateSource',
     declaration: 'export type SettingsUpdateSource = \'update\' | \'provider\';',
+  },
+  {
+    name: 'SettingsValidationCause',
+    declaration: 'export type SettingsValidationCause = \'register\' | \'write\' | \'reload\';',
   },
   {
     name: 'ShellExecRequest',
@@ -5384,6 +5425,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SubagentCapabilities {\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n    readonly cwd?: boolean;\n}',
   },
   {
+    name: 'SubagentChildRoute',
+    declaration: 'export interface SubagentChildRoute {\n    readonly provider?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SubagentChildRouteInput',
+    declaration: 'export interface SubagentChildRouteInput {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly requested?: AgentOptions;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
+    name: 'SubagentChildRouteKind',
+    declaration: 'export type SubagentChildRouteKind = \'subagent\' | \'workflow\';',
+  },
+  {
+    name: 'SubagentChildRouteRequest',
+    declaration: 'export interface SubagentChildRouteRequest {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly subagentProvider: string;\n    readonly inherited: SubagentChildRoute;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
     name: 'SubagentDescendantListEntry',
     declaration: 'export type SubagentDescendantListEntry = SubagentListEntry & {\n    readonly parentId: SessionId;\n    readonly depth: number;\n};',
   },
@@ -5401,7 +5458,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentProvider',
-    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
+    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    readonly runsRequestedModel?: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
   },
   {
     name: 'SubagentReportDelivery',
@@ -5433,7 +5490,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
+    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n    async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>;\n}',
   },
   {
     name: 'SubagentStartRequest',

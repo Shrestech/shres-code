@@ -10,7 +10,9 @@
 import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 import type {
   ModelRoutingBreakReason,
+  ModelRoutingDecision,
   ModelRoutingEntryBaseView,
+  ModelRoutingReason,
   ModelRoutingSelection,
   ModelRoutingStickyView,
 } from './types.ts'
@@ -19,10 +21,12 @@ import type {
 export interface ModelRoutingStickyState {
   /** Whether a downgraded streak is in force. */
   readonly active: boolean
-  /** Turns elapsed since the streak was entered; 0 while strong. */
-  readonly turnsElapsed: number
+  /** Model steps logged since the streak was entered; 0 while strong. */
+  readonly stepsElapsed: number
   /** Turn the streak was entered; absent while strong. */
   readonly enteredTurn?: number
+  /** Step the streak was entered on; absent while strong or when the entering record omitted it. */
+  readonly enteredStep?: number
   /** Allowlisted route the streak holds; absent while strong. */
   readonly candidate?: ModelRoutingSelection
   /**
@@ -38,7 +42,34 @@ export interface ModelRoutingStickyState {
   readonly needsStrongTurn?: true
   /** Turn whose matching manual request is the recovery proof. */
   readonly recoveryTurn?: number
+  /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
+  readonly cooldownTurn?: number
+  /**
+   * Consecutive failed judgment calls since the last answered one, and the turn
+   * of the latest; absent when none is counted.
+   */
+  readonly judgmentFailures?: ModelRoutingJudgmentFailures
 }
+
+/** Consecutive failed judgment calls as the fold counts them. */
+export interface ModelRoutingJudgmentFailures {
+  /** Failed judgment calls since the last answered one. */
+  readonly count: number
+  /** Turn of the latest failed judgment call. */
+  readonly turn: number
+}
+
+/** Decision reasons that record a judgment call that failed. */
+const FAILED_JUDGMENT_REASONS: ReadonlySet<ModelRoutingReason> = new Set([
+  'engine-unavailable', 'invalid-answer', 'judgment-error', 'judgment-failure-held',
+])
+
+/**
+ * Streak ends that start the re-entry cooldown: the exits that say the
+ * candidate could not carry the work, as opposed to a mode, manual, capability,
+ * or horizon change.
+ */
+const COOLDOWN_BREAKS: ReadonlySet<ModelRoutingBreakReason> = new Set(['escalated', 'current-preferred', 'route-failed'])
 
 /**
  * Serializable accumulator for the sticky-state fold.
@@ -53,6 +84,10 @@ export interface ModelRoutingStickyFoldState {
   readonly active: boolean
   /** Turn the streak was entered; absent while strong. */
   readonly enteredTurn?: number
+  /** Step the streak was entered on; absent while strong or when the entering record omitted it. */
+  readonly enteredStep?: number
+  /** `step/start` events logged since the streak was entered; 0 while strong. */
+  readonly stepsElapsed: number
   /** Allowlisted route the streak holds; absent while strong. */
   readonly candidate?: ModelRoutingSelection
   /** Manual route in force when the streak was entered. */
@@ -75,6 +110,20 @@ export interface ModelRoutingStickyFoldState {
   readonly recoveryBase?: ModelRoutingEntryBaseView
   /** Whether the recovery turn's latest matching request header was seen. */
   readonly recoveryHeaderMatches?: boolean
+  /**
+   * Consecutive `route-failed` decisions for one candidate. It survives the
+   * streak each failure ends, so repeated in-turn fallbacks reach the recorded
+   * error limit; a completed turn on that candidate or a route-error break
+   * clears it.
+   */
+  readonly candidateFailures?: { readonly candidate: ModelRoutingSelection; readonly count: number }
+  /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
+  readonly cooldownTurn?: number
+  /**
+   * Consecutive failed judgment calls since the last answered one, and the turn
+   * of the latest; absent when none is counted.
+   */
+  readonly judgmentFailures?: ModelRoutingJudgmentFailures
 }
 
 /**
@@ -125,7 +174,7 @@ function isRouteFailure(reason: TurnEndReason): boolean {
  * @returns the accumulator for an empty log.
  */
 export function createStickyFoldState(): ModelRoutingStickyFoldState {
-  return { active: false, currentTurn: 0, routeFailures: 0 }
+  return { active: false, currentTurn: 0, stepsElapsed: 0, routeFailures: 0 }
 }
 
 /** Whether a stored route-error limit can govern a future failure. */
@@ -173,8 +222,15 @@ function validateStickyView(sticky: ModelRoutingStickyView): void {
   }
 }
 
-/** Compare two held selections as route identities, including effort. */
-function sameSelection(
+/**
+ * Compare two selections as route identities, including effort. The fold and
+ * the consult share this comparison, so a decision that continues a streak and
+ * the fold's transition test agree on what counts as a candidate change.
+ * @param left - one selection, or `undefined` when no route is held.
+ * @param right - the other selection, or `undefined`.
+ * @returns true when both are absent or name the same candidate, route, and effort.
+ */
+export function sameSelection(
   left: ModelRoutingSelection | undefined,
   right: ModelRoutingSelection | undefined,
 ): boolean {
@@ -199,12 +255,13 @@ function sameEntryBase(
 function clearActiveFields(state: ModelRoutingStickyFoldState): ModelRoutingStickyFoldState {
   const {
     enteredTurn: _enteredTurn,
+    enteredStep: _enteredStep,
     candidate: _candidate,
     entryBase: _entryBase,
     routeErrorLimit: _routeErrorLimit,
     ...retained
   } = state
-  return { ...retained, active: false, routeFailures: 0 }
+  return { ...retained, active: false, stepsElapsed: 0, routeFailures: 0 }
 }
 
 /** Remove the pending manual recovery marker after its proof turn succeeds. */
@@ -237,6 +294,7 @@ function breakForRouteErrors(state: ModelRoutingStickyFoldState): ModelRoutingSt
   const {
     recoveryTurn: _recoveryTurn,
     recoveryHeaderMatches: _recoveryHeaderMatches,
+    candidateFailures: _candidateFailures,
     ...withoutRecoveryTurn
   } = clearActiveFields(state)
   return {
@@ -246,6 +304,23 @@ function breakForRouteErrors(state: ModelRoutingStickyFoldState): ModelRoutingSt
     routeFailures: 0,
     ...recoveryBase === undefined ? {} : { recoveryBase },
   }
+}
+
+/**
+ * Count one `route-failed` decision against the held candidate and end its
+ * streak. Reaching the recorded error limit is a route-error break, which
+ * requires a manual recovery turn exactly as terminal failures do.
+ * @param state - the active accumulator whose held route failed.
+ * @returns the broken state, or the route-error break at the limit.
+ */
+function failRoute(state: ModelRoutingStickyFoldState): ModelRoutingStickyFoldState {
+  assertRouteErrorLimit(state.routeErrorLimit)
+  const candidate = state.candidate
+  if (candidate === undefined) return breakSticky(state, 'route-failed')
+  const previous = state.candidateFailures
+  const count = previous !== undefined && sameSelection(previous.candidate, candidate) ? previous.count + 1 : 1
+  if (count >= state.routeErrorLimit) return breakForRouteErrors(state)
+  return { ...breakSticky(state, 'route-failed'), candidateFailures: { candidate, count } }
 }
 
 /**
@@ -302,6 +377,10 @@ export function advanceStickyFoldState(
   event: SessionEvent,
 ): ModelRoutingStickyFoldState {
   switch (event.type) {
+    case 'step/start':
+      // Only a held streak counts steps: the entering decision follows its own
+      // step's start, so the entering step is step 0 of the streak.
+      return state.active ? { ...state, stepsElapsed: state.stepsElapsed + 1 } : state
     case 'turn/start': {
       if (state.currentTurn === event.data.turn) return state
       if (state.needsStrongTurn !== true) return { ...state, currentTurn: event.data.turn }
@@ -332,6 +411,12 @@ export function advanceStickyFoldState(
         const routeFailures = isRouteFailure(event.data.reason) ? state.routeFailures + 1 : 0
         if (routeFailures >= state.routeErrorLimit) next = breakForRouteErrors(state)
         else if (state.routeFailures !== routeFailures) next = { ...state, routeFailures }
+        // A completed turn on the candidate ends its run of in-turn fallbacks.
+        if (event.data.reason.kind === 'completed' && state.candidateFailures !== undefined
+          && sameSelection(state.candidateFailures.candidate, state.candidate)) {
+          const { candidateFailures: _candidateFailures, ...recovered } = next
+          next = recovered
+        }
       }
       return isRecoveryProof(next, event) ? clearRecoveryFields(next) : next
     }
@@ -342,33 +427,82 @@ export function advanceStickyFoldState(
     case 'model-routing/decision': {
       const sticky = event.data.sticky
       validateStickyView(sticky)
-      if (sticky.active) {
-        const candidate = event.data.selection ?? state.candidate
-        const entering = !state.active
-        const transitioned = state.active && !sameSelection(state.candidate, candidate)
-        const entryBase = entering ? sticky.entryBase ?? state.lastHeader : state.entryBase
-        const { brokenBy: _previousBreak, ...withoutBreak } = state
-        return {
-          ...withoutBreak,
-          active: true,
-          enteredTurn: sticky.enteredTurn ?? state.enteredTurn ?? state.currentTurn,
-          ...candidate === undefined ? {} : { candidate },
-          ...entryBase === undefined ? {} : { entryBase },
-          routeErrorLimit: sticky.routeErrorLimit,
-          routeFailures: entering || transitioned ? 0 : state.routeFailures,
-        }
-      }
-      const recoveryBase = sticky.brokenBy === 'route-errors'
-        ? sticky.entryBase
-        : undefined
-      if (recoveryBase !== undefined) return startRecovery(state, recoveryBase)
-      return state.active && sticky.brokenBy !== undefined
-        ? breakSticky(state, sticky.brokenBy)
-        : state.active ? clearActiveFields(state) : state
+      return applyDecision(countJudgment(state, event.data), event.data)
     }
     default:
       return state
   }
+}
+
+/**
+ * Count a failed judgment call, or clear the count after an answered one.
+ * Decisions that made no judgment call leave the count alone.
+ * @param state - the accumulator before the decision.
+ * @param decision - the logged decision.
+ * @returns the accumulator with the judgment-failure count applied.
+ */
+function countJudgment(state: ModelRoutingStickyFoldState, decision: ModelRoutingDecision): ModelRoutingStickyFoldState {
+  if (FAILED_JUDGMENT_REASONS.has(decision.reason)) {
+    return { ...state, judgmentFailures: { count: (state.judgmentFailures?.count ?? 0) + 1, turn: state.currentTurn } }
+  }
+  if (decision.route === undefined || state.judgmentFailures === undefined) return state
+  const { judgmentFailures: _failures, ...answered } = state
+  return answered
+}
+
+/**
+ * Apply one decision's sticky transition.
+ * @param state - the accumulator before the decision's transition.
+ * @param decision - the logged decision.
+ * @returns the accumulator after the decision.
+ */
+function applyDecision(state: ModelRoutingStickyFoldState, decision: ModelRoutingDecision): ModelRoutingStickyFoldState {
+  const sticky = decision.sticky
+  if (sticky.active) {
+    const candidate = decision.selection ?? state.candidate
+    const entering = !state.active
+    const restarted = entering || !sameSelection(state.candidate, candidate)
+    const entryBase = entering ? sticky.entryBase ?? state.lastHeader : state.entryBase
+    const enteredStep = sticky.enteredStep ?? (restarted ? undefined : state.enteredStep)
+    const { brokenBy: _previousBreak, cooldownTurn: _cooldown, enteredStep: _previousStep, ...withoutBreak } = state
+    return {
+      ...withoutBreak,
+      active: true,
+      enteredTurn: sticky.enteredTurn ?? state.enteredTurn ?? state.currentTurn,
+      ...enteredStep === undefined ? {} : { enteredStep },
+      stepsElapsed: restarted ? 0 : state.stepsElapsed,
+      ...candidate === undefined ? {} : { candidate },
+      ...entryBase === undefined ? {} : { entryBase },
+      routeErrorLimit: sticky.routeErrorLimit,
+      routeFailures: restarted ? 0 : state.routeFailures,
+    }
+  }
+  const ended = endStreak(state, sticky)
+  return state.active && sticky.brokenBy !== undefined && COOLDOWN_BREAKS.has(sticky.brokenBy)
+    ? { ...ended, cooldownTurn: state.currentTurn }
+    : ended
+}
+
+/**
+ * Apply one inactive decision: a recorded route failure, a route-error
+ * recovery, an ordinary break, or a strong decision that leaves any held
+ * route.
+ * @param state - the accumulator before the decision.
+ * @param sticky - the decision's inactive sticky facts.
+ * @returns the accumulator after the decision.
+ */
+function endStreak(
+  state: ModelRoutingStickyFoldState,
+  sticky: Extract<ModelRoutingStickyView, { active: false }>,
+): ModelRoutingStickyFoldState {
+  if (sticky.brokenBy === 'route-failed') return state.active ? failRoute(state) : state
+  const recoveryBase = sticky.brokenBy === 'route-errors'
+    ? sticky.entryBase
+    : undefined
+  if (recoveryBase !== undefined) return startRecovery(state, recoveryBase)
+  return state.active && sticky.brokenBy !== undefined
+    ? breakSticky(state, sticky.brokenBy)
+    : state.active ? clearActiveFields(state) : state
 }
 
 /**
@@ -377,13 +511,11 @@ export function advanceStickyFoldState(
  * @returns the public sticky state.
  */
 export function readStickyFoldState(state: ModelRoutingStickyFoldState): ModelRoutingStickyState {
-  const turnsElapsed = state.active && state.enteredTurn !== undefined
-    ? Math.max(0, state.currentTurn - state.enteredTurn)
-    : 0
   return {
     active: state.active,
-    turnsElapsed,
+    stepsElapsed: state.active ? state.stepsElapsed : 0,
     ...state.active && state.enteredTurn !== undefined ? { enteredTurn: state.enteredTurn } : {},
+    ...state.active && state.enteredStep !== undefined ? { enteredStep: state.enteredStep } : {},
     ...state.active && state.candidate !== undefined ? { candidate: state.candidate } : {},
     ...state.active && state.entryBase !== undefined ? { entryBase: state.entryBase } : {},
     ...!state.active && state.recoveryBase !== undefined ? { entryBase: state.recoveryBase } : {},
@@ -391,6 +523,8 @@ export function readStickyFoldState(state: ModelRoutingStickyFoldState): ModelRo
     ...state.brokenBy === undefined ? {} : { brokenBy: state.brokenBy },
     ...state.needsStrongTurn === true ? { needsStrongTurn: true } : {},
     ...state.recoveryTurn === undefined ? {} : { recoveryTurn: state.recoveryTurn },
+    ...state.cooldownTurn === undefined ? {} : { cooldownTurn: state.cooldownTurn },
+    ...state.judgmentFailures === undefined ? {} : { judgmentFailures: state.judgmentFailures },
   }
 }
 
@@ -399,7 +533,7 @@ export function readStickyFoldState(state: ModelRoutingStickyFoldState): ModelRo
  *
  * The state is a pure function of the log: `model-routing/decision` records
  * every transition, `model-routing/mode` records the off-switch, `turn/start`
- * numbers the turns the horizon is measured in, and `request/header` supplies
+ * numbers the turns, `step/start` counts the steps the horizon is measured in, and `request/header` supplies
  * the manual route a streak was entered on. Decisions are replayed rather than
  * re-derived, so a streak a restart or a fork inherits continues exactly as
  * the live consult left it.

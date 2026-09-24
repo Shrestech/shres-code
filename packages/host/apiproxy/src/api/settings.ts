@@ -79,7 +79,8 @@ export interface SettingsApi {
    * commit). Secret-role fields may be INCLUDED in the patch (write-only
    * direction); a form that leaves a secret untouched simply omits it and the
    * merge preserves the stored value. Responds with the namespace's new
-   * redacted view; a schema or storage rejection is `settings-rejected`.
+   * redacted view; a schema, owner-validation, or storage rejection is
+   * `settings-rejected`, carrying the field path when the owner named one.
    */
   update(request: RpcRequest<{ ns: string; patch: object; expectedRevision?: number }>): Promise<RpcResponse<SettingsNamespaceView>>
 

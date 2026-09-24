@@ -47,6 +47,12 @@ export class CursorSessionLlmAdapter extends LlmAdapter {
     })))
   }
 
+  /**
+   * Resolve one exact route model by id, carrying the route's declared context
+   * window and max-token default when the catalog entry sets them.
+   * @param id - exact model id passed to {@link GenerateOptions.model}.
+   * @returns provider/model identity plus any context and call-default metadata.
+   */
   override resolveModel(provider: string, id: string): Promise<LlmResolvedModelInfo> {
     const route = this.options.route()
     const model = route.models.find(entry => entry.id === id)

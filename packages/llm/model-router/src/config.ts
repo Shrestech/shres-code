@@ -18,6 +18,9 @@ export type ModelRoutingInitialMode = 'off' | 'on'
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** What a failed downgraded request means for its step. */
+export type ModelRoutingInTurnFallback = 'manual' | 'off'
+
 /** The state window one judgment call reads. */
 export interface ModelRoutingStateConfig {
   /** Prior user messages of the conversation to include before the current turn's. Defaults to 2. */
@@ -34,6 +37,58 @@ export interface ModelRoutingEscalateBackConfig {
   scoreThreshold?: number
 }
 
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
 /** The advisory-hint operating point. */
 export interface ModelRoutingHardHintConfig {
   /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
@@ -42,9 +97,13 @@ export interface ModelRoutingHardHintConfig {
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
   scoreThreshold: number
-  /** Effort the selected downgraded route runs at above the threshold. */
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
 }
 
@@ -61,18 +120,23 @@ export interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -80,17 +144,34 @@ export interface ModelRouterConfig {
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
   /**
-   * Consecutive candidate failures that require a manual-model turn. Recorded
-   * on each held decision; settings changes affect subsequent decisions.
-   * Defaults to 2.
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
    */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
-   * Optional effort lift for a selected route on a hard turn. Omitted — or
-   * written as a valueless key, which the schema resolves to null — means not
-   * configured; the group is never implied by a default.
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /**
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
+  /**
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
    */
   difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
   /**
@@ -125,8 +206,12 @@ export interface ResolvedModelRouterConfig {
   readonly downgradeThreshold: number
   /** Top-two margin floor. */
   readonly downgradeMargin: number
-  /** Streak horizon; `0` disables stickiness. */
-  readonly minTurnsDowngraded: number
+  /** Streak horizon and cap, in model steps. */
+  readonly hold: { readonly minSteps: number; readonly maxSteps: number }
+  /** Difficulty at or above which a streak is not entered. */
+  readonly entryScoreCeiling: number
+  /** Turns after a quality exit that keep the manual route without judgment. */
+  readonly reentryCooldownTurns: number
   /** Choice question text. */
   readonly routeInstructions: string
   /** Difficulty question text; absent when no configured feature reads difficulty. */
@@ -139,6 +224,16 @@ export interface ResolvedModelRouterConfig {
   readonly maxRouteErrors: number
   /** Policy for a failed judgment call. */
   readonly onUnavailable: ModelRoutingUnavailablePolicy
+  /** Deadline of one judgment call, in milliseconds. */
+  readonly judgmentDeadlineMs: number
+  /** Hold tolerance and breaker for failed judgment calls. */
+  readonly judgmentFailures: {
+    readonly holdTolerance: number
+    readonly breakerThreshold: number
+    readonly breakerOpenTurns: number
+  }
+  /** Policy for a failed downgraded request. */
+  readonly inTurnFallback: ModelRoutingInTurnFallback
   /** Effort lift for a hard turn, when configured. */
   readonly difficultyToEffort?: { readonly scoreThreshold: number; readonly reasoningEffort: string }
   /** Advisory-hint threshold, when configured. */
@@ -158,14 +253,49 @@ export const DEFAULT_STATE_MAX_CHARS = 12_000
 /** Default number of complete input alternatives for exact token fitting. */
 export const DEFAULT_STATE_MAX_FIT_CANDIDATES = 8
 
-/** Default streak horizon. */
-export const DEFAULT_MIN_TURNS_DOWNGRADED = 5
+/**
+ * Default streak horizon, in steps. At a 200k-token prefix with a five-minute
+ * manual-route cache, a return after expiry breaks even after about 20 steps on
+ * a DeepSeek-class candidate.
+ */
+export const DEFAULT_HOLD_MIN_STEPS = 20
+
+/**
+ * Default streak cap, in steps: about the number of steps at 7.8 s each that fit
+ * a five-minute manual-route cache lifetime, and the bound on a hold inside the
+ * turn that entered it.
+ */
+export const DEFAULT_HOLD_MAX_STEPS = 40
+
+/** Default entry ceiling: the third level (index 2) of the five-level rubric. */
+export const DEFAULT_ENTRY_SCORE_CEILING = 2
+
+/** Default number of turns after a quality exit that keep the manual route without judgment. */
+export const DEFAULT_REENTRY_COOLDOWN_TURNS = 2
 
 /** Default escalate-back difficulty threshold: the fourth level (index 3) of the five-level rubric. */
 export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
 
 /** Default durable route-failure streak. */
 export const DEFAULT_MAX_ROUTE_ERRORS = 2
+
+/**
+ * Default judgment deadline, in milliseconds: above the slowest judgment call a
+ * live session recorded (924 ms) and far above a local Laya call (about 14 ms).
+ */
+export const DEFAULT_JUDGMENT_DEADLINE_MS = 1500
+
+/** Largest accepted judgment deadline, in milliseconds. */
+export const MAX_JUDGMENT_DEADLINE_MS = 30_000
+
+/** Default number of consecutive failed judgment calls a held streak survives. */
+export const DEFAULT_JUDGMENT_HOLD_TOLERANCE = 2
+
+/** Default number of consecutive failed judgment calls that open the breaker. */
+export const DEFAULT_JUDGMENT_BREAKER_THRESHOLD = 3
+
+/** Default number of turns an open breaker keeps the manual route. */
+export const DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS = 5
 
 /**
  * Default difficulty levels. Scores are zero-based indexes into this ordered
@@ -186,13 +316,18 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'candidates',
   'downgradeThreshold',
   'downgradeMargin',
-  'minTurnsDowngraded',
+  'hold',
+  'difficulty',
+  'reentryCooldownTurns',
   'routeInstructions',
   'difficultyInstructions',
   'difficultyLevels',
   'escalateBack',
   'maxRouteErrors',
   'onUnavailable',
+  'judgmentDeadlineMs',
+  'judgmentFailures',
+  'inTurnFallback',
   'difficultyToEffort',
   'hardHint',
   'state',
@@ -232,12 +367,15 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   // Read through an unknown-typed view: the discriminated literals are the
   // schema's to enforce for a composition entry, but programmatic construction
   // bypasses it, so they are re-judged here as raw values a type cannot vouch for.
-  const raw = config as { initialMode?: unknown; onUnavailable?: unknown; tier?: unknown }
+  const raw = config as { initialMode?: unknown; onUnavailable?: unknown; inTurnFallback?: unknown; tier?: unknown }
   if (raw.initialMode !== 'off' && raw.initialMode !== 'on') {
     throw new Error('ModelRouterConfig.initialMode must be "off" or "on"')
   }
   if (raw.onUnavailable !== undefined && raw.onUnavailable !== 'fallback' && raw.onUnavailable !== 'error') {
     throw new Error('ModelRouterConfig.onUnavailable must be "fallback" or "error"')
+  }
+  if (raw.inTurnFallback !== undefined && raw.inTurnFallback !== 'manual' && raw.inTurnFallback !== 'off') {
+    throw new Error('ModelRouterConfig.inTurnFallback must be "manual" or "off"')
   }
   if (raw.tier !== undefined && raw.tier !== 'fast' && raw.tier !== 'accurate') {
     throw new Error('ModelRouterConfig.tier must be "fast" or "accurate"')
@@ -269,17 +407,28 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
       ...candidate.description === undefined ? {} : { description: candidate.description },
     })
   })
-  const minTurnsDowngraded = config.minTurnsDowngraded ?? DEFAULT_MIN_TURNS_DOWNGRADED
-  if (!Number.isInteger(minTurnsDowngraded) || minTurnsDowngraded < 0) {
-    throw new Error('ModelRouterConfig.minTurnsDowngraded must be a non-negative integer')
+  const minSteps = config.hold?.minSteps ?? DEFAULT_HOLD_MIN_STEPS
+  if (!Number.isInteger(minSteps) || minSteps < 0) {
+    throw new Error('ModelRouterConfig.hold.minSteps must be a non-negative integer')
+  }
+  const maxSteps = config.hold?.maxSteps ?? DEFAULT_HOLD_MAX_STEPS
+  if (!Number.isInteger(maxSteps) || maxSteps < 1) {
+    throw new Error('ModelRouterConfig.hold.maxSteps must be a positive integer')
+  }
+  if (minSteps > maxSteps) {
+    throw new Error('ModelRouterConfig.hold.minSteps must not exceed hold.maxSteps')
+  }
+  const reentryCooldownTurns = config.reentryCooldownTurns ?? DEFAULT_REENTRY_COOLDOWN_TURNS
+  if (!Number.isInteger(reentryCooldownTurns) || reentryCooldownTurns < 0) {
+    throw new Error('ModelRouterConfig.reentryCooldownTurns must be a non-negative integer')
   }
   const difficultyInstructions = config.difficultyInstructions
-  const needsDifficulty = minTurnsDowngraded > 0
+  const needsDifficulty = minSteps > 0
     || (config.hardHint ?? undefined) !== undefined
     || (config.difficultyToEffort ?? undefined) !== undefined
   if (needsDifficulty && (difficultyInstructions === undefined || difficultyInstructions.trim() === '')) {
     throw new Error(
-      'ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint or difficultyToEffort'
+      'ModelRouterConfig.difficultyInstructions is required while hold.minSteps > 0 or hardHint or difficultyToEffort'
       + ' is set: these features require a difficulty answer',
     )
   }
@@ -296,11 +445,33 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   const maxDifficultyScore = difficultyLevels.length - 1
   const scoreThreshold = config.escalateBack?.scoreThreshold ?? DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD
   assertScoreThreshold('ModelRouterConfig.escalateBack.scoreThreshold', scoreThreshold, maxDifficultyScore)
+  const entryScoreCeiling = config.difficulty?.entryScoreCeiling ?? DEFAULT_ENTRY_SCORE_CEILING
+  assertScoreThreshold('ModelRouterConfig.difficulty.entryScoreCeiling', entryScoreCeiling, maxDifficultyScore)
+  if (entryScoreCeiling > scoreThreshold) {
+    throw new Error('ModelRouterConfig.difficulty.entryScoreCeiling must not exceed escalateBack.scoreThreshold')
+  }
   const maxRouteErrors = config.maxRouteErrors ?? DEFAULT_MAX_ROUTE_ERRORS
   if (!Number.isInteger(maxRouteErrors) || maxRouteErrors < 1) {
     throw new Error('ModelRouterConfig.maxRouteErrors must be a positive integer')
   }
+  const judgmentDeadlineMs = config.judgmentDeadlineMs ?? DEFAULT_JUDGMENT_DEADLINE_MS
+  if (!Number.isInteger(judgmentDeadlineMs) || judgmentDeadlineMs < 1 || judgmentDeadlineMs > MAX_JUDGMENT_DEADLINE_MS) {
+    throw new Error(`ModelRouterConfig.judgmentDeadlineMs must be a positive integer no greater than ${MAX_JUDGMENT_DEADLINE_MS}`)
+  }
+  const holdTolerance = config.judgmentFailures?.holdTolerance ?? DEFAULT_JUDGMENT_HOLD_TOLERANCE
+  if (!Number.isInteger(holdTolerance) || holdTolerance < 0) {
+    throw new Error('ModelRouterConfig.judgmentFailures.holdTolerance must be a non-negative integer')
+  }
+  const breakerThreshold = config.judgmentFailures?.breakerThreshold ?? DEFAULT_JUDGMENT_BREAKER_THRESHOLD
+  if (!Number.isInteger(breakerThreshold) || breakerThreshold < 1) {
+    throw new Error('ModelRouterConfig.judgmentFailures.breakerThreshold must be a positive integer')
+  }
+  const breakerOpenTurns = config.judgmentFailures?.breakerOpenTurns ?? DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS
+  if (!Number.isInteger(breakerOpenTurns) || breakerOpenTurns < 0) {
+    throw new Error('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
+  }
   const onUnavailable = config.onUnavailable ?? 'fallback'
+  const inTurnFallback = config.inTurnFallback ?? 'manual'
   const tier = config.tier ?? 'fast'
   const contextTurns = config.state?.contextTurns ?? DEFAULT_STATE_CONTEXT_TURNS
   if (!Number.isInteger(contextTurns) || contextTurns < 0) {
@@ -331,19 +502,32 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
       'ModelRouterConfig.difficultyToEffort.reasoningEffort',
       difficultyToEffort.reasoningEffort,
     )
+    // The lift applies on the entering step, and entry needs a score below the
+    // ceiling, so a threshold at or above it could never lift anything.
+    if (difficultyToEffort.scoreThreshold >= entryScoreCeiling) {
+      throw new Error(
+        'ModelRouterConfig.difficultyToEffort.scoreThreshold must be below difficulty.entryScoreCeiling: '
+        + 'a streak is only entered below the ceiling, so the lift could never apply',
+      )
+    }
   }
   return Object.freeze({
     initialMode: config.initialMode,
     candidates: Object.freeze(candidates),
     downgradeThreshold: config.downgradeThreshold,
     downgradeMargin: config.downgradeMargin,
-    minTurnsDowngraded,
+    hold: Object.freeze({ minSteps, maxSteps }),
+    entryScoreCeiling,
+    reentryCooldownTurns,
     routeInstructions: config.routeInstructions,
     ...difficultyInstructions === undefined ? {} : { difficultyInstructions },
     difficultyLevels: Object.freeze([...difficultyLevels]),
     escalateBackScoreThreshold: scoreThreshold,
     maxRouteErrors,
     onUnavailable,
+    judgmentDeadlineMs,
+    judgmentFailures: Object.freeze({ holdTolerance, breakerThreshold, breakerOpenTurns }),
+    inTurnFallback,
     ...difficultyToEffort === undefined
       ? {}
       : {

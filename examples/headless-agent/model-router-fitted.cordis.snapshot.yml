@@ -16,7 +16,7 @@
           workspaceContext:
             maxBytes: 65536
           persona: |
-            You are headless-agent, a coding assistant powered by the {{model}} model.
+            You are headless-agent, a coding assistant.
 
             Verify your work by running the code or tests. Keep answers brief and
             factual.
@@ -36,10 +36,8 @@
                   model: deepseek-v4-flash
               downgradeThreshold: 0.7
               downgradeMargin: 0.5
-              minTurnsDowngraded: 3
-              difficultyToEffort:
-                scoreThreshold: 4
-                reasoningEffort: high
+              hold:
+                minSteps: 3
               routeInstructions: Pick the cheapest route that can finish this turn.
               difficultyInstructions: Rate how much reasoning this turn needs.
           - id: judgment-dispatch
@@ -50,6 +48,6 @@
             name: './tests/fixtures/model-router-snapshot-fixture.ts'
             config:
               route: candidate
-              difficultyScore: 2
+              difficultyScore: 1
               fitStateMaxChars: 180
               trailingContext: Workspace context follows the user request.

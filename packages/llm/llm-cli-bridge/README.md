@@ -59,7 +59,7 @@ The external CLI sees one serialized prompt (system text, then `user` / `assista
 
 #### Token effect
 
-The child CLI pays for its own context. When the CLI reports usage, the adapter emits a `usage` chunk; otherwise the stream has none.
+The child CLI pays for its own context. When the CLI reports usage, the adapter emits a `usage` chunk carrying input, output, and reasoning counts; otherwise the stream has none. The adapter never reads a CLI's cache counts, so `cacheReadTokens` and `cacheWriteTokens` are always absent and `inputTokens` is whatever prompt count the CLI reported.
 
 #### KV Cache effect
 

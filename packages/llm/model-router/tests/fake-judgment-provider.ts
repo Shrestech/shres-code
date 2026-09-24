@@ -24,8 +24,8 @@ export const SCRIPTED_OTHER_CANDIDATE = 'vision'
 /** Confidence the scripted route answer reports; above any gate the tests configure. */
 export const SCRIPTED_ROUTE_CONFIDENCE = 0.9
 
-/** Probability-weighted difficulty the scripted score answer reports; below escalate-back. */
-export const SCRIPTED_DIFFICULTY_SCORE = 2
+/** Probability-weighted difficulty the scripted score answer reports; below the entry ceiling. */
+export const SCRIPTED_DIFFICULTY_SCORE = 1
 
 /** Engine name the scripted answers report. */
 export const SCRIPTED_ENGINE = 'fake-judgment'

@@ -32,6 +32,7 @@ import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres
 import {
   CLAUDE_SESSION_PROVIDER_ID,
   Config,
+  PROMPT_CACHE_TTL_MS,
   resolveCredentialSpec,
   resolveRoute,
 } from './config.ts'
@@ -41,14 +42,16 @@ export {
   CLAUDE_SESSION_PROVIDER_ID,
   Config,
   DEFAULT_BASE_URL,
+  DEFAULT_CACHE_RETENTION,
   DEFAULT_DISPLAY_NAME,
   DEFAULT_REFRESH_LEEWAY_MS,
+  PROMPT_CACHE_TTL_MS,
   SHIPPED_MODELS,
   defaultAuthPath,
   resolveCredentialSpec,
   resolveRoute,
 } from './config.ts'
-export type { ClaudeSessionModelConfig } from './config.ts'
+export type { ClaudeSessionCacheRetention, ClaudeSessionModelConfig } from './config.ts'
 export { ClaudeSessionManager, KEYCHAIN_SERVICE, TOKEN_URL, selectSessionEntry } from '@shres-code/shres-code-claude-credential'
 export type { ClaudeSessionEntry, ClaudeSessionOptions, ClaudeSessionToken } from '@shres-code/shres-code-claude-credential'
 
@@ -74,6 +77,9 @@ function registrationFacts(current: () => Config): unknown {
     displayName: route.displayName,
     baseURL: route.baseURL,
     modelIds: current().models?.map(model => model.id),
+    // Model metadata declares the lifetime this retention requests, so a
+    // change republishes the route for listings to refresh.
+    cacheRetention: route.cacheRetention,
   }
 }
 
@@ -160,6 +166,8 @@ function buildAdapter(
         + ` sending that message as provider-neutral content (${reason})`,
       )
     },
+    // Every model on the route requests the section's one retention.
+    promptCacheTtlMs: () => PROMPT_CACHE_TTL_MS[resolveRoute(current()).cacheRetention],
   })
 }
 
