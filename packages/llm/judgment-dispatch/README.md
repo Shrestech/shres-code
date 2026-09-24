@@ -33,7 +33,11 @@ The engine's own failures reach the caller unchanged. Consumers treat every fail
 
 ## Settings
 
-The dispatcher installs the `judgment` section with the composition layer `{ enabled: true, engine: <defaultEngine> }`. A write is rejected, naming the field, when it selects an id no provider registered or an engine whose descriptor names another host (`judgment: engine "laya" requires darwin-arm64`). A stored selection is not checked while the section registers, because its engine can register later in the same load; after the Loader settles, the dispatcher logs each selected id that is still unregistered, once per id, and the first ask routed to it fails `UNCONFIGURED`.
+The dispatcher installs the `judgment` section with the composition layer `{ enabled: true, engine: <defaultEngine> }`.
+
+Live-service checks apply only to what a configuration write changes. A write is rejected, naming the field it writes, when it changes `engine` to, or adds or changes an override to, an id no provider registered or an engine whose descriptor names another host (`judgment: engine "laya" requires darwin-arm64`), or when it adds or changes an override for an undeclared consumer. An entry the write leaves unchanged is not re-judged, so a stale override never blocks an unrelated write.
+
+A document the settings file loads or reloads is applied as written, whatever the state of the registry. Rejecting it would keep the previous engine answering with only a warning in the log, which is how a switch away from a remote engine could silently fail. An unregistered selection then fails every ask routed to it with `UNCONFIGURED`, with no fallback, and an override for an undeclared consumer is ignored. After the Loader settles, the dispatcher logs each such condition once at error level, again whenever a later change introduces one, and at info level when one resolves: an engine that registers, or a consumer that declares and whose stored override is then honoured.
 
 ```yaml
 judgment:
@@ -42,7 +46,7 @@ judgment:
     worker-escalation: typesafe
 ```
 
-An override key must be a consumer id that a mounted consumer declared in the registry with `declareJudgmentConsumer`; a write naming any other key is rejected with `judgment: consumer "<key>" does not name itself in judgment asks; this override would have no effect` at `['overrides', <key>]`. The check is skipped while the section registers, because consumers can declare after the stored settings load; after the Loader settles, the dispatcher logs each stored override for an undeclared consumer once, and asks ignore it. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves. The model router declares `model-router` once its asks carry that consumer id.
+An override key must be a consumer id that a mounted consumer declared in the registry with `declareJudgmentConsumer`; a write adding or changing any other key is rejected with `judgment: consumer "<key>" does not name itself in judgment asks; this override would have no effect` at `['overrides', <key>]`, and asks ignore a stored override for an undeclared consumer. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves. The model router declares `model-router` once its asks carry that consumer id.
 
 ## Model Experience
 

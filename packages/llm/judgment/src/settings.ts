@@ -45,15 +45,19 @@ export interface JudgmentSettingsInstall {
   /** Composition layer of the section; omission installs {@link JUDGMENT_SETTINGS_DEFAULT}. */
   readonly base?: JudgmentSettings
   /**
-   * Reject a selection the installing service cannot serve, such as an engine
-   * that is not registered; throw `SettingsFieldError` naming the selecting
-   * field. It runs for the `write` and `reload` validation causes and never
-   * for `register`: at registration a stored selection can name an engine
-   * whose provider has not registered yet, and rejecting it there would fail
-   * the registration.
-   * @param value - the resolved section, structurally valid.
+   * Reject a selection a write introduces that the installing service cannot
+   * serve, such as an engine that is not registered; throw
+   * `SettingsFieldError` naming the field being written. It runs only for the
+   * `write` validation cause, which a configuration surface produces, so it
+   * can judge what the write changed against `previous`. A `register` or
+   * `reload` applies the stored document without it: rejecting a file for the
+   * state of live services would keep the previous selection answering with
+   * no visible sign, and at registration a stored selection can name a
+   * service that registers later in the same load.
+   * @param value - the resolved section the write would commit, structurally valid.
+   * @param previous - the resolved section in force before the write.
    */
-  readonly validateSelection?: (value: JudgmentSettings) => void
+  readonly validateSelection?: (value: JudgmentSettings, previous: JudgmentSettings) => void
 }
 
 /**
@@ -116,7 +120,9 @@ export function installJudgmentSettings(ctx: Context, install: JudgmentSettingsI
     onChange: () => {},
     validate: (value, cause) => {
       assertJudgmentSettingsShape(value)
-      if (cause !== 'register') validateSelection?.(value)
+      // The source still reads the committed section: a write commits only
+      // after this check passes.
+      if (cause === 'write') validateSelection?.(value, source())
     },
   })
   return () => source()

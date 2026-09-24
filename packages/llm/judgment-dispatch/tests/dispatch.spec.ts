@@ -66,6 +66,11 @@ async function consumer(ctx: Context, id: string): Promise<{ dispose(): Promise<
   })
 }
 
+/** Commit a document the settings provider observed in storage, as a file reload does. */
+function publish(ctx: Context, doc: Record<string, unknown>): void {
+  ;(ctx.settings as unknown as { publish(document: Record<string, unknown>): void }).publish(doc)
+}
+
 /** The failure an operation rejected with, asserted to be a judgment failure. */
 async function failure(operation: () => Promise<unknown>): Promise<JudgmentError> {
   try {
@@ -324,19 +329,57 @@ describe('settings writes', () => {
       .rejects.toMatchObject({ path: ['overrides', 'compaction-jev'] })
   })
 
-  it('keeps the last good selection when a reloaded document overrides an undeclared consumer', async () => {
+  it('applies a reloaded document whose override names an undeclared consumer, and ignores that override', async () => {
     const ctx = root()
     await withSettings(ctx)
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => ctx.logger)
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
     await engine(ctx, { id: 'alpha' })
+    const beta = await engine(ctx, { id: 'beta' })
+    await engine(ctx, { id: 'local' })
+
+    publish(ctx, { judgment: { engine: 'local', overrides: { 'model-router': 'beta' } } })
+
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'local', overrides: { 'model-router': 'beta' } })
+    expect(warn).not.toHaveBeenCalled()
+    expect((await ctx.judgment.ask({ ...ASK, consumer: judgmentConsumerId('model-router') })).engineId).toBe('local')
+    expect(beta.asks).toHaveLength(0)
+  })
+
+  it('lets an unrelated write through a stale override, and names the key a write adds', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    await engine(ctx, { id: 'alpha' })
     await engine(ctx, { id: 'beta' })
+    await engine(ctx, { id: 'gamma' })
+    const escalation = await consumer(ctx, 'worker-escalation')
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'worker-escalation': 'beta' } })
+    await escalation.dispose()
 
-    ;(ctx.settings as unknown as { publish(doc: Record<string, unknown>): void })
-      .publish({ judgment: { overrides: { 'model-router': 'beta' } } })
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'gamma' })
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'gamma', overrides: { 'worker-escalation': 'beta' } })
 
-    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
-    expect(warn.mock.calls.some(call => String(call[0]).includes('keeping last good'))).toBe(true)
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'beta' } }))
+      .rejects.toMatchObject({
+        path: ['overrides', 'model-router'],
+        message: 'judgment: consumer "model-router" does not name itself in judgment asks; this override would have no effect',
+      })
+  })
+
+  it('lets a write through a stale unregistered engine it leaves unchanged', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    vi.spyOn(ctx.logger, 'error').mockImplementation(() => ctx.logger)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    await engine(ctx, { id: 'alpha' })
+    await consumer(ctx, 'compaction-jev')
+    publish(ctx, { judgment: { engine: 'missing' } })
+
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'compaction-jev': 'alpha' } })
+
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'missing', overrides: { 'compaction-jev': 'alpha' } })
+    expect((await ctx.judgment.ask({ ...ASK, consumer: judgmentConsumerId('compaction-jev') })).engineId).toBe('alpha')
   })
 
   it('rejects an engine whose descriptor names another host, and accepts any or a matching host', async () => {
@@ -379,17 +422,23 @@ describe('settings writes', () => {
     await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: '' })).rejects.toThrow('judgment: engine must name an engine id')
   })
 
-  it('keeps the last good selection when a reloaded document selects an unregistered engine', async () => {
+  it('applies a reloaded engine switch to an engine that is not composed; asks fail UNCONFIGURED without fallback, reported once', async () => {
     const ctx = root()
     await withSettings(ctx)
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => ctx.logger)
-    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
-    await engine(ctx, { id: 'alpha' })
+    const error = vi.spyOn(ctx.logger, 'error').mockImplementation(() => ctx.logger)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
+    const remote = await engine(ctx, { id: 'typesafe' })
 
-    ;(ctx.settings as unknown as { publish(doc: Record<string, unknown>): void }).publish({ judgment: { engine: 'laya' } })
+    publish(ctx, { judgment: { engine: 'laya' } })
 
-    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
-    expect(warn.mock.calls.some(call => String(call[0]).includes('keeping last good'))).toBe(true)
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'laya' })
+    expect(warn).not.toHaveBeenCalled()
+    expect((await failure(() => ctx.judgment.ask(ASK))).code).toBe('UNCONFIGURED')
+    expect((await failure(() => ctx.judgment.ask(ASK))).code).toBe('UNCONFIGURED')
+    expect(remote.asks).toHaveLength(0)
+    expect(error).toHaveBeenCalledTimes(1)
+    expect(String(error.mock.calls[0]?.[1])).toBe('laya')
   })
 
   it('keeps a stored selection whose provider registers after the dispatcher', async () => {

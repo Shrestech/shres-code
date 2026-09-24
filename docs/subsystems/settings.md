@@ -43,9 +43,11 @@ interface SettingsRegisterOptions<T> {
    * so an externally edited document cannot strand a running owner. At
    * registration there is no last good value yet, so a stored section that
    * already fails rejects the registration itself — again exactly as a schema
-   * failure does. A check against live services should therefore skip the
-   * `register` cause: a service a stored value names can register after the
-   * owner in the same load.
+   * failure does. A check against live services should therefore run only for
+   * the `write` cause, and only on the fields the write changes: at
+   * `register` a service a stored value names can register after the owner in
+   * the same load, and a `reload` that fails keeps the previous value in force
+   * with only a warning, which a file edit cannot see.
    * @param value - the resolved section, schema-valid by construction.
    * @param cause - which operation produced the value.
    */
@@ -63,7 +65,7 @@ interface SettingsRegisterOptions<T> {
 type SettingsValidationCause = 'register' | 'write' | 'reload'
 ```
 
-`validate` runs after the schema admits a value, so it sees defaults and the composition base exactly as the owner will. `shres-llm-pi-ai` uses it to refuse a provider profile it could not serve at the write that produced it, rather than storing one that would disable every route in its namespace. The second argument names the operation that produced the value. A check that reads live services — the LLM runtime's providers or the judgment engine registry — runs it for `write` and `reload` and skips `register`, because a service a stored value names can register after the owner in the same load. Throwing `SettingsFieldError` names the offending field: its `path` holds keys and array indices from the section root, and the configuration wire reports it with the message so a form can show the refusal beside that field. Any other error rejects the write with its message alone.
+`validate` runs after the schema admits a value, so it sees defaults and the composition base exactly as the owner will. `shres-llm-pi-ai` uses it to refuse a provider profile it could not serve at the write that produced it, rather than storing one that would disable every route in its namespace. The second argument names the operation that produced the value. A check that reads live services — the LLM runtime's providers or the judgment engine registry — runs only for `write` and judges only the fields the write changes: at `register` a service a stored value names can register after the owner in the same load, and a failed `reload` keeps the previous value in force with only a warning, so a file edit would fail without a visible sign. The owner applies a stored or reloaded value as written and reports what it cannot serve. Throwing `SettingsFieldError` names the offending field: its `path` holds keys and array indices from the section root, and the configuration wire reports it with the message so a form can show the refusal beside that field. Any other error rejects the write with its message alone.
 
 `applies` is a UI hint, not a mechanism: a `restart` owner simply never watches, so its value is read once at construction and configuration surfaces can badge the pending change.
 
@@ -266,7 +268,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:386`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:388`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 

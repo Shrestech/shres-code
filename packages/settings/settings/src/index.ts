@@ -58,9 +58,11 @@ export interface SettingsRegisterOptions<T> {
    * so an externally edited document cannot strand a running owner. At
    * registration there is no last good value yet, so a stored section that
    * already fails rejects the registration itself — again exactly as a schema
-   * failure does. A check against live services should therefore skip the
-   * `register` cause: a service a stored value names can register after the
-   * owner in the same load.
+   * failure does. A check against live services should therefore run only for
+   * the `write` cause, and only on the fields the write changes: at
+   * `register` a service a stored value names can register after the owner in
+   * the same load, and a `reload` that fails keeps the previous value in force
+   * with only a warning, which a file edit cannot see.
    * @param value - the resolved section, schema-valid by construction.
    * @param cause - which operation produced the value.
    */
