@@ -6,6 +6,7 @@ import { Context } from '@shres-code/cordis'
 import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
 import {
+  declareJudgmentConsumer,
   JUDGMENT_SETTINGS_NAMESPACE,
   JudgmentError,
   judgmentConsumerId,
@@ -50,6 +51,19 @@ async function engine(ctx: Context, config: FakeEngineConfig): Promise<FakeEngin
   })
   if (created === undefined) throw new Error('the fake engine did not mount')
   return created
+}
+
+/**
+ * Mount one consumer plugin that declares its consumer id.
+ * @returns the consumer's fiber, whose disposal ends the declaration.
+ */
+async function consumer(ctx: Context, id: string): Promise<{ dispose(): Promise<unknown> }> {
+  return ctx.plugin({
+    name: `consumer-${id}`,
+    apply: (inner: Context) => {
+      declareJudgmentConsumer(inner, judgmentConsumerId(id))
+    },
+  })
 }
 
 /** The failure an operation rejected with, asserted to be a judgment failure. */
@@ -155,6 +169,7 @@ describe('routing', () => {
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
     const alpha = await engine(ctx, { id: 'alpha' })
     const beta = await engine(ctx, { id: 'beta' })
+    await consumer(ctx, 'worker-escalation')
     await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'worker-escalation': 'beta' } })
 
     const overridden = await ctx.judgment.ask({ ...ASK, consumer: judgmentConsumerId('worker-escalation') })
@@ -225,12 +240,13 @@ describe('fitting', () => {
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'fitter' })
     await engine(ctx, { id: 'fitter', fitting: true })
     const plain = await engine(ctx, { id: 'plain' })
-    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'plain' } })
+    await consumer(ctx, 'worker-escalation')
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'worker-escalation': 'plain' } })
 
-    const failed = await failure(() => ctx.judgment.fitting!.ask({ states: ['s'], questions: [], consumer: judgmentConsumerId('model-router') }))
+    const failed = await failure(() => ctx.judgment.fitting!.ask({ states: ['s'], questions: [], consumer: judgmentConsumerId('worker-escalation') }))
 
     expect(failed.code).toBe('UNAVAILABLE')
-    expect(failed.message).toBe('judgment engine "plain" selected for consumer "model-router" does not support fitting')
+    expect(failed.message).toBe('judgment engine "plain" selected for consumer "worker-escalation" does not support fitting')
     expect(plain.asks).toHaveLength(0)
   })
 
@@ -255,19 +271,72 @@ describe('settings writes', () => {
     await withSettings(ctx)
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
     await engine(ctx, { id: 'alpha' })
+    await consumer(ctx, 'worker-escalation')
 
     const engineRefusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'laya' }).then(() => undefined, (error: unknown) => error)
-    const overrideRefusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'laya' } })
+    const overrideRefusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'worker-escalation': 'laya' } })
       .then(() => undefined, (error: unknown) => error)
 
     expect(engineRefusal).toBeInstanceOf(SettingsFieldError)
     expect(engineRefusal).toMatchObject({ path: ['engine'], message: 'judgment: engine names engine "laya", which is not composed' })
     expect(overrideRefusal).toBeInstanceOf(SettingsFieldError)
     expect(overrideRefusal).toMatchObject({
-      path: ['overrides', 'model-router'],
-      message: 'judgment: overrides.model-router names engine "laya", which is not composed',
+      path: ['overrides', 'worker-escalation'],
+      message: 'judgment: overrides.worker-escalation names engine "laya", which is not composed',
     })
     expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
+  })
+
+  it('rejects an override for a consumer that does not name itself, even one naming a ready engine', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'remote' })
+    await engine(ctx, { id: 'remote' })
+    const local = await engine(ctx, { id: 'local' })
+
+    const refusal = await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'local' } })
+      .then(() => undefined, (error: unknown) => error)
+
+    expect(refusal).toBeInstanceOf(SettingsFieldError)
+    expect(refusal).toMatchObject({
+      path: ['overrides', 'model-router'],
+      message: 'judgment: consumer "model-router" does not name itself in judgment asks; this override would have no effect',
+    })
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'remote' })
+    expect((await ctx.judgment.ask({ ...ASK, consumer: judgmentConsumerId('model-router') })).engineId).toBe('remote')
+    expect(local.asks).toHaveLength(0)
+  })
+
+  it('rejects an override once its consumer stops declaring itself', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    await engine(ctx, { id: 'alpha' })
+    await engine(ctx, { id: 'beta' })
+    const declared = await consumer(ctx, 'compaction-jev')
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'compaction-jev': 'beta' } })
+    expect(ctx.judgmentEngines.consumers()).toEqual(['compaction-jev'])
+
+    await declared.dispose()
+
+    expect(ctx.judgmentEngines.hasConsumer('compaction-jev')).toBe(false)
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'compaction-jev': 'alpha' } }))
+      .rejects.toMatchObject({ path: ['overrides', 'compaction-jev'] })
+  })
+
+  it('keeps the last good selection when a reloaded document overrides an undeclared consumer', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => ctx.logger)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    await engine(ctx, { id: 'alpha' })
+    await engine(ctx, { id: 'beta' })
+
+    ;(ctx.settings as unknown as { publish(doc: Record<string, unknown>): void })
+      .publish({ judgment: { overrides: { 'model-router': 'beta' } } })
+
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'alpha' })
+    expect(warn.mock.calls.some(call => String(call[0]).includes('keeping last good'))).toBe(true)
   })
 
   it('rejects an engine whose descriptor names another host, and accepts any or a matching host', async () => {
@@ -289,8 +358,9 @@ describe('settings writes', () => {
     Object.defineProperty(process, 'arch', { ...arch, value: 'x64' })
     await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'mac' }))
       .rejects.toThrow('judgment: engine "mac" requires darwin-arm64')
-    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'mac' } }))
-      .rejects.toMatchObject({ path: ['overrides', 'model-router'], message: 'judgment: engine "mac" requires darwin-arm64' })
+    await consumer(ctx, 'judgment-guardrails')
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'judgment-guardrails': 'mac' } }))
+      .rejects.toMatchObject({ path: ['overrides', 'judgment-guardrails'], message: 'judgment: engine "mac" requires darwin-arm64' })
     await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'anywhere' })
     expect(ctx.judgment.settings().engine).toBe('anywhere')
 

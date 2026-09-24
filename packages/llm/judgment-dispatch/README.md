@@ -21,7 +21,7 @@ The one `ctx.judgment` implementation in a deployment that composes judgment eng
 
 ## Routing
 
-Each ask resolves one engine id: the `judgment.overrides` entry for the ask's `consumer`, else `judgment.engine`, whose composition layer is `defaultEngine`. Then:
+Each ask resolves one engine id: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition layer is `defaultEngine`. Then:
 
 - An id no provider registered fails `UNCONFIGURED` with `judgment engine "<id>" is not composed`.
 - A registered engine whose `status()` is not `ready` fails `UNAVAILABLE` with the state and its detail.
@@ -42,7 +42,7 @@ judgment:
     worker-escalation: typesafe
 ```
 
-Consumers name themselves with `worker-escalation`, `compaction-jev`, and `judgment-guardrails`. A key no consumer sends has no effect.
+An override key must be a consumer id that a mounted consumer declared in the registry with `declareJudgmentConsumer`; a write naming any other key is rejected with `judgment: consumer "<key>" does not name itself in judgment asks; this override would have no effect` at `['overrides', <key>]`. The check is skipped while the section registers, because consumers can declare after the stored settings load; after the Loader settles, the dispatcher logs each stored override for an undeclared consumer once, and asks ignore it. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves. The model router declares `model-router` once its asks carry that consumer id.
 
 ## Model Experience
 
@@ -65,4 +65,4 @@ A judgment ask is independent of the conversation model request, and the dispatc
 - **No automatic engine fallback** — a failing selected engine fails the ask; answering with another engine would change decisions under a different calibration. A deployment that wants another engine selects it.
 - **Consumers record the answering engine separately** — the result's `engineId` identifies the engine, and the model router does not yet record the selected engine or its operating point on its decisions.
 - **Host matching covers one pair** — a descriptor can require `darwin-arm64` or `any`; the check compares `process.platform` and `process.arch` when a selection is written.
-- **The model router does not name itself** — its asks carry no `consumer` id yet, so a `model-router` override has no effect; the router follows `judgment.engine`.
+- **The model router does not name itself** — its asks carry no `consumer` id and it declares none, so a `model-router` override is rejected and the router follows `judgment.engine`. It declares `model-router` when its asks carry that id.

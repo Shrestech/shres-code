@@ -11,7 +11,9 @@
  * never answers with a different engine: an unregistered selection fails
  * `UNCONFIGURED` and a registered engine that is not `ready` fails
  * `UNAVAILABLE`, so consumers take their own fallback path instead of reading a
- * judgment made under another engine's calibration.
+ * judgment made under another engine's calibration. An override applies only
+ * to a consumer that declared its id in the registry, so a write naming any
+ * other consumer is rejected rather than accepted without effect.
  *
  * @module @shres-code/shres-code-judgment-dispatch
  */
@@ -69,6 +71,8 @@ export class JudgmentDispatch extends JudgmentService {
   private readonly dispatchedFitting: JudgmentFittingEngine
   /** Unregistered selections already logged, so each is reported once. */
   private readonly reportedUnresolved = new Set<string>()
+  /** Undeclared override consumers already logged, so each is reported once. */
+  private readonly reportedUndeclared = new Set<string>()
   /**
    * {@link settings} with `engine` known to be present: the composition layer
    * supplies it, a stored layer cannot remove it (a merge skips an absent key),
@@ -139,12 +143,15 @@ export class JudgmentDispatch extends JudgmentService {
 
   /**
    * Resolve the engine that answers one consumer's asks.
-   * @param consumer - the asking consumer; omission selects the deployment-wide engine.
+   * @param consumer - the asking consumer; omission, or a consumer that has not
+   *   declared its id, selects the deployment-wide engine.
    * @returns the registry id the settings select.
    */
   selectedEngine(consumer?: JudgmentConsumerId): JudgmentEngineId {
     const settings = this.selection()
-    const override = consumer === undefined ? undefined : settings.overrides?.[consumer]
+    // An override applies only while its consumer declares itself, so a stored
+    // override the settle-time report names as ignored is ignored for every ask.
+    const override = consumer === undefined || !this.registry.hasConsumer(consumer) ? undefined : settings.overrides?.[consumer]
     return judgmentEngineId(override ?? settings.engine)
   }
 
@@ -185,10 +192,19 @@ export class JudgmentDispatch extends JudgmentService {
     return entry
   }
 
-  /** Log every selected id no provider registered, once per id. */
+  /**
+   * Log every selected id no provider registered, and every override for a
+   * consumer that did not declare its id, once per id.
+   */
   private reportUnresolvedSelection(): void {
-    for (const id of selectedIds(this.selection())) {
+    const settings = this.selection()
+    for (const id of selectedIds(settings)) {
       if (this.registry.get(judgmentEngineId(id)) === undefined) this.reportUnresolved(id)
+    }
+    for (const consumer of Object.keys(settings.overrides ?? {})) {
+      if (this.registry.hasConsumer(consumer) || this.reportedUndeclared.has(consumer)) continue
+      this.reportedUndeclared.add(consumer)
+      this.ctx.logger.error('judgment-dispatch: %s; the stored override is ignored', undeclaredConsumer(consumer))
     }
   }
 
@@ -206,15 +222,28 @@ function selectedIds(settings: DispatchedSettings): string[] {
 }
 
 /**
- * Reject a selection this dispatcher cannot serve: an id no provider
- * registered, or an engine whose descriptor names another host.
+ * Diagnostic for an override whose consumer never names itself on its asks.
+ * @param consumer - the override key.
+ * @returns the message, shared by the write rejection and the settle-time log.
+ */
+function undeclaredConsumer(consumer: string): string {
+  return `judgment: consumer "${consumer}" does not name itself in judgment asks; this override would have no effect`
+}
+
+/**
+ * Reject a selection this dispatcher cannot serve: an override for a consumer
+ * that did not declare its id, an id no provider registered, or an engine
+ * whose descriptor names another host.
  * @param registry - the live registry.
  * @param settings - the resolved section a write or reload would commit.
- * @throws SettingsFieldError naming the selecting field and the engine.
+ * @throws SettingsFieldError naming the selecting field.
  */
 function assertSelectionServable(registry: JudgmentEngineRegistry, settings: DispatchedSettings): void {
   const fields: Array<[readonly string[], string]> = [[['engine'], settings.engine]]
-  for (const [consumer, id] of Object.entries(settings.overrides ?? {})) fields.push([['overrides', consumer], id])
+  for (const [consumer, id] of Object.entries(settings.overrides ?? {})) {
+    if (!registry.hasConsumer(consumer)) throw new SettingsFieldError(['overrides', consumer], undeclaredConsumer(consumer))
+    fields.push([['overrides', consumer], id])
+  }
   const host = `${process.platform}-${process.arch}`
   for (const [path, id] of fields) {
     const entry = registry.get(judgmentEngineId(id))

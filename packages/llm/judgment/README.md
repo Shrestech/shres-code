@@ -63,6 +63,8 @@ interface JudgmentEngineEntry {
 
 `judgmentEngineId(value)` brands a registry id. The registry rejects a descriptor whose `id` differs from the registered id, a `supportsFitting` flag that disagrees with the engine's `fitting`, and a second registration of one id. The shipped registry ids are `typesafe` ([judgment-typesafe](../judgment-typesafe/README.md), remote), `shield` ([judgment-shield](../judgment-shield/README.md), a deployment-run local gateway), and `laya` ([judgment-laya](../judgment-laya/README.md), a supervised laya-mlx gateway on Apple silicon).
 
+A consumer that names itself on its asks calls `declareJudgmentConsumer(ctx, id)` once; the id is declared in `ctx.judgmentEngines` while both the consumer and the registry are mounted, and the dispatcher accepts a `judgment.overrides` key only for a declared id. The registry reports declarations through `hasConsumer(id)` and `consumers()`, and notifies its subscribers when an id becomes declared or stops being declared.
+
 ## Settings
 
 The service mounted as `ctx.judgment` installs the Definition-owned `judgment` settings namespace, so the section appears and disappears with it. Under `judgment-dispatch` its composition layer is `{ enabled: true, engine: <defaultEngine> }`; a single-engine subclass mounted directly installs `{ enabled: true }`. A configuration surface writes it through the settings seam like any other section.

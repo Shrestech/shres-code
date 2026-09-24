@@ -127,6 +127,22 @@ export function registerJudgmentEngine(ctx: Context, entry: JudgmentEngineEntry)
 }
 
 /**
+ * Declare, for the lifetime of the fiber that owns `ctx`, that this consumer
+ * names itself with `id` on every judgment ask, so a `judgment.overrides`
+ * entry for it takes effect. The declaration is made whenever
+ * `ctx.judgmentEngines` is available and released with the consumer's fiber or
+ * the registry's; a composition without the registry makes none, because it
+ * has no dispatcher to route by consumer.
+ * @param ctx - the consumer's context.
+ * @param id - the consumer id the consumer's asks carry.
+ */
+export function declareJudgmentConsumer(ctx: Context, id: JudgmentConsumerId): void {
+  ctx.inject(['judgmentEngines'], (registryCtx) => {
+    registryCtx.effect(() => registryCtx.judgmentEngines.declareConsumer(id), `judgment consumer ${id}`)
+  })
+}
+
+/**
  * Brand a raw string as a {@link JudgmentConsumerId}.
  * @param value - candidate consumer id; non-empty.
  * @returns the branded id.

@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import {
+  declareJudgmentConsumer,
   JudgmentEngineRegistry,
   judgmentConsumerId,
   judgmentEngineId,
@@ -108,6 +109,84 @@ describe('JudgmentEngineRegistry', () => {
 
     expect(reached).toEqual(['last'])
     expect(failures.map(error => (error as Error).message)).toEqual(['sync', 'async'])
+  })
+})
+
+describe('consumer declarations', () => {
+  it('keeps an id declared until every declaration is disposed, notifying on the first and the last', () => {
+    const engines = registry()
+    let notified = 0
+    engines.subscribe(() => {
+      notified += 1
+    })
+    const first = engines.declareConsumer(judgmentConsumerId('worker-escalation'))
+    const second = engines.declareConsumer(judgmentConsumerId('worker-escalation'))
+    engines.declareConsumer(judgmentConsumerId('compaction-jev'))
+
+    expect(engines.consumers()).toEqual(['worker-escalation', 'compaction-jev'])
+    expect(notified).toBe(2)
+
+    first()
+    first()
+    expect(engines.hasConsumer('worker-escalation')).toBe(true)
+    expect(notified).toBe(2)
+
+    second()
+    expect(engines.hasConsumer('worker-escalation')).toBe(false)
+    expect(engines.consumers()).toEqual(['compaction-jev'])
+    expect(notified).toBe(3)
+  })
+
+  it('declareJudgmentConsumer declares while the registry is provided and releases with either fiber', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    const engines = registry()
+    const provider = await ctx.plugin({
+      name: 'registry-provider',
+      apply: (inner: Context) => {
+        inner.provide('judgmentEngines', engines)
+      },
+    })
+    const consumerFiber = await ctx.plugin({
+      name: 'consumer',
+      apply: (inner: Context) => {
+        declareJudgmentConsumer(inner, judgmentConsumerId('judgment-guardrails'))
+      },
+    })
+    await vi.waitFor(() => {
+      expect(engines.hasConsumer('judgment-guardrails')).toBe(true)
+    })
+
+    await provider.dispose()
+    expect(engines.hasConsumer('judgment-guardrails')).toBe(false)
+
+    const replacement = registry()
+    await ctx.plugin({
+      name: 'registry-provider-2',
+      apply: (inner: Context) => {
+        inner.provide('judgmentEngines', replacement)
+      },
+    })
+    await vi.waitFor(() => {
+      expect(replacement.hasConsumer('judgment-guardrails')).toBe(true)
+    })
+
+    await consumerFiber.dispose()
+    expect(replacement.hasConsumer('judgment-guardrails')).toBe(false)
+  })
+
+  it('declareJudgmentConsumer declares nothing where no registry is provided', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+
+    await ctx.plugin({
+      name: 'consumer',
+      apply: (inner: Context) => {
+        declareJudgmentConsumer(inner, judgmentConsumerId('worker-escalation'))
+      },
+    })
+
+    expect(ctx.get('judgmentEngines')).toBeUndefined()
   })
 })
 

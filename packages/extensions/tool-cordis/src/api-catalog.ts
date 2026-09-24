@@ -1081,8 +1081,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'judgmentEngines',
-    summary: 'Engines a deployment composes, keyed by id.',
-    description: 'Engines a deployment composes, keyed by id. Registration is all-or-nothing and synchronous; subscribers are notified after every registration, removal, and announced status change, and re-read list and each entry\'s `status()` themselves.',
+    summary: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks.',
+    description: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks. Registration is all-or-nothing and synchronous; subscribers are notified after every engine registration, removal, and announced status change, and when a consumer id becomes declared or stops being declared, and re-read list, consumers, and each entry\'s `status()` themselves.',
     methods: [
       {
         signature: 'register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegistration',
@@ -1102,6 +1102,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Look up one registered engine.',
         parameters: [{ name: 'id', description: 'the registry id.' }],
         returns: 'the entry, or `undefined` when no provider registered the id.',
+      },
+      {
+        signature: 'declareConsumer(id: JudgmentConsumerId): () => void',
+        description: 'Declare that a consumer names itself with `id` on its asks, so a per-consumer override for it has an effect. Call it inside the consumer\'s `ctx.effect` so the returned disposer runs with the consumer\'s fiber; declareJudgmentConsumer does that. Several live declarations of one id are allowed, and the id stays declared until every one is disposed.',
+        parameters: [{ name: 'id', description: 'the consumer id the consumer\'s asks carry.' }],
+        returns: 'the disposer ending this declaration; repeated calls do nothing.',
+      },
+      {
+        signature: 'hasConsumer(id: string): boolean',
+        description: 'Whether a consumer currently names itself with `id` on its asks.',
+        parameters: [{ name: 'id', description: 'the consumer id.' }],
+        returns: 'true while at least one declaration of the id is live.',
+      },
+      {
+        signature: 'consumers(): readonly JudgmentConsumerId[]',
+        description: 'List the declared consumer ids.',
+        parameters: [],
+        returns: 'the ids, in first-declaration order.',
       },
       {
         signature: 'subscribe(listener: () => unknown): () => void',

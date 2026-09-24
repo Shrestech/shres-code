@@ -37,7 +37,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { declareJudgmentConsumer, judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
@@ -176,7 +176,8 @@ const LADDER_EVENTS: ReadonlySet<string> = new Set([
 const PROGRESS_QUESTION_ID = judgmentQuestionId('worker-progress')
 
 /**
- * The consumer id every Stage 0 progress ask carries; a `judgment.overrides`
+ * The consumer id every Stage 0 progress ask carries, declared in
+ * `ctx.judgmentEngines` while the plugin is mounted; a `judgment.overrides`
  * entry under this key routes the asks to another engine.
  */
 export const WORKER_ESCALATION_JUDGMENT_CONSUMER = judgmentConsumerId('worker-escalation')
@@ -375,6 +376,7 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
  *   caller that invoked `apply` directly.
  */
 export function apply(ctx: Context, config: WorkerEscalationConfig): () => void {
+  declareJudgmentConsumer(ctx, WORKER_ESCALATION_JUDGMENT_CONSUMER)
   let source: () => WorkerEscalationConfig = () => config
   let raw: WorkerEscalationConfig = config
   let resolved: ResolvedWorkerEscalationConfig = resolveConfig(config)

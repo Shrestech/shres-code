@@ -18,7 +18,7 @@ The `judgment` section becomes `{ enabled, engine?, overrides? }`. The Definitio
 
 The settings seam gains what these checks need, generically for every namespace: `SettingsRegisterOptions.validate` receives the validation cause (`register`, `write`, or `reload`), a registrant throws `SettingsFieldError` to name the offending field by keys and array indices, and the configuration wire's `settings-rejected` error carries that `path` beside the message so a settings form can show the refusal at the field. A check that reads a live service, such as the LLM runtime's providers for the model-router namespace, uses the same cause rule.
 
-`worker-escalation`, `compaction-jev`, and `judgment-guardrails` send their consumer ids on every ask, so an override can move one of them to another engine. The model router does not send one yet; its asks follow `judgment.engine`.
+Consumer ids are declared, not implied. A consumer calls `declareJudgmentConsumer(ctx, id)`, which registers the id in `ctx.judgmentEngines` through an effect for as long as both the consumer and the registry are mounted. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare the ids their asks carry. The dispatcher accepts an override key only for a declared consumer: a write naming any other key fails with `SettingsFieldError(['overrides', key])`, stating that the override would have no effect. That check skips the `register` cause, because consumers can declare after the stored settings load. After the Loader settles, each stored override for an undeclared consumer is logged once, and asks ignore it. The registry holds declarations beside the engines because the dispatcher reads both to validate one section, and a consumer reaches the registry through `ctx.inject` without depending on the dispatcher; a composition without the registry makes no declaration and needs none. The model router sends no consumer id and declares none, so a `model-router` override is rejected; it declares `model-router` once its asks carry that id.
 
 Every composition that mounted a provider directly now mounts the dispatcher with an explicit `defaultEngine`: the three benchmark overlays, the eight keyless model-router example compositions (whose scripted fixture registers as `snapshot`), and the test compositions of the providers and consumers. The headless bundle declares the dispatcher so profile overlays resolve it.
 
@@ -34,6 +34,10 @@ Every composition that mounted a provider directly now mounts the dispatcher wit
 
 **Infer the registration pass inside the hook.** A hook can detect registration by the namespace not yet being recorded, but that depends on the settings service's internal ordering and every owner would repeat it. The explicit validation cause states it once in the seam.
 
+**Accept an override for any consumer key.** A key no consumer sends validates but changes nothing, so an owner who moves one consumer to a local engine sees success while its asks still reach the default, possibly remote, engine. Declared consumer ids make that write fail loudly.
+
+**Declare consumers on the dispatcher.** `ctx.judgment` is the abstract seam that single-engine test doubles also implement, so a declaration method there would widen every implementation; the registry is already the Definition's list of participants and is what the dispatcher validates against.
+
 **Encode the field only in the message text.** A client would have to parse prose to place the refusal. `SettingsFieldError.path` is structured and survives the wire.
 
 **Move `installJudgmentSettings` out of the `JudgmentService` constructor into the dispatcher.** Every single-engine test double would then have to reinstall the toggle its consumer suites exercise. The constructor still installs the section; the dispatcher passes the composition layer and the selection check through it, so a deployment's section is always the dispatcher's.
@@ -44,7 +48,7 @@ A settings write switches the engine that answers the next ask without a reload,
 
 A composition that mounts an engine provider without the dispatcher fails to load, because the provider injects `judgmentEngines`. The shipped providers always report `ready` and surface credential and transport failures per ask; a provider that supervises a local process reports its own lifecycle through `status()`.
 
-Routing decisions record the provider-reported `engine` and `model`, not the selected registry id or the operating point it was gated under, and the router's asks carry no consumer id, so a `model-router` override has no effect.
+Routing decisions record the provider-reported `engine` and `model`, not the selected registry id or the operating point it was gated under, and the router's asks carry no consumer id, so a `model-router` override is rejected until the router declares that id.
 
 This decision replaces the single-provider `ctx.judgment` mount described in the [shipped Jev routing record](../feature/2026-09-20-jev-judgment-routing-shipped.md) and the [owned Shield judgments record](../feature/2026-09-23-owned-shield-judgments.md); both remain active for their other decisions.
 
@@ -53,6 +57,7 @@ This decision replaces the single-provider `ctx.judgment` mount described in the
 - The dispatcher suite covers routing, `UNCONFIGURED` and `UNAVAILABLE` without fallback to a ready second engine, `engineId` stamping on answered and unfit fitted results, per-consumer overrides, fitting availability as the selection changes, write rejection for unregistered and host-mismatched engines, a stored selection whose engine registers late, subscriber failure containment, and the settle-time report in a real Loader composition.
 - A real Loader composition with TypeSafe and a second local engine shows a settings write switching which engine answers the next ask, and an override routing one consumer to the other engine.
 - The registry suite covers descriptor rejection, notification order, disposal through the provider fiber, and announcements after removal.
-- The provider, router, worker-escalation, compaction-jev, and guardrails suites pass with the dispatcher composed, and the consumer suites assert the consumer id on each ask.
+- The provider, router, worker-escalation, compaction-jev, and guardrails suites pass with the dispatcher composed, and the consumer suites assert the consumer id on each ask and its declaration in the registry.
+- The dispatcher suite covers a declared consumer's override, the rejection of an undeclared key with its path, a rejection after the consumer's declaration is disposed, a reloaded document keeping its last good value, and the settle-time report of a stored override for an undeclared consumer; with the consumer check removed, exactly those four tests fail.
 - The eight keyless model-router example snapshots replay unchanged with the dispatcher composed.
 - The settings suite covers the validation cause for register, each write mode, and reload, and a `SettingsFieldError` reaching the writer with its path; the configuration wire suite covers `settings-rejected` carrying the path for a field error and omitting it for any other refusal.

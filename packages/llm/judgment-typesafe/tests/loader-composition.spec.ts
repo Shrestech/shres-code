@@ -7,6 +7,7 @@ import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
 import {
+  declareJudgmentConsumer,
   JUDGMENT_SETTINGS_NAMESPACE,
   judgmentConsumerId,
   judgmentEngineId,
@@ -254,6 +255,12 @@ describe('engine selection in a real Loader composition', () => {
     expect(server.requests).toHaveLength(1)
     expect(LocalEngine.asks).toHaveLength(1)
 
+    await loaded.plugin({
+      name: 'worker-escalation-consumer',
+      apply: (inner: Context) => {
+        declareJudgmentConsumer(inner, judgmentConsumerId('worker-escalation'))
+      },
+    })
     await loaded.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'typesafe', overrides: { 'worker-escalation': 'local' } })
     const overridden = await loaded.judgment.ask({ state: 's', questions: [BINARY], consumer: judgmentConsumerId('worker-escalation') })
     expect(overridden.engineId).toBe('local')

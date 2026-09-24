@@ -21,7 +21,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { declareJudgmentConsumer, judgmentConsumerId, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryAnswer,
   JudgmentBinaryQuestion,
@@ -72,8 +72,9 @@ export const INJECTION_QUESTION_ID = judgmentQuestionId('guard-injection')
 export const SEVERITY_QUESTION_ID = judgmentQuestionId('guard-severity')
 
 /**
- * The consumer id every guard ask carries; a `judgment.overrides` entry under
- * this key routes the asks to another engine.
+ * The consumer id every guard ask carries, declared in `ctx.judgmentEngines`
+ * while the plugin is mounted; a `judgment.overrides` entry under this key
+ * routes the asks to another engine.
  */
 export const GUARDRAILS_JUDGMENT_CONSUMER = judgmentConsumerId('judgment-guardrails')
 
@@ -139,6 +140,7 @@ function severityQuestion(config: ResolvedGuardrailsConfig): JudgmentScoreQuesti
  *   caller that invoked `apply` directly.
  */
 export function apply(ctx: Context, config: GuardrailsConfig): () => void {
+  declareJudgmentConsumer(ctx, GUARDRAILS_JUDGMENT_CONSUMER)
   let source: () => GuardrailsConfig = () => config
   let raw: GuardrailsConfig = config
   let resolved: ResolvedGuardrailsConfig = resolveConfig(config)

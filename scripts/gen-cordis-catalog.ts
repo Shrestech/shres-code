@@ -274,6 +274,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ResolvedModelRouterConfig: 'model-router.md',
   JudgmentResult: 'judgment.md',
   JudgmentSettings: 'judgment.md',
+  JudgmentConsumerId: 'judgment.md',
   JudgmentEngineDescriptor: 'judgment.md',
   JudgmentEngineEntry: 'judgment.md',
   JudgmentEngineId: 'judgment.md',

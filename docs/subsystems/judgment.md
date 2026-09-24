@@ -288,9 +288,11 @@ interface JudgmentEngine {
 
 A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe`, `shield`, and `laya` — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
 
-Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer`, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
+Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
 
-A settings write that selects an unregistered engine, or an engine whose descriptor names another host, is rejected with an error naming the field and the engine. A stored selection is kept at registration even when its engine registers later in the same load; once the Loader settles, the dispatcher logs each selected id no provider registered, once per id.
+A consumer declares the id its asks carry with `declareJudgmentConsumer(ctx, id)`, which registers the id in `ctx.judgmentEngines` for the consumer's lifetime; `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves, and the model router declares `model-router` once its asks carry that id. An override is valid only for a declared consumer, so an override that would silently leave a consumer's asks on the default engine is refused instead.
+
+A settings write that overrides an undeclared consumer, selects an unregistered engine, or selects an engine whose descriptor names another host, is rejected with an error naming the field. A stored selection is kept at registration even when its engine registers, or its consumer declares, later in the same load; once the Loader settles, the dispatcher logs each selected id no provider registered and each stored override for an undeclared consumer, once each.
 
 ```ts type-equiv
 /** Nominal id of one engine registered in `ctx.judgmentEngines`, such as `typesafe` or `shield`. */
@@ -476,13 +478,13 @@ The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, b
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:234`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:250`](../../packages/llm/judgment/src/index.ts)
 
 <a id="ctxjudgmentengines--judgmentengineregistry"></a>
 
 ### `ctx.judgmentEngines` — `JudgmentEngineRegistry`
 
-Engines a deployment composes, keyed by id. Registration is all-or-nothing and synchronous; subscribers are notified after every registration, removal, and announced status change, and re-read list and each entry's `status()` themselves.
+Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks. Registration is all-or-nothing and synchronous; subscribers are notified after every engine registration, removal, and announced status change, and when a consumer id becomes declared or stops being declared, and re-read list, consumers, and each entry's `status()` themselves.
 
 ```ts cordis-catalog
 /**
@@ -511,6 +513,30 @@ list(): readonly JudgmentEngineDescriptor[]
 get(id: JudgmentEngineId): JudgmentEngineEntry | undefined
 
 /**
+ * Declare that a consumer names itself with `id` on its asks, so a
+ * per-consumer override for it has an effect. Call it inside the consumer's
+ * `ctx.effect` so the returned disposer runs with the consumer's fiber;
+ * {@link declareJudgmentConsumer} does that. Several live declarations of one
+ * id are allowed, and the id stays declared until every one is disposed.
+ * @param id - the consumer id the consumer's asks carry.
+ * @returns the disposer ending this declaration; repeated calls do nothing.
+ */
+declareConsumer(id: JudgmentConsumerId): () => void
+
+/**
+ * Whether a consumer currently names itself with `id` on its asks.
+ * @param id - the consumer id.
+ * @returns true while at least one declaration of the id is live.
+ */
+hasConsumer(id: string): boolean
+
+/**
+ * List the declared consumer ids.
+ * @returns the ids, in first-declaration order.
+ */
+consumers(): readonly JudgmentConsumerId[]
+
+/**
  * Observe registrations, removals, and announced status changes.
  * @param listener - called after each change; what it throws or rejects
  *   with is reported and does not reach the caller that caused the change.
@@ -519,5 +545,5 @@ get(id: JudgmentEngineId): JudgmentEngineEntry | undefined
 subscribe(listener: () => unknown): () => void
 ```
 
-Source: [`packages/llm/judgment/src/registry.ts:30`](../../packages/llm/judgment/src/registry.ts)
+Source: [`packages/llm/judgment/src/registry.ts:35`](../../packages/llm/judgment/src/registry.ts)
 <!-- END GENERATED cordis-surface -->
