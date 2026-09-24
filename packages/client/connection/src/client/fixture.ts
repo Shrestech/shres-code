@@ -816,7 +816,8 @@ function permissionSelectOf(
   }
 }
 
-interface FixtureTokenUsageProjection {
+/** The fixture's `tokenUsage` projection value, bucketed as token-meter buckets it. */
+export interface FixtureTokenUsageProjection {
   uncachedInputTokens: number
   unreportedInputTokens: number
   outputTokens: number
@@ -851,8 +852,15 @@ function usageSampleOf(event: SessionEvent): FixtureUsageSample | undefined {
     : { turn: item.data.turn, step: item.data.step, usage }
 }
 
-/** Fixture parallel of token-meter's last-sample-replacing usage projection. */
-function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
+/**
+ * Fixture parallel of token-meter's last-sample-replacing usage projection. The
+ * read count decides whether a call is reported, so an unreported call's whole
+ * prompt, including a write count carried without a read count, is unreported
+ * input.
+ * @param log - the session's durable events.
+ * @returns the projection value token-meter would serve for the same log.
+ */
+export function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
   const totals: FixtureTokenUsageProjection = {
     uncachedInputTokens: 0,
     unreportedInputTokens: 0,
