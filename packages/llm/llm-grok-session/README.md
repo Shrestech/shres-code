@@ -7,6 +7,7 @@ Using the route bills the CLI's subscription (SuperGrok tiers), not the X API; n
 ## Session credential
 
 The session document is `~/.grok/auth.json` (configurable `authPath`), written by `grok login` (OIDC authorization-code + PKCE, or `--device-auth`). This adapter reads the newest `https://auth.x.ai::<client-id>` entry, serves its access token while it is valid, and at the refresh leeway runs one `refresh_token` grant against `https://auth.x.ai/oauth2/token`, persisting the rotated `key` / `refresh_token` / `expires_at` back into the same entry atomically at owner-only mode. Concurrent callers share one in-flight resolve, and a sibling process that refreshes the same document — the CLI itself — wins: its fresher token is adopted instead of overwritten, on both grant success and failure.
+
 The credential engine itself — reading and selecting the document entry, running the refresh grant, and persisting rotations — is shared, not owned here. It lives in [`@shres-code/shres-code-grok-credential`](../grok-credential/README.md) and is exposed as the `ctx.grokCredential` service: this adapter resolves one single-flight manager per credential spec through `managerFor(spec)` when the service is mounted, so a future consumer (such as image generation) uses the same token engine and the same in-flight refresh against the same document. The credential fields (`authPath`, `refreshLeewayMs`) stay in this adapter's settings section.
 
 Without a signed-in login the route still lists and can be selected; the first request fails loud with `MISSING_CREDENTIAL` and a message naming `grok login`. A failed refresh after the document expired is `AUTH_REFRESH_FAILED`, again naming `grok login`. Diagnostics never quote credential values.
@@ -60,7 +61,7 @@ server-tool-call and never execute locally. The hosted x_search invocation is pr
 to a server-tool-call content block in the stream, so the agent loop logs it but never dispatches
 it as a local tool; search results ride the assistant text the model writes.
 
-The provider executes the search; this route never runs a local web_search for it.
+The provider executes the search; this route never runs a local web_search for it. X search is available to conversations on this Grok subscription route, not to other chat providers through the Customize Grok web-search switch. That switch controls the separate API-key-backed web-search method, which returns web results only.
 ## Known Limitations and Deferred Work
 
 - **Unofficial wire** — `auth.json`'s format, the proxy's paths, and the CLI's client id are the Grok Build CLI's implementation details, not a published contract; a CLI self-update can change them, and this package pins no client id (the credential's own is echoed at refresh).

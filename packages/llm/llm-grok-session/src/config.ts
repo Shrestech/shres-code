@@ -101,11 +101,11 @@ export interface Config {
   cliVersion?: string
   /**
    * Serve web search as a hosted backend tool instead of the local `tool-web`
-   * tool for this route. Defaults to off; when on, the colliding local
+   * tool for this route. Defaults to on; when on, the colliding local
    * `web_search` function tool is dropped from the request (hosted wins).
    */
   hostedWebSearch?: boolean
-  /** Serve X (Twitter) search as a hosted backend tool. Defaults to off. */
+  /** Serve X (Twitter) search as a hosted backend tool. Defaults to on. */
   hostedXSearch?: boolean
 }
 

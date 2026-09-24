@@ -43,7 +43,6 @@ import {
   applyChildComposition,
   captureDelegatedPolicyOverrides,
   childSessionMeta,
-  effectiveChildRoute,
   resolveChildAgentOptions,
   resolveChildDepth,
   resolveRequestedChildCwd,
@@ -148,6 +147,13 @@ export interface ContinuableStart {
   readonly childId: SessionId
   /** The accepted initial prompt's inbox message id. */
   readonly messageId: MessageId
+  /**
+   * The child's resolved provider/model route, equal to the `agentProvider` /
+   * `agentModel` its durable descriptor records and the route cold resume
+   * reuses. A field is absent when neither the parent nor the request
+   * resolved it.
+   */
+  readonly route: { readonly provider?: string; readonly model?: string }
 }
 
 /**
@@ -441,7 +447,7 @@ export class SubagentContinuationManager {
    * The caller signal owns lookup, materialization, and admission only until
    * acceptance; afterwards the manager owns the Activation independently.
    * @param spec - provider, delegation request, and caller cancellation.
-   * @returns the durable child id and the accepted initial prompt's message id.
+   * @returns the durable child id, the accepted initial prompt's message id, and the descriptor route.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
     const request = spec.request
@@ -453,11 +459,12 @@ export class SubagentContinuationManager {
     const childDepth = resolveChildDepth(parent, request.maxDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
-    // The route reads the parent's EFFECTIVE model so the durable descriptor
-    // reports what the child actually runs, not the parent's creation options.
-    const route = effectiveChildRoute(parent, request.agentOptions)
-    const agentProvider = route.provider
-    const agentModel = route.model
+    // The options read the parent's EFFECTIVE model once, so a parent switch
+    // during provider preparation cannot split the descriptor, the returned
+    // route, and the child's first request.
+    const agentOptions = resolveChildAgentOptions(parent, request.agentOptions, childDepth)
+    const agentProvider = agentOptions.provider
+    const agentModel = agentOptions.model
     const descriptor = snapshotSubagentDescriptor({
       mode: 'continuable',
       provider: spec.provider,
@@ -498,7 +505,7 @@ export class SubagentContinuationManager {
             ),
             delegatedPolicies,
           },
-          agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
+          agentOptions,
           composition: { persona: request.persona, toolFilter: request.toolFilter },
           signal: spec.signal,
           releaseSlot,
@@ -511,7 +518,14 @@ export class SubagentContinuationManager {
           spec.signal,
         )
       })
-      return { childId, messageId }
+      return {
+        childId,
+        messageId,
+        route: {
+          ...agentProvider !== undefined ? { provider: agentProvider } : {},
+          ...agentModel !== undefined ? { model: agentModel } : {},
+        },
+      }
     } catch (error: unknown) {
       releaseSlot()
       throw error

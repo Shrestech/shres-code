@@ -67,28 +67,29 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
 }
 
 /**
- * The parent's effective provider/model route, read without side effects: the
- * parent's logged request header (what its requests actually run), else the
- * live default-model selection when that service is composed, else the
- * parent's creation-time options. A parent that switched models in-process
- * but has not yet made a request since is read through its last header — the
- * same approximation any log-derived observer sees.
- * @param parent - the delegating parent.
- * @returns the inherited route fields that are known.
+ * An Agent's effective provider/model route, read without side effects: its
+ * latest logged request header, else the live default-model selection when
+ * that service is composed, else its creation-time options. This is the
+ * route a delegating parent passes to new children and the route the Team
+ * roster reports for the Lead. A `/model` selection made in this process
+ * appears once the Agent makes its next request; until then the previous
+ * header is reported, the same approximation any log-derived observer sees.
+ * @param agent - the loaded Agent to read.
+ * @returns the known route fields.
  */
-function inheritedRoute(parent: Agent): { provider?: string; model?: string } {
-  const logged = parent.session.requestHeader()?.config
+export function effectiveAgentRoute(agent: Agent): { provider?: string; model?: string } {
+  const logged = agent.session.requestHeader()?.config
   if (logged !== undefined) {
     return { provider: logged.provider, model: logged.model }
   }
-  const defaults = parent.ctx.get('agentDefaultModel')
+  const defaults = agent.ctx.get('agentDefaultModel')
   if (defaults !== undefined) {
     const picked = defaults.currentSelection()
     return { provider: picked.provider, model: picked.model }
   }
   return {
-    ...parent.options.provider !== undefined ? { provider: parent.options.provider } : {},
-    ...parent.options.model !== undefined ? { model: parent.options.model } : {},
+    ...agent.options.provider !== undefined ? { provider: agent.options.provider } : {},
+    ...agent.options.model !== undefined ? { model: agent.options.model } : {},
   }
 }
 
@@ -106,7 +107,7 @@ export function effectiveChildRoute(
   requested: AgentOptions | undefined,
 ): { provider?: string; model?: string } {
   return {
-    ...inheritedRoute(parent),
+    ...effectiveAgentRoute(parent),
     ...requested?.provider !== undefined ? { provider: requested.provider } : {},
     ...requested?.model !== undefined ? { model: requested.model } : {},
   }

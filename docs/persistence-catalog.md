@@ -988,7 +988,7 @@ Source: [`packages/subagent/subagent/src/descriptor.ts:37`](../packages/subagent
 'team/member': TeamMemberEvent
 ```
 
-Source: [`packages/team/agent-team/src/types.ts:109`](../packages/team/agent-team/src/types.ts)
+Source: [`packages/team/agent-team/src/types.ts:122`](../packages/team/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -1005,7 +1005,7 @@ Source: [`packages/team/agent-team/src/types.ts:109`](../packages/team/agent-tea
 'team/message/delivered': TeamMessageDeliveredEvent
 ```
 
-Source: [`packages/team/agent-team/src/types.ts:131`](../packages/team/agent-team/src/types.ts)
+Source: [`packages/team/agent-team/src/types.ts:144`](../packages/team/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -1021,7 +1021,7 @@ Source: [`packages/team/agent-team/src/types.ts:131`](../packages/team/agent-tea
 'team/message/queued': TeamMessageQueuedEvent
 ```
 
-Source: [`packages/team/agent-team/src/types.ts:123`](../packages/team/agent-team/src/types.ts)
+Source: [`packages/team/agent-team/src/types.ts:136`](../packages/team/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -1037,7 +1037,7 @@ Source: [`packages/team/agent-team/src/types.ts:123`](../packages/team/agent-tea
 'team/task': TeamTaskEvent
 ```
 
-Source: [`packages/team/agent-team/src/types.ts:116`](../packages/team/agent-team/src/types.ts)
+Source: [`packages/team/agent-team/src/types.ts:129`](../packages/team/agent-team/src/types.ts)
 
 ### `todo/*`
 

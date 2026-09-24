@@ -29,6 +29,8 @@ const teamMemberSchema = z.object({
   context: z.enum(['fresh', 'fork']),
   phase: z.enum(['provisioning', 'active', 'failed']),
   error: z.string().optional(),
+  agentProvider: z.string().min(1).optional(),
+  agentModel: z.string().min(1).optional(),
 }).strict()
 
 const teamTaskSchema = z.object({

@@ -6,7 +6,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-tools'
 import type { MessageId } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
-import { foldSubagentDescriptor } from '@shres-code/shres-code-subagent'
+import { effectiveAgentRoute, foldSubagentDescriptor } from '@shres-code/shres-code-subagent'
 import type { ContinuableStart } from '@shres-code/shres-code-subagent'
 import { errorMessage, TeamError } from './error.ts'
 import type { TeamJournal } from './journal.ts'
@@ -38,6 +38,18 @@ export function teammateSeatGuard(execution: { readonly name: string }): string 
     return 'teammates do not have named seat tools; use team_send'
   }
   return undefined
+}
+
+/**
+ * Project a resolved route onto {@link TeamMemberView} fields.
+ * @param route - known provider/model fields.
+ * @returns `agentProvider` / `model` view fields for the known values.
+ */
+function routeFields(route: { provider?: string; model?: string }): Pick<TeamMemberView, 'agentProvider' | 'model'> {
+  return {
+    ...route.provider === undefined ? {} : { agentProvider: route.provider },
+    ...route.model === undefined ? {} : { model: route.model },
+  }
 }
 
 /** Caller identity inside one implicit Team. */
@@ -144,12 +156,11 @@ export class TeamRoster {
       name: 'lead',
       role: 'lead',
       status: root.status,
-      ...root.options.model === undefined ? {} : { model: root.options.model },
+      ...routeFields(effectiveAgentRoute(root)),
       diagnostics: [],
     }]
     for (const member of state.members) {
       const live = this.ctx.agents.get(member.id)
-      const model = live?.options.model ?? root.options.model
       result.push({
         id: member.id,
         name: member.name,
@@ -162,12 +173,37 @@ export class TeamRoster {
         description: member.description,
         provider: member.provider,
         context: member.context,
-        /* v8 ignore next -- neither the live child nor the Lead has a model option. */
-        ...model === undefined ? {} : { model },
+        ...routeFields(this.teammateRoute(member, live)),
         diagnostics: member.error === undefined ? [] : [member.error],
       })
     }
     return result
+  }
+
+  /**
+   * A teammate row's route. A loaded child reports its latest request header,
+   * else its creation options — the descriptor route it was created or
+   * resumed with — so a child that has not yet made a request never reports
+   * the deployment default. An unloaded child reports the route its `active`
+   * snapshot recorded; a snapshot without one reports none rather than the
+   * Lead's route.
+   */
+  private teammateRoute(
+    member: TeamMemberSnapshot,
+    live: Agent | undefined,
+  ): { provider?: string; model?: string } {
+    if (live === undefined) {
+      return {
+        ...member.agentProvider === undefined ? {} : { provider: member.agentProvider },
+        ...member.agentModel === undefined ? {} : { model: member.agentModel },
+      }
+    }
+    const logged = live.session.requestHeader()?.config
+    if (logged !== undefined) return { provider: logged.provider, model: logged.model }
+    return {
+      ...live.options.provider === undefined ? {} : { provider: live.options.provider },
+      ...live.options.model === undefined ? {} : { model: live.options.model },
+    }
   }
 
   /**
@@ -346,6 +382,8 @@ export class TeamRoster {
     const active = {
       ...member,
       phase: 'active' as const,
+      ...started.route.provider === undefined ? {} : { agentProvider: started.route.provider },
+      ...started.route.model === undefined ? {} : { agentModel: started.route.model },
     } satisfies TeamMemberSnapshot
     const settledPhase = await this.settleProvisioning(root, active)
     /* v8 ignore start -- recovery committed `failed` while this creator was still running. */
@@ -427,6 +465,7 @@ export class TeamRoster {
       if (this.ctx.agents.get(member.id) !== undefined) continue
       let phase: 'active' | 'failed' = 'failed'
       let failure = 'provisioning did not leave a resumable child Session'
+      let route: { agentProvider?: string; agentModel?: string } = {}
       try {
         /* v8 ignore start -- inspect of a leftover provisioning child, including a matching continuable log. */
         const loaded = await readPersistedSession(this.ctx.sessionPersistence, member.id, signal)
@@ -438,6 +477,10 @@ export class TeamRoster {
           && descriptor.provider === member.provider
           && acceptedInitialPrompt) {
           phase = 'active'
+          route = {
+            ...descriptor.agentProvider === undefined ? {} : { agentProvider: descriptor.agentProvider },
+            ...descriptor.agentModel === undefined ? {} : { agentModel: descriptor.agentModel },
+          }
         } else {
           failure = 'persisted child Session does not match the provisioned continuation'
         }
@@ -455,7 +498,7 @@ export class TeamRoster {
           ...current,
           phase,
           /* v8 ignore next -- successful recovery omits the error field. */
-          ...phase === 'failed' ? { error: failure } : {},
+          ...phase === 'failed' ? { error: failure } : route,
         }
         await this.journal.appendAndFlush(root.session, 'team/member', {
           teamId: TeamId(root.id),
@@ -476,7 +519,7 @@ export class TeamRoster {
       description: member.description,
       provider: member.provider,
       context: member.context,
-      ...live?.options.model === undefined ? {} : { model: live.options.model },
+      ...routeFields(this.teammateRoute(member, live)),
       diagnostics: [],
     }
   }
