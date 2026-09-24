@@ -36,9 +36,20 @@
           - text: Web search Turn on the search methods the agent may use.
           - img
         - paragraph: Methods
+        - text: Brave
+        - switch "Brave" [checked]
+        - paragraph: First in the default web_search order when enabled and a key is configured; other methods are fallbacks.
+        - 'button "Hide settings: Brave" [expanded]'
+        - text: Brave API key No key is configured; search is unavailable until one is.
+        - textbox "Brave API key"
+        - paragraph: Stored outside the settings file. Leave blank to keep the current key.
+        - text: Brave endpoint
+        - textbox "Brave endpoint":
+          - /placeholder: ""
+        - paragraph: Leave blank to use the provider default.
         - text: Grok
         - switch "Grok" [checked]
-        - paragraph: xAI web search, using the same key as the Grok CLI.
+        - paragraph: Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.
         - text: Claude
         - switch "Claude" [checked]
         - paragraph: Anthropic web search, using the same key as the Claude CLI.
@@ -56,7 +67,8 @@
         - paragraph: Z.AI web search, using the same key as Z.AI chat.
         - text: Perplexity
         - switch "Perplexity" [checked]
-        - paragraph: Perplexity web search. Turn this off if you do not have a Perplexity key.
+        - paragraph: Powers deep_research, not routine web_search. Requires a Perplexity API key.
+        - 'button "Hide settings: Perplexity" [expanded]'
         - text: Perplexity API key No key is configured; search is unavailable until one is.
         - textbox "Perplexity API key"
         - paragraph: Stored outside the settings file. Leave blank to keep the current key.
@@ -66,7 +78,8 @@
         - paragraph: Leave blank to use the provider default.
         - text: DeepSeek
         - switch "DeepSeek" [checked]
-        - paragraph: DeepSeek web search. Turn this off if you do not have a DeepSeek key.
+        - paragraph: Last in the default web_search fallback order. Requires a DeepSeek API key.
+        - 'button "Hide settings: DeepSeek" [expanded]'
         - text: DeepSeek API key No key is configured; search is unavailable until one is.
         - textbox "DeepSeek API key"
         - paragraph: Stored outside the settings file. Leave blank to keep the current key.

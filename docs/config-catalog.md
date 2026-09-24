@@ -1858,11 +1858,11 @@ export interface Config {
   cliVersion?: string
   /**
    * Serve web search as a hosted backend tool instead of the local `tool-web`
-   * tool for this route. Defaults to off; when on, the colliding local
+   * tool for this route. Defaults to on; when on, the colliding local
    * `web_search` function tool is dropped from the request (hosted wins).
    */
   hostedWebSearch?: boolean
-  /** Serve X (Twitter) search as a hosted backend tool. Defaults to off. */
+  /** Serve X (Twitter) search as a hosted backend tool. Defaults to on. */
   hostedXSearch?: boolean
 }
 
@@ -3714,7 +3714,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:218`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:219`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 
@@ -4525,9 +4525,13 @@ Requires: `subagents` · `tools` · `systemPrompt`
 /** Config: how accepted reports are scheduled on the parent. */
 export interface Config {
   /**
-   * Parent scheduling (default `wakeup`). `wakeup` creates one ordinary later
-   * parent turn; `quiet` adds context without waking, so a parked parent learns
-   * of the report only when something else wakes it.
+   * Parent scheduling (default `wakeup`). `wakeup` shares the settlement
+   * notice's lane: an idle parent gets one ordinary later turn, while a busy
+   * parent is steered into a step of the turn it already has open, so several
+   * reports cost steps rather than one turn each. A parent in maintenance reads
+   * its reports as separate later turns, because `Agent.status` reports
+   * maintenance as idle. `quiet` adds context without waking, so a parked
+   * parent learns of the report only when something else wakes it.
    */
   reportDelivery?: SubagentReportDelivery
 }

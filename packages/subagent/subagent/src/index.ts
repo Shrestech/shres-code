@@ -116,6 +116,7 @@ export {
   applyChildComposition,
   captureDelegatedPolicyOverrides,
   childSessionMeta,
+  effectiveAgentRoute,
   effectiveChildRoute,
   ENVIRONMENT_ORDER,
   ENVIRONMENT_SECTION,

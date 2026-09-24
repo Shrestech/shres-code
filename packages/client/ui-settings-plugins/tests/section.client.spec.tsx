@@ -5,7 +5,7 @@
  * unavailable, and the save footer that decides when staged edits are written.
  */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
@@ -22,7 +22,8 @@ import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
-import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
+import { WebSearchCardController, type WebSearchCardState, type WebSearchSettings, type WebSearchMethods } from '../src/client/web-search-card-controller.ts'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -335,6 +336,13 @@ describe('WebSearchCard', () => {
   function renderWebSearch(state: Partial<WebSearchCardState> = {}) {
     const store = createSnapshotStore<WebSearchCardState>({
       ...settled,
+      providers: Object.fromEntries(['brave', 'perplexity', 'deepseek', 'methods'].map(id => [id, { available: true, writable: state.writable ?? true, dirty: false }])) as WebSearchCardState['providers'],
+      brave: field('true'),
+      braveBaseURL: field(''),
+      braveApiKey: field(''),
+      braveApiKeyConfigured: false,
+      braveApiKeyKnown: true,
+      braveApiKeyWritable: true,
       grok: field('true'),
       claude: field('true'),
       codex: field('true'),
@@ -346,11 +354,13 @@ describe('WebSearchCard', () => {
       maxUses: field('5'),
       apiKey: field(''),
       apiKeyConfigured: false,
+      apiKeyKnown: true,
       apiKeyWritable: true,
       perplexity: field('true'),
       perplexityBaseURL: field(''),
       perplexityApiKey: field(''),
       perplexityApiKeyConfigured: false,
+      perplexityApiKeyKnown: true,
       perplexityApiKeyWritable: true,
       ...state,
     })
@@ -359,6 +369,117 @@ describe('WebSearchCard', () => {
     render(<WebSearchCard {...props} />)
     return actions
   }
+
+  it('folds Perplexity without disabling it or writing drafts', () => {
+    const actions = renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    const toggle = screen.getByRole('switch', { name: 'Perplexity' })
+    const details = screen.getByLabelText(en.webSearchPerplexityApiKey).closest('[id$="-details"]')!
+    fireEvent.change(screen.getByLabelText(en.webSearchPerplexityBaseUrl), { target: { value: 'https://staged.test' } })
+    actions.edit.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide settings: Perplexity' }))
+    expect(details).toHaveProperty('hidden', true)
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Perplexity' }))
+    expect(details).toHaveProperty('hidden', false)
+    expect(actions.edit).not.toHaveBeenCalled()
+    expect(actions.save).not.toHaveBeenCalled()
+  })
+
+  it('starts configured provider details collapsed and lets them reopen', () => {
+    renderWebSearch({ braveApiKeyConfigured: true, perplexityApiKeyConfigured: true })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    expect(screen.getByLabelText(en.webSearchBraveApiKey).closest('[hidden]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Brave' }))
+    expect(screen.getByLabelText(en.webSearchBraveApiKey).closest('[hidden]')).toBeNull()
+  })
+
+  it('renders an unavailable provider off and disabled without credential fields', () => {
+    const actions = renderWebSearch({
+      providers: { brave: settled, deepseek: settled, methods: settled, perplexity: { available: false, writable: false, dirty: false } },
+    })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    const toggle = screen.getByRole('switch', { name: 'Perplexity' })
+    expect(toggle).toHaveProperty('disabled', true)
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(toggle)
+    expect(actions.edit).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText(en.webSearchPerplexityApiKey)).toBeNull()
+    expect(screen.getByText(en.providerUnavailable)).toBeTruthy()
+  })
+
+  it.each([
+    [false, 'none', true], [true, 'none', false],
+    [true, 'open', true], [false, 'closed', false],
+  ] as const)('resolves delayed credential state %s while preserving gesture %s', async (configured, gesture, expanded) => {
+    const hosts = Array.from({ length: 3 }, () => stubSettingsScope<WebSearchSettings>())
+    for (const host of hosts) host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    const [deepseek, perplexity, brave] = hosts as [typeof hosts[number], typeof hosts[number], typeof hosts[number]]
+    const methods = stubSettingsScope<WebSearchMethods>()
+    let resolve!: (value: unknown) => void
+    const pending = new Promise<unknown>((done) => { resolve = done })
+    const api = { credentials: {
+      describe: vi.fn(({ refs }: { refs: string[] }) => refs[0] === 'BRAVE_API_KEY'
+        ? pending : Promise.resolve({ result: { ok: true, value: { credentials: {} } } })),
+      set: vi.fn(),
+    } } as never
+    const face = new WebSearchCardController(deepseek.scope, api, methods.scope, perplexity.scope, brave.scope).inject()
+    const props = { ...face, t, useWebSearchCard: bindSnapshotSelector(face.hooks.webSearchCard) } as unknown as WebSearchCardProps
+    render(<WebSearchCard {...props} />)
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    const details = screen.getByLabelText(en.webSearchBraveApiKey).closest('[id$="-details"]')!
+    expect(details).toHaveProperty('hidden', true)
+    if (gesture !== 'none') fireEvent.click(screen.getByRole('button', { name: 'Show settings: Brave' }))
+    if (gesture === 'closed') fireEvent.click(screen.getByRole('button', { name: 'Hide settings: Brave' }))
+    await act(async () => {
+      resolve({ result: { ok: true, value: { credentials: { BRAVE_API_KEY: { configured, writable: true } } } } })
+      await pending
+    })
+    expect(details).toHaveProperty('hidden', !expanded)
+    expect(face.hooks.webSearchCard.getSnapshot().dirty).toBe(false)
+  })
+
+  it('round-trips mounted Perplexity switches through the staged controller', () => {
+    const deepseek = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchSettings>()
+    const brave = stubSettingsScope<WebSearchSettings>()
+    const methods = stubSettingsScope<WebSearchMethods>()
+    for (const host of [deepseek, perplexity, brave]) host.publish({ status: 'ready', writable: true, value: { enabled: true }, user: {} })
+    methods.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    const api = { credentials: {
+      describe: vi.fn(async () => ({ result: { ok: true, value: { credentials: {} } } })),
+      set: vi.fn(),
+    } } as never
+    const controller = new WebSearchCardController(deepseek.scope, api, methods.scope, perplexity.scope, brave.scope)
+    const face = controller.inject()
+    const props = { ...face, t, useWebSearchCard: bindSnapshotSelector(face.hooks.webSearchCard) } as unknown as WebSearchCardProps
+    render(<WebSearchCard {...props} />)
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    const toggle = screen.getByRole('switch', { name: 'Perplexity' })
+    for (const on of [false, true, false, true]) {
+      fireEvent.click(toggle)
+      expect(toggle.getAttribute('aria-checked')).toBe(String(on))
+      expect(screen.queryByLabelText(en.webSearchPerplexityApiKey) !== null).toBe(on)
+    }
+    expect(perplexity.set).not.toHaveBeenCalled()
+  })
+
+  it('describes Brave priority, Perplexity research and Grok hosted X accurately', () => {
+    renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    expect(screen.getByText('First in the default web_search order when enabled and a key is configured; other methods are fallbacks.')).toBeTruthy()
+    expect(screen.getByText('Powers deep_research, not routine web_search. Requires a Perplexity API key.')).toBeTruthy()
+    expect(screen.getByText('Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.')).toBeTruthy()
+  })
+
+  it('stages Brave credentials and endpoint independently', () => {
+    const actions = renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.change(screen.getByLabelText(en.webSearchBraveApiKey), { target: { value: 'test-key' } })
+    fireEvent.change(screen.getByLabelText(en.webSearchBraveBaseUrl), { target: { value: 'https://brave.test' } })
+    fireEvent.click(screen.getByRole('switch', { name: 'Brave' }))
+    expect(actions.edit.mock.calls).toEqual([['braveApiKey', 'test-key'], ['braveBaseURL', 'https://brave.test'], ['braveEnabled', 'false']])
+  })
 
   it('reports whether a key is configured without ever showing one', () => {
     renderWebSearch({ apiKeyConfigured: true })
@@ -455,6 +576,7 @@ describe('WebSearchCard', () => {
       perplexityBaseURL: field('https://stored.test', { overridden: true }),
     })
     fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Perplexity' }))
 
     expect(screen.getByLabelText(en.webSearchPerplexityApiKey)).toHaveProperty('type', 'password')
     fireEvent.change(screen.getByLabelText(en.webSearchPerplexityApiKey), { target: { value: 'pplx-secret' } })

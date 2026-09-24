@@ -25,7 +25,7 @@ import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { effectiveAgentRoute } from '@shres-code/shres-code-subagent'
 import type { SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
 import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
 import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
@@ -674,8 +674,10 @@ describe('children of a parent on a held downgrade', () => {
     await turn(agent, 'First easy turn.')
     expect(eventsOfType(agent.session.events, 'model-routing/decision')[0]?.data)
       .toMatchObject({ outcome: 'downgraded', sticky: { active: true } })
-    // The parent's latest header carries the routed candidate, not its manual route.
+    // The parent's latest header carries the routed candidate, not its manual route,
+    // while the route children inherit and the Team roster reports for a Lead is manual.
     expect(agent.session.requestHeader()?.config.model).toBe(CANDIDATE_MODEL)
+    expect(effectiveAgentRoute(agent)).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
     return { loaded, agent }
   }
 

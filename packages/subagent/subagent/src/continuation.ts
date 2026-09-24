@@ -43,7 +43,6 @@ import {
   applyChildComposition,
   captureDelegatedPolicyOverrides,
   childSessionMeta,
-  effectiveChildRoute,
   resolveChildAgentOptions,
   resolveChildDepth,
   resolveRequestedChildCwd,
@@ -99,12 +98,21 @@ declare module '@shres-code/shres-code-llm' {
   }
 }
 
-/** Deployment scheduling policy for accepted child reports. */
+/**
+ * Deployment scheduling policy for accepted child reports.
+ *
+ * `wakeup` delivers on the shared child-to-parent waking lane: an idle parent
+ * gets one ordinary turn, a busy parent is steered into its open turn. Because
+ * `Agent.status` folds maintenance into `idle`, a report arriving during
+ * compaction stays a separate next-turn follow-up, which preserves FIFO order
+ * with human prompts queued during that maintenance. `quiet` injects into the
+ * parent's inbox without waking it.
+ */
 export type SubagentReportDelivery = 'quiet' | 'wakeup'
 
 /** Options for one continuable child's report to its direct parent. */
 export interface SubagentReportOptions {
-  /** Already-resolved parent scheduling policy. */
+  /** Already-resolved parent scheduling policy; its lane is on {@link SubagentReportDelivery}. */
   readonly delivery: SubagentReportDelivery
   /** Caller cancellation, owning authorization and admission until acceptance. */
   readonly signal: AbortSignal
@@ -139,6 +147,13 @@ export interface ContinuableStart {
   readonly childId: SessionId
   /** The accepted initial prompt's inbox message id. */
   readonly messageId: MessageId
+  /**
+   * The child's resolved provider/model route, equal to the `agentProvider` /
+   * `agentModel` its durable descriptor records and the route cold resume
+   * reuses. A field is absent when neither the parent nor the request
+   * resolved it.
+   */
+  readonly route: { readonly provider?: string; readonly model?: string }
 }
 
 /**
@@ -432,7 +447,7 @@ export class SubagentContinuationManager {
    * The caller signal owns lookup, materialization, and admission only until
    * acceptance; afterwards the manager owns the Activation independently.
    * @param spec - provider, delegation request, and caller cancellation.
-   * @returns the durable child id and the accepted initial prompt's message id.
+   * @returns the durable child id, the accepted initial prompt's message id, and the descriptor route.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
     const request = spec.request
@@ -444,11 +459,12 @@ export class SubagentContinuationManager {
     const childDepth = resolveChildDepth(parent, request.maxDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
-    // The route reads the parent's EFFECTIVE model so the durable descriptor
-    // reports what the child actually runs, not the parent's creation options.
-    const route = effectiveChildRoute(parent, request.agentOptions)
-    const agentProvider = route.provider
-    const agentModel = route.model
+    // The options read the parent's EFFECTIVE model once, so a parent switch
+    // during provider preparation cannot split the descriptor, the returned
+    // route, and the child's first request.
+    const agentOptions = resolveChildAgentOptions(parent, request.agentOptions, childDepth)
+    const agentProvider = agentOptions.provider
+    const agentModel = agentOptions.model
     const descriptor = snapshotSubagentDescriptor({
       mode: 'continuable',
       provider: spec.provider,
@@ -489,7 +505,7 @@ export class SubagentContinuationManager {
             ),
             delegatedPolicies,
           },
-          agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
+          agentOptions,
           composition: { persona: request.persona, toolFilter: request.toolFilter },
           signal: spec.signal,
           releaseSlot,
@@ -502,7 +518,14 @@ export class SubagentContinuationManager {
           spec.signal,
         )
       })
-      return { childId, messageId }
+      return {
+        childId,
+        messageId,
+        route: {
+          ...agentProvider !== undefined ? { provider: agentProvider } : {},
+          ...agentModel !== undefined ? { model: agentModel } : {},
+        },
+      }
     } catch (error: unknown) {
       releaseSlot()
       throw error
@@ -727,14 +750,42 @@ export class SubagentContinuationManager {
     }
   }
 
-  /** Send one report while translating only the parent's own rejection. */
+  /**
+   * Send one waking message across a live parent's current phase: an idle
+   * parent is woken with one ordinary turn, a busy parent is steered into the
+   * turn it already has open, so several deliveries cost steps rather than one
+   * turn each.
+   *
+   * The settlement notice and a `wakeup` report are the two child-to-parent
+   * channels on this lane; each decides its own admission and error handling
+   * around the call.
+   *
+   * The status read and the send are one synchronous span, so this lane closes
+   * no retirement window. A driver that retires after `turn()`'s last
+   * `hasPending` check but before `kick()` commits its idle phase leaves the
+   * message for the next wake, because `wakeDriver` latches only for maintenance
+   * or post-abort sends. The lane therefore promises no extra turn per delivery,
+   * not no new turns (Known Limitations in the tool-jobs README).
+   * @param parent - the exact live parent receiving the message.
+   * @param message - the message to deliver.
+   */
+  private sendLane(parent: Agent, message: ReturnType<typeof createUserMessage>): void {
+    if (parent.status === 'idle') parent.followup(message)
+    else parent.steer(message)
+  }
+
+  /**
+   * Send one report while translating only the parent's own rejection. The
+   * translation wraps the agent call innermost so a rejection still reaches the
+   * waking accounting that admitted this message.
+   */
   private sendReport(
     parent: Agent,
     message: ReturnType<typeof createUserMessage>,
     delivery: SubagentReportDelivery,
   ): void {
     try {
-      if (delivery === 'wakeup') parent.followup(message)
+      if (delivery === 'wakeup') this.sendLane(parent, message)
       else parent.inject(message)
     } catch (error: unknown) {
       throw new SubagentError(
@@ -1491,15 +1542,11 @@ export class SubagentContinuationManager {
         return
       }
       // An idle parent has nothing else to look at, so it gets one ordinary
-      // turn. A busy parent is steered instead of woken: `Inbox.claim()` takes
-      // the whole next-step batch at one boundary, so several children settling
-      // together cost one step rather than one turn each. Steering rather than
-      // injecting closes the window where a driver retires between this status
-      // read and the send, which would strand the notice unclaimed.
-      this.sendWaking(parent, message, () => {
-        if (parent.status === 'idle') parent.followup(message)
-        else parent.steer(message)
-      })
+      // turn; a busy parent is steered into the turn it already has open, whose
+      // `Inbox.claim()` takes the whole next-step batch at one boundary, so
+      // several children settling together cost one step rather than one turn
+      // each.
+      this.sendWaking(parent, message, () => { this.sendLane(parent, message) })
     } catch (error: unknown) {
       this.ctx.logger.warn(
         `subagent "${activation.childId}" settlement notice was not delivered to its parent: `

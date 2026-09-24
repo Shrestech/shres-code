@@ -21,6 +21,7 @@ export const agentTeamsMemberRowSchema = z.object({
   id: z.string(),
   description: z.string().optional(),
   provider: z.string().optional(),
+  agentProvider: z.string().optional(),
   model: z.string().optional(),
   diagnostics: z.array(z.string()),
 }) satisfies z.ZodType<Wire<AgentTeamsMemberRow>>

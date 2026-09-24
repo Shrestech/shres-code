@@ -78,6 +78,8 @@ export const en = {
   'activity.title': 'Inspect this session',
   'activity.views': 'Views',
   'activity.tools': 'Tools & utilities',
+  'activity.running.one': '{count} subagent running',
+  'activity.running.other': '{count} subagents running',
   'details.title': 'Details',
   'details.close': 'Close details',
   'details.empty': 'Click a tool row in the message flow to view its details',

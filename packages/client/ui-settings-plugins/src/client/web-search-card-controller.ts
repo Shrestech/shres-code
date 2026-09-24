@@ -1,11 +1,7 @@
 /**
- * The web-search card's staged form: method switches plus the DeepSeek and
- * Perplexity endpoints, keys, and DeepSeek's budget.
- *
- * CLI method flags live on `web-search-attached-cli`. DeepSeek's enable flag,
- * endpoint, and budget live on `web-search-deepseek`; Perplexity's enable
- * flag and endpoint live on `web-search-perplexity`. Both keys are written
- * through the credentials domain, never into a settings section.
+ * Staged search-provider settings and write-only credentials. Brave and
+ * DeepSeek serve routine search; Perplexity serves deep research. Each
+ * provider owns its settings namespace and credential reference.
  */
 
 import type { IApiClient } from '@shres-code/shres-code-client-connection/client'
@@ -25,6 +21,9 @@ export const WEB_SEARCH_NS = 'web-search-deepseek'
 /** Namespace of the attached-CLI method switches. */
 export const WEB_SEARCH_METHODS_NS = 'web-search-attached-cli'
 
+/** Namespace of the Brave search provider. */
+export const WEB_SEARCH_BRAVE_NS = 'web-search-brave'
+
 /** Namespace of the Perplexity search provider. */
 export const WEB_SEARCH_PERPLEXITY_NS = 'web-search-perplexity'
 
@@ -34,23 +33,21 @@ const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
 /** Credential reference the Perplexity provider resolves when the section names none. */
 const DEFAULT_PERPLEXITY_API_KEY_REF = 'PERPLEXITY_API_KEY'
 
+/** Credential reference the Brave provider resolves when the section names none. */
+const DEFAULT_BRAVE_API_KEY_REF = 'BRAVE_API_KEY'
+
 /** Form field the credential control stages under. */
 const API_KEY_FIELD = 'apiKey'
 
 /** Fields written to the attached-CLI section. */
 const METHOD_FIELDS = new Set(['grok', 'claude', 'codex', 'kimi', 'ollama', 'zai'])
 
-/**
- * UI field aliases addressing the Perplexity section. Its section keys are
- * DeepSeek's (`enabled`, `baseURL`, `apiKey`), and the card's edit protocol
- * is one flat field namespace, so the Perplexity controls route through
- * aliases the controller maps back onto the section keys.
- */
-const PERPLEXITY_FIELDS: ReadonlyMap<string, string> = new Map([
-  ['perplexityEnabled', 'enabled'],
-  ['perplexityBaseURL', 'baseURL'],
-  ['perplexityApiKey', API_KEY_FIELD],
-])
+/** Provider-prefixed aliases keep shared section keys distinct in one form. */
+const PROVIDER_FIELDS = [
+  ['Enabled', 'enabled'],
+  ['BaseURL', 'baseURL'],
+  ['ApiKey', API_KEY_FIELD],
+] as const
 
 /** The DeepSeek section fields this card edits. */
 export interface WebSearchSettings {
@@ -86,14 +83,19 @@ export interface WebSearchPerplexitySettings {
   apiKeyEnv?: string
   /** Provider endpoint; blank inherits the provider default. */
   baseURL?: string
-  /** When false, Perplexity is omitted from the search pool. */
+  /** When false, Perplexity is unavailable to deep_research. */
   enabled?: boolean
 }
+
+/** Brave fields edited by the card; its result count stays deployment-owned. */
+export type WebSearchBraveSettings = WebSearchPerplexitySettings
 
 /** What the credentials domain last reported, and for which reference. */
 interface CredentialState {
   /** Reference this answer describes; a stale response for another one is dropped. */
   ref: string
+  /** Whether the current reference has a successful metadata response. */
+  known: boolean
   /** Whether any layer supplies a value for it. */
   configured: boolean
   /** Whether `credentials.set` can affect it; false disables the control. */
@@ -109,7 +111,7 @@ interface CredentialState {
  * reference in force.
  */
 class CredentialTracker {
-  private state: CredentialState = { ref: '', configured: false, writable: true }
+  private state: CredentialState = { ref: '', known: false, configured: false, writable: true }
 
   /**
    * @param api - wire face used for the credential the section references.
@@ -121,6 +123,11 @@ class CredentialTracker {
     private readonly refOf: () => string,
     private readonly publish: () => void,
   ) {}
+
+  /** Whether credential metadata for the current reference has arrived. */
+  get known(): boolean {
+    return this.state.known
+  }
 
   /** Whether the Host reports a credential configured for the tracked reference. */
   get configured(): boolean {
@@ -138,7 +145,7 @@ class CredentialTracker {
     if (ref !== this.state.ref) {
       // A new reference knows nothing yet; keeping the old answer would claim
       // the key is configured under a name nobody has checked.
-      this.state = { ref, configured: false, writable: true }
+      this.state = { ref, known: false, configured: false, writable: true }
       this.publish()
     }
     let response: Awaited<ReturnType<IApiClient['credentials']['describe']>>
@@ -153,12 +160,13 @@ class CredentialTracker {
     const view = response.result.value.credentials[ref]
     const next: CredentialState = {
       ref,
+      known: true,
       configured: view?.configured ?? false,
       // An unknown reference is treated as writable: the control stays usable
       // and the Host is what refuses, rather than the card guessing a refusal.
       writable: view?.writable ?? true,
     }
-    if (next.configured === this.state.configured && next.writable === this.state.writable) return
+    if (next.known === this.state.known && next.configured === this.state.configured && next.writable === this.state.writable) return
     this.state = next
     this.publish()
   }
@@ -191,6 +199,20 @@ class CredentialTracker {
 
 /** What the web-search card renders. */
 export interface WebSearchCardState extends CardShell {
+  /** Availability and settings writability of each independently composed provider. */
+  providers: Record<'brave' | 'perplexity' | 'deepseek' | 'methods', Pick<CardShell, 'available' | 'writable' | 'dirty'>>
+  /** Brave method switch. */
+  brave: CardFieldState
+  /** Brave endpoint. */
+  braveBaseURL: CardFieldState
+  /** Staged Brave credential; reads never return the stored value. */
+  braveApiKey: CardFieldState
+  /** Whether the Brave credential reference has a value. */
+  braveApiKeyConfigured: boolean
+  /** Whether Brave credential metadata has arrived. */
+  braveApiKeyKnown: boolean
+  /** Whether the Brave credential reference accepts writes. */
+  braveApiKeyWritable: boolean
   /** Grok method switch. */
   grok: CardFieldState
   /** Claude method switch. */
@@ -213,6 +235,8 @@ export interface WebSearchCardState extends CardShell {
   apiKey: CardFieldState
   /** Whether the Host reports a credential configured for the referenced key. */
   apiKeyConfigured: boolean
+  /** Whether DeepSeek credential metadata has arrived. */
+  apiKeyKnown: boolean
   /** Whether the credentials domain accepts a write for it; false disables the control. */
   apiKeyWritable: boolean
   /** Perplexity method switch. */
@@ -223,6 +247,8 @@ export interface WebSearchCardState extends CardShell {
   perplexityApiKey: CardFieldState
   /** Whether the Host reports a credential configured for the Perplexity reference. */
   perplexityApiKeyConfigured: boolean
+  /** Whether Perplexity credential metadata has arrived. */
+  perplexityApiKeyKnown: boolean
   /** Whether the credentials domain accepts a write for the Perplexity reference. */
   perplexityApiKeyWritable: boolean
 }
@@ -235,28 +261,33 @@ export interface WebSearchCardFace extends CardActions {
   }
 }
 
-const ON: CardFieldState = { text: 'true', overridden: false, invalid: false }
+const OFF: CardFieldState = { text: 'false', overridden: false, invalid: false }
 
-/** Bridges the three search namespaces and the credentials domain onto the card. */
+/** Bridges independently composed search namespaces and write-only credentials. */
 export class WebSearchCardController {
   private readonly form: CardForm<WebSearchSettings>
   private readonly methods: CardForm<WebSearchMethods>
   private readonly perplexityForm: CardForm<WebSearchPerplexitySettings>
+  private readonly braveForm: CardForm<WebSearchBraveSettings>
+  private readonly providerFields = new Map<string, { actions: CardActions; field: string }>()
   private readonly store: SnapshotStore<WebSearchCardState>
   private readonly credential: CredentialTracker
   private readonly perplexityCredential: CredentialTracker
+  private readonly braveCredential: CredentialTracker
 
   /**
    * @param scope - the bound settings scope for the DeepSeek namespace.
    * @param api - wire face used for the credentials the sections reference.
    * @param methodsScope - the bound settings scope for CLI method switches.
    * @param perplexityScope - the bound settings scope for the Perplexity namespace.
+   * @param braveScope - the bound settings scope for the Brave namespace.
    */
   constructor(
     scope: SettingsScope<WebSearchSettings>,
     api: Pick<IApiClient, 'credentials'>,
     methodsScope: SettingsScope<WebSearchMethods>,
     perplexityScope: SettingsScope<WebSearchPerplexitySettings>,
+    braveScope: SettingsScope<WebSearchBraveSettings>,
   ) {
     this.form = new CardForm(
       scope,
@@ -276,6 +307,19 @@ export class WebSearchCardController {
       [textField('baseURL'), booleanField('enabled')],
       [{ field: API_KEY_FIELD, write: text => this.perplexityCredential.write(text) }],
     )
+    this.braveForm = new CardForm(
+      braveScope,
+      [textField('baseURL'), booleanField('enabled')],
+      [{ field: API_KEY_FIELD, write: text => this.braveCredential.write(text) }],
+    )
+    for (const [prefix, actions] of [
+      ['perplexity', this.perplexityForm.actions()],
+      ['brave', this.braveForm.actions()],
+    ] as const) {
+      for (const [suffix, field] of PROVIDER_FIELDS) {
+        this.providerFields.set(`${prefix}${suffix}`, { actions, field })
+      }
+    }
     // The trackers precede the store: the store's first projection already
     // reads their state, while their publish callback defers to a method that
     // only runs once the store exists.
@@ -289,6 +333,11 @@ export class WebSearchCardController {
       () => refOf(perplexityScope.getSnapshot().value?.apiKeyEnv, DEFAULT_PERPLEXITY_API_KEY_REF),
       () => { this.publishProjection() },
     )
+    this.braveCredential = new CredentialTracker(
+      api,
+      () => refOf(braveScope.getSnapshot().value?.apiKeyEnv, DEFAULT_BRAVE_API_KEY_REF),
+      () => { this.publishProjection() },
+    )
     this.store = createSnapshotStore(this.projection())
     const push = (): WebSearchCardState => {
       const next = this.projection()
@@ -298,10 +347,13 @@ export class WebSearchCardController {
     this.form.bind(push)
     this.methods.bind(push)
     this.perplexityForm.bind(push)
+    this.braveForm.bind(push)
     scope.subscribe(() => { void this.credential.read() })
     perplexityScope.subscribe(() => { void this.perplexityCredential.read() })
+    braveScope.subscribe(() => { void this.braveCredential.read() })
     void this.credential.read()
     void this.perplexityCredential.read()
+    void this.braveCredential.read()
   }
 
   /** Rebuild the card's projection and publish it through the store. */
@@ -313,31 +365,41 @@ export class WebSearchCardController {
     const deepseek = this.form.shell()
     const perplexity = this.perplexityForm.shell()
     const methods = this.methods.shell()
+    const brave = this.braveForm.shell()
+    const providers = { brave, perplexity, deepseek, methods }
+    const shells = Object.values(providers)
     return {
-      available: deepseek.available || perplexity.available || methods.available,
-      writable: deepseek.writable
-        && (perplexity.available ? perplexity.writable : true)
-        && (methods.available ? methods.writable : true),
-      dirty: deepseek.dirty || perplexity.dirty || methods.dirty,
-      invalid: deepseek.invalid || perplexity.invalid || methods.invalid,
-      saving: deepseek.saving || perplexity.saving || methods.saving,
-      failed: deepseek.failed || perplexity.failed || methods.failed,
-      grok: methods.available ? this.methods.field('grok') : ON,
-      claude: methods.available ? this.methods.field('claude') : ON,
-      codex: methods.available ? this.methods.field('codex') : ON,
-      kimi: methods.available ? this.methods.field('kimi') : ON,
-      ollama: methods.available ? this.methods.field('ollama') : ON,
-      zai: methods.available ? this.methods.field('zai') : ON,
-      deepseek: deepseek.available ? this.form.field('enabled') : ON,
+      providers,
+      available: shells.some(shell => shell.available),
+      writable: shells.some(shell => shell.available && shell.writable),
+      dirty: shells.some(shell => shell.dirty),
+      invalid: shells.some(shell => shell.invalid),
+      saving: shells.some(shell => shell.saving),
+      failed: shells.some(shell => shell.failed),
+      brave: brave.available ? this.braveForm.field('enabled') : OFF,
+      braveBaseURL: this.braveForm.field('baseURL'),
+      braveApiKey: this.braveForm.field(API_KEY_FIELD),
+      braveApiKeyConfigured: this.braveCredential.configured,
+      braveApiKeyKnown: this.braveCredential.known,
+      braveApiKeyWritable: this.braveCredential.writable,
+      grok: methods.available ? this.methods.field('grok') : OFF,
+      claude: methods.available ? this.methods.field('claude') : OFF,
+      codex: methods.available ? this.methods.field('codex') : OFF,
+      kimi: methods.available ? this.methods.field('kimi') : OFF,
+      ollama: methods.available ? this.methods.field('ollama') : OFF,
+      zai: methods.available ? this.methods.field('zai') : OFF,
+      deepseek: deepseek.available ? this.form.field('enabled') : OFF,
       baseURL: this.form.field('baseURL'),
       maxUses: this.form.field('maxUses'),
       apiKey: this.form.field(API_KEY_FIELD),
       apiKeyConfigured: this.credential.configured,
+      apiKeyKnown: this.credential.known,
       apiKeyWritable: this.credential.writable,
-      perplexity: perplexity.available ? this.perplexityForm.field('enabled') : ON,
+      perplexity: perplexity.available ? this.perplexityForm.field('enabled') : OFF,
       perplexityBaseURL: this.perplexityForm.field('baseURL'),
       perplexityApiKey: this.perplexityForm.field(API_KEY_FIELD),
       perplexityApiKeyConfigured: this.perplexityCredential.configured,
+      perplexityApiKeyKnown: this.perplexityCredential.known,
       perplexityApiKeyWritable: this.perplexityCredential.writable,
     }
   }
@@ -353,6 +415,7 @@ export class WebSearchCardController {
   refreshCredential(ref: string): void {
     this.credential.refresh(ref)
     this.perplexityCredential.refresh(ref)
+    this.braveCredential.refresh(ref)
   }
 
   /**
@@ -362,6 +425,7 @@ export class WebSearchCardController {
   inject(): WebSearchCardFace {
     const deepseek = this.form.actions()
     const perplexity = this.perplexityForm.actions()
+    const brave = this.braveForm.actions()
     const methods = this.methods.actions()
     return {
       hooks: { webSearchCard: this.store },
@@ -370,8 +434,8 @@ export class WebSearchCardController {
           methods.edit(field, text)
           return
         }
-        const perplexityField = PERPLEXITY_FIELDS.get(field)
-        if (perplexityField !== undefined) perplexity.edit(perplexityField, text)
+        const providerField = this.providerFields.get(field)
+        if (providerField !== undefined) providerField.actions.edit(providerField.field, text)
         else deepseek.edit(field, text)
       },
       resetField: (field) => {
@@ -379,18 +443,20 @@ export class WebSearchCardController {
           methods.resetField(field)
           return
         }
-        const perplexityField = PERPLEXITY_FIELDS.get(field)
-        if (perplexityField !== undefined) perplexity.resetField(perplexityField)
+        const providerField = this.providerFields.get(field)
+        if (providerField !== undefined) providerField.actions.resetField(providerField.field)
         else deepseek.resetField(field)
       },
       save: () => {
         deepseek.save()
         perplexity.save()
+        brave.save()
         methods.save()
       },
       discard: () => {
         deepseek.discard()
         perplexity.discard()
+        brave.discard()
         methods.discard()
       },
     }

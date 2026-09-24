@@ -12,14 +12,27 @@ interface TeamMemberSnapshot {
   readonly id: SessionId
   readonly name: string
   readonly description: string
+  /** Subagent spawn provider that created the child, such as `spawn`; not the LLM provider. */
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
   readonly error?: string
+  /**
+   * LLM provider route the child was created with, as recorded in its
+   * subagent descriptor. Written only on the `active` edge; absent on older
+   * logs and when no route resolved.
+   */
+  readonly agentProvider?: string
+  /**
+   * LLM model the child was created with and cold-resumes on, as recorded in
+   * its subagent descriptor. Written only on the `active` edge; absent on
+   * older logs and when no route resolved.
+   */
+  readonly agentModel?: string
 }
 ```
 
-Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`unstarted`/`inactive` status is derived separately and never rewrites this record.
+Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`unstarted`/`inactive` status is derived separately and never rewrites this record. `provider` is the subagent spawn provider, such as `spawn`. `agentProvider` and `agentModel` are the LLM route the child was created with, copied from its subagent descriptor and the route a cold resume runs; only the `active` edge may carry them, each is a non-empty string, and the fold faults on any other placement or value. Logs written before these fields existed omit them.
 
 ## Durable mailbox
 
@@ -109,15 +122,33 @@ type TeamMemberStatus =
 ```
 
 ```ts type-equiv
-/** Current runtime-enriched roster row. */
+/**
+ * Current runtime-enriched roster row.
+ *
+ * `agentProvider` / `model` are the row's own LLM route. The loaded Lead
+ * reports its manual selection — its explicit `/model` selection, else the
+ * manual base a composed router reports beneath a routed request header, else
+ * its latest logged request header — else the live default-model selection,
+ * else its creation options, so a held downgrade never reads as the Lead's
+ * model. A loaded teammate reports its latest logged request header, else its
+ * creation options, which are the descriptor route it was created or resumed
+ * with. An unloaded started teammate reports its {@link TeamMemberSnapshot}
+ * route. An `unstarted` row reports the current template binding. A row whose
+ * route is unknown omits both fields and never reports the Lead's route
+ * instead. A teammate's `/model` switch appears after its next request.
+ */
 interface TeamMemberView {
   readonly id: SessionId
   readonly name: string
   readonly role: 'lead' | 'teammate'
   readonly status: TeamMemberStatus
   readonly description?: string
+  /** Subagent spawn provider that starts or started the teammate, such as `spawn`; not the LLM provider. Absent on the Lead row. */
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
+  /** LLM provider route. */
+  readonly agentProvider?: string
+  /** LLM model. */
   readonly model?: string
   readonly diagnostics: string[]
 }
@@ -185,12 +216,18 @@ interface SendTeamMessageResult {
 ```
 
 ```ts type-equiv
-/** Human-configured teammate that can be lazily provisioned. */
+/**
+ * Human-configured teammate that can be lazily provisioned. The template is
+ * read when an `unstarted` name starts; a started teammate keeps the route it
+ * was created with.
+ */
 interface TeamRosterTemplateEntry {
   readonly name: string
   readonly description: string
   readonly persona?: string
+  /** LLM provider route; applied together with {@link model}. */
   readonly provider: string
+  /** LLM model; without it the teammate inherits the Lead's route when it starts. */
   readonly model?: string
   readonly context?: 'fresh' | 'fork'
 }
@@ -282,5 +319,5 @@ async ensureTemplateMember( caller: Agent, rawName: string, assignment?: readonl
 
 Types: [Agent](core.md) · [ContentBlock](llm-streaming.md)
 
-Source: [`packages/team/agent-team/src/service.ts:56`](../../packages/team/agent-team/src/service.ts)
+Source: [`packages/team/agent-team/src/service.ts:59`](../../packages/team/agent-team/src/service.ts)
 <!-- END GENERATED cordis-surface -->

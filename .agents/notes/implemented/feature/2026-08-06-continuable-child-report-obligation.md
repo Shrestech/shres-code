@@ -2,6 +2,8 @@
 
 Status: implemented
 
+> The `wakeup` default, the reporting obligation, and their rationale remain current. The separate-turn scheduling clause is superseded by [busy-parent subagent report delivery](../bug-fix/2026-09-24-busy-parent-subagent-report-delivery.md), which owns the lane rule.
+
 ## Problem
 
 A continuable background child owns its own Session, so nothing it writes there reaches the agent that started it. [The report tool](2026-07-30-continuable-subagent-report-tool.md) gave that child a return channel and then presented it as one option among several: the schema said "call this zero or more times", nothing in the child's prompt asked it to call the tool at all, and the accepted default scheduling (`quiet`) added the report to a parked parent's next request without waking it.
@@ -15,7 +17,7 @@ The return channel is an instruction the child receives, not a capability it may
 - the `report` tool, whose description now states that the child calls it once before finishing with a self-contained final result, and earlier for progress that changes what the parent should do next;
 - a `tool:report` system-prompt section at order 117 carrying the same obligation in the child's own voice, so a child that never reads tool descriptions closely still receives it.
 
-`reportDelivery` now defaults to `wakeup`. An accepted report creates exactly one ordinary later parent turn and wakes a parked parent driver; it still never steers an open turn. `quiet` remains available for deployments that prefer unread reports over turn amplification.
+`reportDelivery` defaults to `wakeup`, and an accepted report is scheduled on the manager's shared waking lane; [busy-parent subagent report delivery](../bug-fix/2026-09-24-busy-parent-subagent-report-delivery.md) owns that lane's rule and its maintenance exception. `quiet` remains available for deployments that prefer unread reports over turn amplification.
 
 ### Why the section and the description both exist
 

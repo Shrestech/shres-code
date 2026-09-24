@@ -68,38 +68,40 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
 }
 
 /**
- * The parent's manual provider/model route, read without side effects: the
- * model selection in force on the parent (`selectionInForce`), else the live
- * default-model selection when that service is composed, else the parent's
- * creation-time options. The selection in force is the parent's explicit
- * `agent/model-selection`, else the manual base a composed router reports
- * beneath a routed request header, else that logged header. A child therefore
- * never inherits a routed candidate: while a downgrade is held, the parent's
- * header carries the candidate, and a child that inherited it would run the
- * cheaper route with no routing decision of its own.
- * @param parent - the delegating parent.
- * @returns the inherited route fields that are known.
- * @throws when the parent's latest durable explicit selection has invalid fields.
+ * An Agent's manual provider/model route, read without side effects: the
+ * model selection in force on it (`selectionInForce`), else the live
+ * default-model selection when that service is composed, else its
+ * creation-time options. This is the route a delegating parent passes to new
+ * children and the route the Team roster reports for the Lead. The selection
+ * in force is the explicit `agent/model-selection`, else the manual base a
+ * composed router reports beneath a routed request header, else that logged
+ * header. It is therefore never a routed candidate: while a downgrade is held,
+ * the header carries the candidate, and a child that inherited it would run
+ * the cheaper route with no routing decision of its own.
+ * @param agent - the loaded Agent to read.
+ * @returns the known route fields.
+ * @throws when the Agent's latest durable explicit selection has invalid fields.
  */
-function inheritedRoute(parent: Agent): { provider?: string; model?: string } {
-  const selected = selectionInForce(parent)
+export function effectiveAgentRoute(agent: Agent): { provider?: string; model?: string } {
+  const selected = selectionInForce(agent)
   if (selected !== undefined) {
     return { provider: selected.provider, model: selected.model }
   }
-  const defaults = parent.ctx.get('agentDefaultModel')
+  const defaults = agent.ctx.get('agentDefaultModel')
   if (defaults !== undefined) {
     const picked = defaults.currentSelection()
     return { provider: picked.provider, model: picked.model }
   }
   return {
-    ...parent.options.provider !== undefined ? { provider: parent.options.provider } : {},
-    ...parent.options.model !== undefined ? { model: parent.options.model } : {},
+    ...agent.options.provider !== undefined ? { provider: agent.options.provider } : {},
+    ...agent.options.model !== undefined ? { model: agent.options.model } : {},
   }
 }
 
 /**
  * The provider/model route a child of this parent would run: the parent's
- * effective route with any per-child request overrides applied. Option
+ * manual route ({@link effectiveAgentRoute}) with any per-child request
+ * overrides applied. Option
  * resolution and the model-facing spawn telemetry both read this, so the
  * logged route and the run route cannot drift.
  * @param parent - the delegating parent whose route the child inherits.
@@ -111,7 +113,7 @@ export function effectiveChildRoute(
   requested: AgentOptions | undefined,
 ): { provider?: string; model?: string } {
   return {
-    ...inheritedRoute(parent),
+    ...effectiveAgentRoute(parent),
     ...requested?.provider !== undefined ? { provider: requested.provider } : {},
     ...requested?.model !== undefined ? { model: requested.model } : {},
   }

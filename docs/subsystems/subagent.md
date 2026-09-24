@@ -204,6 +204,13 @@ interface ContinuableStart {
   readonly childId: SessionId
   /** The accepted initial prompt's inbox message id. */
   readonly messageId: MessageId
+  /**
+   * The child's resolved provider/model route, equal to the `agentProvider` /
+   * `agentModel` its durable descriptor records and the route cold resume
+   * reuses. A field is absent when neither the parent nor the request
+   * resolved it.
+   */
+  readonly route: { readonly provider?: string; readonly model?: string }
 }
 ```
 
@@ -223,7 +230,16 @@ interface SubagentReportMessageSource {
 ```
 
 ```ts type-equiv
-/** Deployment scheduling policy for accepted child reports. */
+/**
+ * Deployment scheduling policy for accepted child reports.
+ *
+ * `wakeup` delivers on the shared child-to-parent waking lane: an idle parent
+ * gets one ordinary turn, a busy parent is steered into its open turn. Because
+ * `Agent.status` folds maintenance into `idle`, a report arriving during
+ * compaction stays a separate next-turn follow-up, which preserves FIFO order
+ * with human prompts queued during that maintenance. `quiet` injects into the
+ * parent's inbox without waking it.
+ */
 type SubagentReportDelivery = 'quiet' | 'wakeup'
 ```
 
@@ -251,7 +267,7 @@ interface SubagentSettledMessageSource {
 ```ts type-equiv
 /** Options for one continuable child's report to its direct parent. */
 interface SubagentReportOptions {
-  /** Already-resolved parent scheduling policy. */
+  /** Already-resolved parent scheduling policy; its lane is on {@link SubagentReportDelivery}. */
   readonly delivery: SubagentReportDelivery
   /** Caller cancellation, owning authorization and admission until acceptance. */
   readonly signal: AbortSignal
@@ -786,7 +802,7 @@ async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<A
 
 Types: [Agent](core.md) · [AgentOptions](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:274`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:275`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
@@ -827,7 +843,7 @@ The waterfall settles before any child resource exists, so a listener that recor
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:205`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:206`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 
@@ -849,7 +865,7 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:183`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:184`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -866,7 +882,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:157`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:158`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -883,7 +899,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:163`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:164`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -907,5 +923,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:174`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:175`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->

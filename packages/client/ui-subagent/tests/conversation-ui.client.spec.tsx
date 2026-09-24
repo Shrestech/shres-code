@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import type {
   SessionId, SessionListState, SessionSummary, SubagentCatalogSnapshot,
@@ -135,7 +135,7 @@ describe('SubagentCatalogAction', () => {
     }
     const view = render(<SubagentCatalogAction {...props(catalog(), {}, summaries)} />)
 
-    const trigger = screen.getByRole('button', { name: '1 subagent running' })
+    const trigger = screen.getByRole('button', { name: '1 subagent running, 3 subagents' })
     expect(trigger.querySelector('[data-state="ongoing"]')).not.toBeNull()
 
     view.rerender(<SubagentCatalogAction {...props(catalog(), {}, {
@@ -186,21 +186,51 @@ describe('SubagentCatalogAction', () => {
   })
 
   it('selects singular count keys for one descendant', () => {
-    const base = props(catalog({
-      entries: [{
-        kind: 'child', id: CHILD, mode: 'continuable', label: 'worker',
-        activity: 'running', hasChildren: false,
-      }],
-    }), {}, {
+    const entries = (activity: 'running' | 'inactive') => [{
+      kind: 'child' as const, id: CHILD, mode: 'continuable' as const, label: 'worker',
+      activity, hasChildren: false,
+    }]
+    const only = (running: boolean) => ({
       [CHILD]: {
-        ...summary(CHILD, Date.now()), parentId: PARENT, origin: 'subagent', running: true,
+        ...summary(CHILD, Date.now()), parentId: PARENT, origin: 'subagent' as const, running,
       },
     })
-    const translate = vi.fn(base.t)
-    render(<SubagentCatalogAction {...base} t={translate} />)
 
-    expect(translate).toHaveBeenCalledWith('count.running.one', { count: 1 })
-    expect(translate).toHaveBeenCalledWith('count.total.one', { count: 1 })
+    const running = props(catalog({ entries: entries('running') }), {}, only(true))
+    const runningTranslate = vi.fn(running.t)
+    const view = render(<SubagentCatalogAction {...running} t={runningTranslate} />)
+    expect(runningTranslate).toHaveBeenCalledWith('count.running.one', { count: 1 })
+    view.unmount()
+
+    // One idle descendant: the running key has no subject, so the total states it.
+    const idle = props(catalog({ entries: entries('inactive') }), {}, only(false))
+    const idleTranslate = vi.fn(idle.t)
+    render(<SubagentCatalogAction {...idle} t={idleTranslate} />)
+    expect(idleTranslate).toHaveBeenCalledWith('count.total.one', { count: 1 })
+  })
+
+  it('states the running count beside the total while part of the subtree runs', () => {
+    const second = 'child-2' as SessionId
+    render(<SubagentCatalogAction {...props(catalog(), {}, {
+      [CHILD]: { ...summary(CHILD, 1), parentId: PARENT, origin: 'subagent', running: true },
+      [second]: { ...summary(second, 1), parentId: PARENT, origin: 'subagent' },
+    })} />)
+
+    const trigger = screen.getByRole('button', { name: '1 subagent running, 2 subagents' })
+    expect(within(trigger).getByText('1 subagent running')).toBeTruthy()
+    expect(within(trigger).getByText('2 subagents')).toBeTruthy()
+  })
+
+  it('states a fully running subtree once', () => {
+    const second = 'child-2' as SessionId
+    render(<SubagentCatalogAction {...props(catalog(), {}, {
+      [CHILD]: { ...summary(CHILD, 1), parentId: PARENT, origin: 'subagent', running: true },
+      [second]: { ...summary(second, 1), parentId: PARENT, origin: 'subagent', running: true },
+    })} />)
+
+    const trigger = screen.getByRole('button', { name: '2 subagents running' })
+    expect(within(trigger).getByText('2 subagents running')).toBeTruthy()
+    expect(within(trigger).queryByText('2 subagents')).toBeNull()
   })
 
   it('removes the disclosure column from branchless catalog levels', () => {
@@ -352,7 +382,7 @@ describe('SubagentCatalogAction', () => {
     })) as Record<SessionId, SessionSummary>
     const input = props(catalog({ entries }), {}, summaries)
     render(<SubagentCatalogAction {...input} />)
-    const trigger = screen.getByRole('button', { name: '1 subagent running' })
+    const trigger = screen.getByRole('button', { name: '1 subagent running, 9 subagents' })
     expect(within(trigger).getByText('9 subagents')).toBeTruthy()
     fireEvent.click(trigger)
 
@@ -373,7 +403,9 @@ describe('SubagentCatalogAction', () => {
     expect(screen.getByText('~2y 3mo')).toBeTruthy()
     expect(screen.getByText('~1y')).toBeTruthy()
 
-    await vi.advanceTimersByTimeAsync(1_000)
+    // The interval callback's state update needs a React flush before the
+    // next query; a bare advance leaves the fake-timer tick out of the DOM.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
     expect(screen.getByRole('treeitem', { name: /running.*4\.6K tok · 1m 11s/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1h 02m 03s/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /interrupted.*123M tok · 6s/ })).toBeTruthy()
@@ -538,7 +570,7 @@ describe('SubagentCatalogAction', () => {
     const absent = props(undefined, {}, summaries)
     const view = render(<SubagentCatalogAction {...absent} />)
 
-    const trigger = screen.getByRole('button', { name: '1 subagent running' })
+    const trigger = screen.getByRole('button', { name: '1 subagent running, 2 subagents' })
     expect(within(trigger).getByText('2 subagents')).toBeTruthy()
     fireEvent.click(trigger)
     expect(absent.setCatalogOpen).toHaveBeenCalledWith(PARENT, true)
@@ -547,7 +579,7 @@ describe('SubagentCatalogAction', () => {
 
     const staleEmpty = props(catalog({ entries: [] }), {}, summaries)
     view.rerender(<SubagentCatalogAction {...staleEmpty} />)
-    expect(screen.getByRole('button', { name: '1 subagent running' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '1 subagent running, 2 subagents' })).toBeTruthy()
     expect(screen.getAllByRole('treeitem', { name: 'Loading subagents' })).toHaveLength(2)
     expect(staleEmpty.openChild).not.toHaveBeenCalled()
   })

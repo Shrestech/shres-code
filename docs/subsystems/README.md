@@ -9,6 +9,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [judgment.md](judgment.md) | the typed-judgment seam: choice, score, and binary questions, their calibrated answers, the engine contract, the optional egress redaction hook, and the deployment on/off settings section |
 | [model-router.md](model-router.md) | asymmetric model routing: the downgrade allowlist, the two-axis gate, the logged decision and its reasons, the sticky streak as a pure fold, and the `model-router` settings section with the `/route` command |
 | [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
+| [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the session-credential engine shared by the cursor-session adapter and future consumers |
 | [grok-credential.md](grok-credential.md) | the one Grok Build subscription credential: the single-flight session-credential engine shared by the grok-session adapter and future consumers |
 | [codex-credential.md](codex-credential.md) | the one Codex subscription credential: the single-flight ChatGPT-login session engine shared by the codex-session adapter and future consumers |
 | [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the single-flight Cursor-Agent-CLI session-credential engine every cursor route resolves its bearer token through |

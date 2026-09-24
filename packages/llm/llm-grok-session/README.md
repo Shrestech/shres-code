@@ -34,7 +34,7 @@ The route can present web search and X (Twitter) search as hosted backend tools 
 
 When a switch is on, the matching Responses tool entry is spliced into the outgoing request's tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build CLI itself sends: {"type": "web_search"} and {"type": "x_search"}. Because the names collide with a harness-local tool-web web_search, hosted wins: while hosted web search is on, the local web_search function tool is dropped from the request so the model can reach only the backend tool; a local tool registered for other names is unaffected. A local function tool also named x_search stays in the request while hostedXSearch is on, and its model-invoked calls are promoted to server-tool-call and never execute locally. The hosted x_search invocation is promoted to a server-tool-call content block in the stream, so the agent loop logs it but never dispatches it as a local tool; search results ride the assistant text the model writes.
 
-The provider executes the search; this route never runs a local web_search for it.
+The provider executes the search; this route never runs a local web_search for it. X search is available to conversations on this Grok subscription route, not to other chat providers through the Customize Grok web-search switch. That switch controls the separate API-key-backed web-search method, which returns web results only.
 
 ## Model Experience
 
