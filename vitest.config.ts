@@ -46,7 +46,14 @@ const windowsUnsupportedTests = process.platform === 'win32'
   : []
 
 const windowsUnsupportedCoveragePackages = process.platform === 'win32'
-  ? [...windowsUnsupportedPackages, 'packages/subprocess/*']
+  ? [
+      ...windowsUnsupportedPackages,
+      'packages/subprocess/*',
+      // The default security-tool paths execute a POSIX stand-in script, so the
+      // Windows lane cannot reach them; the injected-hook tests cover the
+      // engine's behavior on every platform.
+      'packages/llm/claude-credential',
+    ]
   : []
 
 // Windows-only packages: their sources execute exclusively on win32 (koffi

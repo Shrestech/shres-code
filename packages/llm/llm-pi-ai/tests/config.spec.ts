@@ -65,6 +65,39 @@ describe('prompt cache key boundary', () => {
   })
 })
 
+describe('anthropic compat declaration boundary', () => {
+  /** Validate one hand-declared anthropic-messages route, the family's protocol. */
+  const anthropicRoute = (profile: Record<string, unknown>): (() => unknown) =>
+    () => Config({
+      providers: {
+        'acme-claude': {
+          api: 'anthropic-messages',
+          baseURL: 'https://acme.test',
+          models: [{ id: 'm' }],
+          ...profile,
+        },
+      },
+    })
+
+  /** Validate that route with the caller's fields on its single model entry. */
+  const anthropicModel = (model: Record<string, unknown>): (() => unknown) =>
+    anthropicRoute({ models: [{ id: 'm', ...model }] })
+
+  it('accepts the anthropic switches at the route and the entry', () => {
+    expect(anthropicRoute({ compat: { forceAdaptiveThinking: true } })).not.toThrow()
+    expect(anthropicModel({ compat: { forceAdaptiveThinking: true, supportsTemperature: false } })).not.toThrow()
+  })
+
+  it('rejects a non-boolean anthropic switch at the write', () => {
+    expect(anthropicModel({ compat: { supportsTemperature: 'no' } })).toThrow(/expected boolean/)
+  })
+
+  it('refuses anthropic switches no model on the route can take', () => {
+    expect(() => { assertServiceable(routeWith({ compat: { forceAdaptiveThinking: true } })() as Config) })
+      .toThrow(/no model on the route speaks anthropic-messages/)
+  })
+})
+
 describe('modality schema boundary', () => {
   it('rejects a modality pi-ai does not know, at either level', () => {
     expect(configWith({ input: ['audio'] })).toThrow(/expected/)

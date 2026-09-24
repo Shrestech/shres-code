@@ -23,6 +23,7 @@ import * as LlmDeepseek from '@shres-code/shres-code-llm-deepseek'
 import * as LlmCliBridge from '@shres-code/shres-code-llm-cli-bridge'
 import * as LlmGrokSession from '@shres-code/shres-code-llm-grok-session'
 import * as LlmCodexSession from '@shres-code/shres-code-llm-codex-session'
+import * as LlmClaudeSession from '@shres-code/shres-code-llm-claude-session'
 import * as LlmXaiApiKey from '@shres-code/shres-code-llm-xai-apikey'
 import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { settingsNamespace } from '@shres-code/shres-code-settings'
@@ -170,6 +171,7 @@ export async function bootModelsCli(shresHome?: string): Promise<Context> {
   await ctx.plugin(LlmCliBridge)
   await ctx.plugin(LlmGrokSession)
   await ctx.plugin(LlmCodexSession)
+  await ctx.plugin(LlmClaudeSession)
   await ctx.plugin(LlmXaiApiKey)
   return ctx
 }

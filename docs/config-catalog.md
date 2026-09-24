@@ -1356,6 +1356,70 @@ export interface Config {
 
 Source: [`packages/ledger/ledger/src/index.ts:162`](../packages/ledger/ledger/src/index.ts)
 
+<a id="shres-codeshres-code-llm-claude-session"></a>
+
+## `@shres-code/shres-code-llm-claude-session`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /** When false, the route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+  /** Credential document path, used where the login keychain is not read. */
+  authPath?: string
+  /** macOS security tool path for the keychain credential source. */
+  securityPath?: string
+  /** Keychain account a rotation writes its item under; defaults to the OS user name. */
+  keychainAccount?: string
+  /** Read the login keychain instead of the credential document. Defaults to true on macOS. */
+  useKeychain?: boolean
+  /** Endpoint base for the API host; defaults to `DEFAULT_BASE_URL`. */
+  baseURL?: string
+  /** Selector label; defaults to `DEFAULT_DISPLAY_NAME`. */
+  displayName?: string
+  /** Model catalog; defaults to `SHIPPED_MODELS`. */
+  models?: ClaudeSessionModelConfig[]
+  /** Refresh leeway in milliseconds; defaults to `DEFAULT_REFRESH_LEEWAY_MS`. */
+  refreshLeewayMs?: number
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface ClaudeSessionModelConfig {
+  /** Model id the subscription accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. The
+   * shipped models serve image input, so their entries declare
+   * `['text', 'image']`, which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+  /**
+   * Anthropic request-format switches for this model: adaptive thinking when
+   * its upstream requires it, and no `temperature` when it rejects one. A
+   * hand-declared route inherits no pi-ai catalog metadata, so these are the
+   * only way its models state what the catalog records for Anthropic's own.
+   */
+  compat?: {
+    /** Whether the model requires adaptive thinking instead of a token budget. */
+    forceAdaptiveThinking?: boolean
+    /** Whether the model accepts the `temperature` request field. */
+    supportsTemperature?: boolean
+  }
+}
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-claude-session/src/config.ts:106`](../packages/llm/llm-claude-session/src/config.ts)
+
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
 ## `@shres-code/shres-code-llm-cli-bridge`
@@ -1719,10 +1783,10 @@ export interface PiAiProviderProfile {
    */
   modelOverrides?: Record<string, PiAiModelOverride>
   /**
-   * Reasoning-dispatch switches for every `openai-completions` model on this
-   * route; each model's own `compat` overrides per field. What neither sets
-   * keeps the installed catalog entry's value, then pi-ai's baseURL-derived
-   * detection.
+   * Reasoning-dispatch switches for every model on this route that speaks the
+   * family's protocol; each model's own `compat` overrides per field. What
+   * neither sets keeps the installed catalog entry's value, then pi-ai's
+   * baseURL-derived detection.
    */
   compat?: PiAiCompatProfile
   /**
@@ -1863,16 +1927,39 @@ export type PiAiModelOverride = Omit<PiAiModelProfile, 'id'>
  * Reasoning-dispatch compatibility switches, set on the route (its models'
  * default) or per model (winning over the route). Only the switches pi-ai's
  * reasoning dispatch reads are offered; the rest of pi-ai's compat surface
- * keeps its baseURL-derived auto-detection. pi-ai types both fields only on
- * `OpenAICompletionsCompat` — the other wire protocols define their reasoning
- * fields in the protocol itself — so resolution rejects a model-level switch
- * anywhere else, while a route-level default skips past models it cannot fit.
+ * keeps its baseURL-derived auto-detection. Each family is typed by exactly one
+ * protocol — the reasoning-parameter switches by `OpenAICompletionsCompat`,
+ * the thinking-format and temperature switches by `AnthropicMessagesCompat` —
+ * so resolution rejects a model-level switch on any other protocol, while a
+ * route-level default skips past models it cannot fit.
  */
 export interface PiAiCompatProfile {
-  /** Reasoning parameter format the endpoint expects; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
+  /**
+   * Reasoning parameter format the endpoint expects, on an `openai-completions`
+   * model; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess.
+   */
   thinkingFormat?: PiAiThinkingFormat
-  /** Whether the endpoint accepts `reasoning_effort`; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
+  /**
+   * Whether the endpoint accepts `reasoning_effort`, on an `openai-completions`
+   * model; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess.
+   */
   supportsReasoningEffort?: boolean
+  /**
+   * Whether the endpoint requires adaptive thinking (`thinking.type:
+   * "adaptive"` with `output_config.effort` instead of a token budget), on an
+   * `anthropic-messages` model; absent keeps the catalog entry's value, then
+   * pi-ai's `false`. A route pi-ai's catalog does not ship cannot inherit that
+   * metadata, and pi-ai's Claude models past Opus 4.5 have deprecated the
+   * budget format.
+   */
+  forceAdaptiveThinking?: boolean
+  /**
+   * Whether the endpoint accepts the Anthropic `temperature` request field, on
+   * an `anthropic-messages` model; absent keeps the catalog entry's value, then
+   * pi-ai's `true`. Claude Opus 4.7 and later reject a non-default
+   * temperature, so a route serving them declares `false`.
+   */
+  supportsTemperature?: boolean
 }
 
 /**
@@ -4834,6 +4921,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
 - `@shres-code/shres-code-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
 - `@shres-code/shres-code-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
+- `@shres-code/shres-code-claude-credential` ([`packages/llm/claude-credential/src/index.ts`](../packages/llm/claude-credential/src/index.ts))
 - `@shres-code/shres-code-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
 - `@shres-code/shres-code-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
 - `@shres-code/shres-code-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
