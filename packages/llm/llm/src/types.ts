@@ -331,6 +331,14 @@ export interface LlmDiscoveredModel {
   audioOutput?: boolean
 }
 
+/**
+ * How a model reasons when a request enables reasoning: `adaptive` lets the
+ * provider decide how much to think within the requested effort, `budget`
+ * spends a fixed thinking-token budget the adapter derives from the effort, and
+ * `none` does not reason.
+ */
+export type LlmThinkingMode = 'adaptive' | 'budget' | 'none'
+
 /** One adapter-discovered model; catalog membership is advisory, not request validation. */
 export interface LlmModelInfo {
   /** Provider route that owns this model entry. */
@@ -356,6 +364,11 @@ export interface LlmModelInfo {
    * may retain a prefix for less. Absent means the adapter does not know.
    */
   promptCacheTtlMs?: number
+  /**
+   * How this route reasons when a request enables reasoning. Absent means the
+   * adapter does not declare it.
+   */
+  thinkingMode?: LlmThinkingMode
 }
 
 /** Provider-owned context capacity for one exact provider/model route. */

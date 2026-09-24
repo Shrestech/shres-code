@@ -1319,7 +1319,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async resolveRequest( agent: Agent, turn: number, step: number, base: ModelSelection, signal: AbortSignal, request: ModelRoutingRequest, ): Promise<ModelSelection | undefined>',
-        description: 'Resolve the route one request should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nEach new downgraded step reassesses the latest task evidence. Same-step retries reuse the judgment only while its complete candidate inputs are unchanged, and recheck manual authority, allowlist membership, and capabilities. A manual-model decision lasts for the turn.',
+        description: 'Resolve the route one request should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nEach new downgraded step reassesses the latest task evidence. Same-step retries reuse the judgment only while its complete candidate inputs are unchanged, and recheck manual authority, `routeFrom` and pool membership, and capabilities. A manual-model decision lasts for the turn.',
         parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: 'step', description: 'the step number within the turn; retries share its judgment.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }, { name: 'request', description: 'frozen conversation content and the manually selected call configuration.' }],
         returns: 'the route to run, or `undefined` to keep the manual route.',
       },
@@ -4374,7 +4374,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -4395,6 +4395,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+  },
+  {
+    name: 'LlmThinkingMode',
+    declaration: 'export type LlmThinkingMode = \'adaptive\' | \'budget\' | \'none\';',
   },
   {
     name: 'LocalOllamaStatus',
@@ -4570,7 +4574,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingCandidate',
-    declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description?: string;\n}',
+    declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description: string;\n}',
   },
   {
     name: 'ModelRoutingInitialMode',
@@ -4581,8 +4585,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
   },
   {
+    name: 'ModelRoutingObjective',
+    declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
+  },
+  {
+    name: 'ModelRoutingRouteFrom',
+    declaration: 'export interface ModelRoutingRouteFrom {\n    readonly provider: string;\n    readonly model: string;\n    readonly objective: ModelRoutingObjective;\n    readonly allowEveryTurn: boolean;\n}',
   },
   {
     name: 'ModelRoutingUnavailablePolicy',
@@ -4750,7 +4762,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',

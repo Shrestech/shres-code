@@ -29,13 +29,17 @@ import ModelRoutingController from '../src/index.ts'
 import { KEEP_CURRENT_OPTION_ID } from '../src/config.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 
-const CANDIDATE = { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model' }
+const CANDIDATE = { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model', description: 'a test candidate' }
+
+/** The one strong route the smallest config routes from. */
+const ROUTE_FROM = { provider: 'strong-provider', model: 'strong-model', objective: 'dollars' } as const
 
 /** The smallest config that resolves; each case perturbs one field. */
 function valid(overrides: Partial<ModelRouterConfig> = {}): ModelRouterConfig {
   return {
     initialMode: 'on',
     candidates: [{ ...CANDIDATE }],
+    routeFrom: [{ ...ROUTE_FROM }],
     downgradeThreshold: 0.8,
     downgradeMargin: 0.1,
     routeInstructions: 'Which route should handle this turn?',
@@ -53,6 +57,7 @@ function withoutDifficultyQuestion(overrides: Partial<ModelRouterConfig> = {}): 
   return {
     initialMode: 'on',
     candidates: [{ ...CANDIDATE }],
+    routeFrom: [{ ...ROUTE_FROM }],
     downgradeThreshold: 0.8,
     downgradeMargin: 0.1,
     routeInstructions: 'Which route should handle this turn?',
@@ -122,12 +127,12 @@ describe('resolveConfig allowlist', () => {
     const resolved = resolveConfig(valid({
       candidates: [
         { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model', reasoningEffort: 'low', description: 'small changes' },
-        { id: 'mid', provider: 'mid-provider', model: 'mid-model' },
+        { id: 'mid', provider: 'mid-provider', model: 'mid-model', description: 'a test candidate' },
       ],
     }))
     expect(resolved.candidates).toEqual([
       { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model', reasoningEffort: 'low', description: 'small changes' },
-      { id: 'mid', provider: 'mid-provider', model: 'mid-model' },
+      { id: 'mid', provider: 'mid-provider', model: 'mid-model', description: 'a test candidate' },
     ])
     expect(resolved.candidates[0]?.description).toBe('small changes')
     // The allowlist is optional in the interface and defaults to empty: routing
@@ -338,6 +343,65 @@ describe('resolveConfig bounds', () => {
       .toEqual({ holdTolerance: 0, breakerThreshold: 3, breakerOpenTurns: 0 })
   })
 
+  it('requires a description of at most 160 characters on every pool candidate', () => {
+    expect(() => resolveConfig(raw({ candidates: [{ id: 'cheap', provider: 'cheap-provider', model: 'cheap-model' }] })))
+      .toThrow('ModelRouterConfig.candidates["cheap"].description must be a non-empty string')
+    expect(() => resolveConfig(valid({ candidates: [{ ...CANDIDATE, description: 'x'.repeat(161) }] })))
+      .toThrow('ModelRouterConfig.candidates["cheap"].description must be at most 160 characters')
+    expect(resolveConfig(valid({ candidates: [{ ...CANDIDATE, description: 'x'.repeat(160) }] })).candidates[0]?.description)
+      .toHaveLength(160)
+  })
+
+  it('routeFrom rejects duplicate and invalid objective', () => {
+    expect(() => resolveConfig(valid({ routeFrom: [{ ...ROUTE_FROM }, { ...ROUTE_FROM, objective: 'latency' }] })))
+      .toThrow('ModelRouterConfig.routeFrom lists "strong-provider/strong-model" more than once')
+    expect(() => resolveConfig(raw({ routeFrom: [{ ...ROUTE_FROM, objective: 'tokens' }] })))
+      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].objective must be "quota", "dollars", or "latency"')
+    expect(() => resolveConfig(raw({ routeFrom: [{ provider: 'strong-provider', model: 'strong-model' }] })))
+      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].objective must be "quota", "dollars", or "latency"')
+    expect(() => resolveConfig(raw({ routeFrom: [{ ...ROUTE_FROM, allowEveryTurn: 'yes' }] })))
+      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].allowEveryTurn must be a boolean')
+    expect(() => resolveConfig(valid({ routeFrom: [{ ...ROUTE_FROM, provider: ' ' }] })))
+      .toThrow('ModelRouterConfig.routeFrom[0].provider must be a non-empty string')
+    expect(() => resolveConfig(valid({ routeFrom: [{ ...ROUTE_FROM, model: '' }] })))
+      .toThrow('ModelRouterConfig.routeFrom[0].model must be a non-empty string')
+    // The same model on another provider is another route.
+    const two = resolveConfig(valid({ routeFrom: [{ ...ROUTE_FROM }, { ...ROUTE_FROM, provider: 'other-provider' }] }))
+    expect(two.routeFrom).toEqual([
+      { ...ROUTE_FROM, allowEveryTurn: false },
+      { ...ROUTE_FROM, provider: 'other-provider', allowEveryTurn: false },
+    ])
+    expect(Object.isFrozen(two.routeFrom)).toBe(true)
+    expect(Object.isFrozen(two.routeFrom[0])).toBe(true)
+  })
+
+  it('latency objective requires deadline <= 200', () => {
+    const latency = { ...ROUTE_FROM, objective: 'latency' as const }
+    expect(() => resolveConfig(valid({ routeFrom: [latency] })))
+      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].objective "latency" requires judgmentDeadlineMs of at most 200')
+    expect(() => resolveConfig(valid({ routeFrom: [latency], judgmentDeadlineMs: 201 })))
+      .toThrow('requires judgmentDeadlineMs of at most 200')
+    expect(resolveConfig(valid({ routeFrom: [latency], judgmentDeadlineMs: 200 })).routeFrom[0]?.objective).toBe('latency')
+  })
+
+  it('quota base refuses every-turn without allowEveryTurn', () => {
+    const quota = { ...ROUTE_FROM, objective: 'quota' as const }
+    expect(() => resolveConfig(valid({ routeFrom: [quota] })))
+      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].objective "quota" requires allowEveryTurn: true under the per-turn entry policy')
+    expect(() => resolveConfig(valid({ routeFrom: [{ ...quota, allowEveryTurn: false }] })))
+      .toThrow('requires allowEveryTurn: true')
+    expect(resolveConfig(valid({ routeFrom: [{ ...quota, allowEveryTurn: true }] })).routeFrom[0])
+      .toEqual({ ...quota, allowEveryTurn: true })
+  })
+
+  it('refuses an empty routeFrom unless routing starts off', () => {
+    expect(() => resolveConfig(valid({ routeFrom: [] })))
+      .toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
+    const { routeFrom: _routeFrom, ...unlisted } = valid()
+    expect(() => resolveConfig(unlisted)).toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
+    expect(resolveConfig({ ...unlisted, initialMode: 'off' }).routeFrom).toEqual([])
+  })
+
   it('rejects the removed turn-counted horizon key by name', () => {
     expect(() => resolveConfig(raw({ minTurnsDowngraded: 5 })))
       .toThrow('ModelRouterConfig: unknown key "minTurnsDowngraded"')
@@ -406,6 +470,10 @@ describe('the composition schema', () => {
     expect(normalized.difficulty).toEqual({ entryScoreCeiling: 2 })
     expect(normalized.reentryCooldownTurns).toBe(2)
     expect(normalized.judgmentDeadlineMs).toBe(1500)
+    expect(normalized.routeFrom).toEqual([])
+    // The schema requires each pool description and bounds its length.
+    expect(() => throughSchema({ ...bare(), candidates: [{ id: 'cheap', provider: 'p', model: 'm' }] })).toThrow()
+    expect(() => throughSchema({ ...bare(), candidates: [{ ...CANDIDATE, description: 'x'.repeat(161) }] })).toThrow()
     expect(normalized.judgmentFailures).toEqual({ holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 })
     expect('difficultyInstructions' in resolved).toBe(false)
     expect(resolved.difficultyToEffort).toBeUndefined()
@@ -523,7 +591,7 @@ describe('resolveConfig defaults and detachment', () => {
       candidates, difficultyLevels: levels, escalateBack: { scoreThreshold: 1 }, difficulty: { entryScoreCeiling: 1 },
     }))
 
-    candidates.push({ id: 'mid', provider: 'mid-provider', model: 'mid-model' })
+    candidates.push({ id: 'mid', provider: 'mid-provider', model: 'mid-model', description: 'a test candidate' })
     candidates[0]!.model = 'mutated-model'
     levels.push('three')
 

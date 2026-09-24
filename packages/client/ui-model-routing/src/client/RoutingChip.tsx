@@ -55,9 +55,11 @@ export function RoutingChip({ useProjection, locked, available, setRouting, rest
   if (!available || routing === undefined) return null
 
   const on = routing.active
-  // Idle is the dead end the projection names: routing is on and every decision
-  // resolves the candidate the session already runs, so no turn can downgrade.
-  const idle = on && routing.last?.reason === 'candidate-equals-base'
+  // Idle is a dead end the projection names: routing is on, but every decision
+  // resolves the candidate the session already runs or finds that routing does
+  // not start from the session's model, so no turn can downgrade.
+  const reason = routing.last?.reason
+  const idle = on && (reason === 'candidate-equals-base' || reason === 'base-unlisted')
   const strong = idle ? routing.lastStrong : undefined
 
   const run = (action: ChipAction, request: () => Promise<string | null>): void => {
@@ -89,7 +91,7 @@ export function RoutingChip({ useProjection, locked, available, setRouting, rest
         {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
         {on ? 'auto' : 'Auto'}
       </button>
-      {idle && <span className={css.idle}>{t('idle.warning')}</span>}
+      {idle && <span className={css.idle}>{t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}</span>}
       {strong !== undefined && (
         <button
           type="button"

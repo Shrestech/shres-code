@@ -12,6 +12,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import AgentDefaultModel from '@shres-code/shres-code-agent-default-model'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import CommandRuntime from '@shres-code/shres-code-commands'
+import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
 // A function plugin: the Loader reads its `name`/`inject`/`apply` namespace, not a default.
 import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
@@ -21,6 +22,7 @@ import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import ModelRoutingController, { KEEP_CURRENT_OPTION_ID, ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
 import * as ModelRouterInvariant from '../src/invariant.ts'
@@ -59,9 +61,13 @@ const ROUTER_CONFIG: readonly string[] = [
   `      - id: ${SCRIPTED_CANDIDATE}`,
   `        provider: ${PROVIDER}`,
   `        model: ${CANDIDATE_MODEL}`,
+  '        description: a small, well-scoped change in familiar code',
   '      - id: vision',
   `        provider: ${PROVIDER}`,
   `        model: ${SECOND_CANDIDATE_MODEL}`,
+  '        description: a small change that reads an image',
+  '    routeFrom:',
+  `      - { provider: ${PROVIDER}, model: ${MANUAL_MODEL}, objective: dollars }`,
   '    downgradeThreshold: 0.7',
   '    downgradeMargin: 0.5',
   '    hold: { minSteps: 3 }',
@@ -102,6 +108,8 @@ interface SpineOptions {
   readonly invariants?: boolean
   /** Router `inTurnFallback`; omitted keeps the documented default. */
   readonly inTurnFallback?: 'manual' | 'off'
+  /** Compose compaction-basic with automatic compaction off, and its summarization route when stated. */
+  readonly compaction?: { readonly summarizationRoute?: 'manual' | 'request' }
 }
 
 /** Boot one test-only cordis.yml through the real Loader and its include builtin. */
@@ -136,6 +144,15 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ...options.invariants === true
       ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
       : [],
+    ...options.compaction === undefined ? [] : [
+      "- name: '@shres-code/shres-code-token-meter'",
+      "- name: '@shres-code/shres-code-compaction-basic'",
+      '  config:',
+      '    auto: false',
+      ...options.compaction.summarizationRoute === undefined
+        ? []
+        : [`    summarizationRoute: ${options.compaction.summarizationRoute}`],
+    ],
     '',
   ].join('\n'))
 
@@ -158,6 +175,8 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ['@shres-code/shres-code-model-router', ModelRoutingController],
     ['@shres-code/shres-code-invariants', InvariantRegistry],
     ['@shres-code/shres-code-model-router/invariant', ModelRouterInvariant],
+    ['@shres-code/shres-code-token-meter', TokenMeter],
+    ['@shres-code/shres-code-compaction-basic', BasicCompactionEngine],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -379,6 +398,33 @@ describe('real Loader composition', () => {
     const secondTurnStart = eventsOfType(agent.session.events, 'turn/start')[1]!
     expect(decisions[1]!.seq).toBeGreaterThan(secondTurnStart.seq)
     expect(headers[0]!.seq).toBeLessThan(secondTurnStart.seq)
+  })
+
+  it('compaction-basic summarizes a held streak on the manual route unless summarizationRoute is request', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    for (const [route, expected] of [[undefined, MANUAL_MODEL], ['request', CANDIDATE_MODEL]] as const) {
+      const loaded = await boot('ROUTED_OK', ['success'], { compaction: route === undefined ? {} : { summarizationRoute: route } })
+      const agent = createAgent(loaded, `router-compaction-${route ?? 'default'}`)
+      await pinManualRoute(loaded, agent)
+      // Long enough that the framed summary is smaller than what it replaces.
+      await turn(agent, `First easy turn. ${'Context line. '.repeat(200)}`)
+      await turn(agent, 'Second easy turn.')
+      expect(eventsOfType(agent.session.events, 'model-routing/decision').at(-1)?.data)
+        .toMatchObject({ outcome: 'downgraded', sticky: { active: true } })
+      const before = server?.requests.length ?? 0
+      expect(requestedModel(before - 1)).toBe(CANDIDATE_MODEL)
+
+      const result = await loaded.compaction.compactNow(agent, new AbortController().signal)
+      expect(result).not.toBeNull()
+      // The one summarization request ran on the expected route, and the log records it.
+      expect(server?.requests).toHaveLength(before + 1)
+      expect(requestedModel(before)).toBe(expected)
+      const summary = eventsOfType(agent.session.events, 'compaction/summary').at(-1)?.data
+      expect(summary).toMatchObject({ provider: PROVIDER, model: expected })
+      await context?.fiber.dispose()
+      context = undefined
+      await server?.close()
+      server = undefined
+    }
   })
 
   it('reports the session’s own selection while a held streak serves the routed candidate', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {

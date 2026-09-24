@@ -185,6 +185,14 @@ describe('RoutingChip', () => {
     expect(view.container.textContent).not.toContain(STRONG.model)
   })
 
+  it('reports the unlisted-base idle state with its own warning and the restore', () => {
+    setup({ routing: idle({ last: { outcome: 'kept-strong', reason: 'base-unlisted' } }) })
+
+    expect(screen.getByText(en['idle.unlisted'])).toBeTruthy()
+    expect(screen.queryByText(en['idle.warning'])).toBeNull()
+    expect(restoreChip()).toBeTruthy()
+  })
+
   it('reports the idle state without a restore while no streak has recorded a route', () => {
     setup({ routing: IDLE_WITHOUT_BASE })
 

@@ -816,6 +816,31 @@ describe('provider profile lifecycle', () => {
     expect(asked).toContainEqual(['deepseek', 'deepseek-v4-flash'])
   })
 
+  it('declares the thinking mode of Anthropic Messages models and none for other protocols', async () => {
+    const adapter = adapterOf({
+      anthropic: {
+        models: [
+          { id: 'claude-opus-5' },
+          { id: 'claude-sonnet-5' },
+          { id: 'claude-haiku-4-5' },
+          { id: 'plain-anthropic', name: 'Plain', contextWindow: 100_000, maxTokens: 8_000 },
+        ],
+      },
+      deepseek: {},
+    })
+    const listed = await adapter.listModels('anthropic')
+    // The catalog's adaptive models run adaptive thinking.
+    expect(listed.find(model => model.id === 'claude-opus-5')?.thinkingMode).toBe('adaptive')
+    // A reasoning model without forced adaptive thinking runs a fixed budget.
+    expect(listed.find(model => model.id === 'claude-haiku-4-5')?.thinkingMode).toBe('budget')
+    await expect(adapter.resolveModel('anthropic', 'claude-haiku-4-5')).resolves.toMatchObject({ thinkingMode: 'budget' })
+    await expect(adapter.resolveModel('anthropic', 'claude-sonnet-5')).resolves.toMatchObject({ thinkingMode: 'adaptive' })
+    await expect(adapter.resolveModel('anthropic', 'plain-anthropic')).resolves.toMatchObject({ thinkingMode: 'none' })
+    // Other protocols declare nothing.
+    for (const model of await adapter.listModels('deepseek')) expect(model).not.toHaveProperty('thinkingMode')
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-flash')).not.toHaveProperty('thinkingMode')
+  })
+
   it('declares no prompt-cache lifetime when the owner supplies no hook', async () => {
     const adapter = adapterOf({ deepseek: { cacheRetention: 'long' } })
     // The profile's retention alone does not name the upstream's lifetime.

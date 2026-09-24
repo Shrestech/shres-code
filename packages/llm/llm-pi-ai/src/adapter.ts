@@ -43,6 +43,7 @@ import type {
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  LlmThinkingMode,
   ReasoningEffortId as ReasoningEffortIdType,
   ResolvedRetryPolicy,
   StreamChunk,
@@ -318,6 +319,19 @@ export class PiAiAdapter extends LlmAdapter {
     return tools === undefined ? {} : { hostedTools: [...tools] }
   }
 
+  /**
+   * The thinking mode an Anthropic Messages route runs, or nothing for other
+   * protocols: pi-ai sends adaptive thinking to a model whose compat sets
+   * `forceAdaptiveThinking`, a fixed thinking budget to any other reasoning
+   * model, and no thinking to a non-reasoning one.
+   */
+  private thinkingModeOf(model: Model<Api>): { thinkingMode: LlmThinkingMode } | Record<string, never> {
+    if (model.api !== 'anthropic-messages') return {}
+    if (!model.reasoning) return { thinkingMode: 'none' }
+    const compat = model.compat as { forceAdaptiveThinking?: boolean } | undefined
+    return { thinkingMode: compat?.forceAdaptiveThinking === true ? 'adaptive' : 'budget' }
+  }
+
   /** The owner-declared prompt-cache lifetime for one model, or nothing to declare none. */
   private promptCacheTtlOf(
     provider: string,
@@ -349,6 +363,7 @@ export class PiAiAdapter extends LlmAdapter {
         inputModalities: [...model.input],
         ...this.hostedToolsOf(profile, model.id),
         ...this.promptCacheTtlOf(provider, model.id),
+        ...this.thinkingModeOf(model),
       }))
     })
   }
@@ -373,6 +388,7 @@ export class PiAiAdapter extends LlmAdapter {
         inputModalities: [...resolvedModel.input],
         ...this.hostedToolsOf(profile, model),
         ...this.promptCacheTtlOf(provider, model),
+        ...this.thinkingModeOf(resolvedModel),
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),

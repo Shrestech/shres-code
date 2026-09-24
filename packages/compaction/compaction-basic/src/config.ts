@@ -38,6 +38,7 @@ const POLICY_CONFIG_KEYS = [
   'retainTokens',
   'summarizationProvider',
   'summarizationModel',
+  'summarizationRoute',
   'maxTokens',
   'compactionRetries',
   'maxOverflowRetries',
@@ -104,6 +105,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     ...retention,
     summarizationProvider: config.summarizationProvider ?? '',
     summarizationModel: config.summarizationModel ?? '',
+    summarizationRoute: config.summarizationRoute ?? 'manual',
     maxTokens: config.maxTokens ?? 8192,
     compactionRetries: config.compactionRetries ?? 1,
     maxOverflowRetries: config.maxOverflowRetries ?? 1,
@@ -137,6 +139,7 @@ export function resolveTargetPolicy(
     ...resolveRetention(override ?? {}, inheritedRetention),
     summarizationProvider: override?.summarizationProvider ?? config.summarizationProvider,
     summarizationModel: override?.summarizationModel ?? config.summarizationModel,
+    summarizationRoute: override?.summarizationRoute ?? config.summarizationRoute,
     maxTokens: override?.maxTokens ?? config.maxTokens,
     compactionRetries: override?.compactionRetries ?? config.compactionRetries,
     maxOverflowRetries: override?.maxOverflowRetries ?? config.maxOverflowRetries,
@@ -180,6 +183,7 @@ export function resolveCompactSpec(
     retainTokens,
     summarizationProvider: policy.summarizationProvider,
     summarizationModel: policy.summarizationModel,
+    summarizationRoute: policy.summarizationRoute,
     maxTokens: policy.maxTokens,
     compactionRetries: policy.compactionRetries,
     maxOverflowRetries: policy.maxOverflowRetries,
@@ -274,6 +278,10 @@ function validatePolicy(
   }
 
   validateSummarizationPair(config, name)
+  const route = config.summarizationRoute
+  if (route !== undefined && route !== 'manual' && route !== 'request') {
+    throw new Error(`${name}.summarizationRoute must be "manual" or "request"`)
+  }
 }
 
 /** Require one scope to omit, clear, or replace the summarization target as a pair. */

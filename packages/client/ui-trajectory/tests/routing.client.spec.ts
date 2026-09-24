@@ -188,6 +188,33 @@ describe('trajectoryRoutingRow', () => {
     expect(en[ROUTING_REASON_KEYS['breaker-open']]).toBe('judgment paused after repeated failures')
   })
 
+  it('shows base-unlisted as the quiet marker, and as a visible exit when it ends a streak', () => {
+    const unlisted = decision({ outcome: 'kept-strong', reason: 'base-unlisted', sticky: { active: false, stepsElapsed: 0 } }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(unlisted)).toEqual({ outcome: 'kept-strong', reason: 'base-unlisted', quiet: true })
+    const ended = decision({
+      outcome: 'kept-strong',
+      reason: 'base-unlisted',
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'base-unlisted' },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(ended)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'base-unlisted',
+      streak: { kind: 'exited', reason: 'base-unlisted' },
+      quiet: false,
+    })
+    expect(en[ROUTING_REASON_KEYS['base-unlisted']]).toBe('routing does not start from this model')
+    expect(ROUTING_BREAK_KEYS['base-unlisted']).toBe('routing.reason.baseUnlisted')
+  })
+
+  it('shows thinking-mode-incompatible as the quiet marker with its label', () => {
+    const refused = decision({
+      outcome: 'kept-strong', reason: 'thinking-mode-incompatible', sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(refused)).toEqual({ outcome: 'kept-strong', reason: 'thinking-mode-incompatible', quiet: true })
+    expect(en[ROUTING_REASON_KEYS['thinking-mode-incompatible']])
+      .toBe('manual model thinks on a fixed budget, which a return would lose')
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',

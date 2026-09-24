@@ -37,11 +37,13 @@ The router's config in `route-on` is frozen here: `tier: "fast"`,
 `reentryCooldownTurns: 2`, `escalateBack: { scoreThreshold: 4 }`,
 `maxRouteErrors: 2`, `onUnavailable: "fallback"`, `judgmentDeadlineMs: 1500`,
 `judgmentFailures: { holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 }`,
+`routeFrom: [{ provider: "deepseek-official", model: "deepseek-v4-pro", objective: "dollars" }]`,
 and exactly one candidate (the weak route). Amendment: the step-counted
 `hold`, the entry ceiling, and the re-entry cooldown replace the turn-counted
 `minTurnsDowngraded: 5` this arm was first frozen with, which the router no
-longer accepts, and the judgment deadline and failure handling are pinned at
-their defaults. No trial was recorded under the original rule: the repository
+longer accepts, the judgment deadline and failure handling are pinned at
+their defaults, and `routeFrom` names the pinned strong route, which the
+router now requires before it routes from any route. No trial was recorded under the original rule: the repository
 holds no `route-on` or `route-off` run, and the stored runs in
 `bench/analysis/out-of-loop-stored-runs.json` cover only the J-Space
 experiments. The confirmatory routing preregistration is PR 16 of the

@@ -484,7 +484,22 @@ interface LlmModelInfo {
    * may retain a prefix for less. Absent means the adapter does not know.
    */
   promptCacheTtlMs?: number
+  /**
+   * How this route reasons when a request enables reasoning. Absent means the
+   * adapter does not declare it.
+   */
+  thinkingMode?: LlmThinkingMode
 }
+```
+
+```ts type-equiv
+/**
+ * How a model reasons when a request enables reasoning: `adaptive` lets the
+ * provider decide how much to think within the requested effort, `budget`
+ * spends a fixed thinking-token budget the adapter derives from the effort, and
+ * `none` does not reason.
+ */
+type LlmThinkingMode = 'adaptive' | 'budget' | 'none'
 ```
 
 Correctness-sensitive metadata is resolved separately from the advisory catalog and is owned by the adapter serving the exact route. Context capacity, adapter call defaults, and reasoning choices share one exact-model result so consumers do not repeat authoritative model resolution.
@@ -933,7 +948,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:298`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:311`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -982,5 +997,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:68`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:69`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -632,6 +632,52 @@ describe('LlmRuntime', () => {
       .resolves.toEqual({ provider: 'route', id: 'unknown', name: 'unknown' })
   })
 
+  it('rejects an unknown exact thinking mode', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends ScriptedAdapter {
+      override resolveModel(): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider: 'route', id: 'model', name: 'Model', thinkingMode: 'interleaved' } as unknown as LlmResolvedModelInfo)
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+
+    await expect(ctx.llm.resolveModelInfo('route', 'model'))
+      .rejects.toMatchObject({ code: 'INVALID_MODEL_THINKING_MODE' })
+  })
+
+  it('passes a declared thinking mode through listing and exact resolution', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends ScriptedAdapter {
+      override listModels(): Promise<readonly LlmModelInfo[]> {
+        return Promise.resolve([
+          { provider: 'route', id: 'budget', name: 'Budget', thinkingMode: 'budget' },
+          { provider: 'route', id: 'unknown', name: 'Unknown' },
+        ])
+      }
+
+      override resolveModel(_provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({
+          provider: 'route', id: model, name: model,
+          ...model === 'unknown' ? {} : { thinkingMode: model === 'budget' ? 'budget' : 'adaptive' },
+        })
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+
+    await expect(ctx.llm.listModels('route')).resolves.toEqual([
+      { provider: 'route', id: 'budget', name: 'Budget', thinkingMode: 'budget' },
+      { provider: 'route', id: 'unknown', name: 'Unknown' },
+    ])
+    await expect(ctx.llm.resolveModelInfo('route', 'budget'))
+      .resolves.toEqual({ provider: 'route', id: 'budget', name: 'budget', thinkingMode: 'budget' })
+    await expect(ctx.llm.resolveModelInfo('route', 'adaptive'))
+      .resolves.toEqual({ provider: 'route', id: 'adaptive', name: 'adaptive', thinkingMode: 'adaptive' })
+    await expect(ctx.llm.resolveModelInfo('route', 'unknown'))
+      .resolves.toEqual({ provider: 'route', id: 'unknown', name: 'unknown' })
+  })
+
   it('preserves modality metadata through exact model resolution', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -1095,6 +1141,7 @@ describe('LlmRuntime', () => {
     [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: -1 }, 'negative prompt-cache TTL'],
     [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: 1.5 }, 'fractional prompt-cache TTL'],
     [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: Number.NaN }, 'NaN prompt-cache TTL'],
+    [{ provider: 'route', id: 'm', name: 'M', thinkingMode: 'interleaved' }, 'unknown thinking mode'],
   ] as const)('rejects invalid model metadata (%s: %s)', async (metadata, _label) => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
