@@ -1418,7 +1418,7 @@ export interface ClaudeSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:106`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -4882,7 +4882,7 @@ export interface EscalationTurnFailureStreakConfig {
 
 Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
-Source: [`packages/team/worker-escalation/src/config.ts:160`](../packages/team/worker-escalation/src/config.ts)
+Source: [`packages/team/worker-escalation/src/config.ts:153`](../packages/team/worker-escalation/src/config.ts)
 
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
@@ -5048,6 +5048,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
 - `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-progress-signals` ([`packages/team/progress-signals/src/index.ts`](../packages/team/progress-signals/src/index.ts))
 - `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
 - `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))

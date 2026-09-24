@@ -476,7 +476,7 @@ Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/comp
 'escalation/decision': EscalationDecision
 ```
 
-Source: [`packages/team/worker-escalation/src/types.ts:268`](../packages/team/worker-escalation/src/types.ts)
+Source: [`packages/team/worker-escalation/src/types.ts:230`](../packages/team/worker-escalation/src/types.ts)
 
 ### `feedback/*`
 
