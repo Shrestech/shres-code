@@ -29,7 +29,7 @@ A text reply, a second tool call, or an answer cut off at the output limit is `I
 
 **Temperature refusal is a route fact.** `LlmResolvedModelInfo` gains `acceptsTemperature?: boolean`. `false` means the route rejects or discards a stated temperature for that model, and absence is no claim. The llm runtime validates and carries it. The pi-ai adapter sets it from the Anthropic compat switch that makes pi-ai omit the field, and llm-cli-bridge declares it for every model, because its stream refuses a stated temperature. A configured `temperature` on such a model leaves the engine `unconfigured`, with a detail naming the field, logged once as an error. It is never sent and silently dropped. This is the earliest resolvable point: adapters register after load and can change at runtime, so the check cannot run in the config schema.
 
-**One request, no retry.** Each ask consults the redactor exactly once, bounds the redacted state by `maxStateTokens` counted as UTF-8 bytes (no tokenizer emits more tokens than bytes), and makes one request bounded by `timeoutMs`. The caller's signal cancels it, and a cancelled ask fails `ABORTED` even when the route finished anyway. A failed request fails `UNAVAILABLE`, and its `LlmFailure` becomes the cause.
+**One request, no retry.** Each ask consults the redactor exactly once, bounds the redacted state by `maxStateTokens` counted as UTF-8 bytes (no tokenizer emits more tokens than bytes), and makes one request bounded by `timeoutMs`. The caller's signal is honoured at every await: the redaction and the request run through the judgment package's `abortableJudgmentStep`, so the ask settles `ABORTED` as soon as the signal aborts even when the redactor or the route is slow to observe it. The request also receives the signal, and a cancelled ask fails `ABORTED` even when the route finished anyway. A failed request fails `UNAVAILABLE`, and its `LlmFailure` becomes the cause.
 
 **Usage rides on the result.** `JudgmentResult.usage?: TokenUsage` carries the judge request's usage exactly as the adapter reported it, so `TokenUsage`'s presence contract holds unchanged: a cache count is present exactly when the provider reported it, and a reader uses `cacheCount`. The field is absent when the route reported nothing. The dispatcher's spread keeps the field on a routed result.
 
@@ -87,6 +87,6 @@ Later work:
   - the redactor called once, and the byte bound after redaction;
   - one request with no retry;
   - the timeout;
-  - cancellation before, during redaction, during the request, and after the route finished.
+  - cancellation before, during redaction, during the request, and after the route finished, including a redactor that never settles and a route that ignores the signal.
 - `tests/loader-composition.spec.ts` boots file settings, `judgment-dispatch` with a local default engine, the llm runtime, DeepSeek pointed at the mock LLM server, and this package through the real Loader. A settings write selects `llm:deepseek-official/deepseek-v4-flash`. The next ask reaches the mock server with the `judgment_answer` tool and returns normalised probabilities with `engineId` stamped and `usage` present.
 - The llm runtime and pi-ai adapter tests cover `acceptsTemperature`: it is carried and validated, and it is declared only for an Anthropic model whose request body really omits a stated temperature.

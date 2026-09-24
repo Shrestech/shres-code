@@ -17,7 +17,9 @@
  * route is resolved again whenever the llm adapter topology changes. The
  * optional `ctx.judgmentRedactor` hook is consulted exactly once for each ask
  * that sends a request, before the size bound is checked, and each ask makes
- * exactly one model request with no retry.
+ * exactly one model request with no retry. The caller's signal is honoured at
+ * every await: the redaction and the request each settle the ask with
+ * `ABORTED` as soon as it aborts, and the request also receives the signal.
  *
  * @module @shres-code/shres-code-judgment-llm
  */
@@ -25,7 +27,13 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import {
+  abortableJudgmentStep,
+  JudgmentError,
+  judgmentEngineId,
+  registerJudgmentEngine,
+  throwIfJudgmentAborted,
+} from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentEngineDescriptor,
@@ -54,6 +62,9 @@ const NO_CONFIG = {} as LlmJudgmentConfig
 type LlmJudgmentStatus =
   | { readonly state: 'ready' }
   | { readonly state: 'starting' | 'unavailable' | 'unconfigured'; readonly detail: string }
+
+/** Diagnostic of every `ABORTED` failure an ask reports. */
+const ABORTED_MESSAGE = 'judgment-llm: the ask was cancelled by the caller'
 
 /** Status while the configured route has not resolved yet. */
 const STARTING: LlmJudgmentStatus = Object.freeze({ state: 'starting', detail: 'resolving the configured llm route' })
@@ -153,11 +164,10 @@ export class LlmJudgmentEngine implements JudgmentEngine {
    */
   async ask(input: JudgmentInput): Promise<JudgmentResult> {
     const startedAt = performance.now()
-    throwIfCancelled(input.signal)
+    throwIfJudgmentAborted(input.signal, ABORTED_MESSAGE)
     const model = this.readyModel()
     if (input.questions.length === 0) return { answers: [], engine: ENGINE, model, latencyMs: 0 }
-    const state = await this.redactState(input.state)
-    throwIfCancelled(input.signal)
+    const state = await abortableJudgmentStep(() => this.redactState(input.state), input.signal, ABORTED_MESSAGE)
     const stateBytes = Buffer.byteLength(state, 'utf8')
     if (stateBytes > this.config.maxStateTokens) {
       throw new JudgmentError(
@@ -167,10 +177,10 @@ export class LlmJudgmentEngine implements JudgmentEngine {
     }
     const deadline = AbortSignal.timeout(this.config.timeoutMs)
     const signal = input.signal === undefined ? deadline : AbortSignal.any([input.signal, deadline])
-    const assembler = new BlockAssembler()
-    for await (const chunk of this.ctx.llm.stream(this.request(state, input.questions, signal))) assembler.push(chunk)
-    // A cancelled ask fails even when the route finished the request anyway.
-    throwIfCancelled(input.signal)
+    const request = this.request(state, input.questions, signal)
+    // The route receives the combined signal; the step also settles the ask at
+    // once, even for an adapter that finishes the request anyway.
+    const assembler = await abortableJudgmentStep(() => this.collect(request), input.signal, ABORTED_MESSAGE)
     const finish = assembler.finish
     if (finish.kind === 'aborted' || finish.kind === 'error') {
       if (deadline.aborted) {
@@ -202,6 +212,13 @@ export class LlmJudgmentEngine implements JudgmentEngine {
       latencyMs: Math.round(performance.now() - startedAt),
       ...usage === undefined ? {} : { usage: { ...usage } },
     }
+  }
+
+  /** Read one judge request's stream to its end. */
+  private async collect(request: GenerateOptions): Promise<BlockAssembler> {
+    const assembler = new BlockAssembler()
+    for await (const chunk of this.ctx.llm.stream(request)) assembler.push(chunk)
+    return assembler
   }
 
   /** The judge request for one redacted state. */
@@ -296,11 +313,5 @@ function statusKey(status: LlmJudgmentStatus): string {
   return status.state === 'ready' ? status.state : `${status.state}\n${status.detail}`
 }
 
-/** Fail an ask the caller has cancelled. */
-function throwIfCancelled(signal: AbortSignal | undefined): void {
-  if (signal?.aborted === true) {
-    throw new JudgmentError('ABORTED', 'judgment-llm: the ask was cancelled by the caller', { cause: signal.reason })
-  }
-}
 
 export default LlmJudgmentEngine

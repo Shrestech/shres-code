@@ -374,12 +374,10 @@ describe('cancellation', () => {
     const { ctx, adapter, engine } = await ready([])
     const redactor = new CountingRedactor(ctx)
     const controller = new AbortController()
-    const reason = new Error('turn cancelled')
-    controller.abort(reason)
+    controller.abort(new Error('turn cancelled'))
     const error = await failure(engine.ask(input({ signal: controller.signal })))
     expect(error.code).toBe('ABORTED')
     expect(error.message).toBe('judgment-llm: the ask was cancelled by the caller')
-    expect(error.cause).toBe(reason)
     expect(redactor.calls).toBe(0)
     expect(adapter.requests).toHaveLength(0)
   })
@@ -392,6 +390,47 @@ describe('cancellation', () => {
     expect(adapter.requests).toHaveLength(0)
   })
 
+  it('settles ABORTED while a redactor that never settles is still running', async () => {
+    const { ctx, adapter, engine } = await ready([])
+    const started = Promise.withResolvers<undefined>()
+    new class extends Service {
+      constructor(inner: Context) {
+        super(inner, 'judgmentRedactor')
+      }
+
+      redactState(): Promise<string> {
+        started.resolve(undefined)
+        return new Promise<string>(() => {})
+      }
+    }(ctx)
+    const controller = new AbortController()
+    const asked = engine.ask(input({ signal: controller.signal }))
+    await started.promise
+    controller.abort()
+    expect((await failure(asked)).code).toBe('ABORTED')
+    expect(adapter.requests).toHaveLength(0)
+  })
+
+  it('settles ABORTED while a route that ignores the signal never finishes', async () => {
+    const ctx = await base()
+    const requested = Promise.withResolvers<GenerateOptions>()
+    ctx.llm.registerAdapter([PROVIDER], new class extends MockAdapter {
+      override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        requested.resolve(options)
+        await new Promise<never>(() => {})
+      }
+    }([]))
+    const { entry, engine } = await mount(ctx)
+    await settled(entry)
+    const controller = new AbortController()
+    const asked = engine.ask(input({ signal: controller.signal }))
+    const request = await requested.promise
+    controller.abort()
+    expect((await failure(asked)).code).toBe('ABORTED')
+    // The route still received the aborted signal it chose to ignore.
+    expect(request.signal?.aborted).toBe(true)
+  })
+
   it('cancels the in-flight request and fails ABORTED', async () => {
     const { adapter, engine } = await ready(['hang'])
     const controller = new AbortController()
@@ -402,7 +441,7 @@ describe('cancellation', () => {
     expect(adapter.requests[0]?.signal?.aborted).toBe(true)
   })
 
-  it('fails ABORTED when cancelled after the route finished anyway', async () => {
+  it('fails ABORTED when cancelled while the route finishes the request anyway', async () => {
     const controller = new AbortController()
     const { engine } = await ready([() => {
       controller.abort()

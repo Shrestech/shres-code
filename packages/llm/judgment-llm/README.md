@@ -47,7 +47,7 @@ The judge answers through one `judgment_answer` tool call whose parameter schema
 - `confidence` is `1 − H(p) / ln(n)`: normalised Shannon entropy subtracted from 1 over the `n` options or levels. It is 0 for a uniform distribution and 1 when one key holds all the probability or the question has one key;
 - a choice's `option` is the highest-probability key, the earliest listed on a tie, and a score is the probability-weighted level index.
 
-Any other answer, a text reply, a second tool call, or an answer cut off at the output limit fails the ask `INVALID_ANSWER`. A cancelled `input.signal` fails it `ABORTED` and cancels an in-flight request.
+Any other answer, a text reply, a second tool call, or an answer cut off at the output limit fails the ask `INVALID_ANSWER`. The ask honours `input.signal` at every await: the redaction and the request each settle it `ABORTED` as soon as the signal aborts, even when the redactor or the route is slow to observe cancellation, and the request also receives the signal so the route can stop.
 
 A result reports `engine: 'llm'`, the configured `model`, which the llm runtime requires the adapter to resolve under exactly that id, `latencyMs`, and the request's `usage` when the route reported it.
 
