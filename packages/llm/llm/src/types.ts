@@ -374,6 +374,13 @@ export interface LlmResolvedModelInfo extends LlmModelInfo {
   defaultMaxTokens?: number
   /** Adapter-owned selectable reasoning levels when exposed. */
   reasoning?: LlmModelReasoningInfo
+  /**
+   * `false` when this route rejects or discards a stated
+   * {@link GenerateOptions.temperature} for this model. Absent when the adapter
+   * makes no claim, so a caller that must not have its temperature dropped
+   * treats only `false` as refusal.
+   */
+  acceptsTemperature?: boolean
 }
 
 /**

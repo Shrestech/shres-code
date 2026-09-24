@@ -13,6 +13,7 @@ import type {
   JudgmentEngineId,
   JudgmentQuestion,
 } from '@shres-code/shres-code-judgment'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
 
 interface JudgmentInput {
   state: string
@@ -28,10 +29,11 @@ interface JudgmentResult {
   model: string
   latencyMs: number
   engineId?: JudgmentEngineId
+  usage?: TokenUsage
 }
 ```
 
-Answers come back in the order the questions were asked, each carrying its question's `id`. An omitted `tier` resolves to `accurate`: the cheap tier is an explicit optimization, so silence must not weaken a decision. `engine` names the provider that served the ask and `model` the exact model that answered — a provider serving tier aliases reports the model id the alias resolved to, which is what makes an answer reproducible from a log. `consumer` names the asking consumer (`judgmentConsumerId(value)` brands it) so a dispatcher can apply a per-consumer engine override, and `engineId` is the registry id of the engine a dispatcher routed the ask to.
+Answers come back in the order the questions were asked, each carrying its question's `id`. An omitted `tier` resolves to `accurate`: the cheap tier is an explicit optimization, so silence must not weaken a decision. `engine` names the provider that served the ask and `model` the exact model that answered — a provider serving tier aliases reports the model id the alias resolved to, which is what makes an answer reproducible from a log. `consumer` names the asking consumer (`judgmentConsumerId(value)` brands it) so a dispatcher can apply a per-consumer engine override, and `engineId` is the registry id of the engine a dispatcher routed the ask to. `usage` is the token usage of the model request an engine made through `ctx.llm` for the ask, exactly as that route's adapter reported it: `inputTokens` counts uncached input only, and a cache count is present only when the adapter reported one. An engine that made no such request, or whose route reported no usage, omits it.
 
 Every failure is one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` (no usable credential, thrown before any request, or a selected engine no provider registered), `UNAVAILABLE` (the engine could not be reached, refused the request, or is not `ready`), `INPUT_TOO_LARGE` (the complete serialized input exceeds a provider limit before transport), `INVALID_ANSWER` (the response did not match the question kind or was malformed), and `ABORTED` (the ask was cancelled through `input.signal`).
 
@@ -183,7 +185,7 @@ Fitting measures alternatives within one independent judgment operation. It does
 - **The toggle gates consumers, not the engine** — `ctx.judgment.ask` answers while the service is mounted regardless of `judgment.enabled`; a consumer reads the toggle itself and takes its own engine-absent path. A deployment that wants the engine physically out of the composition withdraws the plugin instead.
 - **Consumer decisions are out of scope** — the seam reports probabilities and confidence and applies no threshold, margin, or fallback. A consumer that acts on an answer owns the band it treats as safe, and thresholds do not transfer between question kinds.
 - **State is text** — `JudgmentInput.state` is a string, so a consumer with structured state serializes it itself. Sending the engine a JSON object or an array of text values directly is deferred until a consumer needs it.
-- **Engine status is provider-reported** — the shipped `typesafe` and `shield` engines always report `ready` and surface a missing credential or unreachable endpoint per ask; a provider that supervises a process reports its own lifecycle through `status()`.
+- **Engine status is provider-reported** — the shipped `typesafe` and `shield` engines always report `ready` and surface a missing credential or unreachable endpoint per ask; the `llm:<provider>/<model>` engine reports whether its `ctx.llm` route resolves; a provider that supervises a process reports its own lifecycle through `status()`.
 - **Fitting is provider-optional** — `JudgmentEngine.fitting` is absent when a provider cannot measure and judge atomically. Consumers that need ordered candidate selection must handle an absent capability and the explicit `unfit` capacity result.
 - **The redaction hook covers state only** — question instructions, criteria, options, and levels are consumer-authored and pass through unchanged, and nothing here caps their size. A deployment that must bound egress caps the state it builds.
 - **No session event** — an ask is a model request a consumer made, not a session-log record: nothing in this package emits, replays, or persists. A consumer that must reconstruct why it asked logs its own decision.

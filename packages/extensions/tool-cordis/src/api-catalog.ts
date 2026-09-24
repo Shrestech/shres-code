@@ -4225,7 +4225,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentResult',
-    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n    engineId?: JudgmentEngineId;\n}',
+    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n    engineId?: JudgmentEngineId;\n    usage?: TokenUsage;\n}',
   },
   {
     name: 'JudgmentScoreAnswer',
@@ -4357,7 +4357,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmResolvedModelInfo',
-    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n}',
+    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n    acceptsTemperature?: boolean;\n}',
   },
   {
     name: 'LlmRuntime',

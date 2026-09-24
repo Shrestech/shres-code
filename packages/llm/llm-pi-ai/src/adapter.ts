@@ -194,6 +194,21 @@ function resolveReasoningLevel(
 }
 
 /**
+ * The temperature fact pi-ai's request builder acts on. An Anthropic-protocol
+ * model whose compat declares `supportsTemperature: false` has a stated
+ * temperature omitted from the request without any error, so the route
+ * declares that refusal instead of letting a caller's value vanish.
+ * @param model - the resolved pi-ai model.
+ * @returns `{ acceptsTemperature: false }` for that refusal, otherwise nothing.
+ */
+function temperatureInfo(model: Model<Api>): { acceptsTemperature?: false } {
+  if (model.api !== 'anthropic-messages') return {}
+  // Model<Api>'s compat is a union over every protocol; the api check selects Anthropic's.
+  const compat = model.compat as { supportsTemperature?: boolean } | undefined
+  return compat?.supportsTemperature === false ? { acceptsTemperature: false } : {}
+}
+
+/**
  * Selectable reasoning efforts for one model, or nothing at all.
  *
  * A model that carries no reasoning metadata — every hand-declared one, and
@@ -357,6 +372,7 @@ export class PiAiAdapter extends LlmAdapter {
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),
+        ...temperatureInfo(resolvedModel),
       }
     })
   }
