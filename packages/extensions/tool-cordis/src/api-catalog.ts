@@ -5002,7 +5002,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SkillSource',
-    declaration: 'export type SkillSource = \'project-shres\' | \'project-agents\' | \'runtime\' | \'user-shres\' | \'user-agents\' | \'custom\' | \'bundled\' | (string & {});',
+    declaration: 'export type SkillSource = \'project-shres\' | \'project-agents\' | \'runtime\' | \'user-shres\' | \'user-agents\' | \'custom\' | \'bundled\' | \'installed\' | (string & {});',
   },
   {
     name: 'SkillSummary',

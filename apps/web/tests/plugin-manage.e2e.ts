@@ -29,7 +29,7 @@ async function startWeb(root: string): Promise<RunningWeb> {
   ], {
     cwd: join(root, 'workspace'),
     env: {
-      PATH: process.env.PATH, HOME: join(root, 'home-user'), TMPDIR: join(root, 'tmp'), CI: '1',
+      PATH: process.env.PATH, HOME: join(root, 'home-user'), TMPDIR: join(root, 'tmp'),
       npm_config_userconfig: join(root, 'npmrc'), npm_config_globalconfig: join(root, 'npm-globalrc'),
       DEEPSEEK_API_KEY: 'keyless-installer-no-model-call',
       SHRES_HOME: join(root, 'home'), SHRES_AGENTS_HOME: join(root, 'agents'),

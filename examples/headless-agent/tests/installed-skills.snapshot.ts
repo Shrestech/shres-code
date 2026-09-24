@@ -17,6 +17,7 @@ describe('installed skill headless snapshot', () => {
     const result = await runLoaderSmoke({
       label: 'installed skill headless snapshot', tempDirPrefix: 'installed-skill-snapshot-',
       binScript, libBinScript: binScript, configPath, tsconfigPath,
+      // Uncompressed session output; the local fixture supplies every model response.
       env: { SHRES_SNAPSHOT: 'refresh' },
       prepare: async (cwd) => {
         const shresHome = join(cwd, '.shres')

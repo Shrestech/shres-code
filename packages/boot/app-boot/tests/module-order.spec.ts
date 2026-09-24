@@ -1,8 +1,4 @@
-/**
- * Fresh-module-order regression: profile.ts reaches its patch-file loader
- * through the leaf patch-files module, so entering the profile module first
- * can no longer observe a partially initialized package index.
- */
+/** The profile-first import order exercises the eager protected-bundle set's dependency on initialized template constants. */
 
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PROFILE_BUNDLES, PROFILE_TEMPLATES } from '../src/profile.ts'

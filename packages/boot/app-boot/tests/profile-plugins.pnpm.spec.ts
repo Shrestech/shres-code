@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_PROFILE_BUNDLES, healProfilesModuleFallback, initProfile, resolveProfileDir } from '../src/profile.ts'
 import { beginPluginInstall, pluginStates, removePlugin, withRecoveredProfile } from '../src/profile-plugins.ts'
 import { nodePnpmRunner } from '../src/profile-pnpm.ts'
+import { PLUGIN_JOURNAL } from '../src/profile-plugin-journal.ts'
 import type { CoreOptions, InstallBegin } from '../src/profile-plugin-types.ts'
 
 let root: string
@@ -159,8 +160,8 @@ describe.runIf(process.platform !== 'win32')('offline managed plugin installatio
     expect(result).toMatchObject({ kind: 'refused', refusal: { code: 'unsupported-layout', nodeLinker: 'isolated' } })
     expect(await readFile(join(profile, 'package.json'), 'utf8')).toBe(manifestBefore)
     expect(await readFile(join(profile, 'pnpm-lock.yaml'), 'utf8')).toBe(lockBefore)
-    await expect(access(join(profile, '.shres-plugin-txn.json'))).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(await readdir(join(profile, '.shres-plugin-sources')).catch(() => [])).toEqual([])
+    await expect(access(join(profile, PLUGIN_JOURNAL))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readdir(join(profile, '.shres-plugin-sources'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(access(join(root, 'script-ran'))).rejects.toMatchObject({ code: 'ENOENT' })
   }, 30_000)
   it('refuses external local dependencies and symlinks without changing profile bytes', async () => {
