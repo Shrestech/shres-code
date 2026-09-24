@@ -46,6 +46,7 @@
   "dependencies": {
     "@shres-code/shres-code-cmdline": "workspace:^",
     "@shres-code/shres-code-code-runtime-worker-thread": "workspace:^",
+    "@shres-code/shres-code-judgment-laya": "workspace:^",
     "@shres-code/shres-code-judgment-shield": "workspace:^",
     "@shres-code/shres-code-judgment-typesafe": "workspace:^",
     "@shres-code/shres-code-model-router": "workspace:^",

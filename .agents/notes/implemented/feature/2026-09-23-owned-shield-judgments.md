@@ -24,7 +24,7 @@ The [generation pilot](../../../../bench/routing/generation-model-pilot-2026-09-
 
 **Reuse the security probability as a generic judgment.** A prompt-injection probability does not measure a candidate model's ability to complete a task, nor does it define a distribution over arbitrary choices.
 
-**Load the Python model inside the harness provider.** Runtime dependencies, device management, artifacts, and training belong to the model-owning repository. The existing judgment service permits a thin provider without loop changes.
+**Load the Python model inside the harness provider.** Runtime dependencies, device management, artifacts, and training belong to the model-owning repository. The existing judgment service permits a thin provider without loop changes. A separate provider that supervises an in-repository laya-mlx gateway process, while this provider stays a wire client, is recorded in [local Laya judgment](2026-09-24-local-laya-judgment.md).
 
 **Check tokens in a separate request before asking.** Independent calls can apply redaction twice or observe different model configuration. Atomic fitting binds the measured input to its inference. Adding separately tokenized entry lengths also cannot account for tokenization at serialized text boundaries.
 
