@@ -1,0 +1,342 @@
+{
+  "snapshotDate": "2026-09-24",
+  "currency": "USD",
+  "priceUnit": "USD per 1,000,000 tokens",
+  "researchOnly": true,
+  "models": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "currency": "USD",
+      "input": 4,
+      "output": 20,
+      "cacheWrite5m": 5,
+      "cacheWrite1h": 8,
+      "cacheRead": 0.2,
+      "offPeak": null,
+      "nullFields": [],
+      "peakWindowsUtc": [],
+      "offPeakWindowsUtc": [],
+      "windowNotes": null,
+      "cacheTtlNotes": "Two cache TTL tiers: 5 minutes by default and a 1-hour extended tier. Writes bill at 1.25x base input for the 5-minute tier and 2x for the 1-hour tier; reads bill at 0.05x on Opus 5.5. An entry's lifetime is measured from the start of the request, and changing output_config.effort invalidates the cached blocks.",
+      "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": null
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-v4.1-flash",
+      "currency": "USD",
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.006,
+      "offPeak": {
+        "input": 0.15,
+        "output": 0.6,
+        "cacheWrite5m": null,
+        "cacheWrite1h": null,
+        "cacheRead": 0.003
+      },
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "offPeak.cacheWrite5m",
+        "offPeak.cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "01:00-04:00",
+        "06:00-10:00"
+      ],
+      "offPeakWindowsUtc": [
+        "00:00-01:00",
+        "04:00-06:00",
+        "10:00-24:00"
+      ],
+      "windowNotes": "Peak windows apply Monday-Friday, excluding Chinese public holidays; every other hour is off-peak, including all of every weekend and holiday.",
+      "cacheTtlNotes": "Context caching on disk is enabled by default and carries no separate write premium. An unused cache is cleared automatically, usually within a few hours to a few days.",
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null. The legacy name deepseek-v4-flash is retired and is billed at V4.1-Flash prices on the DeepSeek API; the Ollama deepseek-v4-flash entry keeps its own Ollama prices."
+    },
+    {
+      "provider": "ollama",
+      "model": "deepseek-v4.1-flash",
+      "currency": "USD",
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.006,
+      "offPeak": {
+        "input": 0.15,
+        "output": 0.6,
+        "cacheWrite5m": null,
+        "cacheWrite1h": null,
+        "cacheRead": 0.003
+      },
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "offPeak.cacheWrite5m",
+        "offPeak.cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "12:00-18:00"
+      ],
+      "offPeakWindowsUtc": [
+        "00:00-12:00",
+        "18:00-24:00"
+      ],
+      "windowNotes": "Off-peak pricing applies outside 12:00-18:00 UTC on weekdays and all day on weekends.",
+      "cacheTtlNotes": "Ollama publishes no cache write premium and no cache retention guarantee.",
+      "sourceUrl": "https://ollama.com/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null."
+    },
+    {
+      "provider": "ollama",
+      "model": "deepseek-v4-flash",
+      "currency": "USD",
+      "input": 0.44,
+      "output": 1.32,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.014,
+      "offPeak": {
+        "input": 0.22,
+        "output": 0.66,
+        "cacheWrite5m": null,
+        "cacheWrite1h": null,
+        "cacheRead": 0.007
+      },
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "offPeak.cacheWrite5m",
+        "offPeak.cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "12:00-18:00"
+      ],
+      "offPeakWindowsUtc": [
+        "00:00-12:00",
+        "18:00-24:00"
+      ],
+      "windowNotes": "Off-peak pricing applies outside 12:00-18:00 UTC on weekdays and all day on weekends.",
+      "cacheTtlNotes": "Ollama publishes no cache write premium and no cache retention guarantee.",
+      "sourceUrl": "https://ollama.com/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null."
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "currency": "USD",
+      "input": 1.32,
+      "output": 3.96,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.044,
+      "offPeak": {
+        "input": 0.66,
+        "output": 1.98,
+        "cacheWrite5m": null,
+        "cacheWrite1h": null,
+        "cacheRead": 0.022
+      },
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "offPeak.cacheWrite5m",
+        "offPeak.cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "01:00-04:00",
+        "06:00-10:00"
+      ],
+      "offPeakWindowsUtc": [
+        "00:00-01:00",
+        "04:00-06:00",
+        "10:00-24:00"
+      ],
+      "windowNotes": "Peak windows apply Monday-Friday, excluding Chinese public holidays; every other hour is off-peak, including all of every weekend and holiday.",
+      "cacheTtlNotes": "Context caching on disk is enabled by default and carries no separate write premium. An unused cache is cleared automatically, usually within a few hours to a few days.",
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null. The legacy name deepseek-v4-flash is retired and is billed at V4.1-Flash prices on the DeepSeek API; the Ollama deepseek-v4-flash entry keeps its own Ollama prices.",
+      "verification": "Lead check of primary sources, 2026-09-24",
+      "verificationSources": [
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://ollama.com/pricing"
+      ]
+    },
+    {
+      "provider": "ollama",
+      "model": "deepseek-v4-pro",
+      "currency": "USD",
+      "input": 1.32,
+      "output": 3.96,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.044,
+      "offPeak": {
+        "input": 0.66,
+        "output": 1.98,
+        "cacheWrite5m": null,
+        "cacheWrite1h": null,
+        "cacheRead": 0.022
+      },
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "offPeak.cacheWrite5m",
+        "offPeak.cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "12:00-18:00"
+      ],
+      "offPeakWindowsUtc": [
+        "00:00-12:00",
+        "18:00-24:00"
+      ],
+      "windowNotes": "Off-peak pricing applies outside 12:00-18:00 UTC on weekdays and all day on weekends.",
+      "cacheTtlNotes": "Ollama publishes no cache write premium and no cache retention guarantee.",
+      "sourceUrl": "https://ollama.com/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null.",
+      "verification": "Lead check of primary sources, 2026-09-24",
+      "verificationSources": [
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://ollama.com/pricing"
+      ]
+    },
+    {
+      "provider": "zai",
+      "model": "glm-5.3",
+      "currency": "USD",
+      "input": 1.4,
+      "output": 4.4,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.26,
+      "offPeak": null,
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h"
+      ],
+      "peakWindowsUtc": [],
+      "offPeakWindowsUtc": [],
+      "windowNotes": null,
+      "cacheTtlNotes": "Z.ai publishes no cache TTL (\"reasonable time limits\") and no write premium; cached-input storage is \"Limited-time Free\". A return-leg cost for this model is unverified.",
+      "sourceUrl": "https://docs.z.ai/guides/overview/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price is published, so cacheWrite5m and cacheWrite1h are null."
+    },
+    {
+      "provider": "ollama",
+      "model": "glm-5.3",
+      "currency": "USD",
+      "input": 1.4,
+      "output": 4.4,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": 0.26,
+      "offPeak": null,
+      "nullFields": [
+        "cacheWrite5m",
+        "cacheWrite1h"
+      ],
+      "peakWindowsUtc": [
+        "12:00-18:00"
+      ],
+      "offPeakWindowsUtc": [],
+      "windowNotes": "The Ollama page publishes the off-peak window for the platform but no off-peak rate for this model.",
+      "cacheTtlNotes": "Ollama publishes no cache write premium and no cache retention guarantee.",
+      "sourceUrl": "https://ollama.com/pricing",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": "No cache-write price and no off-peak rate are published, so those fields are null."
+    },
+    {
+      "provider": "moonshot",
+      "model": "kimi-k3",
+      "currency": "USD",
+      "input": 3,
+      "output": 15,
+      "cacheWrite5m": 3,
+      "cacheWrite1h": 6,
+      "cacheRead": 0.3,
+      "offPeak": null,
+      "nullFields": [],
+      "peakWindowsUtc": [],
+      "offPeakWindowsUtc": [],
+      "windowNotes": null,
+      "cacheTtlNotes": "Two cache TTL tiers; the 5-minute tier is the default and the 1-hour tier bills at 2x base input. Cache reads bill at 0.1x base input.",
+      "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat",
+      "fetched": "2026-09-24",
+      "unverified": false,
+      "notes": null
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "currency": "USD",
+      "input": null,
+      "output": null,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": null,
+      "offPeak": null,
+      "nullFields": [
+        "input",
+        "output",
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "cacheRead"
+      ],
+      "peakWindowsUtc": [],
+      "offPeakWindowsUtc": [],
+      "windowNotes": null,
+      "cacheTtlNotes": null,
+      "sourceUrl": null,
+      "fetched": "2026-09-24",
+      "unverified": true,
+      "notes": "No price was verified in the review sources and no pricing page was fetched, so no sourceUrl is recorded."
+    },
+    {
+      "provider": "xai",
+      "model": "grok-4.x",
+      "currency": "USD",
+      "input": null,
+      "output": null,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": null,
+      "offPeak": null,
+      "nullFields": [
+        "input",
+        "output",
+        "cacheWrite5m",
+        "cacheWrite1h",
+        "cacheRead"
+      ],
+      "peakWindowsUtc": [],
+      "offPeakWindowsUtc": [],
+      "windowNotes": null,
+      "cacheTtlNotes": null,
+      "sourceUrl": null,
+      "fetched": "2026-09-24",
+      "unverified": true,
+      "notes": "No price was verified in the review sources and no pricing page was fetched, so no sourceUrl is recorded."
+    }
+  ]
+}
