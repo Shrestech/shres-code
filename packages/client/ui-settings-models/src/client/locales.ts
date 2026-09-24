@@ -9,7 +9,7 @@ export const en = {
   intro: 'HTTP providers need an API key. Delegated CLIs use a command on your PATH and their own login — a key is optional.',
   teamsNav: 'Team members',
   teamsTitle: 'Team members',
-  teamsIntro: 'Set each teammate\'s role, persona, and model binding. The chat model remains the conductor.',
+  teamsIntro: 'Set each teammate\'s role, persona, and model binding. Changes apply when a teammate is first started; existing teammates keep their binding.',
   teamsUnavailable: 'Team members are unavailable in this workspace.',
   audioNav: 'Voice & audio',
   audioTitle: 'Voice & audio',

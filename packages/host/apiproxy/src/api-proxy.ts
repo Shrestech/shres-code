@@ -2800,6 +2800,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             id: String(row.id),
             ...row.description === undefined ? {} : { description: row.description },
             ...row.provider === undefined ? {} : { provider: row.provider },
+            ...row.agentProvider === undefined ? {} : { agentProvider: row.agentProvider },
             ...row.model === undefined ? {} : { model: row.model },
             diagnostics: [...row.diagnostics],
           })),

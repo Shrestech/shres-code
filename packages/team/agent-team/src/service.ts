@@ -52,6 +52,9 @@ function assignmentText(assignment: readonly ContentBlock[] | undefined): string
   return parts.join('\n\n')
 }
 
+/** Subagent spawn provider that starts every template teammate. */
+const TEMPLATE_SPAWN_PROVIDER = 'spawn'
+
 /** Agent Teams service backed by the exact live Lead Session log. */
 export class TeamService extends Service {
   static inject = ['agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents']
@@ -130,8 +133,8 @@ export class TeamService extends Service {
         role: 'teammate',
         status: 'unstarted',
         description: entry.description,
-        provider: entry.provider,
-        ...entry.model === undefined ? {} : { model: entry.model },
+        provider: TEMPLATE_SPAWN_PROVIDER,
+        ...entry.model === undefined ? {} : { agentProvider: entry.provider, model: entry.model },
         diagnostics: [],
       })
     }
@@ -253,7 +256,7 @@ export class TeamService extends Service {
       description: entry.description,
       prompt,
       context: entry.context ?? 'fresh',
-      provider: 'spawn',
+      provider: TEMPLATE_SPAWN_PROVIDER,
       signal: AbortSignal.any([signal ?? this.lifecycle.signal, this.lifecycle.signal]),
       source: {
         kind: 'team-message',
