@@ -941,6 +941,7 @@ export class LlmRuntime extends Service {
           'INVALID_PREPARED_CALL',
         )
       }
+      assertHostedToolsDeclared(options, modelInfo)
       const resolvedOptions = callConfigEquals(options, resolvedConfig)
         ? options
         : Object.isFrozen(options)
@@ -999,6 +1000,12 @@ export class LlmRuntime extends Service {
    * dispatch, and iteration failures become terminal `error` or `aborted`
    * finish chunks; middleware, nested-call, cleanup, and consumer failures
    * remain thrown.
+   *
+   * A `hostedTools` list naming a tool outside the resolved model info's
+   * `hostedTools` ends the stream with an `UNSUPPORTED_OPTION` error finish
+   * before the adapter is called. An adapter whose model info declares
+   * `hostedTools` MUST apply a request's `hostedTools` narrowing: it offers
+   * only the listed hosted tools and treats the rest as undeclared.
    * @param options - the full request; `options.provider` selects the adapter.
    * @returns the chunk stream, possibly wrapped by `llm/stream` listeners.
    */
@@ -1015,6 +1022,26 @@ export class LlmRuntime extends Service {
       'llm/stream',
       options,
       () => this.adapterStream(options, prepared),
+    )
+  }
+}
+
+/**
+ * Reject a request whose `hostedTools` narrowing names a hosted tool the
+ * resolved model does not declare.
+ * @param options - the request being dispatched.
+ * @param info - the resolved model info for its route.
+ * @throws {LlmError} `UNSUPPORTED_OPTION` naming the first undeclared tool.
+ */
+function assertHostedToolsDeclared(options: GenerateOptions, info: LlmResolvedModelInfo): void {
+  const requested = options.hostedTools
+  if (requested === undefined) return
+  const declared = info.hostedTools ?? []
+  const missing = requested.find(tool => !declared.includes(tool))
+  if (missing !== undefined) {
+    throw new LlmError(
+      `model "${options.provider}/${options.model}" does not declare hosted tool "${missing}"`,
+      'UNSUPPORTED_OPTION',
     )
   }
 }

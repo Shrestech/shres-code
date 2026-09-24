@@ -1659,7 +1659,7 @@ describe('session layout', () => {
     })
   })
 
-  it('drops the gate notice when the host no longer reports the gate', async () => {
+  it('drops the gate notice when the host no longer reports the gate', () => {
     const { face } = sessionFace()
     render(<ProviderEditor
       provider="cursor-session"
@@ -1673,10 +1673,10 @@ describe('session layout', () => {
     />)
     expect(screen.queryByText(en.sessionGate)).toBeNull()
     expect(screen.getByText(en.sessionModelsHint)).toBeTruthy()
-    await waitFor(() => { expect(face.credentials.describe).toHaveBeenCalled() })
+    expect(face.credentials.describe).not.toHaveBeenCalled()
   })
 
-  it('credential-only mode keeps the notice and drops the catalog editor', async () => {
+  it('credential-only mode keeps the notice and drops the catalog editor', () => {
     const { face } = sessionFace()
     render(<ProviderEditor
       provider="cursor-session"
@@ -1692,7 +1692,7 @@ describe('session layout', () => {
     />)
     expect(screen.getByText(en.sessionGate)).toBeTruthy()
     expect(screen.queryByText(en.sessionModelsHint)).toBeNull()
-    await waitFor(() => { expect(face.credentials.describe).toHaveBeenCalled() })
+    expect(face.credentials.describe).not.toHaveBeenCalled()
   })
 })
 

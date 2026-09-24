@@ -35,7 +35,8 @@ type RenderedBlock =
     type: 'hosted-tool-call'
     kind: string
     name?: string
-    status: 'completed' | 'failed'
+    /** Absent when the provider or adapter reported no completion state. */
+    status?: 'completed' | 'failed'
     results?: Array<{ title?: string; url?: string; snippet?: string }>
   }
 
@@ -92,7 +93,7 @@ function renderBlock(block: ContentBlock): RenderedBlock | undefined {
         type: 'hosted-tool-call',
         kind: block.kind,
         ...block.name === undefined ? {} : { name: block.name },
-        status: block.status,
+        ...block.status === undefined ? {} : { status: block.status },
         ...block.results === undefined ? {} : {
           results: block.results.map(result => ({
             ...result.title === undefined ? {} : { title: result.title },

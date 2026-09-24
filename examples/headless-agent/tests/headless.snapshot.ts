@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { delimiter, dirname, join } from 'node:path'
@@ -49,6 +50,10 @@ const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
 const hostedSearchScenarioDir = join(snapshotsDir, 'hosted-search')
 const hostedSearchConfigPath = fileURLToPath(new URL('../hosted-search.cordis.snapshot.yml', import.meta.url))
+const grokXToolsScenarioDir = join(snapshotsDir, 'grok-x-tools')
+const grokXToolsConfigPath = fileURLToPath(new URL('../grok-x-tools.cordis.snapshot.yml', import.meta.url))
+const hostedOnlyScenarioDir = join(snapshotsDir, 'hosted-search-only')
+const hostedOnlyConfigPath = fileURLToPath(new URL('../hosted-search-only.cordis.snapshot.yml', import.meta.url))
 const deepResearchScenarioDir = join(snapshotsDir, 'deep-research')
 const deepResearchConfigPath = fileURLToPath(new URL('../deep-research.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
@@ -123,6 +128,73 @@ async function deepseekDefaultsServer(): Promise<DeepSeekDefaultsServer> {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('DeepSeek defaults snapshot server has no port')
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () => new Promise(resolve => server.close(() => { resolve() })),
+  }
+}
+
+/** Auth-document entry key of the Grok credential fixture. */
+const GROK_AUTH_ENTRY_KEY = 'https://auth.x.ai::snapshot-client-id'
+
+/** A Grok credential entry whose JWT-shaped token expires far in the future. */
+function grokAuthEntry(): JsonObject {
+  const expiresAtMs = Date.now() + 6 * 3600 * 1000
+  const encode = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url')
+  return {
+    key: [encode({ alg: 'ES256', typ: 'at+jwt' }), encode({ exp: Math.floor(expiresAtMs / 1000) }), 'signature'].join('.'),
+    auth_mode: 'oidc',
+    refresh_token: 'snapshot-refresh-token',
+    expires_at: new Date(expiresAtMs).toISOString(),
+    oidc_issuer: 'https://auth.x.ai',
+    oidc_client_id: 'snapshot-client-id',
+  }
+}
+
+/**
+ * Serve the Grok subscription proxy's side of one X search: a hosted
+ * `x_keyword_search` custom tool call and an answer that reports whether the
+ * request offered exactly the hosted `x_search` tool and no function tools.
+ */
+async function grokProxyStandIn(): Promise<DeepSeekDefaultsServer> {
+  const requests: JsonObject[] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    let body = ''
+    request.setEncoding('utf8')
+    request.on('data', (chunk: string) => { body += chunk })
+    request.on('end', () => {
+      const parsed = JSON.parse(body) as JsonObject
+      requests.push(parsed)
+      const tools = JSON.stringify(parsed.tools)
+      const verdict = tools === JSON.stringify([{ type: 'x_search' }]) ? 'GROK_REQUEST_OK' : 'GROK_REQUEST_BAD'
+      const text = `${verdict}: xAI posted https://x.com/xai/status/7`
+      const custom = { id: 'ctc_item_1', call_id: 'call_ctc_1', type: 'custom_tool_call', name: 'x_keyword_search', input: 'from:xai grok', status: 'completed' }
+      const message = { type: 'message', id: 'msg_grok_1', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] }
+      const usage = {
+        input_tokens: 4,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 2,
+        output_tokens_details: { reasoning_tokens: 0 },
+        total_tokens: 6,
+      }
+      const events = [
+        { type: 'response.created', response: { id: 'resp_grok_1' } },
+        { type: 'response.output_item.added', output_index: 0, item: custom },
+        { type: 'response.output_item.done', output_index: 0, item: custom },
+        { type: 'response.output_item.added', output_index: 1, item: { ...message, content: [] } },
+        { type: 'response.output_text.delta', item_id: message.id, output_index: 1, content_index: 0, delta: text },
+        { type: 'response.output_item.done', output_index: 1, item: message },
+        { type: 'response.completed', response: { id: 'resp_grok_1', status: 'completed', usage } },
+      ]
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      for (const event of events) response.write(`data: ${JSON.stringify(event)}\n\n`)
+      response.end()
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('Grok proxy stand-in has no port')
   return {
     url: `http://127.0.0.1:${address.port}`,
     requests,
@@ -408,7 +480,7 @@ describe('headless stream-json snapshots', () => {
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
-  it('splices hosted tools over the local web_search on a declared route', async () => {
+  it('splices hosted tools, keeps every hosted X call out of dispatch, and replays without it', async () => {
     const prompt = await scenarioPrompt(hostedSearchScenarioDir, 'hosted-search')
     const streamExpected = join(hostedSearchScenarioDir, 'stream-json.expected.jsonl')
     let runCwd = ''
@@ -426,17 +498,18 @@ describe('headless stream-json snapshots', () => {
       },
       prepare: (cwd) => { runCwd = cwd },
       inspect: async (cwd) => {
-        // The persisted transcript must carry the hosted call as a
-        // server-tool-call block (never dispatched) and the wire-verified
-        // splice verdict text.
+        // The persisted transcript carries every hosted X call as a
+        // server-tool-call block, dispatches only the local todo_write, and
+        // ends with the wire-verified splice and replay verdicts.
         const logs = await persistedLogs(cwd)
         expect(logs).toHaveLength(1)
         const content = logs[0]?.content ?? ''
-        expect(content).toContain('server-tool-call')
-        expect(content).toContain('x_search')
-        expect(content).toContain('HOSTED_OK')
-        expect(content).not.toContain('HOSTED_MISSING')
-        expect(content).not.toContain('HOSTED_LOCAL_WEB_SEARCH_NOT_DROPPED')
+        for (const name of ['x_search', 'x_keyword_search', 'x_semantic_search', 'x_user_search', 'x_thread_fetch']) {
+          expect(content).toContain(`"type":"server-tool-call","kind":"x_search","name":"${name}"`)
+        }
+        expect(content).toContain('HOSTED_OK REPLAY_OK')
+        expect(content).not.toContain('UNKNOWN_TOOL')
+        expect(content).not.toMatch(/HOSTED_(?:MISSING|LOCAL)|REPLAY_(?:HOSTED|TOOL|DEGRADED)/)
       },
     })
 
@@ -444,6 +517,86 @@ describe('headless stream-json snapshots', () => {
     const normalized = normalizeHeadlessStream(result.stdout, runCwd)
     if (refreshing) await writeFile(streamExpected, normalized)
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('finishes a hosted-only X search step without dispatching a tool', async () => {
+    const prompt = await scenarioPrompt(hostedOnlyScenarioDir, 'hosted-search-only')
+    const streamExpected = join(hostedOnlyScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'hosted-only X search headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-hosted-only-',
+      binScript,
+      libBinScript: binScript,
+      configPath: hostedOnlyConfigPath,
+      binArgs: [hostedOnlyConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const content = logs[0]?.content ?? ''
+        expect(content).toContain('"name":"x_thread_fetch"')
+        expect(content).not.toContain('"type":"tool/call"')
+        expect(content).not.toContain('UNKNOWN_TOOL')
+        expect(content).not.toContain('"step":2')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('lets a non-Grok model discover and call an X tool answered by the Grok route', async () => {
+    const prompt = await scenarioPrompt(grokXToolsScenarioDir, 'grok-x-tools')
+    const streamExpected = join(grokXToolsScenarioDir, 'stream-json.expected.jsonl')
+    const grok = await grokProxyStandIn()
+    const authDir = await mkdtemp(join(tmpdir(), 'headless-snapshot-grok-auth-'))
+    const authPath = join(authDir, 'auth.json')
+    await writeFile(authPath, JSON.stringify({ [GROK_AUTH_ENTRY_KEY]: grokAuthEntry() }), { mode: 0o600 })
+    let runCwd = ''
+    try {
+      const result = await runLoaderSmoke({
+        label: 'Grok X tools headless stream-json snapshot',
+        tempDirPrefix: 'headless-snapshot-grok-x-tools-',
+        binScript,
+        libBinScript: binScript,
+        configPath: grokXToolsConfigPath,
+        binArgs: [grokXToolsConfigPath, prompt],
+        tsconfigPath,
+        env: {
+          SHRES_SNAPSHOT: 'replay',
+          SHRES_SNAPSHOT_GROK_BASE_URL: `${grok.url}/v1`,
+          SHRES_SNAPSHOT_GROK_AUTH_PATH: authPath,
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+        },
+        prepare: (cwd) => { runCwd = cwd },
+        inspect: async (cwd) => {
+          const logs = await persistedLogs(cwd)
+          expect(logs).toHaveLength(1)
+          const content = logs[0]?.content ?? ''
+          expect(content).toContain('"type":"grok-x-search/request"')
+          expect(content).toContain('X_TOOLS_OK')
+          expect(content).not.toContain('UNKNOWN_TOOL')
+        },
+      })
+      expect(result.stderr).toBe('')
+      // Exactly one Grok request, offering only the hosted x_search tool.
+      expect(grok.requests).toHaveLength(1)
+      expect(grok.requests[0]?.tools).toEqual([{ type: 'x_search' }])
+      const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+      if (refreshing) await writeFile(streamExpected, normalized)
+      expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+    } finally {
+      await grok.close()
+      await rm(authDir, { recursive: true, force: true })
+    }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('executes deep_research through its provider pin and answers from the result', async () => {

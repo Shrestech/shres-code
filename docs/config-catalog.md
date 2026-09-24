@@ -1864,6 +1864,13 @@ export interface Config {
   hostedWebSearch?: boolean
   /** Serve X (Twitter) search as a hosted backend tool. Defaults to on. */
   hostedXSearch?: boolean
+  /**
+   * Expose the four X search tools of `@shres-code/shres-code-tool-grok-x-search`
+   * to Shres agents on other routes. Those tools ask this route's hosted X search,
+   * so they apply only while `enabled` and `hostedXSearch` are also on.
+   * Defaults to off. Turning it on does not check the Grok sign-in or plan.
+   */
+  agentXTools?: boolean
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -4213,6 +4220,28 @@ export interface Config {
 ```
 
 Source: [`packages/goal/tool-goal/src/index.ts:26`](../packages/goal/tool-goal/src/index.ts)
+
+<a id="shres-codeshres-code-tool-grok-x-search"></a>
+
+## `@shres-code/shres-code-tool-grok-x-search`
+
+Requires: `tools` · `llm` · `settings`
+
+```ts config-catalog
+/** Plugin config: the Grok model the tools ask and the per-call limits. */
+export interface Config {
+  /** Grok model id on the grok-session route. Defaults to `grok-4.6`. */
+  model?: string
+  /** End-to-end deadline of one tool call in milliseconds. Defaults to 180000. */
+  timeoutMs?: number
+  /** Output-token cap of the Grok request. Defaults to 2048. */
+  maxOutputTokens?: number
+  /** Cap on the complete rendered tool result in characters. Defaults to 20000. */
+  maxResultChars?: number
+}
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/config.ts:10`](../packages/llm/tool-grok-x-search/src/config.ts)
 
 <a id="shres-codeshres-code-tool-image-gen"></a>
 

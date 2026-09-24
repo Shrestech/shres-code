@@ -1,0 +1,24 @@
+# Keyless Grok X tools composition for the headless stream-json snapshot: a
+# non-Grok calling model (fixture backend) discovers and calls
+# x_keyword_search; the real llm-grok-session route answers it from a Grok
+# proxy stand-in the snapshot test serves, with a fixture credential document.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: grok-x-tools-snapshot-backend
+            name: './tests/fixtures/grok-x-tools-snapshot-backend.mjs'
+          - id: llm-grok-session
+            name: '@shres-code/shres-code-llm-grok-session'
+            config:
+              baseURL: !!js process.env.SHRES_SNAPSHOT_GROK_BASE_URL
+              authPath: !!js process.env.SHRES_SNAPSHOT_GROK_AUTH_PATH
+              hostedWebSearch: false
+              agentXTools: true
+          - id: tool-grok-x-search
+            name: '@shres-code/shres-code-tool-grok-x-search'

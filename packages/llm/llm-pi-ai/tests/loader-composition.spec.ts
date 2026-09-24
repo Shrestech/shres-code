@@ -156,7 +156,7 @@ describe('llm-pi-ai real dormant composition', () => {
       replayState: {
         response: {
           kind: 'pi-ai',
-          version: 2,
+          version: 3,
           api: 'openai-completions',
           provider: 'deepseek',
           model: 'deepseek-v4-flash',

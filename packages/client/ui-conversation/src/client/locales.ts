@@ -10,6 +10,13 @@ const PLAN_NEXT_ACTION = 'describe your task to generate plan'
 /** English dictionary, the key-set source of truth. */
 export const en = {
   'view.chat': 'Chat',
+  'hosted.x': 'Hosted X search',
+  'hosted.web': 'Hosted web search',
+  'hosted.keyword': 'keyword',
+  'hosted.semantic': 'semantic',
+  'hosted.users': 'accounts',
+  'hosted.thread': 'thread',
+  'hosted.failed': 'Failed',
   'hint.plan': PLAN_NEXT_ACTION,
   'hint.goal': 'describe the objective for a long-running task',
   'hint.goal.active': 'goal active — edit / pause / resume / clear',

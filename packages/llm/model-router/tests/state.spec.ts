@@ -163,6 +163,7 @@ describe('buildRoutingState', () => {
       toServerToolCallBlock({ kind: 'web_search', status: 'failed' }),
       toServerToolCallBlock({ kind: 'web_search', status: 'completed', results: [{ title: 'Title only' }] }),
       toServerToolCallBlock({ kind: 'web_search', status: 'completed', results: [{ url: 'URL only' }] }),
+      toServerToolCallBlock({ kind: 'x_search', name: 'x_keyword_search' }),
       { type: 'future-block', value: 'provider-private' } as never,
       { type: 'reasoning', text: 'must never reach the judge' },
     ])
@@ -188,6 +189,8 @@ describe('buildRoutingState', () => {
       { type: 'hosted-tool-call', kind: 'web_search', status: 'failed' },
       { type: 'hosted-tool-call', kind: 'web_search', status: 'completed', results: [{ title: 'Title only' }] },
       { type: 'hosted-tool-call', kind: 'web_search', status: 'completed', results: [{ url: 'URL only' }] },
+      // An unreported status stays absent rather than reading as a success or a failure.
+      { type: 'hosted-tool-call', kind: 'x_search', name: 'x_keyword_search' },
       { type: 'unsupported', kind: 'future-block' },
     ])
     expect(state.text).not.toContain('permission denied\nprivate')

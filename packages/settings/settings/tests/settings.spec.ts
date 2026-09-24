@@ -243,6 +243,28 @@ describe('registration', () => {
     const again = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
     expect(again.get()).toEqual({ theme: 'light', fontSize: 14 })
   })
+
+  it('announces each registration attach and detach, including a remount', async () => {
+    const { ctx } = await boot()
+    const events: unknown[] = []
+    ctx.on('settings/registered', (ns, value) => { events.push(['registered', ns, value]) })
+    ctx.on('settings/unregistered', (ns) => { events.push(['unregistered', ns, ctx.settings.get(ns)]) })
+    const owner = (child: Context): void => {
+      child.settings.register(settingsNamespace('ui-theme'), ThemeSchema, { base: { theme: 'dark', fontSize: 16 } })
+    }
+    const first = ctx.plugin({ inject: ['settings'], apply: owner })
+    await first
+    await first.dispose()
+    const second = ctx.plugin({ inject: ['settings'], apply: owner })
+    await second
+    expect(events).toEqual([
+      ['registered', 'ui-theme', { theme: 'dark', fontSize: 16 }],
+      ['unregistered', 'ui-theme', undefined],
+      ['registered', 'ui-theme', { theme: 'dark', fontSize: 16 }],
+    ])
+    await second.dispose()
+    expect(events.at(-1)).toEqual(['unregistered', 'ui-theme', undefined])
+  })
 })
 
 describe('update', () => {

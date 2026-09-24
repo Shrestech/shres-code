@@ -60,7 +60,7 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBraveApiKey: 'Brave API key',
   webSearchBraveBaseUrl: 'Brave endpoint',
   webSearchGrok: 'Grok',
-  webSearchGrokHint: 'Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.',
+  webSearchGrokHint: 'Web results using XAI_API_KEY. For subscription-backed X tools and sharing with other agents, open Settings → Models & providers → Grok (subscription).',
   webSearchClaude: 'Claude',
   webSearchClaudeHint: 'Anthropic web search, using the same key as the Claude CLI.',
   webSearchCodex: 'Codex',

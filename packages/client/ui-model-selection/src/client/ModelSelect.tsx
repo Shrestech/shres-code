@@ -24,6 +24,7 @@ import {
 import type { PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
+import { hostedLabels } from './hosted-labels.ts'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
@@ -318,19 +319,19 @@ export function ModelSelect(
                                 {/* 'text' is the floor every route carries; only
                                     additional declared modalities earn a tag. The
                                     map is merge-extensible, so an unrecognized
-                                    value renders as its own label. Hosted web
-                                    search is the same kind of named claim. */}
+                                    value renders as its own label. Hosted search
+                                    badges describe route capabilities, not account access. */}
                                 {(model.inputModalities ?? []).filter(modality => modality !== 'text')
                                   .map(modality => (
                                     <span className={css.modality} key={modality}>
                                       {modality === 'image' ? t('modality.vision') : modality}
                                     </span>
                                   ))}
-                                {model.hostedTools?.includes('web_search') === true && (
-                                  <span className={css.modality} key="hosted.web_search">
-                                    {t('hosted.webSearch')}
+                                {hostedLabels(model.hostedTools, t).map(({ tool, label }) => (
+                                  <span className={css.modality} key={tool} title={t('hosted.hint')}>
+                                    {label}
                                   </span>
-                                )}
+                                ))}
                               </span>
                               {model.description !== undefined && (
                                 <span className={css.description}>{model.description}</span>

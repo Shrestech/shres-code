@@ -10,6 +10,7 @@ The LLM seam and its provider adapters. The `llm` package owns both the Service 
 | [`llm-deepseek/`](llm-deepseek/README.md) | Direct DeepSeek adapter | registers on `ctx.llm` |
 | [`llm-pi-ai/`](llm-pi-ai/README.md) | Multi-provider pi-ai adapter | registers on `ctx.llm` |
 | [`llm-cli-bridge/`](llm-cli-bridge/README.md) | Delegated completion through grok/kimi/codex/claude CLIs | registers on `ctx.llm` |
+| [`tool-grok-x-search/`](tool-grok-x-search/README.md) | Default-off X search tools answered by the grok-session route | registers on `ctx.tools` |
 
 Adapters register provider routes on the seam; retry and token measurement remain separate consumers. The child READMEs own routing, metadata, replay, and provider-wire details; the [LLM architecture decisions](../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.md) own the rationale.
 
