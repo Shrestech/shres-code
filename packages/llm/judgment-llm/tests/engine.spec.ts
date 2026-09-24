@@ -333,6 +333,44 @@ describe('one ask', () => {
     expect(adapter.requests).toHaveLength(1)
   })
 
+  it.each([
+    ['no signal', undefined],
+    ['a signal that never aborts', new AbortController().signal],
+  ])('ends the ask at timeoutMs with %s while a route that saw the abort never finishes', async (_case, signal) => {
+    const ctx = await base()
+    const aborted = Promise.withResolvers<undefined>()
+    ctx.llm.registerAdapter([PROVIDER], new class extends MockAdapter {
+      override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        options.signal?.addEventListener('abort', () => { aborted.resolve(undefined) }, { once: true })
+        yield* []
+        await new Promise<never>(() => {})
+      }
+    }([]))
+    const { entry, engine } = await mount(ctx, { timeoutMs: 30 })
+    await settled(entry)
+    const error = await failure(engine.ask(input(signal === undefined ? {} : { signal })))
+    expect(error.code).toBe('UNAVAILABLE')
+    expect(error.message).toBe('judgment-llm: the judge request did not finish within timeoutMs 30')
+    expect(error.cause).toMatchObject({ code: 'ABORTED' })
+    await aborted.promise
+  })
+
+  it('reports ABORTED when the caller also cancels at the deadline', async () => {
+    const ctx = await base()
+    const controller = new AbortController()
+    ctx.llm.registerAdapter([PROVIDER], new class extends MockAdapter {
+      override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        // Runs after the step settled on the deadline and before the ask reads why.
+        options.signal?.addEventListener('abort', () => { controller.abort() }, { once: true })
+        yield* []
+        await new Promise<never>(() => {})
+      }
+    }([]))
+    const { entry, engine } = await mount(ctx, { timeoutMs: 30 })
+    await settled(entry)
+    expect((await failure(engine.ask(input({ signal: controller.signal })))).code).toBe('ABORTED')
+  })
+
   it('fails unavailable naming timeoutMs when the request outlives it', async () => {
     const { engine } = await ready(['hang'], { timeoutMs: 20 })
     const error = await failure(engine.ask(input()))

@@ -38,7 +38,7 @@ Through the dispatcher, a status other than `ready` fails the ask `UNAVAILABLE` 
 
 ## Ask behaviour
 
-An ask with no questions returns no answers without a request. Otherwise the engine consults `ctx.judgmentRedactor` exactly once, rejects a redacted state above `maxStateTokens` bytes with `INPUT_TOO_LARGE`, and sends one request carrying `JUDGE_SYSTEM_PROMPT`, one user message from `renderJudgeMessage`, and the one tool from `answerTool`. There is no retry: a failed or timed-out request fails the ask `UNAVAILABLE`, and a caller that wants a second attempt asks again.
+An ask with no questions returns no answers without a request. Otherwise the engine consults `ctx.judgmentRedactor` exactly once, rejects a redacted state above `maxStateTokens` bytes with `INPUT_TOO_LARGE`, and sends one request carrying `JUDGE_SYSTEM_PROMPT`, one user message from `renderJudgeMessage`, and the one tool from `answerTool`. There is no retry: a failed or timed-out request fails the ask `UNAVAILABLE`, and a caller that wants a second attempt asks again. `timeoutMs` bounds the ask's wait for every route: the request receives a signal that aborts at the deadline, and the ask fails `UNAVAILABLE` naming `timeoutMs` at that moment even when the route never finishes. A caller cancellation fails the ask `ABORTED` instead, also when it coincides with the deadline.
 
 The judge answers through one `judgment_answer` tool call whose parameter schema requires every question and every option or level. `readAnswers` then applies these rules:
 

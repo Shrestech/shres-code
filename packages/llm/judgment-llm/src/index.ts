@@ -20,6 +20,8 @@
  * exactly one model request with no retry. The caller's signal is honoured at
  * every await: the redaction and the request each settle the ask with
  * `ABORTED` as soon as it aborts, and the request also receives the signal.
+ * `timeoutMs` ends the wait for the request the same way for every route,
+ * failing the ask `UNAVAILABLE`, even when the route never finishes.
  *
  * @module @shres-code/shres-code-judgment-llm
  */
@@ -178,14 +180,22 @@ export class LlmJudgmentEngine implements JudgmentEngine {
     const deadline = AbortSignal.timeout(this.config.timeoutMs)
     const signal = input.signal === undefined ? deadline : AbortSignal.any([input.signal, deadline])
     const request = this.request(state, input.questions, signal)
-    // The route receives the combined signal; the step also settles the ask at
-    // once, even for an adapter that finishes the request anyway.
-    const assembler = await abortableJudgmentStep(() => this.collect(request), input.signal, ABORTED_MESSAGE)
+    let assembler: BlockAssembler
+    try {
+      // The step races the same combined signal the route receives, so the ask
+      // settles at the deadline or the caller's cancellation even when the route
+      // never finishes or finishes the request anyway.
+      assembler = await abortableJudgmentStep(() => this.collect(request), signal, ABORTED_MESSAGE)
+    } catch (error: unknown) {
+      if (!deadline.aborted || input.signal?.aborted === true) throw error
+      throw new JudgmentError(
+        'UNAVAILABLE',
+        `judgment-llm: the judge request did not finish within timeoutMs ${this.config.timeoutMs}`,
+        { cause: error },
+      )
+    }
     const finish = assembler.finish
     if (finish.kind === 'aborted' || finish.kind === 'error') {
-      if (deadline.aborted) {
-        throw new JudgmentError('UNAVAILABLE', `judgment-llm: the judge request did not finish within timeoutMs ${this.config.timeoutMs}`)
-      }
       throw new JudgmentError(
         'UNAVAILABLE',
         `judgment-llm: the judge request to ${this.config.provider}/${this.config.model} failed: ${finish.failure.message}`,
