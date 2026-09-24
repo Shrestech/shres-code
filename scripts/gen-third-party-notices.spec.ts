@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CLAUDE_AGENT_SDK_PACKAGE,
   claudeDistributionFromManifest,
+  collectModelCheckpoints,
   collectPythonDependencies,
   isOwnerAuthorizedRuntime,
   isPermissive,
@@ -341,5 +342,28 @@ describe('manifestPatterns', () => {
       'native/landlock-run/packages/*/package.json',
       'examples/*/package.json',
     ])
+  })
+})
+
+describe('collectModelCheckpoints', () => {
+  const metadata = { 'owner/a': { license: 'Apache-2.0', role: 'weights' }, 'owner/b': { license: 'MIT', role: 'weights' } }
+  const manifest = (repo: string, revision: string): string => JSON.stringify({ repo, revision, checkpointContext: 1024, files: {} })
+
+  it('lists every pinned checkpoint with its disclosure, sorted by repository and revision', () => {
+    expect(collectModelCheckpoints([manifest('owner/b', '2'), manifest('owner/a', '1')], metadata)).toEqual([
+      { repo: 'owner/a', revision: '1', license: 'Apache-2.0', role: 'weights' },
+      { repo: 'owner/b', revision: '2', license: 'MIT', role: 'weights' },
+    ])
+  })
+
+  it('fails on a checkpoint without disclosure metadata or without a pin', () => {
+    expect(() => collectModelCheckpoints([manifest('owner/c', '1')], metadata)).toThrow(/checkpoint owner\/c is missing from MODEL_CHECKPOINTS/)
+    expect(() => collectModelCheckpoints(['{"repo":"owner/a"}'], metadata)).toThrow(/has no repo and revision/)
+  })
+
+  it('discloses the gateway checkpoint pinned in this repository', () => {
+    const pinned = readdirSync(resolve(root, 'python/laya-gateway/manifests'))
+      .map(name => readFileSync(resolve(root, 'python/laya-gateway/manifests', name), 'utf8'))
+    expect(collectModelCheckpoints(pinned).map(row => row.repo)).toContain('convaiinnovations/laya-typed-decisions')
   })
 })

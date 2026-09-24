@@ -14,7 +14,7 @@ Status: implemented
 - `sessions.selectModel` refuses a `chatGated` provider with `model-unavailable` after `resolveCallConfig` succeeds and before the selection is applied or persisted as the default; the message is generic because the directory entry carries only a boolean.
 - The Models page maps the `llm-cursor-session` namespace to a `session` card layout: the gate notice (rendered while the provider view reports `chatGated`) naming the `cursor-cli` overlay recovery path, plus the shared `DeepSeekModelsEditor` over the `models` settings path with Apply enabled.
 - `llm-cursor-session`'s settings section gains a `validate` hook mirroring grok-session: an explicitly empty `models` array rejects at the settings boundary (it would remove the route's picker group; omitting `models` inherits the shipped catalog).
-- The [CLI bridge README](../../../packages/llm/llm-cli-bridge/README.md) carries the worked `cursor-cli` overlay declaration the gate message references; the retired shipped CLI routes are no longer documented as live picker routes.
+- The [CLI bridge README](../../../../packages/llm/llm-cli-bridge/README.md) carries the worked `cursor-cli` overlay declaration the gate message references; the retired shipped CLI routes are no longer documented as live picker routes.
 
 ## Alternatives considered
 

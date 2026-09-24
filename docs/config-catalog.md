@@ -1237,6 +1237,77 @@ Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
 Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
 
+<a id="shres-codeshres-code-judgment-laya"></a>
+
+## `@shres-code/shres-code-judgment-laya`
+
+Requires: `subprocess`
+
+```ts config-catalog
+/** Configuration for the supervised local Laya judgment gateway. */
+export interface LayaJudgmentConfig {
+  /** The pinned checkpoint and its manifest digest. */
+  model: LayaJudgmentModel
+  /** Token window of the pinned checkpoint; the gateway must report the same limit. */
+  checkpointContext: 512 | 1024
+  /** Inference precision passed to laya-mlx. */
+  dtype?: 'float16' | 'float32'
+  /** Absolute directory holding the virtual environment, its uv-managed Python, the uv package cache, and the install marker. */
+  runtimeDir?: string
+  /** Absolute Hugging Face home holding downloaded checkpoints. */
+  hfHome?: string
+  /** Absolute path of the `python/laya-gateway` project. */
+  gatewayProject?: string
+  /** `uv` executable: an absolute path or a name on PATH. */
+  uvPath?: string
+  /** Version of the uv-managed CPython the virtual environment uses, `major.minor`. */
+  python?: string
+  /** Questions per gateway inference batch. */
+  batchSize?: number
+  /** Deadline for the first readiness line, health check, and smoke ask, in milliseconds. */
+  startupTimeoutMs?: number
+  /** Deadline for one judgment request, in milliseconds. */
+  requestTimeoutMs?: number
+  /** SIGTERM-to-SIGKILL grace when stopping the gateway, in milliseconds. */
+  shutdownGraceMs?: number
+  /** Deadline for each install step, in milliseconds. */
+  installTimeoutMs?: number
+  /** Maximum serialized UTF-8 request body, enforced by both the provider and the gateway. */
+  maxRequestBytes?: number
+  /** Maximum response body accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Crash-restart budget. */
+  restart?: LayaRestartPolicy
+}
+
+/** The pinned checkpoint the local gateway serves. */
+export interface LayaJudgmentModel {
+  /** Hugging Face repository, `owner/name`. */
+  repo: string
+  /** 40-character commit sha of the pinned revision. */
+  revision: string
+  /**
+   * SHA-256 of the exact bytes of the gateway project's
+   * `manifests/<revision>.json`, which pins every checkpoint file's digest.
+   */
+  manifestSha256: string
+}
+
+/** Crash-restart budget for the supervised gateway. */
+export interface LayaRestartPolicy {
+  /** Restarts allowed inside one {@link windowMs}; one more leaves the gateway unavailable. */
+  maxRestarts?: number
+  /** Sliding window over which restarts are counted, in milliseconds. */
+  windowMs?: number
+  /** First restart delay; each consecutive failure doubles it. */
+  backoffMs?: number
+  /** Largest restart delay. */
+  maxBackoffMs?: number
+}
+```
+
+Source: [`packages/llm/judgment-laya/src/types.ts:33`](../packages/llm/judgment-laya/src/types.ts)
+
 <a id="shres-codeshres-code-judgment-shield"></a>
 
 ## `@shres-code/shres-code-judgment-shield`
@@ -4959,7 +5030,7 @@ export interface EscalationTurnFailureStreakConfig {
 
 Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
-Source: [`packages/team/worker-escalation/src/config.ts:160`](../packages/team/worker-escalation/src/config.ts)
+Source: [`packages/team/worker-escalation/src/config.ts:153`](../packages/team/worker-escalation/src/config.ts)
 
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
@@ -5125,6 +5196,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
 - `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-progress-signals` ([`packages/team/progress-signals/src/index.ts`](../packages/team/progress-signals/src/index.ts))
 - `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
 - `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))

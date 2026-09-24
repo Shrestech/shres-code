@@ -16,7 +16,7 @@ The clock is elapsed milliseconds since `goal.createdAt`. It is not an estimate 
 
 Incomplete todos are the army when any exist. Remaining goal rounds stay unused (the default cap is 256). Live child sessions have no parent-session projection, so they are not zombies. An empty remaining-todo set draws a standing army of four; the army-source rule lives in [Goal fight visible army](../bug-fix/2026-08-18-goal-fight-visible-army.md).
 
-Sprites are inlined data URLs in `packages/client/ui-goal/src/client/sprites.ts` so the client plugin bundle does not need an image loader.
+Sprites were inlined data URLs so the client plugin bundle needed no image loader.
 
 ## Alternatives considered
 

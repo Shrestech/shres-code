@@ -30,3 +30,15 @@ This is an **implementation** package: it registers provider id `brave` into `ct
 ## Model Experience
 
 Indirectly, through [`shres-tool-web`](../tool-web/README.md), which retains this provider's URLs, titles, snippets, and published dates or its exact `Brave search aborted`, `Brave search request failed: <error>`, `Brave API error (HTTP <status>)`, `Brave search returned an unprocessable response body: <error>`, and missing-credential failures under the consumer's error wrapper. No auxiliary model turn exists.
+
+#### KV Cache effect
+
+No direct invalidation; the named consumer owns any request-prefix changes.
+
+## Known Limitations and Deferred Work
+
+- **Link results carry no answer text** — `content` is never set; a query that needs a synthesized answer belongs to the `deep_research` tool's Perplexity pin, not to this provider.
+- **Fewer sources than `count` can return** — a row without a non-empty URL is dropped, and mapping always reports `truncated: false`, so the consumer cannot distinguish a short page from a capped one.
+- **Only five row fields are read** — `url`, `title`, `description`, `page_age`, and `age` map to the four `WebSearchSource` fields (`page_age` takes precedence over `age` for `publishedAt`); Brave's other per-result fields (`extra_snippets`, `thumbnail`, `language`, and the rest) never reach the seam's `WebSearchSource`.
+- **Abort classification is error-shape-based** — only an `Error` named `AbortError` maps to `WEB_ABORTED`; an abort carrying a custom reason surfaces as `WEB_PROVIDER_ERROR`.
+- **A subscription token is required** — there is no keyless path: with no resolved key `available()` is false and a direct search throws `WEB_PROVIDER_CREDENTIAL_MISSING`.

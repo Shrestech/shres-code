@@ -20,7 +20,7 @@ The model router on PR #195 (branch `feat/jev-judgment-foundation`) has a sound 
 
 ## Proposal
 
-Where sources disagree, facts in this note take this precedence: live-session evidence first, then the verified review reports, then analyst reports, then the Laya findings. Line references are to commit `f0abff5519` unless stated. Section labels §0–§7 and §R are stable cross-reference labels used by the delivery sequence (§6) and the owner decisions (§7).
+Where sources disagree, facts in this note take this precedence: the live session log first, then checks against the code and fetched primary sources, then the Laya findings. The Evidence section records the resolved facts. Line references are to commit `f0abff5519` unless stated. Section labels §0–§7 and §R are stable cross-reference labels used by the delivery sequence (§6) and the owner decisions (§7).
 
 The shield prompt-security doctrine and the guard packages are out of scope. `@shres-code/shres-code-judgment-shield`, the local judgment provider, is in scope, used only as a wire client. The doctrine section's prompt churn appears only as the prefix-stability requirement in §2.3.
 
@@ -80,7 +80,7 @@ The layers are evaluated in order, and the first one that forces strong wins:
 
 - **(a) Subagents and seats.** Adopt; this is the primary cost lever. Children start with a fresh context, so the cold entry is unavoidable anyway. Routing them causes no parent cache churn and, being static, adds no judge latency.
   - Team seats keep explicit roster bindings: manual authority, no routing.
-  - Fork children (`subagent_fork`) are never routed, because they inherit a warm parent prefix (cache verification, missed issue 3).
+  - Fork children (`subagent_fork`) are never routed, because they inherit a warm parent prefix: caches are per model and per account (Evidence, log statistics).
 - **(b) Plan/execute phase.** Adopt two parts: plan mode is a hard strong gate (default on), and executing an approved plan is an opt-in entry point treated like a cold point. The state is already logged (`plan/mode`, `packages/plan/plan-mode/src/index.ts:53`).
 - **(c) Verification-driven escalation.** Adopt as the exit signal. It reuses `foldEscalationTriggers` (`packages/team/worker-escalation/src/fold.ts:481`), which is deterministic, log-derived, and free.
 - **(d) Cold points only.** Adopt as the default entry and return policy. It removes the verified break-even problem:
@@ -93,11 +93,11 @@ The layers are evaluated in order, and the first one that forces strong wins:
 
 ## Evidence
 
-### Research method and archive
+### Provenance and archive
 
-- The review covered four areas: routing approach, prompt-cache economics, performance and measurement, and behavioral correctness. Each area had an analyst report followed by an independent adversarial verification that re-checked every claim against the code, the session logs, and fetched primary sources. The owner dropped a fifth area, state of the art; its unverified draft is kept in the archive only.
-- The reviewer seat reviewed the #195 diff and the documentation-catalog failure. This session's own log supplied the live evidence.
-- Web search was unavailable, so external facts come from primary pages fetched on 2026-09-24: Anthropic prompt caching, pricing, and extended thinking; DeepSeek context caching and pricing; OpenAI prompt caching; the Claude Code model configuration; and the Moonshot, Z.ai, and Ollama pricing pages.
+- The evidence covers four areas: routing approach, prompt-cache economics, performance and measurement, and behavioral correctness.
+- Each claim is checked against the code, the session logs, or primary pages fetched on 2026-09-24: Anthropic prompt caching, pricing, and extended thinking; DeepSeek context caching and pricing; OpenAI prompt caching; the Claude Code model configuration; and the Moonshot, Z.ai, and Ollama pricing pages.
+- The live evidence comes from the session log of the demo-home deployment described below.
 - The raw research archive is local and not in git: `.run/routing-review-evidence/2026-09-24/` and `~/shres-research/routing-review-2026-09-24.tar.zst`. It contains:
   - the analyst and verified reports (`*.md`, `*.verified.md`);
   - `live-evidence.md` and `laya-findings.md`;
@@ -122,7 +122,7 @@ Session `session-2c8ec18f-5511-462d-a7dc-bc251a0888bf`, 2026-09-23 to 2026-09-24
   - The user switched manually to `zai/glm-5.3`.
   - The server restarted.
   - The user switched manually to `claude-session/claude-opus-5-5` at xhigh effort.
-- **Deployment correction.** Review claims derived from `~/.shres/settings.yaml` describe a different installation and do not apply to this session: a `grok-session/grok-4.7` default, no router mounted anywhere, no routed data.
+- **Applicable deployment.** The evidence and this plan apply to the demo-home deployment, with the router composed as described above. `~/.shres/settings.yaml` configures a separate installation, with a `grok-session/grok-4.7` default and no router mounted.
 
 | Time | Base | Reason | Route choice (confidence) | Top-2 probabilities | Difficulty (confidence) | Judge ms |
 |---|---|---|---|---|---|---|
@@ -146,6 +146,7 @@ Session `session-2c8ec18f-5511-462d-a7dc-bc251a0888bf`, 2026-09-23 to 2026-09-24
 
 - **Judge latency.** The engine was `typesafe`, model `jev-1.13.0`. Latency across the 17 calls was 497–924 ms, median 704, mean 712: about 2.6× the 273 ms bench figure. There is one call per turn, on the critical path before step 1.
 - **Egress.** Each consult sent up to 12,000 characters of recent conversation (`contextTurns: 2`) to the third-party TypeSafe API.
+- **Egress stopped (D-15).** A hot reload of the demo home's `initialMode: off` recorded `model-routing/configuration {active:false}` at 13:16:05 on 2026-09-24. The last TypeSafe consult was at 13:11:52: 22 consults in total, all kept-strong.
 - **Trivial turns stayed strong.**
   - "hello": difficulty 0 at confidence 1.0, with keep-current 0.59 against flash 0.41.
   - "check branch and dir": flash 0.52 against keep-current 0.43, but at confidence 0.39.
@@ -195,7 +196,7 @@ Verified list prices (USD per million tokens, peak rates):
 | Kimi K3 (Moonshot) | 3.00 | 3.00 (5-minute) / 6.00 (1-hour) | 0.30 | 15.00 |
 
 - **Price and tokenizer details.**
-  - The approach analysis used the Opus 5 / 4.8 price row ($5 input / $0.50 read / $25 output), which is wrong for Opus 5.5.
+  - Opus 5 and 4.8 list at $5 input, $0.50 cache read, and $25 output; the Opus 5.5 row above is the one that applies.
   - Off-peak prices are half of peak. For DeepSeek they apply outside 01:00–04:00 and 06:00–10:00 UTC on weekdays; for Ollama, outside 12:00–18:00 UTC on weekdays.
   - Z.ai publishes no cache TTL.
   - Anthropic 4.7-and-later models count about 30% more tokens for the same text, which scales Opus-side dollar figures but leaves break-even step counts nearly unchanged.
@@ -225,7 +226,7 @@ Verified list prices (USD per million tokens, peak rates):
 - **Quality bound.** Routing stops paying once about 0.33 of downgrades fail a task the strong model would pass. An 11-step downgrade that returns to a cold strong cache loses about $0.47.
 - **Subscriptions.** The owner's strong routes are subscriptions. Ollama Cloud draws per-token usage from monthly plan credits ($60 Pro, $300 Max), so both sides of a switch can be flat-rate. How subscription quota counts cache writes and reads is unverified.
 - **Cache telemetry.** pi-ai omits `cacheReadTokens` when it is 0 (`packages/llm/llm-pi-ai/src/stream.ts:26`), so a miss and an unreported count are indistinguishable.
-  - The low Ollama hit ratios reported by analysis are mostly missing telemetry. The field is absent in 90.8% of `deepseek-v4-flash:cloud` records, 97.4% of `glm-5.3-flash:cloud` records, and 67.7% of `deepseek-v4-pro:cloud` records.
+  - Low apparent Ollama hit ratios are mostly missing telemetry. The field is absent in 90.8% of `deepseek-v4-flash:cloud` records, 97.4% of `glm-5.3-flash:cloud` records, and 67.7% of `deepseek-v4-pro:cloud` records.
   - Where the field is present, the hit ratios are 0.982, 0.896, and 0.973.
 - **Log statistics** (683 sessions, 49.6k steps):
   - the first step on a model newly used in a session has a median hit ratio of 0 (n = 66);
@@ -235,11 +236,11 @@ Verified list prices (USD per million tokens, peak rates):
 
 ### Verified correctness findings
 
-- **Mid-turn return to Claude (C1).** Refuted as a failure for adaptive-thinking routes. Anthropic's extended-thinking documentation: "Adaptive mode relaxes this: no assistant turn needs to start with one. Mid-turn conflicts degrade gracefully … the API doesn't error." Every shipped `claude-session` model (Opus 5.5, Opus 5, Sonnet 5) uses adaptive thinking.
+- **Mid-turn return to Claude (C1).** It is not a failure on adaptive-thinking routes. Anthropic's extended-thinking documentation: "Adaptive mode relaxes this: no assistant turn needs to start with one. Mid-turn conflicts degrade gracefully … the API doesn't error." Every shipped `claude-session` model (Opus 5.5, Opus 5, Sonnet 5) uses adaptive thinking.
   - The residual is reasoning continuity: the other model's reasoning reaches Claude as plain text.
   - Manual-budget Claude routes get thinking silently disabled after a mid-turn return.
   - The path is latent, because the live session made no downgrade.
-- **Confirmed defects and gaps.**
+- **Defects and gaps.**
   - C2: there is no `agent/request-error` listener, a candidate failure fails the turn, and the failure breaker counts only while a streak is active.
   - C4: there is no re-entry cooldown.
   - C5: compaction summarizes on the routed candidate. This is a trade-off: it reuses the candidate's warm prefix.
@@ -248,14 +249,14 @@ Verified list prices (USD per million tokens, peak rates):
   - C9: the chip shows the mode only.
   - C10: tool pairing and replay transforms work across switches.
   - Subagents and team seats are never routed.
-- **Hypotheses.**
+- **Unverified hypotheses.**
   - C3: Kimi thinking mode may reject history that lacks `reasoning_content`.
   - C8: candidate tool-count limits may reject large tool sets.
-- **New medium issues.**
+- **Medium issues.**
   - M1: the base is offered as its own candidate. During a held streak, an answer naming the duplicate bypasses the current-preferred exit, and sticky-hold keeps the cheap route.
   - M2: routed requests carry the manual model's name in the system prompt.
   - M3: candidates have no cost or strength ordering relative to the base.
-- **New low issues.**
+- **Low issues.**
   - M4: reasoning continuity loss.
   - M5: manual-budget Claude routes lose thinking after a mid-turn return.
 - **Unbounded hold.** Within the entry turn, `turnsElapsed` stays 0, so a downgrade holds for the whole turn however long it runs.
@@ -279,12 +280,11 @@ Verified list prices (USD per million tokens, peak rates):
   - Anthropic's 20-block lookback can cause misses unrelated to routing.
   - TypeSafe's terms clause (vi) restricts using the service to develop new products.
 
-### Review of the #195 diff
+### The #195 diff and documentation gates
 
-- **No blockers.**
-  - Verified sound: allowlist enforcement, manual authority, abort handling, replay determinism, the decision→header invariant, and the byte-identical OFF arm.
+- **Sound mechanisms.** Allowlist enforcement, manual authority, abort handling, replay determinism, the decision→header invariant, and the byte-identical OFF arm.
   - The router suite passes 212 tests; the spine and client routing suites pass 558.
-- **Open suggestions from the review.**
+- **Minor open issues.**
   - A base-resolution failure is reported as `candidate-ineligible`.
   - The `/route` status horizon text reads the live configuration.
   - The streak exits `state-too-large`, `engine-unavailable`, and `judgment-input-too-large` carry no `brokenBy` reason.
@@ -293,9 +293,9 @@ Verified list prices (USD per million tokens, peak rates):
   - On origin/master only: `ctx.cursorCredential.managerFor` references `CursorSessionManager` and `CursorSessionOptions`, which are classified on #195 but not on master. Master therefore has four violations.
   - PR 0 against master fixes both. It adds `Request` and `Response` to `FOUNDATION_TYPE_NAMES`, ports #195's `cursorCredential` classification byte-identical (commit `91b8a940a4`), and regenerates the catalogs.
 - **CI is off.** GitHub Actions are disabled at the repository level, and the CI workflow has been disabled manually since 2026-08-17, so nothing has enforced the documentation gates.
-  - At origin/master `481ea66c52`, doc-sync passes 15 of 26 gates and fails 11.
-  - At #195 (`f0abff5519`) it passes 14 and fails 12: the same gates as master, plus doc refs.
-  - These baselines are recorded in `/tmp/routing-review/doc-sync-baseline.md`.
+  - Baseline at origin/master `481ea66c52`: doc-sync passes 15 of 26 gates and fails 11. The failing gates are cordis catalog, doc graphs, config catalog, export jsdoc, type equivalence, markdown wrap, markdown links, package paths, package README model experience, package README limitations, and agent note format.
+  - Baseline at #195 (`f0abff5519`): 14 pass and 12 fail, the same 11 gates plus doc refs.
+  - Current state: #203 (PR 0b) brings master to 26 of 26. The #195 cleanup commits `2b9bbfd58c`, `c8ef75b2fb`, and `cee6f55279` bring #195 to 17 passed and 9 failed, and every remaining failure is in master's baseline.
 
 ### Laya findings
 
@@ -356,7 +356,7 @@ All three workstreams are separate PRs against master.
 
 #### 2.1.1 Does subscription OAuth honour the 1-hour TTL?
 
-This is unverified. Add an e2e probe under `packages/llm/llm-claude-session/tests/` (`e2e/cache-retention.e2e.spec.ts`), which self-skips without the Claude credential.
+This is unverified. Add an e2e probe under `packages/llm/llm-claude-session/tests/` (`cache-retention.e2e.ts`, collected only by the e2e configuration). It runs only when `SHRES_E2E_CLAUDE_CACHE_TTL=1` is set (D-24) and self-skips without the Claude credential.
 
 1. Build a prefix of at least 2,048 tokens: a fixed system prompt plus one user message.
 2. Send request 1 with `cacheRetention: long`. Assert that the raw response has `usage.cache_creation.ephemeral_1h_input_tokens > 0` and `ephemeral_5m_input_tokens == 0`.
@@ -383,50 +383,57 @@ Plus the e2e probe above.
 
 ### 2.2 Three-state cache usage telemetry
 
-**Problem.** `mapUsage` in `packages/llm/llm-pi-ai/src/stream.ts:26-27` omits cache fields when they are 0, while `packages/llm/llm-deepseek/src/translate.ts:59` writes them whenever they are defined. The log therefore cannot tell a miss from an unreported count (cache verification C4 and missed issue 1).
+**Problem.** `mapUsage` in `packages/llm/llm-pi-ai/src/stream.ts:26-27` omits cache fields when they are 0, while `packages/llm/llm-deepseek/src/translate.ts:59` writes them whenever they are defined. The log therefore cannot tell a miss from an unreported count (Evidence, cache telemetry: the field is absent in 67.7–97.4% of Ollama records).
 
-**Type change** in `packages/llm/llm/src/types.ts` (`TokenUsage`, line 179):
+**Design** (aegis ruling on PR 2, D-22). `TokenUsage` in `packages/llm/llm/src/types.ts` keeps its existing optional `cacheReadTokens` and `cacheWriteTokens` fields, and their presence is the documented signal. No field is added or removed, so the session format is unchanged and existing logs still load. The `TokenUsage` JSDoc carries this contract:
 
-```ts
-/** Whether and how the provider reported prompt-cache usage for one call. */
-export type CacheUsage =
-  | { kind: 'reported'; readTokens: number; writeTokens: number; writeTtl?: 'short' | 'long' | 'mixed' }
-  | { kind: 'unreported' } // provider sent no cache counts; inputTokens may include cached input
-export interface TokenUsage {
-  inputTokens: number
-  outputTokens: number
-  cache: CacheUsage
-  reasoningTokens?: number
-}
-```
+> cacheReadTokens and cacheWriteTokens each record whether the provider reported that count. Present (including 0): the provider reported the count for this call. Absent: the provider did not report it; inputTokens may then include cached input. Adapters MUST emit a reported zero and MUST NOT emit an unreported count. The two fields are independent: a provider that reports cache hits but has no write concept omits cacheWriteTokens.
 
-Under the pre-release stance, `cacheReadTokens` and `cacheWriteTokens` are removed and every reader is updated in the same PR. `SESSION_FORMAT_VERSION` stays 0, and old logs are rejected per policy.
-
-**Adapters and consumers.**
+**Adapters.**
 - **`llm-pi-ai`.** pi-ai's `Usage` always carries numbers, so each profile declares whether its provider reports cache usage.
   - Add a profile field, `cacheUsage: 'reported' | 'unreported'`.
   - The resolved default depends on the API: `anthropic-messages` and `openai-responses` → `reported`; `openai-completions` → `unreported` unless declared.
+  - Each session adapter sets `cacheUsage` explicitly in the profile it builds, rather than relying on the resolved default.
   - An Ollama Cloud profile declares `unreported`, because its August records carried no counts at all.
-  - `mapUsage(usage, cacheUsage)` emits `{kind:'reported', readTokens: usage.cacheRead, writeTokens: usage.cacheWrite}`, zeros included, when the profile declares `reported`.
+  - `mapUsage(usage, cacheUsage)` emits both counts, zeros included, when the profile declares `reported`. It omits both when the profile declares `unreported`.
   - Add `XXX(pi-ai upstream)`: request raw provider usage so reportedness can be observed rather than declared.
-- **`llm-deepseek`** (`translate.ts:54-59`): `prompt_cache_hit_tokens` present → `reported`; absent → `unreported`.
-- **Other adapters** (codex-session, grok-session, cursor-session, cli-bridge, xai-apikey) each state their mapping explicitly. A delegated CLI bridge reports `unreported`.
-- **Consumers.**
-  - `packages/llm/token-meter/src/usage-projection.ts` and `breakdown-projection.ts` show "cache: not reported" rather than 0%.
-  - The compaction pressure readers.
-  - `bench/runner/metrics.js`: `cacheHitShare` excludes unreported calls and reports the unreported share.
-- **Event.** `assistant/message.data.usage` carries the new type, so no new event is needed.
-  - TTFT is derivable from the log: the time of the first `assistant/chunk` event minus the time of the `request/header` event for the same turn and step.
-  - Document that derivation in `docs/subsystems/llm-streaming.md` rather than adding a field.
-- **Invariant.** `packages/llm/llm/src/invariant.ts` adds a check that an `assistant/message` whose usage has `cache.kind === 'reported'` carries non-negative integer counts.
+- **`llm-deepseek`** (`translate.ts:54-59`): when `prompt_cache_hit_tokens` is present, `cacheReadTokens` is present, including 0; when it is absent, the field is omitted. The adapter never emits a count the provider did not report.
+- **Other adapters** (codex-session, grok-session, cursor-session, cli-bridge, xai-apikey) each state their mapping explicitly under the same contract. A delegated CLI bridge omits both counts.
 
-**Tests.**
+**Consumers.** A single helper, `cacheCount(usage, 'read' | 'write')`, lives in `llm`. It returns `undefined` for an absent field, never 0. Every consumer reads cache counts through it, and none reads absence as 0:
+- `packages/llm/token-meter/src/usage-projection.ts` and `breakdown-projection.ts` show "cache: not reported" rather than 0%;
+- the compaction pressure readers;
+- `bench/runner/metrics.js`: `cacheHitShare` excludes unreported calls and reports the unreported share.
+
+**No write-TTL class.** `writeTtl` is dropped; cache writes are not split by TTL.
+
+**Event.** `assistant/message.data.usage` keeps its fields, so no new event is needed.
+- TTFT is derivable from the log: the time of the first `assistant/chunk` event minus the time of the `request/header` event for the same turn and step.
+- Document that derivation in `docs/subsystems/llm-streaming.md` rather than adding a field.
+
+**Invariant.** `packages/llm/llm/src/invariant.ts` adds a check that every present `cacheReadTokens` or `cacheWriteTokens` on an `assistant/message` usage is a non-negative integer. Absence is valid and means the count was not reported.
+
+**Known limitation.** pi-ai logs written before this change omit zero cache reads, so those zeros read as "not reported".
+
+**Tests.** The ruling (D-22) requires these behaviours:
+- pi-ai: a reported profile with 0 reads emits `cacheReadTokens: 0`.
+- pi-ai: an unreported profile omits both cache fields.
+- `cacheCount` returns `undefined` for an absent field and never 0.
+- token-meter: the projection renders "not reported" for absent counts.
+- bench: `cacheHitShare` excludes calls with absent fields and reports the unreported share.
+
+The plan's tests that remain valid under presence semantics carry over:
 - `llm-pi-ai/tests/stream.spec.ts`:
   - `reports zero cache reads as reported-zero on a reported profile`;
   - `reports unreported on an openai-completions profile without a declaration`.
 - `llm-deepseek`: `absent prompt_cache_hit_tokens is unreported`.
 - The token-meter projection specs.
-- A keyless snapshot re-record for any transcript that renders usage. Check whether the `examples/headless-agent` usage lines change.
+
+The remaining conditions also need coverage:
+- each session adapter declares `cacheUsage` explicitly;
+- the invariant rejects a present count that is negative or not an integer.
+
+A keyless snapshot re-record covers any transcript that renders usage. Reported profiles emit zero reads, so check whether the `examples/headless-agent` usage lines change.
 
 ### 2.3 Prompt-prefix stability (requirement only)
 
@@ -436,7 +443,7 @@ Under the pre-release stance, `cacheReadTokens` and `cacheWriteTokens` are remov
 
 **Where toggling text belongs.** The cache-safe home for toggling text is a dynamic context, `ctx.systemPrompt.context()`. The shipped loop evaluates context providers at each assembly and logs them as a sourced runtime-context snapshot at the conversation tail (`packages/core/system-prompt/README.md`), so a toggle changes only the tail and the cached prefix survives. Declaring a system section `conditional` and ordering it last is only the fallback. Its cost is stated: tools and static sections stay cached, but every toggle re-prefills all cached conversation messages.
 
-**Acceptance check.** The check is owned by `packages/core/system-prompt` and is generic, with nothing specific to the doctrine section. It is implemented in PR 3 (commit `30a357bec8`).
+**Acceptance check.** The check is owned by `packages/core/system-prompt` and is generic, with nothing specific to the doctrine section. It is implemented in PR 3 (#205, commit `adb866aa45`).
 - A test, `system-prompt/tests/prefix-stability.spec.ts`, toggles every registered *conditional* section across all combinations and asserts that the rendered bytes before the first conditional section stay identical.
 - The section registry gains `stability: 'static' | 'conditional'`. An omitted value means static, so every existing prompt renders byte-identical.
 - `assemble()` rejects an effective conditional section ordered at or before a static one, naming both. The rule is skipped while a complete section replaces the prompt.
@@ -456,7 +463,7 @@ These fixes are stacked on #195 and land before it merges. All live in `packages
   - Effort is ignored because a same-model effort change is a cache transition on Anthropic (§3.7).
 - **Route question.** `routeQuestion` (`index.ts:1144-1160`) is built from `eligibleCandidates`, so the duplicate disappears from the question.
 - **Defensive fold.** In `decide()`, before `gate()` (`index.ts:953`), an answer naming a candidate whose assessment is `equals-base` is treated as `keep-current`, with reason `current-preferred`. This closes the held-streak path where the duplicate bypassed `current-preferred` and `sticky-hold` kept the cheap route (`index.ts:942-972`).
-- **`gate()`.** Its `candidate-equals-base` check becomes unreachable by construction. Keep it as an assertion with a `/* v8 ignore */` and a stated reason, or delete the reason.
+- **`candidate-equals-base` keeps a narrower meaning (D-19).** It fires only when every configured candidate equals the manual route, and it skips judgment. RoutingChip's idle signal depends on it. When candidates fail for mixed reasons, the decision reports `candidate-ineligible`, with per-assessment `equals-base` reasons. It is a reachable decision reason, not an assertion.
 - **Load-time check.** With `basePolicies` (§4.5), a candidate listed for its own base fails at load.
 
 **Logging.** `candidateEligibility.assessments[].reason: 'equals-base'`.
@@ -468,6 +475,7 @@ These fixes are stacked on #195 and land before it merges. All live in `packages
 - `controller.spec.ts`:
   - `route question omits the base-equal candidate`;
   - `held streak: an answer naming the base-equal candidate ends the streak as current-preferred`.
+- Behaviour: when every configured candidate equals the manual route, the decision is `candidate-equals-base` and no judgment runs; mixed failures report `candidate-ineligible` with per-assessment `equals-base` reasons.
 - Keyless snapshot: re-record `model-router-keep-current.cordis.snapshot.yml` with a base-equal candidate configured.
 
 ### 3.2 Bug 2: routed requests name the manual model
@@ -478,13 +486,13 @@ These fixes are stacked on #195 and land before it merges. All live in `packages
 - the CLI agent presets: `apps/cli/config/agent-presets/code/agent.cordis.yml:35`, `standard/agent.cordis.yml:28`, and `cordis/agent.cordis.yml:21`;
 - the example compositions under `examples/headless-agent/`, including every `model-router-*.cordis.snapshot.yml`, and `examples/acp-agent/`.
 
-The guard below enforces the rule for any template once the router is composed. PR 4 updates the presets and the router-composing example compositions together with the bundles.
+The guard below enforces the rule for any template once the router is composed. Together with the bundles, PR 4 updates the three CLI agent presets (code, standard, cordis) and the 9 router snapshot configurations under `examples/headless-agent/`. The ACP example compositions keep the model name, because they do not compose the router.
 
 **Rejected alternatives.**
 - Deciding the route before prompt assembly needs an agent-loop change: assembly happens once per turn (`agent.ts:348-353`), and routing is decided per step.
 - Rewriting the system prompt per request would violate the rule that `agent/request` listeners change only the config.
 
-**Guard.** `model-router/src/invariant.ts` gains a check that fails with "routed request names the manual model" when a `request/header`'s config differs from the latest manual selection *and* its `header.system` contains the manual model id. This enforces the rule in the operation, for any future template.
+**Guard.** `model-router/src/invariant.ts` gains a check that fails with "routed request names the manual model" when a `request/header`'s config differs from the latest manual selection *and* its `header.system` contains the manual model id. This enforces the rule in the operation, for any future template. The check applies only to requests under a downgraded decision; route-error recovery is exempt.
 
 **Tests.**
 - `invariant.spec.ts`: `rejects a routed header whose system prompt names the manual model`.
@@ -554,7 +562,7 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
   - The fold derives the cooldown from the break decision's turn, so it is deterministic.
 - **Step-counted horizon and cap.** `minTurnsDowngraded` is replaced by:
   - `hold.minSteps` (every-turn policy only), default 20. Evidence: an expired return breaks even at 20.5 steps at 200k with a 5-minute strong TTL.
-  - `hold.maxSteps` (both policies), default 40. Evidence: the 5-minute warm window holds at most ~38 steps at 7.8 s per step. This also bounds the unbounded hold within the entry turn (approach verification M2).
+  - `hold.maxSteps` (both policies), default 40. Evidence: the 5-minute warm window holds at most ~38 steps at 7.8 s per step. This also bounds the hold within the entry turn, where `turnsElapsed` stays 0 (Evidence, unbounded hold).
   - The fold counts steps from `enteredStep`, a new sticky field, using the `(turn, step)` of held decisions.
   - When `hold.maxSteps` is reached, the next consult ends the streak with `brokenBy: 'hold-cap'`.
 - **Entry turn.** `turnsElapsed` is replaced by `stepsElapsed`, which advances within the entry turn.
@@ -591,8 +599,9 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
 ### 3.7 Bug 7: effort changes are hidden cache transitions
 
 **Changes.**
-- `candidateSelection` (`index.ts:1100-1116`) applies `difficultyToEffort` **only at streak entry**. The chosen effort is stored in the selection and in a new `sticky.selectionEffort` field.
-- `continuing` (`index.ts:975`) compares the full selection, `candidateId` and `reasoningEffort`. An effort change is then a candidate change, subject to the horizon and the cold-point rules.
+- `candidateSelection` (`index.ts:1100-1116`) applies `difficultyToEffort` **only at streak entry**. There is no `sticky.selectionEffort` field (D-19): effort is durable in each decision's `selection.reasoningEffort` and in the fold's held candidate.
+- While a streak is held, the selection is kept if its effort is still reachable: the configured effort or the lift.
+- `continuing` (`index.ts:975`) compares the full selection through the fold's exported `sameSelection`. An effort change is then a candidate change, subject to the horizon and the cold-point rules.
 - Same-model effort "downgrades" are excluded by `equals-base` (§3.1).
 
 **Tests** in `controller.spec.ts`:
@@ -632,7 +641,7 @@ The router registers `ctx.on('agent/request-error', listener)` through `ctx.effe
 
 ### 3.10 Phase 2 Agent Note
 
-`.agents/notes/implemented/bug-fix/2026-09-26-routing-correctness-after-live-review.md`. It records the live evidence and M1/M2/M3. It cross-links the 2026-09-22 note, which it partially supersedes: the sticky-candidate transitions and the `minTurnsDowngraded` horizon.
+`.agents/notes/implemented/bug-fix/2026-09-24-routing-correctness-after-live-review.md`. It records the live evidence and M1/M2/M3. It cross-links the 2026-09-22 note, which it partially supersedes: the sticky-candidate transitions and the `minTurnsDowngraded` horizon.
 
 ## 4. Phase 3: policy redesign
 
@@ -694,7 +703,7 @@ tier: fast
 - the child's first `request/header` must match it, which the invariant checks;
 - the existing spawn telemetry already logs the route in the parent's model-visible result.
 
-**Failure.** The in-turn fallback (§3.4) applies within the child. The router listener is installed per agent through `installModelSelection` for children too. The in-process driver does not call it for children today (correctness verification C11), so installing it is part of this PR.
+**Failure.** The in-turn fallback (§3.4) applies within the child. The router listener is installed per agent through `installModelSelection` for children too. The in-process driver does not call it for children, so subagents and team seats are never routed (Evidence, defects and gaps). Installing it is part of this PR.
 
 **Tests.**
 - `subagent/tests/child-route.spec.ts`:
@@ -732,7 +741,7 @@ tier: fast
 ### 4.5 (d) Cold-point switching and (e) objectives
 
 **Cold-point fold.** `folds.ts` adds `coldPointAt(events, base, ttlMs, now)`, which returns `{kind, evidence}` or `undefined`:
-- `session-start`: no `request/header` or `assistant/message` exists for this base, **and** the session has no seeded or parent history (`parentSession` absent, no fork seed). Resumed and forked sessions are warm (cache verification C9).
+- `session-start`: no `request/header` or `assistant/message` exists for this base, **and** the session has no seeded or parent history (`parentSession` absent, no fork seed). Resumed and forked sessions are warm, because caches are per model and per account (Evidence, log statistics).
 - `post-compaction`: a compaction commit event follows the last base-route `assistant/message`.
 - `idle`: `now - lastBaseRequestStartTime > ttlMs`. The TTL is counted from the request start, as Anthropic counts it. `ttlMs` comes from `LlmModelInfo.promptCacheTtlMs` (§2.1), else `entry.unknownTtlMs`.
 - `manual-switch`: the latest `agent/model-selection` changed the base since the last base request.
@@ -1044,7 +1053,7 @@ The bench work lands in separate PRs against master.
 ### 5.1 Bench cost accounting
 
 - **Priced and cache-inclusive.** In `bench/runner/metrics.js` and `descendants.js:149-163`, `foldUsage` sums the new `TokenUsage` fields:
-  - input, output, `cache.readTokens`, and `cache.writeTokens` with its TTL class;
+  - input, output, and the cache read and write counts, read through `cacheCount(usage, 'read' | 'write')`. There is no write-TTL class;
   - unreported calls are flagged and excluded from cache-share metrics. They are counted at the uncached input price in a separately reported upper bound.
 - **Price snapshot.** `bench/prices/2026-09-24.json` is a dated snapshot per model: input, output, 5-minute write, 1-hour write, read, and the peak/off-peak windows. Every trial records `priceSnapshot`, and off-peak windows apply by request timestamp.
   - The runtime still has no prices. The snapshot is research-only, consistent with the "tokens are the only runtime cost currency" note, which the bench Agent Note amends for bench scope.
@@ -1058,7 +1067,7 @@ The bench work lands in separate PRs against master.
   - TypeSafe is priced per the vendor plan if known; otherwise it is reported as a call count.
 - **TTFT and latency.**
   - Per step, TTFT = the first `assistant/chunk` time − the `request/header` time.
-  - Report the added critical-path latency: the sum of judgment `latencyMs` on awaited consults plus eligibility time. Add `eligibilityMs` to decisions, which also covers approach verification M1 and performance verification M7.
+  - Report the added critical-path latency: the sum of judgment `latencyMs` on awaited consults plus eligibility time. Add `eligibilityMs` to decisions; it measures the eligibility time that step 1 of every turn pays (Evidence, step-1 latency on every turn).
   - Per-trial `durationMs` is kept.
 - **Tokenizer asymmetry.** Report dollars, and never claim token equality across vendors.
 
@@ -1091,7 +1100,7 @@ The bench work lands in separate PRs against master.
 ### 5.4 Sample size and pre-specified operating point
 
 - **Primary endpoint.** Task success of `router-coldpoint` vs `always-strong`, paired by task, with a non-inferiority margin of δ = 5 points, one-sided α = 0.025, and power 0.8.
-  - With expected discordance of 10–20%, this needs **314–628 pairs** (per the performance verification).
+  - With expected discordance of 10–20%, this needs **314–628 pairs** (n = 7.85·p_disc/δ², where p_disc is the share of tasks on which the arms disagree).
   - Plan: 60 tasks × 6 repeats = 360 pairs.
   - Report within-task variance per arm (cluster-robust, with the ICC-adjusted design effect). Add repeats if the observed discordance exceeds 18%.
 - **Secondary endpoints**, Holm-corrected:
@@ -1108,7 +1117,7 @@ The bench work lands in separate PRs against master.
 - **Cache isolation.**
   - Randomize arm order per task, with a seeded order that is logged.
   - Use a separate Anthropic organization or API key per strong-using arm where possible; caches are isolated per organization.
-  - Report first-request `cache.readTokens` per trial, and exclude or flag trials whose first request hit a warm cache they did not create.
+  - Report the first request's cache reads (`cacheCount(usage, 'read')`) per trial, and exclude or flag trials whose first request hit a warm cache they did not create.
   - DeepSeek and Ollama caches persist for hours to days, so inject a per-arm nonce in the first user message: a logged, model-visible task header in a fixed format. This decorrelates prefixes across arms for all providers.
   - Tag Anthropic 20-block lookback misses separately, and do not attribute them to routing.
 - **Metered keys.** The confirmatory strong arms run on metered API keys, not subscriptions, both for volume and for dollar comparability.
@@ -1158,59 +1167,115 @@ Until then, the default is `off`, and `shadow` is permitted with a local engine.
 
 ## 6. Delivery sequence
 
-Stacks use GitHub native stacks (the `shres-merging-stacked-prs` skill). "#195-stack" means stacked on `feat/jev-judgment-foundation` and landing with or immediately after #195, following the repository rule to fix the introducing PR before the defect propagates. "master" means independent of #195. "PR 0b" means stacked on `fix/master-doc-sync`. The delivery amendments below the table record the Lead's changes to the bases and scope.
+Stacks use GitHub native stacks (the `shres-merging-stacked-prs` skill). "#195-stack" means stacked on `feat/jev-judgment-foundation` and landing with or immediately after #195, following the repository rule to fix the introducing PR before the defect propagates. "master" means independent of #195. "PR 0b" means stacked on `fix/master-doc-sync`. The delivery amendments below the table record the changes made to the bases and scope during delivery.
 
 | # | Title | Base | Packages | Depends on | Agent Note | Key tests |
 |---|---|---|---|---|---|---|
 | 0 | Catalog classification fix (GitHub #202, branch `fix/catalog-request-response` at `91b8a940a4`): `Request` and `Response` on `ctx.clientModules.fetchBundle`, plus `ctx.cursorCredential` ported byte-identical from #195 | master | `scripts/gen-cordis-catalog.ts`, regenerated catalogs | — | existing | `verify-cordis-catalog`, `verify-doc-graphs`; master doc-sync moves from 15 to 17 of 26 with no regression |
 | 0b | Restore master doc-sync: the remaining 9 gates (GitHub #203, branch `fix/master-doc-sync`) | stacked on PR 0 (GitHub native stack #204) | the files named by the failing master gates | 0 | — | `pnpm run doc-sync` passes 26 of 26 on master; a prerequisite for re-enabling CI (D5) |
-| 1 | `llm-claude-session: explicit cacheRetention and promptCacheTtlMs` | master, stacked on PR 0b | llm-claude-session, llm (`LlmModelInfo.promptCacheTtlMs`) | — | `implemented/feature/2026-09-25-claude-session-cache-retention.md` (includes the OAuth 1-hour probe result) | config.spec cases in §2.1; e2e `cache-retention.e2e.spec.ts` |
-| 2 | `llm: three-state cache usage telemetry` | master, stacked on PR 0b | llm, llm-pi-ai, llm-deepseek, other adapters, token-meter, compaction-basic readers, `bench/runner/metrics.js` | — | `implemented/architecture/2026-09-25-three-state-cache-usage.md` | stream/translate specs; token-meter specs; keyless snapshot re-record |
-| 3 | `system-prompt: section stability classes and prefix-stability check` | master, stacked on PR 0b | core/system-prompt | — | `implemented/architecture/2026-09-25-stable-prompt-prefix.md` (the requirement; the doctrine-section migration is owned elsewhere) | `prefix-stability.spec.ts` |
-| 4 | `model-router: equals-base eligibility, frozen effort, base-name guard` (bugs 1, 7, 2) | #195-stack | model-router, bundle/headless, bundle/web-app, the `apps/cli` agent presets, router-composing example compositions | #195 | `implemented/bug-fix/2026-09-26-routing-correctness-after-live-review.md` (created here; extended by PRs 5–7) | §3.1, §3.2, §3.7; snapshot re-records. The persona change (D10) is a separable commit. |
-| 5 | `model-router: in-turn fallback via agent/request-error` (bug 4) | #195-stack | model-router | 4 | same note | §3.4; `model-router-fallback` snapshot |
+| 1 | `llm-claude-session: explicit cacheRetention and promptCacheTtlMs` (rebased onto PR 0b as `9bb8941cdc`) | master, stacked on PR 0b | llm-claude-session, llm (`LlmModelInfo.promptCacheTtlMs`) | — | `implemented/feature/2026-09-24-claude-session-cache-retention.md` (records the OAuth 1-hour probe result once the owner runs it; pending, D-25) | config.spec cases in §2.1; the opt-in `.e2e.ts` cache-TTL probe (D-24, D-25); no GIF, because the Web GUI does not render the field (D-31) |
+| 2 | `llm: three-state cache usage telemetry` (branch `feat/three-state-cache-usage`) | PR 0b (`fix/master-doc-sync`) | llm (`cacheCount`), llm-pi-ai (`cacheUsage`), llm-deepseek, other adapters, token-meter, compaction-basic readers, `bench/runner/metrics.js` | 0b | `implemented/architecture/2026-09-24-three-state-cache-usage.md` | the D-22 behaviours (pi-ai reported zero and unreported omission, `cacheCount` returning `undefined` for absence, token-meter "not reported", bench `cacheHitShare`); stream/translate specs; session-adapter and invariant coverage; token-meter specs; keyless snapshot re-record |
+| 3 | `system-prompt: section stability classes and prefix-stability check` (GitHub #205, `adb866aa45`) | master, stacked on PR 0b | core/system-prompt | — | `implemented/architecture/2026-09-25-stable-prompt-prefix.md` (the requirement; the doctrine-section migration is owned elsewhere) | `prefix-stability.spec.ts` |
+| 4 | `model-router: equals-base eligibility, frozen effort, base-name guard` (bugs 1, 7, 2; GitHub #206, native stack #207 on #195) | #195-stack | model-router, bundle/headless, bundle/web-app, the `apps/cli` agent presets, router-composing example compositions | #195 | `implemented/bug-fix/2026-09-24-routing-correctness-after-live-review.md` (created here; extended by PRs 5–7) | §3.1, §3.2, §3.7; snapshot re-records. The persona change (D10) is a separable commit. |
+| 5 | `model-router: in-turn fallback via agent/request-error` (bug 4; in progress on branch `fix/model-router-in-turn-fallback`) | #195-stack | model-router | 4 | same note | §3.4; `model-router-fallback` snapshot |
 | 6 | `model-router: hysteresis, step horizon, judgment deadline/tolerance/breaker` (bugs 5, 6) | #195-stack | model-router | 5 | same note | §3.5, §3.6 |
 | 7 | `model-router: basePolicies and per-route objective; compaction summarizes on the manual route; thinking-mode eligibility` (bugs 3, 8, 9; (e)) | #195-stack | model-router, compaction-basic, llm (`thinkingMode`), llm-claude-session e2e | 6 | same note | §3.3, §3.8, §3.9; e2e `foreign-return` |
-| — | **#195 doc-gate cleanup** (number assigned by the Lead): fix the doc-gate failures #195 introduces, on #195 itself. #195 fails 12 of 26 gates against master's 11; the extra gate is doc refs | #195-stack | the files named by the branch-introduced failures | #195 | — | no doc-gate failure beyond the master baseline |
-| — | **Merge #195 with PRs 4–7 and the doc-gate cleanup.** The router ships in no default bundle; the demo home follows owner decision D1. After PR 0 lands, merging #195 produces four additive conflicts, resolved by union plus regeneration. | | | | | pre-push checks per the `shres-pre-push-checks` skill |
-| 8 | `judgment: engine registry and dispatcher; per-engine operating points` (R1 backend) | master (after #195) | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`createShieldWireEngine`, `endpointPolicy`), model-router (`operatingPoints`, `selectedEngine`), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | #195 | `implemented/architecture/2026-09-28-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
+| — | **#195 doc-gate cleanup** (commits `2b9bbfd58c`, `c8ef75b2fb`, `cee6f55279`): fix only the doc-gate failures #195 introduces relative to master, on #195 itself, and add `Request`/`Response` classification lines identical to PR 0's, so the catalog generator works for the #195 stack (D-11). #195 moves from 14/12 to 17/9 (D-17) | #195-stack | the files named by the branch-introduced failures | #195 | — | no doc-gate failure beyond master's baseline |
+| — | **Merge #195 with PRs 4–7 and the doc-gate cleanup.** The router ships in no default bundle; the demo home follows owner decision D1. After PR 0 lands, merging #195 produces four additive conflicts, resolved by union plus regeneration. PRs 10a and 11, siblings on #195, are retargeted to master once #195 lands (D-16). | | | | | pre-push checks per the `shres-pre-push-checks` skill |
+| 8 | `judgment: engine registry and dispatcher; per-engine operating points` (R1 backend) | master (after #195) | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`endpointPolicy`; `createShieldWireEngine` lands in PR 10a), judgment-laya (migrated from its standalone PR 10a provider into the registry), model-router (`operatingPoints`, `selectedEngine`), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | #195, 10a | `implemented/architecture/2026-09-28-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
 | 9 | `ui-settings-model-routing: Model routing section with engine switch` (R1 UI) | master | client/ui-settings-model-routing (new), ui-settings-models (Classifier card removed), api Typert gateway (`judgmentEngines` host API) | 8 | same as PR 8 (UI section) | client specs in §R1.5; browser-plugin disposal; GIF |
-| 10 | `judgment-laya: supervised local MLX gateway` (R2, R3) | master | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | 8 | `implemented/feature/2026-09-30-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.spec.ts`; notices check |
-| 11 | `progress-signals: extract escalation folds` | #195-stack (`packages/team/worker-escalation` exists only on #195) | team/progress-signals (new), worker-escalation | #195; independent of PRs 4–7 | `implemented/architecture/2026-09-29-progress-signals-extraction.md` | moved unit tests; worker-escalation regression |
+| 10a | `judgment-laya: supervised local MLX gateway` as a standalone `ctx.judgment` provider (R2, R3; D-9; in progress) | #195 sibling (branch `feat/judgment-laya-local`), retargeted to master after #195 lands | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | #195 | `implemented/feature/2026-09-30-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.spec.ts`; notices check |
+| 11 | `progress-signals: extract escalation folds` | sibling on #195, base `feat/jev-judgment-foundation` (D-16), GitHub #209; `packages/team/worker-escalation` exists only on #195 | team/progress-signals (new), worker-escalation | #195; independent of PRs 4–7 | `implemented/architecture/2026-09-29-progress-signals-extraction.md` | moved unit tests; worker-escalation regression |
 | 12 | `model-router: cold-point entry, verification exits, plan-mode gate, shadow mode` ((b), (c), (d)) | master | model-router, plan-mode (read-only fold consumer), ui-trajectory (cold-point and shadow rows) | 1, 2, 7, 8, 11 | `proposed/feature/2026-09-27-cold-point-routing-and-child-routes.md` → implemented; partially supersedes the 2026-09-17 proposal and the 2026-09-22 note | §4.3–4.6; `model-router-coldpoint` and `model-router-shadow` snapshots |
 | 13 | `subagent: child-route waterfall; model-router child policies` ((a)) | master | subagent/subagent, model-router, `docs/architecture.md` (extension-point list), `docs/subsystems/subagent.md` | 12 | same note as PR 12 | §4.2; `model-router-subagent` snapshot |
 | 14 | `judgment-llm: LLM-as-judge engine` (R4) | master | judgment-llm (new) | 8 | `implemented/feature/2026-10-xx-llm-judgment-engine.md` (calibration caveats) | structured-output parse; logprob path; verbalized flag; config rejects temperature on Opus |
+| 15a | Research price snapshot for the bench (§5.1; D-20, D-23, D-30), GitHub #208, squashed as `235f507966` | #203 (PR 0b, `fix/master-doc-sync`) | bench/prices | 0b | — | prices tests 8/8; doc-sync 26/26; a required `nullFields` array keeps every missing price explicit |
 | 15 | `bench: priced cache-inclusive accounting, judge calls, TTFT, dollar cap` | master | bench/runner, bench/prices | 2 | `implemented/process/2026-10-xx-bench-priced-accounting.md` | metrics unit tests over fixture trials |
 | 16 | `bench: multi-turn routing suite with idle gaps, arms, offline judge replay, preregistration` | master | `bench/tasks/routing-multiturn`, `bench/routing/replay-judges.mjs`, `runner/arms.js`, preregistration | 12, 13, 15 | `proposed/process/2026-10-xx-routing-measurement-gate.md` | runner dry-run; replay on fixture states |
 | 17 | `routing: default-on decision` (only if §5.8 passes) | master | bundle defaults or recommended profile, model-router README | PR 16 results | a new decision note citing the results | snapshot of the default composition |
 
 **Dependency parallelism.**
-- PRs 1, 2, and 3 (stacked on PR 0b) and PR 11 (on the #195 stack, independent of PRs 4–7) proceed in parallel with PRs 4–7.
-- PR 8 unblocks PRs 9, 10, and 14.
-- The Laya install on this Mac (owner decision D8) unblocks the PR 10 e2e.
+- PRs 1, 2, 3, and 15a (stacked on PR 0b) and PRs 10a and 11 (siblings on #195, independent of PRs 4–7) proceed in parallel with PRs 4–7.
+- PR 8 unblocks PRs 9 and 14.
+- The Laya install on this Mac (owner decision D8) unblocks the PR 10a e2e.
 
-**Execution order (Lead's sequencing).**
-- After the #195 stack (PRs 4–7), the local-engine chain runs in the order PR 8 → PR 10 → PR 9, and completes before PRs 12, 13, and 14.
-- PRs 1, 2, 3, and 11 run as parallel tracks.
+**Execution order.**
+- PR 10a runs first, on #195, as a standalone `ctx.judgment` provider (D-9).
+- After #195 merges, the local-engine chain continues with PR 8, which migrates PR 10a's provider into the registry, then PR 9. The chain completes before PRs 12, 13, and 14.
+- PRs 1, 2, 3, 11, and 15a run as parallel tracks.
 - The first wave is PRs 0, 1, and 4. PR 0b follows PR 0.
 
-**Delivery amendments.** These are Lead decisions made during delivery that amend this sequence. Source: `/tmp/routing-review/delivery-log.md` (2026-09-24).
-- **PR 11 base (D-3).** `packages/team/worker-escalation` exists only on #195, so PR 11 is a #195-stack PR, independent of PRs 4–7. PR 12 already depends on PR 11 and the #195 stack. PRs 1, 2, 3, and 15 touch only packages that exist on master.
-- **PR 0 scope (D-0).** origin/master had four catalog violations, not two, because `ctx.cursorCredential` was never classified there.
-  - PR 0 ports the cursor-credential classification from #195 byte-identical (commit `91b8a940a4`) so the later #195 merge does not conflict on it.
-  - It ports #195's `LINK_MAP` classification rather than adding `TYPE_LINK_EXEMPTIONS` entries, which would collide with #195's `LINK_MAP` at merge (D-6).
-- **PR 0b (D-1).** PR 0b restores the remaining 9 master doc-sync gates. It is stacked on PR 0 and is a prerequisite for re-enabling CI (owner decision D5).
-- **Master-based PRs stack on PR 0b (D-6).** PRs 1, 2, and 3 are rebased onto `fix/master-doc-sync` before they open.
+**Delivery amendments.** Decisions made during delivery, identified D-0 to D-32, amend this sequence. This list is the durable record of them. Provenance: the local research archive in `.run/routing-review-evidence/2026-09-24/` and `~/shres-research/routing-review-2026-09-24.tar.zst`, which is not in git.
+
+GitHub numbers: PR 0 is #202 and PR 0b is #203, and together they form native stack #204. PR 3 is #205. PR 4 is #206, linked to #195 as native stack #207. PR 15a is #208, based on #203. PR 11 is #209, a sibling on #195.
+
+- **D-0 PR 0 scope.** origin/master had four catalog violations, not two, because `ctx.cursorCredential` was never classified there.
+  - PR 0 ports the cursor-credential classification from #195 byte-identical (commit `91b8a940a4`), so the later #195 merge does not conflict on it.
+  - It ports #195's `LINK_MAP` classification rather than adding `TYPE_LINK_EXEMPTIONS` entries, which would collide with #195's `LINK_MAP` at merge.
+  - Master doc-sync moves from 15 to 17 of 26 gates with no regression.
+- **D-1 PR 0b.** PR 0b restores the remaining 9 master doc-sync gates. It is stacked on PR 0 and is a prerequisite for re-enabling CI (owner decision D5).
+- **D-2 #195 doc-gate cleanup.** Branch-introduced doc-gate failures are fixed on #195 itself, following the repository rule to fix the introducing PR. #195 failed 12 of 26 gates against master's 11; the extra gate was doc refs.
+- **D-3 PR 11 base.** `packages/team/worker-escalation` exists only on #195, so PR 11 is a #195-stack PR, independent of PRs 4–7. PR 12 already depends on PR 11 and the #195 stack. PRs 1, 2, 3, and 15 touch only packages that exist on master.
+- **D-4 Acceptance bar.** No delivery PR may add a doc-gate failure relative to the doc-sync baselines recorded under Evidence.
+- **D-5 Plan of record.** This design is the plan of record. After the #195 stack, the local-engine chain runs before PRs 12, 13, and 14; D-9 amends its order. The Laya pins are those resolved in Evidence and §R2.2.
+- **D-6 Master-based PRs stack on PR 0b.** PRs 1, 2, and 3 are rebased onto `fix/master-doc-sync` before they open.
   - This gives their doc gates a clean 26/26 baseline.
   - It avoids re-syncing the `LlmModelInfo` type-equiv paste in `docs/subsystems/llm-streaming.md`, which PR 0b already fixes.
-- **#195 doc-gate cleanup (D-2).** Branch-introduced doc-gate failures are fixed on #195 itself, following the repository rule to fix the introducing PR. #195 fails 12 of 26 gates against master's 11; the extra gate is doc refs. The Lead assigns this PR once the plan-note commits land.
-- **Acceptance bar (D-4).** No delivery PR may add a doc-gate failure relative to `/tmp/routing-review/doc-sync-baseline.md`.
-
-**Lead update, 2026-09-24** (§2.3 correction relayed from the PR 3 worker and verified against its implementation):
-- **Prefix stability (§2.3).** Ordering conditional sections last protects only tools and static sections, and any toggle still invalidates every cached message. The cache-safe home for toggling text is `ctx.systemPrompt.context()`; a conditional section ordered last is the fallback, at a stated cost.
-- **PR 3.** Committed as `30a357bec8` and being rebased onto #203 (PR 0b), per D-6.
-- **Native stack.** #202 → #203 (PR 0 → PR 0b) is GitHub native stack #204.
-- **Forks.** The `parthmstech/laya` fork was re-synced after upstream's release 0.3.12, at 04:23Z to `1a099d9785` (release 0.3.16). Upstream released 0.3.17 at 04:24Z, so at 04:38Z the fork is one commit behind. `parthmstech/laya-mlx` remains identical to upstream.
+- **D-7 PR 0 opened as #202** (`fix/catalog-request-response` at `91b8a940a4`). Merging #195 after PR 0 lands produces four additive conflicts, resolved by union plus regeneration.
+- **D-8 PR 0b opened as #203** (`fix/master-doc-sync`). It brings master doc-sync to 26 of 26. #202 → #203 form GitHub native stack #204.
+- **D-9 PR 10a ahead of PR 8.** The owner's top priority is a local judge with no Jev egress, and PR 8 waits on the #195 merge, which waits on owner decision D5.
+  - PR 10a stacks on #195 (branch `feat/judgment-laya-local`) and ships `judgment-laya` as a standalone `ctx.judgment` provider: the supervised MLX gateway, the shared shield wire client, the pins, and the fidelity check.
+  - PR 10a carries the §R2 scope, so references to PR 10 in this note mean PR 10a.
+  - PR 8 later migrates the provider into the engine registry with a small change. The end-state design is unchanged.
+- **D-10 Plan commits and fork tracking.** This note's commits are `511fc36fe3` (documentation fixes) and `45ff3c807f` (the note).
+  - `parthmstech/laya-mlx` is identical to upstream.
+  - `parthmstech/laya` was re-synced after upstream's release 0.3.12, at 04:23Z to `1a099d9785` (release 0.3.16). Upstream released 0.3.17 at 04:24Z, leaving the fork one commit behind at 04:38Z.
+  - Upstream releases several times an hour, so the drift report (§R3), not fork parity, is the tracking signal.
+- **D-11 #195 cleanup scope.** The cleanup fixes only violations the branch introduces relative to master.
+  - It also adds `Request` and `Response` classification lines identical to PR 0's. The catalog generator then works for the #195 stack PRs, and the #204 merge-forward stays conflict-free for that hunk.
+  - Violations shared with master arrive through the merge-forward after #204 lands.
+- **D-12, D-13 PR 3 final and open.** PR 3 is `adb866aa45`, a single commit on #203 with real generator output and doc-sync at 26 of 26.
+  - It is open as #205 (`feat/system-prompt-prefix-stability`), based on `fix/master-doc-sync` (#203), and is retargeted to master after #204 merges. It is an independent sibling of PR 1, not part of stack #204.
+  - Disabling the check fails exactly 5 rule tests.
+  - Its implementation establishes the §2.3 correction: ordering conditional sections last protects only tools and static sections, and `ctx.systemPrompt.context()` is the cache-safe home for toggling text.
+- **D-14 PR 11 committed** as `2860a17910` on the #195 stack.
+  - progress-signals passes 46 of 46 tests and worker-escalation 126 of 126, both at 100% coverage.
+  - PR 11 is rebased onto #195 after the cleanup, so the catalog gate can run.
+  - Follow-ups for PR 12: model-router consumes progress-signals, reuses its durable-failure check, and imports the argument-canonicalization duplicate from repeat-tool-reminder.
+- **D-15 Jev egress stopped.** A hot reload of the demo home's `initialMode: off` recorded `model-routing/configuration {active:false}` at 13:16:05. The last TypeSafe consult was at 13:11:52, making 22 in total, all kept-strong.
+- **D-16 #195 siblings.** PRs 4–7 form the official stack on #195. PRs 10a and 11 are siblings on #195: they open with base `feat/jev-judgment-foundation` for review, and are retargeted to master once #195 lands. They cannot join #195's stack, because GitHub stacks are linear.
+- **D-17 #195 cleanup done.** Commits `2b9bbfd58c`, `c8ef75b2fb`, and `cee6f55279` take #195 doc-sync from 14/12 to 17/9, and all 9 remaining failures are in master's baseline.
+  - The regenerated catalog artifacts stay, because the #195 stack PRs need a working generator.
+  - The four additive conflicts with #204 resolve by union plus regeneration.
+- **D-18 PR 2 started early.** PR 2 runs on base `fix/master-doc-sync` (PR 0b), branch `feat/three-state-cache-usage`, in parallel with PR 1.
+  - The two overlap only in the `llm` types and `docs/subsystems/llm-streaming.md`, which are resolved at rebase.
+  - PR 2 is on the critical path for PRs 12 and 15.
+  - Its worker lists every #195-branch reader of `cacheReadTokens` that must migrate at merge-forward.
+- **D-19 PR 4 committed** as `8eeb7a72a1`, `4c6b985cc0`, and `13e4ab5d60`. 223 of 223 tests pass at 100% coverage.
+  - The persona commit is separable, pending owner decision D10.
+  - The accepted deviations are carried into §3.1, §3.2, and §3.7: `candidate-equals-base` keeps a narrower meaning, there is no `selectionEffort` field, and bug 2 covers the CLI agent presets and the 9 router snapshot configurations.
+  - PR 5, the in-turn fallback, is on branch `fix/model-router-in-turn-fallback`, stacked on `13e4ab5d60`.
+- **D-20, D-23 PR 15a.** PR 15a is a research price snapshot for the bench, stacked on PR 0b and squashed as `235f507966`.
+  - Its prices tests pass 8 of 8, and doc-sync passes 26 of 26.
+  - A required `nullFields` array keeps every missing price explicit.
+  - DeepSeek V4 Pro, verified against the official DeepSeek page and the Ollama page, which agree: peak input $1.32, cache read $0.044, and output $3.96 per million tokens; off-peak is half.
+  - The DeepSeek API retired the legacy name `deepseek-v4-flash` and bills it at V4.1 Flash prices.
+- **D-21 PR 2 paused for a design ruling.** §2.2's required `cache` union would crash consumers on existing logs with a TypeError, because the loader does not validate payloads, instead of rejecting them. It would also churn 426 fixture usage objects and create 5 conflicts in #195 bench files.
+- **D-22 Aegis ruling on PR 2.** Option B, with conditions, supersedes the tagged union. §2.2 records the design: presence as the signal, per-profile `cacheUsage`, the `cacheCount` helper, the restated invariant, TTFT documented in `llm-streaming.md`, `writeTtl` dropped, and the old-log limitation. Alternatives considered records why A, A1, and A2 were rejected.
+- **D-24 PR 1 committed** as `7777da807a`, based on origin/master. It adds `cacheRetention`, `promptCacheTtlMs` through a route-owner hook, and the `INVALID_MODEL_CACHE_TTL` error code.
+  - Accepted deviation: the probe is named `.e2e.ts`, so it stays out of `pnpm test`, and it runs only with `SHRES_E2E_CLAUDE_CACHE_TTL=1`.
+  - PR 1 is rebased onto `fix/master-doc-sync` (D-6) with a regenerated API catalog (D-31).
+- **D-25 Live 1-hour TTL probe held for owner approval.** The §2.1.1 probe uses the claude-session OAuth credential that a live session shares, so an OAuth refresh could disrupt that session. It runs only with the owner's go-ahead, ideally when no critical session is using the credential.
+- **D-26 Review order.** plan note → #195 cleanup → PR 4 → PR 11 → PR 15a (`235f507966`) → PR 1 (after its rebase).
+- **D-27 #195 pushes and new PRs.**
+  - The #195 plan note (`45ff3c807f`) and cleanup (`cee6f55279`) are pushed.
+  - PR 4 is open as #206, linked as native stack #207 (#195 → #206), with its review fix in `f552403863`. Its negative controls fail as intended, and the §3.2 guard raises no false positives, because instructions are user messages.
+  - PR 15a is open as #208, based on #203.
+- **D-28 PR 1 Settings GIF (superseded by D-31).** The GIF rule was applied on the assumption that the Settings form renders the claude-session `cacheRetention` field from its schema. The GIF is recorded on a separate server started from the PR 1 worktree, with a temporary `SHRES_HOME` and a free port. It touches neither the live server nor the user installation, and uses no credentials.
+- **D-29 PR 11 opened as #209.** PR 11 is rebased onto origin `cee6f55279` with an identical range-diff, and the module-graph, cordis, and config catalogs pass. Its head is `e605f2b413`, open on base `feat/jev-judgment-foundation` as a sibling of stack #207.
+- **D-30 PR 15a README.** `40e0a3ceb1` states that an empty `offPeakWindowsUtc` next to non-empty peak windows means no off-peak rate is published. The prices tests pass 8 of 8.
+- **D-31 PR 1 rebased; no GIF.** PR 1 is `9bb8941cdc`, a single commit on `fix/master-doc-sync`, with doc-sync at 26 of 26. The Models settings editor is hand-written per adapter family and maps `llm-claude-session` to its `unknown` layout, which shows only the `settings.yaml` hint. The Web GUI therefore does not render `cacheRetention`, and the GIF rule does not apply.
+- **D-32 PR 0c: master unit tests.** Master fails 3 `llm-pi-ai` unit tests against the installed pi-ai 0.84.1 DeepSeek catalog. These failures predate this plan. A root-cause fix on a branch based on PR 0b makes master's unit tests green, a prerequisite for re-enabling CI (D5).
 
 ## 7. Owner decisions
 
@@ -1283,12 +1348,12 @@ Each entry gives the recommendation, followed by the resolution.
   - Eligibility: `equals-base`, `thinking-mode-incompatible`.
   - Decision: `base-unlisted`, `engine-uncalibrated`, `route-failed`, `reentry-cooldown`, `judgment-failure-held`, `breaker-open`, `plan-mode`, `verification-escalated`, `verification-active`.
   - Break (`brokenBy`): `hold-cap`, `cold-point-return`, `plan-mode`, `route-failed`, `verification-escalated`.
-- **Decision fields.** `coldPoint`, `objective`, `selectedEngine`, `operatingPoint`, `engineFailure`, `failure`, `failedChunkSeq`, `trigger`, `triggerSeq`, `eligibilityMs`; sticky fields `enteredStep`, `stepsElapsed`, `enteredSeq`, `selectionEffort`.
+- **Decision fields.** `coldPoint`, `objective`, `selectedEngine`, `operatingPoint`, `engineFailure`, `failure`, `failedChunkSeq`, `trigger`, `triggerSeq`, `eligibilityMs`; sticky fields `enteredStep`, `stepsElapsed`, `enteredSeq`; the fold exports `sameSelection`.
 - **Events.** `model-routing/child-decision`; `model-routing/shadow-decision` (`ignorable: true`).
 - **Waterfall.** `subagent/child-route`.
 - **Services.** `judgmentEngines` (the registry); `judgment` is provided by `judgment-dispatch`.
 - **Settings.** `judgment: { enabled, engine, overrides? }`.
-- **Types.** `CacheUsage`, `TokenUsage.cache`, `LlmModelInfo.promptCacheTtlMs`, `LlmModelInfo.thinkingMode`, `JudgmentResult.engineId`.
+- **Types and helpers.** `cacheCount(usage, 'read' | 'write')` in `llm`; the pi-ai profile field `cacheUsage`; `LlmModelInfo.promptCacheTtlMs`, `LlmModelInfo.thinkingMode`, `JudgmentResult.engineId`.
 - **Packages.** `judgment-dispatch`, `judgment-laya` (with `python/laya-gateway`), `judgment-llm`, `progress-signals`, `ui-settings-model-routing`.
 
 ## Alternatives considered
@@ -1297,11 +1362,17 @@ Each entry gives the recommendation, followed by the resolution.
 
 **Main-conversation routing as the primary lever.** Rejected in favour of subagent routing (a) and cold points (d). Children have isolated, cold contexts, so routing them costs no parent cache, needs no judge when static, and fits Laya's window.
 
-**A cost-based dwell, from realized savings or a runtime price table.** Rejected. The repository keeps realized tokens as the only runtime cost currency, because prices and rate ratios go stale. The cache verification found that the decisive levers are the 1-hour strong TTL and three-state telemetry, not a cost-based horizon. Cold-point switching removes the strong-side transition cost without any prices.
+**A cost-based dwell, from realized savings or a runtime price table.** Rejected. The repository keeps realized tokens as the only runtime cost currency, because prices and rate ratios go stale. The decisive levers are the 1-hour strong TTL and three-state telemetry, not a cost-based horizon (Evidence, verified economics: baseline expiries and the 1-hour TTL). Cold-point switching removes the strong-side transition cost without any prices.
+
+**A required tagged union for cache usage (option A), made safe by an upgrader shim (A1) or loader payload validation (A2).** Rejected by the aegis ruling on PR 2 (D-21, D-22).
+- The loader validates event types, not payloads, so a required union crashes existing logs with a TypeError deep in projections instead of rejecting them.
+- The union would also churn 426 fixture usage objects and create 5 conflicts in #195 bench files.
+- A1 and A2 were the two ways to make the union safe on existing logs, and the ruling rejected both along with A.
+- Presence on the existing optional fields (§2.2) carries the same three states without changing the event format.
 
 **Soft-blocking candidates on their observed cache-hit ratio.** Rejected until three-state telemetry exists. pi-ai omits zero cache reads, and the field is absent in 67.7–97.4% of Ollama records, so the ratio would block healthy candidates.
 
-**Gating mid-turn returns to Claude by deferring the return or forcing thinking off.** Rejected after verification. Adaptive-thinking routes degrade gracefully and the API does not error. Budget-thinking bases are excluded by eligibility instead (§3.9), and the remaining continuity loss is documented and observed through `returnThinking`.
+**Gating mid-turn returns to Claude by deferring the return or forcing thinking off.** Rejected. Adaptive-thinking routes degrade gracefully and the API does not error. Budget-thinking bases are excluded by eligibility instead (§3.9), and the remaining continuity loss is documented and observed through `returnThinking`.
 
 **Deciding the route before prompt assembly, or rewriting the system prompt per routed request.** Rejected. The first needs an agent-loop change, because assembly runs once per turn and routing is decided per step. The second violates the rule that `agent/request` listeners change only the config. Removing `{{model}}` plus the invariant guard fixes bug 2 without either.
 
@@ -1331,7 +1402,7 @@ Each entry gives the recommendation, followed by the resolution.
 
 - **Phase 1.**
   - PR 1's `config.spec.ts` cases pass. The §2.1.1 probe result is recorded with its date, and D6 is resolved from it.
-  - PR 2 carries `CacheUsage` through every adapter and consumer, so no reader sees a zero where a count was unreported.
+  - PR 2 makes presence the documented signal. Every adapter emits a reported zero and never an unreported count, and every consumer reads through `cacheCount`, so no reader sees a zero where a count was unreported.
   - PR 3's `prefix-stability.spec.ts` rejects a conditional section ordered before a static one.
 - **Phase 2.**
   - The tests named in §3.1–§3.9 pass on the #195 stack.
@@ -1359,7 +1430,7 @@ Each entry gives the recommendation, followed by the resolution.
   - The §5.7 Laya evaluation criteria either pass, giving Laya an operating point, or fail, leaving it shadow-only.
   - Routing becomes default-on only when every §5.8 criterion holds.
 - **Documentation.** Each PR lands its Agent Note from §6 and cross-links this proposal, and this proposal's shipped portions are recorded present-tense in those notes.
-- **Documentation gates.** No delivery PR adds a doc-gate failure relative to `/tmp/routing-review/doc-sync-baseline.md`. After PR 0b, master passes all 26 doc-sync gates, and the #195 doc-gate cleanup removes the branch-introduced failures before #195 merges.
+- **Documentation gates.** No delivery PR adds a doc-gate failure relative to the doc-sync baselines recorded under Evidence. PR 0b brings master to all 26 doc-sync gates. The #195 cleanup leaves #195 at 17 of 26, with only failures from master's baseline, which clear when the merge-forward brings in PR 0b's fixes.
 - **Owner decisions.** D3's clause (vi) clarification precedes any use of TypeSafe answers as bench, replay, or shadow data. D5, D10, and D12 are resolved before the PRs that depend on them merge.
 
 ## Risks
@@ -1371,7 +1442,7 @@ Each entry gives the recommendation, followed by the resolution.
 - **Subscription behaviour is unverified.** Whether subscription OAuth honours the 1-hour TTL, and how subscription quota counts cache writes and reads, are both unknown. If the TTL is ignored, the cold-point policy assumes 300 s and warm returns stay rare.
 - **Hypotheses about candidates.** Kimi thinking mode may reject history without `reasoning_content` (C3), and candidate tool-count limits may reject large tool sets (C8). The in-turn fallback bounds the damage to one extra request, but both need probes before allowlisting.
 - **Product-visible persona change (D10).** Removing the model name from the persona changes every shipped prompt and many snapshots. The owner has not yet decided.
-- **Pre-release format change.** Removing `cacheReadTokens` and `cacheWriteTokens` makes old session logs unreadable, per the pre-release policy.
+- **Old pi-ai logs.** pi-ai logs written before PR 2 omit zero cache reads, so their zeros read as "not reported". The field set is unchanged, so those logs still load.
 - **Fewer downgrades by design.** Cold points only give up downgrades inside warm stretches. Plan-mode forcing and manual compaction summaries give up cheap-model savings in exchange for quality.
 - **Reasoning continuity.** After any return to Claude, the other model's reasoning reaches it as plain text.
 - **Bench cost and fidelity.**
