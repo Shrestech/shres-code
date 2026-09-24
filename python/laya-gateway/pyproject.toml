@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shres-laya-gateway"
+version = "0.1.0"
+description = "Supervised loopback gateway that serves local Laya typed judgments over the Shield judgment wire"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+dependencies = [
+  # The MLX runtime exists only for Apple silicon. Other hosts install the
+  # gateway without it; the Node supervisor never launches it there.
+  "laya-mlx==0.2.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "huggingface-hub>=0.34,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/parthmstech/shres-code"
+Source = "https://github.com/parthmstech/shres-code"
+
+[dependency-groups]
+test = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+markers = ["integration: requires an installed Laya checkpoint (LAYA_GATEWAY_MODEL_DIR)"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/laya_gateway"]

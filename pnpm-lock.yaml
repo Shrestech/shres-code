@@ -1560,6 +1560,9 @@ importers:
       '@shres-code/shres-code-code-runtime-worker-thread':
         specifier: workspace:^
         version: link:../../code-runtime/code-runtime-worker-thread
+      '@shres-code/shres-code-judgment-laya':
+        specifier: workspace:^
+        version: link:../../llm/judgment-laya
       '@shres-code/shres-code-judgment-shield':
         specifier: workspace:^
         version: link:../../llm/judgment-shield
@@ -6484,6 +6487,79 @@ importers:
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+
+  packages/llm/judgment-laya:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      '@shres-code/shres-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-commands':
+        specifier: workspace:^
+        version: link:../../interaction/commands
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../judgment-shield
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../model-router
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@shres-code/shres-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
+      '@shres-code/shres-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
 
   packages/llm/judgment-shield:
     dependencies:

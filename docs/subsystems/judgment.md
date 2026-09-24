@@ -163,7 +163,7 @@ interface JudgmentResult {
 
 ## The engine contract
 
-One provider registers per context as `ctx.judgment`. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
+One provider registers per context as `ctx.judgment`: [`judgment-typesafe`](../../packages/llm/judgment-typesafe/README.md) calls a remote engine, [`judgment-shield`](../../packages/llm/judgment-shield/README.md) calls a deployment-run loopback gateway, and [`judgment-laya`](../../packages/llm/judgment-laya/README.md) supervises a local laya-mlx gateway on Apple silicon; the last two share one Shield wire client. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
 
 `fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
 
