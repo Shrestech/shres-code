@@ -636,13 +636,20 @@ describe('per-model reasoning efforts', () => {
   it('narrows a catalog model’s levels in place', () => {
     const [catalogModel] = getBuiltinModels('deepseek')
     if (catalogModel === undefined) throw new Error('the installed catalog ships no deepseek model')
-    expect(getSupportedThinkingLevels(catalogModel as Model<Api>)).toEqual(['off', 'low', 'high', 'max'])
+    // The installed catalog owns the level list — it tracks the dependency, not
+    // this package. Require the levels the overlay keeps and require the overlay
+    // to narrow the catalog set rather than inherit it.
+    const catalogLevels = getSupportedThinkingLevels(catalogModel as Model<Api>)
+    expect(catalogLevels).toContain('off')
+    expect(catalogLevels).toContain('high')
 
     const model = modelOf({
       deepseek: { models: [{ id: catalogModel.id, reasoningEfforts: { off: null, high: 'high' } }] },
     }, 'deepseek')
 
-    expect(getSupportedThinkingLevels(model)).toEqual(['off', 'high'])
+    const narrowed = getSupportedThinkingLevels(model)
+    expect(narrowed).toEqual(['off', 'high'])
+    expect(narrowed.length).toBeLessThan(catalogLevels.length)
     // Only the reasoning fields change; identity and capacities stay catalog.
     expect(model.name).toBe(catalogModel.name)
     expect(model.contextWindow).toBe(catalogModel.contextWindow)
