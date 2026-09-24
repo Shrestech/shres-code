@@ -97,7 +97,7 @@ function routingData(overrides: Record<string, unknown> = {}) {
     sticky: {
       active: true,
       routeErrorLimit: 2,
-      turnsElapsed: 0,
+      stepsElapsed: 0,
       enteredTurn: 1,
       entryBase: { provider: 'p', model: 'strong' },
     },
@@ -428,7 +428,7 @@ describe('Trajectory conversation Definitions', () => {
       step: 1,
       outcome: 'downgraded',
       reason: 'gate-passed',
-      sticky: { active: true, turnsElapsed: 0, enteredTurn: 1 },
+      sticky: { active: true, stepsElapsed: 0, enteredTurn: 1 },
     }])
     expect(current.eventNodes.map(node => node.kind)).not.toContain('routing')
 
@@ -499,7 +499,7 @@ describe('Trajectory conversation Definitions', () => {
       at(25, 'model-routing/decision', routingData({
         outcome: 'kept-strong',
         reason: 'gate-failed',
-        sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
       })),
       at(30, 'assistant/message', {
         turn: 1,

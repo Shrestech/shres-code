@@ -7001,6 +7001,9 @@ importers:
       '@shres-code/shres-code-llm-mock-server':
         specifier: workspace:^
         version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-llm-retry':
+        specifier: workspace:^
+        version: link:../llm-retry
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session

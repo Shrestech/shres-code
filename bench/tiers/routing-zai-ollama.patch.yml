@@ -48,10 +48,20 @@
         description: "a routine, bounded task with a known safe fit"
     downgradeThreshold: 0.8
     downgradeMargin: 0.1
-    minTurnsDowngraded: 5
+    hold:
+      minSteps: 20
+      maxSteps: 40
+    difficulty:
+      entryScoreCeiling: 2
+    reentryCooldownTurns: 2
     escalateBack:
       scoreThreshold: 3
     maxRouteErrors: 2
     onUnavailable: "fallback"
+    judgmentDeadlineMs: 1500
+    judgmentFailures:
+      holdTolerance: 2
+      breakerThreshold: 3
+      breakerOpenTurns: 5
     routeInstructions: "Prefer the candidate for a routine, bounded task with a known safe fit; keep the current model when the work is uncertain, ambiguous, or its difficulty is not yet known."
     difficultyInstructions: "How hard is this turn for the model handling it? Score it on the levels below."

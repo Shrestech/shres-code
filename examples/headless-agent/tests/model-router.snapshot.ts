@@ -292,8 +292,8 @@ describe('headless model-routing snapshots', () => {
       ])
       expect(decisions[1]).toMatchObject({
         outcome: 'kept-strong',
-        failure: { code: expect.any(String), provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-        failedChunkSeq: expect.any(Number),
+        failure: { code: expect.any(String) as unknown, provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        failedChunkSeq: expect.any(Number) as unknown,
         sticky: { active: false, brokenBy: 'route-failed', entryBase: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } },
       })
       const ends = durableEvents.filter(event => event['type'] === 'turn/end')
@@ -368,7 +368,7 @@ describe('headless model-routing snapshots', () => {
         .filter(event => event['type'] === 'model-routing/decision')
       expect(decisions).toHaveLength(2)
       expect(decisions[0]?.['data']).toMatchObject({
-        outcome: 'downgraded', reason: 'gate-passed', difficulty: { score: 2 },
+        outcome: 'downgraded', reason: 'gate-passed', difficulty: { score: 1 },
       })
       expect(decisions[1]?.['data']).toMatchObject({
         outcome: 'kept-strong', reason: 'escalated', difficulty: { score: 4 },
@@ -392,6 +392,71 @@ describe('headless model-routing snapshots', () => {
       const secondRequest = server.requests[1]?.body as { messages: { role: string; content: unknown }[] }
       expect(JSON.stringify(secondRequest.messages.filter(message => message.role === 'tool'))).toContain(evidence)
       await expectArmFixtures('model-router-step', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('keeps the manual model without judging on the turn after an escalation', async () => {
+    const evidence = 'Distributed transaction deadlock across services.'
+    const server = await startMockLlmServer({
+      sequence: ['tool_call_success', 'success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+      toolName: 'bash',
+      toolArguments: JSON.stringify({
+        command: `printf '${evidence}'`,
+        description: 'Print fixed hard evidence.',
+      }),
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-cooldown.cordis.snapshot.yml'),
+        promptFixture: 'model-router-cooldown',
+      }, server)
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-pro',
+      ])
+      const decisions = parseJsonl(output.session)
+        .filter(event => event['type'] === 'model-routing/decision')
+        .map(event => event['data'] as Record<string, unknown>)
+      expect(decisions.map(decision => decision['reason'])).toEqual(['gate-passed', 'escalated', 'reentry-cooldown'])
+      // The cooldown turn asks no question and records no answer.
+      expect(decisions[2]).toMatchObject({ outcome: 'kept-strong', sticky: { active: false } })
+      expect(decisions[2]).not.toHaveProperty('route')
+      expect(decisions[2]).not.toHaveProperty('judgmentQuestions')
+      await expectArmFixtures('model-router-cooldown', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('returns to the manual model without judging when a hold reaches its step cap', async () => {
+    const server = await startMockLlmServer({
+      sequence: ['tool_call_success', 'success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+      toolName: 'bash',
+      toolArguments: JSON.stringify({ command: "printf 'done'", description: 'Print a fixed line.' }),
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-cap.cordis.snapshot.yml'),
+        promptFixture: 'model-router-cap',
+      }, server)
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-pro',
+      ])
+      const decisions = parseJsonl(output.session)
+        .filter(event => event['type'] === 'model-routing/decision')
+        .map(event => event['data'] as Record<string, unknown>)
+      expect(decisions.map(decision => decision['reason'])).toEqual(['gate-passed', 'hold-cap'])
+      expect(decisions[0]).toMatchObject({ sticky: { active: true, stepsElapsed: 0, enteredTurn: 1, enteredStep: 1 } })
+      expect(decisions[1]).toMatchObject({ outcome: 'kept-strong', sticky: { active: false, brokenBy: 'hold-cap' } })
+      expect(decisions[1]).not.toHaveProperty('route')
+      await expectArmFixtures('model-router-cap', output)
     } finally {
       await server.close()
     }
@@ -452,7 +517,7 @@ describe('headless model-routing snapshots', () => {
           confidence: 0.9,
           probabilities: { 'keep-current': 0.9, flash: 0.1 },
         },
-        difficulty: { score: 2, confidence: 1 },
+        difficulty: { score: 1, confidence: 1 },
         sticky: { active: false },
       })
       expect(eventOf(records[decisionIndex]!).data).not.toHaveProperty('selection')
