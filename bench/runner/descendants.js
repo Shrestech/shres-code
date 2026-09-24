@@ -7,6 +7,11 @@
  * token-meter's `assistant/chunk` fallback is intentionally not duplicated
  * here (root metrics never counted it).
  *
+ * Priced accounting folds the same closure per call through
+ * `accounting.js`, which reads cache counts by presence and counts usage
+ * chunks of failed attempts; `tokensIncludingDescendants` keeps the
+ * message-only input+output numerator so stored runs stay comparable.
+ *
  * Seeded prior-session fixtures (`bench-prior-*`) are excluded, matching
  * `findSessionLog`. A torn final line (child killed mid-append) is tolerated;
  * a corrupt line before the end throws, same stance as `foldSessionLog`.
@@ -16,6 +21,7 @@
 
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { foldSessionAccounting } from './accounting.js'
 import { isSeededPriorSession } from './session-layout.js'
 
 /**
@@ -29,6 +35,8 @@ import { isSeededPriorSession } from './session-layout.js'
  *   durable header is the counter, not a tool-call name).
  * @property {number} descendantRunCodeCalls - `run_code` tool calls inside descendants.
  *   The root's own `run_code` calls are counted by `foldSessionLog`, never here.
+ * @property {import('./accounting.js').SessionFacts[]} sessions - per-call accounting facts of the
+ *   root and every descendant, root first; empty when the root header cannot be read.
  */
 
 /** Enumerate every session.jsonl under the persistence root. @param {string} root @returns {Promise<string[]>} */
@@ -56,10 +64,12 @@ async function listSessionLogs(root) {
 }
 
 /**
- * Sum `assistant/message` usage from one log's text. The final line may be torn
- * (no trailing newline, invalid JSON) — it is skipped, not an error.
+ * Sum `assistant/message` usage from one log's text and fold its per-call
+ * accounting facts. The final line may be torn (no trailing newline, invalid
+ * JSON) — it is skipped, not an error.
  * @param {string} text - raw JSONL contents.
- * @returns {{ inputTokens: number, outputTokens: number, runCodeCalls: number }} usage sums plus code-mode call count.
+ * @returns {{ inputTokens: number, outputTokens: number, runCodeCalls: number, facts: import('./accounting.js').SessionFacts }}
+ *   usage sums, code-mode call count, and accounting facts.
  */
 function foldUsage(text) {
   let inputTokens = 0
@@ -85,7 +95,7 @@ function foldUsage(text) {
     if (typeof usage.inputTokens === 'number' && Number.isFinite(usage.inputTokens)) inputTokens += usage.inputTokens
     if (typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)) outputTokens += usage.outputTokens
   }
-  return { inputTokens, outputTokens, runCodeCalls }
+  return { inputTokens, outputTokens, runCodeCalls, facts: foldSessionAccounting(text) }
 }
 
 /**
@@ -128,7 +138,9 @@ export async function descendantUsage(sessionLogRoot, rootLogPath) {
     if (path === rootLogPath) rootId = header.id
   }
 
-  if (rootId === null) return { tokensIncludingDescendants: null, descendantSessions: 0, delegatedSessions: 0, descendantRunCodeCalls: 0 }
+  if (rootId === null) {
+    return { tokensIncludingDescendants: null, descendantSessions: 0, delegatedSessions: 0, descendantRunCodeCalls: 0, sessions: [] }
+  }
 
   // Header-keyed BFS: parentSession links decide membership, not path shape.
   /** @type {string[]} */
@@ -150,15 +162,24 @@ export async function descendantUsage(sessionLogRoot, rootLogPath) {
   let outputTokens = 0
   let delegatedSessions = 0
   let descendantRunCodeCalls = 0
+  /** @type {import('./accounting.js').SessionFacts[]} */
+  const sessions = []
   for (const id of closure) {
     const entry = /** @type {{ path: string, origin: string | null }} */ (byId.get(id))
     const usage = foldUsage(await readFile(entry.path, 'utf8'))
     inputTokens += usage.inputTokens
     outputTokens += usage.outputTokens
+    sessions.push(usage.facts)
     if (id !== rootId) {
       if (entry.origin === 'subagent') delegatedSessions += 1
       descendantRunCodeCalls += usage.runCodeCalls
     }
   }
-  return { tokensIncludingDescendants: inputTokens + outputTokens, descendantSessions: closure.length - 1, delegatedSessions, descendantRunCodeCalls }
+  return {
+    tokensIncludingDescendants: inputTokens + outputTokens,
+    descendantSessions: closure.length - 1,
+    delegatedSessions,
+    descendantRunCodeCalls,
+    sessions,
+  }
 }

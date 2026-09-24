@@ -8,6 +8,7 @@
  * @module bench/stats/aggregate
  */
 
+import { summarizeAccounting } from '../runner/accounting.js'
 import { wilsonInterval } from './intervals.js'
 
 /** TrialMetrics field → ReportCell mean field, in ReportCell order. */
@@ -79,12 +80,13 @@ export function summarizeCell(taskId, arm, trials) {
  * total is null when no trial recorded the event family it counts, so a report
  * distinguishes "measured zero" from "never measured". The trial counts are the
  * pre-registered screens' inputs: `cacheHitShareNullTrials` feeds the churn
- * screen's "≥80% of trials carry usage data", `routingDecisionTrials` the
+ * screen's "≥80% of trials carry a reported cache-read count" (the share is the
+ * root session's `metrics.cacheHitShare`), `routingDecisionTrials` the
  * routing-adoption screen's "≥2/3 of route-on trials log a decision", and
  * `compactionVerificationTrials` the verification-adoption screen's "≥2/3 of
  * trials that compact log a verification".
  * @param {import('../schema/trial.js').Trial[]} ok - trials with status success.
- * @returns {{ meanCacheHitShare: number | null, cacheHitShareNullTrials: number,
+ * @returns {{ meanCacheHitShare: number | null, cacheHitShareNullTrials: number, meanCacheUnreportedShare: number | null,
  *   meanModelTransitions: number | null, routingDecisionTrials: number,
  *   meanDowngradedShare: number | null, meanKeptStrongShare: number | null,
  *   meanDowngradedStreakLongest: number | null, totalDowngradedRuns: number,
@@ -95,6 +97,7 @@ export function summarizeCell(taskId, arm, trials) {
 function jevAggregates(ok) {
   const present = field => ok.map(t => t.metrics[field]).filter(v => v !== null && v !== undefined)
   const cacheShares = present('cacheHitShare')
+  const unreportedShares = present('cacheUnreportedShare')
   const transitions = present('modelTransitions')
   const downgradedShares = present('downgradedShare')
   const keptStrongShares = present('keptStrongShare')
@@ -110,6 +113,7 @@ function jevAggregates(ok) {
   return {
     meanCacheHitShare: cacheShares.length > 0 ? mean(cacheShares) : null,
     cacheHitShareNullTrials: ok.length - cacheShares.length,
+    meanCacheUnreportedShare: unreportedShares.length > 0 ? mean(unreportedShares) : null,
     meanModelTransitions: transitions.length > 0 ? mean(transitions) : null,
     routingDecisionTrials: judged.length,
     meanDowngradedShare: downgradedShares.length > 0 ? mean(downgradedShares) : null,
@@ -191,6 +195,7 @@ export function summarizeArm(arm, trials) {
     meanUnverifiedShare: unverifiedValues.length > 0 ? mean(unverifiedValues) : null,
     meanEchoOkRejectRate: echoOkValues.length > 0 ? mean(echoOkValues) : null,
     ...jevAggregates(ok),
+    accounting: summarizeAccounting(ok),
   }
 }
 

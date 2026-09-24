@@ -4,7 +4,7 @@ Dated, research-only reference prices for the models the routing bench can price
 
 ## Research only
 
-**The runtime has no price table, and this folder does not add one.** Tokens are the only runtime cost currency ([bench/README.md](../README.md)); a snapshot exists so a bench report can render API-equivalent dollars beside the raw token counts the runner already records ([BENCHMARK.md](../../BENCHMARK.md)).
+**The runtime has no price table, and this folder does not add one.** Tokens are the only runtime cost currency; a snapshot exists so the bench runner can price each trial in API-equivalent dollars beside the raw token counts it records ([priced accounting](../README.md#priced-accounting), [BENCHMARK.md](../../BENCHMARK.md)). The runner prices under the newest snapshot unless `--price-snapshot` names one.
 
 Nothing here is billing truth. A snapshot records what a pricing page said on its `fetched` date, and prices change without notice; re-check the `sourceUrl` before trusting any figure.
 
