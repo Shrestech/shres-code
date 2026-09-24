@@ -244,13 +244,13 @@ describe('resolveConfig bounds', () => {
       escalateBack: { scoreThreshold: 1 },
       difficulty: { entryScoreCeiling: 1 },
       hardHint: { scoreThreshold: 0 },
-      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
+      difficultyToEffort: { scoreThreshold: 0.5, reasoningEffort: 'high' },
     })
     expect(resolveConfig(short)).toMatchObject({
       escalateBackScoreThreshold: 1,
       entryScoreCeiling: 1,
       hardHintScoreThreshold: 0,
-      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
+      difficultyToEffort: { scoreThreshold: 0.5, reasoningEffort: 'high' },
     })
     expect(() => resolveConfig(valid({ difficultyLevels: ['easy', 'hard'], escalateBack: { scoreThreshold: 2 } })))
       .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 1')
@@ -272,15 +272,29 @@ describe('resolveConfig bounds', () => {
   })
 
   it('requires the effort lift to name an effort', () => {
-    expect(() => resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 4, reasoningEffort: ' ' } })))
+    expect(() => resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 1, reasoningEffort: ' ' } })))
       .toThrow('ModelRouterConfig.difficultyToEffort.reasoningEffort must be a non-empty string')
     // A threshold-only group names no effort, so it is refused too. The input
     // goes through the unknown-typed helper because the interface requires both
     // fields: a threshold-only literal would not compile, which is the point.
-    expect(() => resolveConfig(raw({ difficultyToEffort: { scoreThreshold: 4 } })))
+    expect(() => resolveConfig(raw({ difficultyToEffort: { scoreThreshold: 1 } })))
       .toThrow('ModelRouterConfig.difficultyToEffort.reasoningEffort must be a non-empty string')
-    expect(resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 4, reasoningEffort: 'high' } })).difficultyToEffort)
-      .toEqual({ scoreThreshold: 4, reasoningEffort: 'high' })
+    expect(resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' } })).difficultyToEffort)
+      .toEqual({ scoreThreshold: 1, reasoningEffort: 'high' })
+  })
+
+  it('rejects an effort lift at or above the entry ceiling, which could never apply', () => {
+    for (const scoreThreshold of [2, 3, 4]) {
+      expect(() => resolveConfig(valid({ difficultyToEffort: { scoreThreshold, reasoningEffort: 'high' } })))
+        .toThrow('ModelRouterConfig.difficultyToEffort.scoreThreshold must be below difficulty.entryScoreCeiling')
+    }
+    // A higher ceiling makes the same threshold reachable.
+    expect(resolveConfig(valid({
+      difficulty: { entryScoreCeiling: 3 },
+      difficultyToEffort: { scoreThreshold: 2, reasoningEffort: 'high' },
+    })).difficultyToEffort).toEqual({ scoreThreshold: 2, reasoningEffort: 'high' })
+    expect(resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 1.99, reasoningEffort: 'high' } })).difficultyToEffort)
+      .toEqual({ scoreThreshold: 1.99, reasoningEffort: 'high' })
   })
 
   it('requires a non-negative integer streak horizon below a positive integer cap', () => {
@@ -416,11 +430,11 @@ describe('the composition schema', () => {
     const set = throughSchema({
       ...bare(),
       difficultyInstructions: 'How hard is this turn?',
-      difficultyToEffort: { scoreThreshold: 3, reasoningEffort: 'medium' },
+      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'medium' },
     })
-    expect(set.difficultyToEffort).toEqual({ scoreThreshold: 3, reasoningEffort: 'medium' })
+    expect(set.difficultyToEffort).toEqual({ scoreThreshold: 1, reasoningEffort: 'medium' })
     expect(resolveConfig(set as unknown as ModelRouterConfig).difficultyToEffort)
-      .toEqual({ scoreThreshold: 3, reasoningEffort: 'medium' })
+      .toEqual({ scoreThreshold: 1, reasoningEffort: 'medium' })
   })
 
   it('requires the difficulty question once the hint group is written', () => {
@@ -483,7 +497,7 @@ describe('resolveConfig defaults and detachment', () => {
     const resolved = resolveConfig(valid({
       candidates: [{ ...CANDIDATE, reasoningEffort: 'low' }],
       difficultyInstructions: 'How hard?',
-      difficultyToEffort: { scoreThreshold: 4, reasoningEffort: 'high' },
+      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
       hardHint: {},
       state: { contextTurns: 1, maxChars: 100 },
     }))

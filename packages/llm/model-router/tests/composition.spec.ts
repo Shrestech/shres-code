@@ -65,10 +65,6 @@ const ROUTER_CONFIG: readonly string[] = [
   '    downgradeThreshold: 0.7',
   '    downgradeMargin: 0.5',
   '    hold: { minSteps: 3 }',
-  // Deployment choice: the lift's threshold sits above the scripted difficulty.
-  '    difficultyToEffort:',
-  '      scoreThreshold: 4',
-  '      reasoningEffort: high',
   '    routeInstructions: Pick the cheapest route that can finish this turn.',
   '    difficultyInstructions: Rate how much reasoning this turn needs.',
 ]

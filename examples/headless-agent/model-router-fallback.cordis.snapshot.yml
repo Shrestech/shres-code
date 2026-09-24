@@ -47,11 +47,6 @@
               # Each turn may enter again after a fallback, so the second fallback
               # reaches the error limit; model-router-cooldown covers the cooldown.
               reentryCooldownTurns: 0
-              # Deployment choice: the lift's threshold sits above the scripted
-              # difficulty, so no turn in either arm is lifted.
-              difficultyToEffort:
-                scoreThreshold: 4
-                reasoningEffort: high
               routeInstructions: Pick the cheapest route that can finish this turn.
               difficultyInstructions: Rate how much reasoning this turn needs.
           - id: model-router-snapshot-fixture

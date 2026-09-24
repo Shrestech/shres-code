@@ -1451,7 +1451,7 @@ describe('the sticky streak', () => {
 
   it('an effort change mid-streak is treated as a candidate change', async () => {
     // With and without a lift: the held effort is reachable under neither.
-    for (const difficultyToEffort of [undefined, { scoreThreshold: 2, reasoningEffort: 'high' }]) {
+    for (const difficultyToEffort of [undefined, { scoreThreshold: 1.5, reasoningEffort: 'high' }]) {
       const b = await bench({
         settings: true,
         config: {

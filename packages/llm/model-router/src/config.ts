@@ -97,7 +97,11 @@ export interface ModelRoutingHardHintConfig {
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
   scoreThreshold: number
   /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
@@ -498,6 +502,14 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
       'ModelRouterConfig.difficultyToEffort.reasoningEffort',
       difficultyToEffort.reasoningEffort,
     )
+    // The lift applies on the entering step, and entry needs a score below the
+    // ceiling, so a threshold at or above it could never lift anything.
+    if (difficultyToEffort.scoreThreshold >= entryScoreCeiling) {
+      throw new Error(
+        'ModelRouterConfig.difficultyToEffort.scoreThreshold must be below difficulty.entryScoreCeiling: '
+        + 'a streak is only entered below the ceiling, so the lift could never apply',
+      )
+    }
   }
   return Object.freeze({
     initialMode: config.initialMode,

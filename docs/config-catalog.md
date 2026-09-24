@@ -2528,7 +2528,11 @@ export type ModelRoutingInTurnFallback = 'manual' | 'off'
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
   scoreThreshold: number
   /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
@@ -2551,7 +2555,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:107`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:111`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

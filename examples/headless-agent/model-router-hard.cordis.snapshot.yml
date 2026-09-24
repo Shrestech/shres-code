@@ -42,9 +42,6 @@
               downgradeMargin: 0.5
               hold:
                 minSteps: 3
-              difficultyToEffort:
-                scoreThreshold: 4
-                reasoningEffort: high
               routeInstructions: Pick the cheapest route that can finish this turn.
               difficultyInstructions: Rate how much reasoning this turn needs.
           - id: model-router-snapshot-fixture
