@@ -692,6 +692,9 @@ importers:
       '@shres-code/shres-code-llm-deepseek':
         specifier: workspace:*
         version: link:../packages/llm/llm-deepseek
+      '@shres-code/shres-code-llm-grok-session':
+        specifier: workspace:*
+        version: link:../packages/llm/llm-grok-session
       '@shres-code/shres-code-llm-pi-ai':
         specifier: workspace:*
         version: link:../packages/llm/llm-pi-ai
@@ -869,6 +872,9 @@ importers:
       '@shres-code/shres-code-tool-goal':
         specifier: workspace:*
         version: link:../packages/goal/tool-goal
+      '@shres-code/shres-code-tool-grok-x-search':
+        specifier: workspace:*
+        version: link:../packages/llm/tool-grok-x-search
       '@shres-code/shres-code-tool-jobs':
         specifier: workspace:*
         version: link:../packages/jobs/tool-jobs
@@ -1448,6 +1454,9 @@ importers:
       '@shres-code/shres-code-tool-goal':
         specifier: workspace:^
         version: link:../../goal/tool-goal
+      '@shres-code/shres-code-tool-grok-x-search':
+        specifier: workspace:^
+        version: link:../../llm/tool-grok-x-search
       '@shres-code/shres-code-tool-jobs':
         specifier: workspace:^
         version: link:../../jobs/tool-jobs
@@ -3032,6 +3041,9 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
       '@shres-code/shres-code-api-remotes':
         specifier: workspace:^
         version: link:../../api/remotes
@@ -6496,6 +6508,9 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
       '@shres-code/shres-code-attachment':
         specifier: workspace:^
         version: link:../../attachment/attachment
@@ -6668,6 +6683,64 @@ importers:
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
+
+  packages/llm/tool-grok-x-search:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@shres-code/shres-code-code-runtime':
+        specifier: workspace:^
+        version: link:../../code-runtime/code-runtime
+      '@shres-code/shres-code-code-runtime-worker-thread':
+        specifier: workspace:^
+        version: link:../../code-runtime/code-runtime-worker-thread
+      '@shres-code/shres-code-grok-credential':
+        specifier: workspace:^
+        version: link:../grok-credential
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-grok-session':
+        specifier: workspace:^
+        version: link:../llm-grok-session
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../util/untrusted-frame
 
   packages/llm/tool-image-gen:
     dependencies:

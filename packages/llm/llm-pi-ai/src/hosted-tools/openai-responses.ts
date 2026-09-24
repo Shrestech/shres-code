@@ -17,6 +17,31 @@ export const HOSTED_WEB_SEARCH_NAME = 'web_search'
 /** Wire name of the hosted Responses `x_search` tool. */
 export const HOSTED_X_SEARCH_NAME = 'x_search'
 
+/**
+ * Call names the backend reports for the one hosted `x_search` tool entry.
+ * Grok's sampler executes each as a `custom_tool_call` and normalizes them to
+ * `x_search` (grok-build `xai-grok-sampler/src/stream/responses.rs`); its
+ * pager recognizes the four subtypes (`xai-grok-pager/src/acp/tracker.rs`).
+ * A name outside this list is not treated as hosted.
+ */
+export const HOSTED_X_SEARCH_CALL_NAMES: readonly string[] = Object.freeze([
+  HOSTED_X_SEARCH_NAME,
+  'x_keyword_search',
+  'x_semantic_search',
+  'x_user_search',
+  'x_thread_fetch',
+])
+
+/**
+ * The canonical `server-tool-call` kind for one hosted call name: `x_search`
+ * for every member of {@link HOSTED_X_SEARCH_CALL_NAMES}, otherwise the name.
+ * @param name - the call name the backend reported.
+ * @returns the hosted tool kind to record.
+ */
+export function hostedCallKind(name: string): string {
+  return HOSTED_X_SEARCH_CALL_NAMES.includes(name) ? HOSTED_X_SEARCH_NAME : name
+}
+
 /** The local `tool-web` function-tool name a hosted web search supersedes. */
 export const LOCAL_WEB_SEARCH_NAME = 'web_search'
 
@@ -61,6 +86,11 @@ export interface HostedCustomToolCallItem {
   name?: unknown
   /** Provider-reported completion state. */
   status?: unknown
+}
+
+/** The reported completion state, or `undefined` when the item carries none. */
+function statusOf(value: unknown): 'completed' | 'failed' | undefined {
+  return value === 'completed' || value === 'failed' ? value : undefined
 }
 
 /** The pure string of an optional wire value, or `undefined`. */
@@ -117,10 +147,11 @@ export function webSearchCallToServerToolCall(item: HostedWebSearchCallItem): Se
     .map(resultOf)
     .filter((entry): entry is ServerToolResult => entry !== undefined)
   const id = stringOf(item.id)
+  const status = statusOf(item.status)
   return toServerToolCallBlock({
     kind: HOSTED_WEB_SEARCH_NAME,
     ...id === undefined ? {} : { id },
-    status: item.status === 'failed' ? 'failed' : 'completed',
+    ...status === undefined ? {} : { status },
     results,
   })
 }
@@ -128,10 +159,12 @@ export function webSearchCallToServerToolCall(item: HostedWebSearchCallItem): Se
 /**
  * Project a Responses `custom_tool_call` output item for a hosted custom tool
  * into a bounded `server-tool-call` block. Caller must only supply an item
- * whose `name` is a hosted tool (for example `x_search`); a local custom
- * tool keeps mapping to an ordinary tool call.
+ * whose `name` is a hosted call name (for example `x_keyword_search`); a
+ * local custom tool keeps mapping to an ordinary tool call. The block's
+ * `kind` is {@link hostedCallKind} of that name and `name` keeps the
+ * subtype; `status` is present only when the item reports one.
  * @param item - the `custom_tool_call` output item the backend executed.
- * @param hostedName - the hosted tool name the item's `name` field carries.
+ * @param hostedName - the hosted call name the item's `name` field carries.
  * @returns the frozen block recording the hosted invocation.
  */
 export function hostedCustomToolCallToServerToolCall(
@@ -139,10 +172,11 @@ export function hostedCustomToolCallToServerToolCall(
   hostedName: string,
 ): ServerToolCallBlock {
   const id = stringOf(item.call_id) ?? stringOf(item.id)
+  const status = statusOf(item.status)
   return toServerToolCallBlock({
-    kind: hostedName,
+    kind: hostedCallKind(hostedName),
     name: hostedName,
     ...id === undefined ? {} : { id },
-    status: item.status === 'failed' ? 'failed' : 'completed',
+    ...status === undefined ? {} : { status },
   })
 }

@@ -30,7 +30,7 @@
   - heading "Models & providers" [level=1]
   - paragraph: Set up Shres for the way you work.
   - heading "Providers" [level=2]
-  - paragraph: HTTP providers need an API key. Delegated CLIs use a command on your PATH and their own login — a key is optional.
+  - paragraph: API keys and subscription sign-ins are managed per provider. Delegated CLIs use a command on this host.
   - status: Saved minimax-cn.
   - list:
     - listitem:
@@ -91,6 +91,10 @@
       - text: Grok (subscription)
       - switch "Disable Grok (subscription) (grok-session)" [checked]
       - button "Edit Grok (subscription) (grok-session)": Edit
+    - listitem:
+      - text: Claude (subscription)
+      - switch "Disable Claude (subscription) (claude-session)" [checked]
+      - button "Edit Claude (subscription) (claude-session)": Edit
     - listitem:
       - text: xAI (pay-per-token)
       - img "API key missing"

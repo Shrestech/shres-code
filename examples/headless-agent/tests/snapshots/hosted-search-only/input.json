@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "search X and answer with the hosted search verdict"
+    }
+  ]
+}

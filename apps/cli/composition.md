@@ -214,6 +214,8 @@ flowchart LR
   cfg --> plugin_shres_base_grok_credential
   plugin_shres_base_llm_grok_session["llm-grok-session<br/>@shres-code/shres-code-llm-grok-session"]
   cfg --> plugin_shres_base_llm_grok_session
+  plugin_shres_base_tool_grok_x_search["tool-grok-x-search<br/>@shres-code/shres-code-tool-grok-x-search"]
+  cfg --> plugin_shres_base_tool_grok_x_search
   plugin_shres_base_codex_credential["codex-credential<br/>@shres-code/shres-code-codex-credential"]
   cfg --> plugin_shres_base_codex_credential
   plugin_shres_base_llm_codex_session["llm-codex-session<br/>@shres-code/shres-code-llm-codex-session"]
@@ -337,6 +339,7 @@ flowchart LR
 | `llm-cli-bridge` | `@shres-code/shres-code-llm-cli-bridge` |
 | `grok-credential` | `@shres-code/shres-code-grok-credential` |
 | `llm-grok-session` | `@shres-code/shres-code-llm-grok-session` |
+| `tool-grok-x-search` | `@shres-code/shres-code-tool-grok-x-search` |
 | `codex-credential` | `@shres-code/shres-code-codex-credential` |
 | `llm-codex-session` | `@shres-code/shres-code-llm-codex-session` |
 | `cursor-credential` | `@shres-code/shres-code-cursor-credential` |

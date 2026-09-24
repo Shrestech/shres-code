@@ -152,7 +152,7 @@ interface SettingsDescribeOptions {
 
 ## Change commits
 
-Every committed change — an in-process write or an externally observed provider edit — emits `settings/updated (ns, next, prev, source)` after the new value is authoritative, and never when the resolved value is deep-equal. The source tag separates the two entry paths.
+Every committed change — an in-process write or an externally observed provider edit — emits `settings/updated (ns, next, prev, source)` after the new value is authoritative, and never when the resolved value is deep-equal. The source tag separates the two entry paths. A namespace registration attaching emits `settings/registered (ns, value)` and its disposal, including the owner plugin unloading, emits `settings/unregistered (ns)`, so a plugin that reads another plugin's namespace can follow it regardless of load order.
 
 ```ts type-equiv
 /** Origin of one committed settings change. */
@@ -278,6 +278,47 @@ One registered namespace's RAW user section changed, whether or not the resolved
 ```
 
 Source: [`packages/settings/settings/src/types.ts:48`](../../packages/settings/settings/src/types.ts)
+
+<a id="settingsregistered--emit"></a>
+
+#### `settings/registered` — emit
+
+One namespace registration attached: its owner called `register()` and the namespace is readable through `get()` from this point. A consumer of another plugin's namespace reads `get()` once and follows this event, `settings/updated`, and `settings/unregistered`, so plugin load order does not matter. Listener containment matches `settings/updated`.
+
+```ts cordis-catalog
+/**
+ * One namespace registration attached: its owner called `register()` and
+ * the namespace is readable through `get()` from this point. A consumer of
+ * another plugin's namespace reads `get()` once and follows this event,
+ * `settings/updated`, and `settings/unregistered`, so plugin load order
+ * does not matter. Listener containment matches `settings/updated`.
+ * @param ns - the namespace that became registered.
+ * @param value - the namespace's resolved value at registration.
+ * @mode emit
+ */
+'settings/registered'(ns: SettingsNamespace, value: unknown): void
+```
+
+Source: [`packages/settings/settings/src/types.ts:60`](../../packages/settings/settings/src/types.ts)
+
+<a id="settingsunregistered--emit"></a>
+
+#### `settings/unregistered` — emit
+
+One namespace registration detached, because its owner's fiber was disposed or unloaded; `get()` returns `undefined` from this point until a later registration. Listener containment matches `settings/updated`.
+
+```ts cordis-catalog
+/**
+ * One namespace registration detached, because its owner's fiber was
+ * disposed or unloaded; `get()` returns `undefined` from this point until a
+ * later registration. Listener containment matches `settings/updated`.
+ * @param ns - the namespace that is no longer registered.
+ * @mode emit
+ */
+'settings/unregistered'(ns: SettingsNamespace): void
+```
+
+Source: [`packages/settings/settings/src/types.ts:69`](../../packages/settings/settings/src/types.ts)
 
 <a id="settingsupdated--emit"></a>
 

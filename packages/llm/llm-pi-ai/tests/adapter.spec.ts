@@ -971,4 +971,72 @@ describe('hosted tools and route onPayload composition', () => {
     // route onPayload: service_tier spliced on the same body
     expect(body['service_tier']).toBe('priority')
   })
+
+  it('keeps an X call local when the final request still declares that client tool', async () => {
+    const custom = (name: string, index: number): string[] => {
+      const item = { id: `ctc_item_${index}`, call_id: `call_ctc_${index}`, type: 'custom_tool_call', name, input: 'q', status: 'completed' }
+      return [
+        JSON.stringify({ type: 'response.output_item.added', output_index: index, item }),
+        JSON.stringify({ type: 'response.output_item.done', output_index: index, item }),
+      ]
+    }
+    const server = await mockServer([{ events: [
+      JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } }),
+      ...custom('x_user_search', 0),
+      ...custom('x_keyword_search', 1),
+      JSON.stringify({ type: 'response.completed', response: { id: 'resp_1', usage: { input_tokens: 3, input_tokens_details: { cached_tokens: 0 }, output_tokens: 1, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 4 } } }),
+    ] }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'xai-apikey': {
+          api: 'openai-responses',
+          baseURL: server.url,
+          hostedTools: { xSearch: true },
+          models: [{ id: 'grok-4.6' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      // A route hook that declares a client tool under an X call name after the splice.
+      onPayload: (payload) => {
+        const body = payload as { tools: unknown[] }
+        return { ...body, tools: [...body.tools, { type: 'function', name: 'x_user_search', parameters: {} }] }
+      },
+    })
+    ctx.llm.registerAdapter(['xai-apikey'], adapter)
+    const { message } = await assemble(ctx, { provider: 'xai-apikey', model: 'grok-4.6', messages: [] })
+    expect(message.content.map(block => block.type === 'tool-call' ? `local:${block.name}` : block.type === 'server-tool-call' ? `hosted:${block.name ?? ''}` : block.type))
+      .toEqual(['local:x_user_search', 'hosted:x_keyword_search'])
+  })
+
+  it('narrows the declared hosted tools per request and keeps them when the request is silent', async () => {
+    const textTurn = [
+      JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } }),
+      JSON.stringify({ type: 'response.completed', response: { id: 'resp_1', usage: { input_tokens: 1, input_tokens_details: { cached_tokens: 0 }, output_tokens: 1, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 2 } } }),
+    ]
+    const server = await mockServer([{ events: textTurn }, { events: textTurn }, { events: textTurn }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['xai-apikey'], new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'xai-apikey': {
+          api: 'openai-responses',
+          baseURL: server.url,
+          hostedTools: { webSearch: true, xSearch: true },
+          models: [{ id: 'grok-4.6' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+    }))
+    const localWebSearch = { name: 'web_search', description: 'local', parameters: { type: 'object', properties: {} } }
+    const hostedTypes = (index: number): unknown[] => ((server.requests[index] as Record<string, unknown>)['tools'] as Record<string, unknown>[] | undefined ?? [])
+      .map(tool => tool['type'] === 'function' ? `function:${String(tool['name'])}` : tool['type'])
+    await assemble(ctx, { provider: 'xai-apikey', model: 'grok-4.6', messages: [], tools: [localWebSearch], hostedTools: ['x_search'] })
+    await assemble(ctx, { provider: 'xai-apikey', model: 'grok-4.6', messages: [], tools: [localWebSearch], hostedTools: [] })
+    await assemble(ctx, { provider: 'xai-apikey', model: 'grok-4.6', messages: [], tools: [localWebSearch] })
+    expect(hostedTypes(0)).toEqual(['function:web_search', 'x_search'])
+    expect(hostedTypes(1)).toEqual(['function:web_search'])
+    expect(hostedTypes(2)).toEqual(['web_search', 'x_search'])
+  })
 })

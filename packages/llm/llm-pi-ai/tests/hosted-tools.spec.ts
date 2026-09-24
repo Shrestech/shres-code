@@ -3,11 +3,15 @@ import { CallId, MAX_SERVER_TOOL_CALL_RESULTS } from '@shres-code/shres-code-llm
 import type { StreamChunk } from '@shres-code/shres-code-llm'
 import {
   HOSTED_WEB_SEARCH_NAME,
+  HOSTED_X_SEARCH_CALL_NAMES,
   HOSTED_X_SEARCH_NAME,
   LOCAL_WEB_SEARCH_NAME,
   applyHostedToolsPayload,
+  hostedCallKind,
   hostedCustomToolCallToServerToolCall,
+  hostedToolsDialectFor,
   mapHostedToolCalls,
+  promotableCallNames,
   webSearchCallToServerToolCall,
   webSearchToolEntry,
   xSearchToolEntry,
@@ -117,6 +121,11 @@ describe('webSearchCallToServerToolCall', () => {
     expect(block.results).toBeUndefined()
   })
 
+  it('omits a status the item does not report', () => {
+    const block = webSearchCallToServerToolCall({ type: 'web_search_call', id: 'ws_item_2' })
+    expect(block).toEqual({ type: 'server-tool-call', kind: 'web_search', id: 'ws_item_2' })
+  })
+
   it('bounds source entries at the shared cap and drops empty entries', () => {
     const sources = Array.from({ length: MAX_SERVER_TOOL_CALL_RESULTS + 5 }, (_, index) => ({
       title: `r${index}`,
@@ -161,10 +170,59 @@ describe('hostedCustomToolCallToServerToolCall', () => {
       status: 'completed',
     })
   })
+
+  it('keeps the X subtype as the name under the canonical x_search kind and forges no status', () => {
+    const block = hostedCustomToolCallToServerToolCall({
+      type: 'custom_tool_call',
+      id: 'ctc_item_2',
+      name: 'x_keyword_search',
+    }, 'x_keyword_search')
+    expect(block).toEqual({ type: 'server-tool-call', kind: 'x_search', name: 'x_keyword_search', id: 'ctc_item_2' })
+    expect(hostedCustomToolCallToServerToolCall({ type: 'custom_tool_call', status: 'failed' }, 'x_thread_fetch'))
+      .toEqual({ type: 'server-tool-call', kind: 'x_search', name: 'x_thread_fetch', status: 'failed' })
+  })
+
+  it('maps only the X call family to the x_search kind', () => {
+    expect(hostedCallKind('x_semantic_search')).toBe('x_search')
+    expect(hostedCallKind('web_search')).toBe('web_search')
+  })
+})
+
+describe('openai-responses X search plan', () => {
+  it('hosts the whole X call family and drops colliding client function tools only while hosting', () => {
+    expect(HOSTED_X_SEARCH_CALL_NAMES).toEqual([
+      'x_search', 'x_keyword_search', 'x_semantic_search', 'x_user_search', 'x_thread_fetch',
+    ])
+    const dialect = hostedToolsDialectFor('openai-responses')!
+    const plan = dialect.spliceFor(['x_search'])
+    expect(plan.callNames).toEqual(HOSTED_X_SEARCH_CALL_NAMES)
+    expect(plan.dropLocalTools).toEqual(HOSTED_X_SEARCH_CALL_NAMES)
+    const request = {
+      tools: [
+        { type: 'function', name: 'x_keyword_search' },
+        { type: 'function', name: 'echo' },
+      ],
+    }
+    expect(applyHostedToolsPayload(request, plan)).toEqual({
+      tools: [{ type: 'function', name: 'echo' }, { type: 'x_search' }],
+    })
+    const off = dialect.spliceFor([])
+    expect(off).toEqual({ entries: [], dropLocalTools: [], callNames: [] })
+    expect(applyHostedToolsPayload(request, off)).toBeUndefined()
+  })
+
+  it('promotes only hosted call names the sent request does not declare as client tools', () => {
+    const sent = { tools: [{ type: 'function', name: 'x_user_search' }, { type: 'x_search' }] }
+    expect([...promotableCallNames(HOSTED_X_SEARCH_CALL_NAMES, sent)])
+      .toEqual(['x_search', 'x_keyword_search', 'x_semantic_search', 'x_thread_fetch'])
+    expect([...promotableCallNames(['x_search'], 'not an object')]).toEqual(['x_search'])
+    expect([...promotableCallNames(['x_search'], { tools: [null, 'x'] })]).toEqual(['x_search'])
+  })
 })
 
 describe('mapHostedToolCalls', () => {
-  const hosted = new Set([HOSTED_X_SEARCH_NAME])
+  const hostedNames = new Set(HOSTED_X_SEARCH_CALL_NAMES)
+  const hosted = (name: string): boolean => hostedNames.has(name)
   const hostedBlock: StreamChunk = {
     type: 'block-end',
     index: 0,
@@ -187,7 +245,6 @@ describe('mapHostedToolCalls', () => {
         kind: 'x_search',
         name: 'x_search',
         id: 'ctc_1|ctc_item_1',
-        status: 'completed',
       },
     })
   })
@@ -200,7 +257,7 @@ describe('mapHostedToolCalls', () => {
   })
 
   it('leaves every block untouched when no name matches', async () => {
-    const chunks = await collect(mapHostedToolCalls(streamOf([localBlock]), new Set(['web_search'])))
+    const chunks = await collect(mapHostedToolCalls(streamOf([localBlock]), name => name === 'web_search'))
     expect(chunks[0]).toBe(localBlock)
   })
 
@@ -221,10 +278,56 @@ describe('mapHostedToolCalls', () => {
           kind: 'x_search',
           name: 'x_search',
           id: 'ctc_1|ctc_item_1',
-          status: 'completed',
         },
       },
     ])
+  })
+
+  it('promotes every X subtype under the canonical kind and leaves an unknown name local', async () => {
+    const calls = [...HOSTED_X_SEARCH_CALL_NAMES, 'x_future_search'].map((name, index): StreamChunk => ({
+      type: 'block-end',
+      index,
+      block: { type: 'tool-call', id: CallId(`call-${index}`), name, arguments: '{}' },
+    }))
+    const chunks = await collect(mapHostedToolCalls(streamOf(calls), hosted))
+    expect(chunks.slice(0, 5).map(chunk => chunk.type === 'block-end' ? chunk.block : undefined))
+      .toEqual(HOSTED_X_SEARCH_CALL_NAMES.map((name, index) => ({
+        type: 'server-tool-call', kind: 'x_search', name, id: `call-${index}`,
+      })))
+    expect(chunks[5]).toBe(calls[5])
+  })
+
+  it('decides a buffered start from its block-end, or passes it through before any other chunk', async () => {
+    const start: StreamChunk = { type: 'block-start', index: 0, blockType: 'tool-call' }
+    const promoted = await collect(mapHostedToolCalls(streamOf([start, hostedBlock]), hosted))
+    expect(promoted.map(chunk => chunk.type === 'block-start' ? chunk.blockType : chunk.type))
+      .toEqual(['server-tool-call', 'block-end'])
+    const usage: StreamChunk = { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } }
+    expect(await collect(mapHostedToolCalls(streamOf([start, usage]), hosted))).toEqual([start, usage])
+  })
+
+  it('tags promoted indexes server-tool-call in the finish replay envelope', async () => {
+    const finish: StreamChunk = {
+      type: 'finish',
+      reason: { kind: 'tool-calls' },
+      replayState: {
+        response: { kind: 'pi-ai', version: 3 },
+        blocks: [{ type: 'tool-call' }, { type: 'tool-call', thoughtSignature: 's' }, { type: 'text' }],
+      },
+    }
+    const chunks = await collect(mapHostedToolCalls(streamOf([hostedBlock, localBlock, textBlock, finish]), hosted))
+    expect(chunks[3]).toEqual({
+      ...finish,
+      replayState: {
+        response: { kind: 'pi-ai', version: 3 },
+        blocks: [{ type: 'server-tool-call' }, { type: 'tool-call', thoughtSignature: 's' }, { type: 'text' }],
+      },
+    })
+    const unpromoted = await collect(mapHostedToolCalls(streamOf([localBlock, finish]), hosted))
+    expect(unpromoted[1]).toBe(finish)
+    const responseOnly: StreamChunk = { ...finish, replayState: { response: { kind: 'pi-ai', version: 3 } } }
+    const kept = await collect(mapHostedToolCalls(streamOf([hostedBlock, responseOnly]), hosted))
+    expect(kept[1]).toEqual(responseOnly)
   })
 
   it('derives the z.ai openai-completions splice with no surfaced calls', () => {

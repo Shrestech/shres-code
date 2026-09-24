@@ -435,6 +435,31 @@ Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedb
 
 Source: [`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain.ts)
 
+### `grok-x-search/*`
+
+<a id="grok-x-searchrequest--log-only"></a>
+
+#### `grok-x-search/request` — log-only
+
+```ts persistence-catalog
+/**
+ * Log-only record of one auxiliary Grok X search request, appended to the
+ * calling agent's session before the request is dispatched. The request
+ * is not part of the calling conversation; the tool result carries what
+ * the calling model sees. Writers pass `{ ignorable: true }`.
+ * @param tool - tool whose call produced the request.
+ * @param callId - tool call id in the calling session.
+ * @param route - exact provider route and model.
+ * @param system - exact system prompt.
+ * @param messages - exact message list.
+ * @param hostedTools - exact hosted-tool narrowing, `['x_search']`.
+ * @param maxTokens - exact output-token cap.
+ */
+'grok-x-search/request': GrokXSearchRequestEventData
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/types.ts:56`](../packages/llm/tool-grok-x-search/src/types.ts)
+
 ### `hook/*`
 
 <a id="hookinvoked--log-only"></a>

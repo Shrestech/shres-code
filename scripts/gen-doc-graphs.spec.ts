@@ -61,6 +61,39 @@ const FIXTURE: Record<string, string> = {
   'packages/fix/pkgc/src/helper.ts':
     "function scriptFire(args: [string]): void { void gEvents.dispatch('emit', args) }\n",
   'packages/fix/pkgc/src/caller.ts': "scriptFire(['pkgc/script-event'])\n",
+  // Private and #private methods are local helpers: their call sites with a
+  // literal event name are recovered, including a this['name'] callee. Public
+  // and protected methods can be called from unseen code, so their literal
+  // call sites are not recorded, and a plain string that only names an event
+  // is not a dispatch.
+  'packages/fix/pkgd/src/index.ts': [
+    "import { EventsService } from '../../../../vendor/cordis/src/events.ts'",
+    'declare const events: EventsService',
+    'export class Owner {',
+    "  private fire(args: [string, ...unknown[]]): void { void events.dispatch('emit', args) }",
+    "  #fireHash(args: [string, ...unknown[]]): void { void events.dispatch('emit', args) }",
+    "  fireOpen(args: [string, ...unknown[]]): void { void events.dispatch('emit', args) }",
+    "  protected fireGuarded(args: [string, ...unknown[]]): void { void events.dispatch('emit', args) }",
+    '  run(): void {',
+    "    this.fire(['pkgd/private-one', 1])",
+    "    this['fire'](['pkgd/private-two'])",
+    "    this.#fireHash(['pkgd/hash-one'])",
+    "    this.#fireHash(['pkgd/hash-two', 2])",
+    "    this.fireOpen(['pkgd/public-event'])",
+    "    this.fireGuarded(['pkgd/protected-event'])",
+    "    const label = 'pkgd/plain-string'",
+    '    void label',
+    '  }',
+    '}',
+    '',
+  ].join('\n'),
+  // A TypeScript private method is still callable from another file through
+  // a string key; only the package-wide index finds this call site.
+  'packages/fix/pkgd/src/caller.ts': [
+    "import { Owner } from './index.ts'",
+    "new Owner()['fire'](['pkgd/private-cross-file'])",
+    '',
+  ].join('\n'),
 }
 
 const root = mkdtempSync(join(tmpdir(), 'gen-doc-graphs-'))
@@ -88,6 +121,18 @@ describe('event relation call-site indexing', () => {
 
   it('recovers an alias-escaped helper through the global fallback', () => {
     expect(dispatchersOf(['pkga', 'pkgb'], 'pkgb/aliased-event')).toEqual(['pkga'])
+  })
+
+  it('recovers literal event names at private and #private method call sites', () => {
+    for (const event of ['pkgd/private-one', 'pkgd/private-two', 'pkgd/private-cross-file', 'pkgd/hash-one', 'pkgd/hash-two']) {
+      expect(dispatchersOf(['pkgd'], event)).toEqual(['pkgd'])
+    }
+  })
+
+  it('leaves public and protected method parameters and plain strings unrecorded', () => {
+    for (const event of ['pkgd/public-event', 'pkgd/protected-event', 'pkgd/plain-string']) {
+      expect(dispatchersOf(['pkgd'], event)).toEqual([])
+    }
   })
 
   it('rejects the locality proof for global script files', () => {

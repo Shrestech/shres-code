@@ -619,7 +619,7 @@
     # choice.
     # Delegated CLI completions. Each route runs an external coding-agent
     # binary; its own tools bypass harness approval. The Models picker marks
-    # them delegated. `shres models set grok-cli <model> --effort <level>`
+    # them delegated. `shres models set <route> <model> --effort <level>`
     # writes through the same agent-default-model section as HTTP routes.
     # The cursor-cli route runs the Cursor Agent CLI, whose `cursor-agent
     # login` session bills the Cursor subscription.
@@ -630,13 +630,19 @@
     # "grok login" stores in ~/.grok/auth.json, served as a bearer token to
     # cli-chat-proxy.grok.com over the openai-responses wire and refreshed
     # through auth.x.ai. Dormant until that login exists on the machine; use
-    # bills the CLI subscription (SuperGrok), not the X API. The delegated
-    # grok-cli route above is the spawn-based alternative.
+    # bills the CLI subscription (SuperGrok), not the X API.
     - id: grok-credential
       name: '@shres-code/shres-code-grok-credential'
 
     - id: llm-grok-session
       name: '@shres-code/shres-code-llm-grok-session'
+
+    # X search tools for tool-capable Shres agents, answered by the Grok
+    # subscription's hosted X search. Registered only while the
+    # llm-grok-session settings have enabled, hostedXSearch, and agentXTools
+    # (default off) on.
+    - id: tool-grok-x-search
+      name: '@shres-code/shres-code-tool-grok-x-search'
 
     # Codex subscription session: the same credential the Codex CLI's
     # "codex login" stores in ~/.codex/auth.json, served as a bearer token

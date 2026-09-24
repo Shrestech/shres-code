@@ -324,7 +324,8 @@ function decodeContentBlock(value: unknown, index: number): ContentBlock {
       value['content'].forEach((block, nested) => decodeContentBlock(block, nested))
       return value as unknown as ContentBlock
     case 'server-tool-call':
-      if (typeof value['kind'] !== 'string' || (value['status'] !== 'completed' && value['status'] !== 'failed')) {
+      if (typeof value['kind'] !== 'string'
+        || (value['status'] !== undefined && value['status'] !== 'completed' && value['status'] !== 'failed')) {
         throw new Error(`persisted Agent Teams message content[${String(index)}] is invalid`)
       }
       return value as unknown as ContentBlock

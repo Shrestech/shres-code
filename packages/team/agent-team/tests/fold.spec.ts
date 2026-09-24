@@ -269,14 +269,15 @@ describe('Agent Team fold', () => {
       content: [{ type: 'text' as const, text: 'ok' }],
     }
     const serverTool = { type: 'server-tool-call' as const, kind: 'web_search', status: 'completed' as const }
+    const unreported = { type: 'server-tool-call' as const, kind: 'x_search', name: 'x_keyword_search' }
     const reasoning = { type: 'reasoning' as const, text: 'think' }
     const state = foldTeam(ROOT, [
       event('team/message/queued', {
         teamId: TEAM,
-        message: message({ content: [extension, image, toolCall, toolResult, serverTool, reasoning] }),
+        message: message({ content: [extension, image, toolCall, toolResult, serverTool, unreported, reasoning] }),
       }, 0),
     ])
-    expect(pending(state!)[0]?.content).toEqual([extension, image, toolCall, toolResult, serverTool, reasoning])
+    expect(pending(state!)[0]?.content).toEqual([extension, image, toolCall, toolResult, serverTool, unreported, reasoning])
     expect(() => teamStateFromThrow([
       event('team/message/queued', {
         teamId: TEAM,
