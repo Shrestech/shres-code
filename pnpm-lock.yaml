@@ -7114,6 +7114,9 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
@@ -7123,12 +7126,24 @@ importers:
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-subagent':
+        specifier: workspace:^
+        version: link:../../subagent/subagent
+      '@shres-code/shres-code-subagent-fork-in-process':
+        specifier: workspace:^
+        version: link:../../subagent/subagent-fork-in-process
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../../subagent/subagent-spawn-in-process
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
       '@shres-code/shres-code-token-meter':
         specifier: workspace:^
         version: link:../token-meter
+      '@shres-code/shres-code-tool-subagent':
+        specifier: workspace:^
+        version: link:../../subagent/tool-subagent
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools

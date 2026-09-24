@@ -9,6 +9,7 @@
  */
 
 import type { Context } from '@shres-code/cordis'
+import { selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, AgentOptions, CreateAgentOptions } from '@shres-code/shres-code-agent'
 import type { SandboxMode } from '@shres-code/shres-code-sandbox'
 import type { Session, SessionId } from '@shres-code/shres-code-session'
@@ -26,10 +27,10 @@ import type {} from '@shres-code/shres-code-user-approval'
 // them through the tool registry's global layer.
 import type {} from '@shres-code/shres-code-agent-presets'
 // Type-only: make `ctx.get('agentDefaultModel')` resolve to the default-model
-// service when composed — child route inheritance reads the parent's EFFECTIVE
-// model (logged request header, else the live default) instead of the parent's
-// creation-time AgentOptions, so a parent that switched models does not
-// silently misroute every later child onto its original route. Opportunistic
+// service when composed — child route inheritance reads the parent's MANUAL
+// selection (selection in force, else the live default) instead of the
+// parent's creation-time AgentOptions, so a parent that switched models does
+// not silently misroute every later child onto its original route. Opportunistic
 // (the documented `ctx.get` pattern), never a hard dep; the read is
 // non-installing, so it never attaches selection listeners to the parent.
 import type {} from '@shres-code/shres-code-agent-default-model'
@@ -67,19 +68,23 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
 }
 
 /**
- * The parent's effective provider/model route, read without side effects: the
- * parent's logged request header (what its requests actually run), else the
- * live default-model selection when that service is composed, else the
- * parent's creation-time options. A parent that switched models in-process
- * but has not yet made a request since is read through its last header — the
- * same approximation any log-derived observer sees.
+ * The parent's manual provider/model route, read without side effects: the
+ * model selection in force on the parent (`selectionInForce`), else the live
+ * default-model selection when that service is composed, else the parent's
+ * creation-time options. The selection in force is the parent's explicit
+ * `agent/model-selection`, else the manual base a composed router reports
+ * beneath a routed request header, else that logged header. A child therefore
+ * never inherits a routed candidate: while a downgrade is held, the parent's
+ * header carries the candidate, and a child that inherited it would run the
+ * cheaper route with no routing decision of its own.
  * @param parent - the delegating parent.
  * @returns the inherited route fields that are known.
+ * @throws when the parent's latest durable explicit selection has invalid fields.
  */
 function inheritedRoute(parent: Agent): { provider?: string; model?: string } {
-  const logged = parent.session.requestHeader()?.config
-  if (logged !== undefined) {
-    return { provider: logged.provider, model: logged.model }
+  const selected = selectionInForce(parent)
+  if (selected !== undefined) {
+    return { provider: selected.provider, model: selected.model }
   }
   const defaults = parent.ctx.get('agentDefaultModel')
   if (defaults !== undefined) {
@@ -113,8 +118,8 @@ export function effectiveChildRoute(
 }
 
 /**
- * Resolve the child's `AgentOptions`: the parent's effective provider/model
- * route (logged header, else live default, else creation options) and the
+ * Resolve the child's `AgentOptions`: the parent's manual provider/model
+ * route (selection in force, else live default, else creation options) and the
  * parent's maxTokens unless the request overrides them, stamped with the
  * child's own delegation depth.
  * @param parent - the delegating parent whose route the child inherits.

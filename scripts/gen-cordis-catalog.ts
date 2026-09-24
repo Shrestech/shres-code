@@ -618,7 +618,6 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   ConsumeTokenRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertTextRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
-  AgentHandle: 'agent ownership handle is owned by packages/core/agent/README.md',
   FirstRunResolvedConfig: 'first-run resolved config is owned by packages/core/first-run-setup/README.md',
   LocalOllamaStatus: 'local Ollama probe result is owned by packages/core/first-run-setup/README.md',
   TemplateRoute: 'first-run template route is owned by packages/core/first-run-setup/README.md',

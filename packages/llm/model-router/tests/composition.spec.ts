@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
@@ -24,6 +24,12 @@ import SessionProjectionRegistry from '@shres-code/shres-code-session-projection
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolRuntime from '@shres-code/shres-code-tools'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
+import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import ModelRoutingController, { KEEP_CURRENT_OPTION_ID, ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
 import * as ModelRouterInvariant from '../src/invariant.ts'
 import { FakeJudgment, SCRIPTED_CANDIDATE, SCRIPTED_ENGINE, SCRIPTED_OTHER_CANDIDATE } from './fake-judgment-provider.ts'
@@ -110,6 +116,23 @@ interface SpineOptions {
   readonly inTurnFallback?: 'manual' | 'off'
   /** Compose compaction-basic with automatic compaction off, and its summarization route when stated. */
   readonly compaction?: { readonly summarizationRoute?: 'manual' | 'request' }
+  /** Compose session persistence, the subagent runtime, spawn and fork, `tool-subagent`, and a child-route observer. */
+  readonly subagents?: boolean
+}
+
+/** `inherited` of every `subagent/child-route` dispatch the observer saw. */
+const childRouteInherited: SubagentChildRouteRequest['inherited'][] = []
+
+/** TEST PLUGIN: observes `subagent/child-route` and delegates, so it routes nothing. */
+const ChildRouteObserver = {
+  name: 'child-route-observer',
+  inject: ['subagents'],
+  apply(ctx: Context): void {
+    ctx.on('subagent/child-route', (request, next) => {
+      childRouteInherited.push(request.inherited)
+      return next()
+    })
+  },
 }
 
 /** Boot one test-only cordis.yml through the real Loader and its include builtin. */
@@ -144,6 +167,22 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ...options.invariants === true
       ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
       : [],
+    ...options.subagents === true ? [
+      "- name: '@shres-code/shres-code-session-persistence-jsonl'",
+      '  config:',
+      `    root: '${join(root, 'sessions')}'`,
+      "- name: '@shres-code/shres-code-subagent'",
+      "- name: '@shres-code/shres-code-subagent-spawn-in-process'",
+      '  config:',
+      '    providerName: spawn',
+      "- name: '@shres-code/shres-code-subagent-fork-in-process'",
+      '  config:',
+      '    providerName: fork',
+      "- name: '@shres-code/shres-code-tool-subagent'",
+      '  config:',
+      '    provider: spawn',
+      "- name: '@test/child-route-observer'",
+    ] : [],
     ...options.compaction === undefined ? [] : [
       "- name: '@shres-code/shres-code-token-meter'",
       "- name: '@shres-code/shres-code-compaction-basic'",
@@ -177,6 +216,12 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ['@shres-code/shres-code-model-router/invariant', ModelRouterInvariant],
     ['@shres-code/shres-code-token-meter', TokenMeter],
     ['@shres-code/shres-code-compaction-basic', BasicCompactionEngine],
+    ['@shres-code/shres-code-session-persistence-jsonl', JsonlSessionPersistence],
+    ['@shres-code/shres-code-subagent', SubagentRuntime],
+    ['@shres-code/shres-code-subagent-spawn-in-process', SubagentSpawn],
+    ['@shres-code/shres-code-subagent-fork-in-process', SubagentFork],
+    ['@shres-code/shres-code-tool-subagent', ToolSubagent],
+    ['@test/child-route-observer', ChildRouteObserver],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -198,8 +243,15 @@ async function boot(
   successText = 'ROUTED_OK',
   sequence: readonly MockLlmBehavior[] = ['success'],
   options: SpineOptions = {},
+  tool?: { readonly name: string; readonly arguments: string },
 ): Promise<Context> {
-  server = await startMockLlmServer({ sequence, repeatLast: true, chunkSize: 4096, successText })
+  server = await startMockLlmServer({
+    sequence,
+    repeatLast: true,
+    chunkSize: 4096,
+    successText,
+    ...tool === undefined ? {} : { toolName: tool.name, toolArguments: tool.arguments },
+  })
   return loadSpine(server.baseURL, options)
 }
 
@@ -602,5 +654,71 @@ describe('real Loader composition', () => {
     expect(loaded.get('modelRouting')).toBeUndefined()
     expect(loaded.commands.find(agent, ROUTE_COMMAND)).toBeUndefined()
     expect(loaded.sessionProjections.snapshot(agent.session).values['modelRouting']).toBeUndefined()
+  })
+})
+
+describe('children of a parent on a held downgrade', () => {
+  beforeEach(() => { childRouteInherited.length = 0 })
+
+  /** The manual route every child must inherit. */
+  const MANUAL = { provider: PROVIDER, model: MANUAL_MODEL }
+
+  /** Boot with subagents and run one easy turn, so the parent holds a downgrade streak. */
+  async function heldParent(
+    id: string,
+    sequence: readonly MockLlmBehavior[] = ['success'],
+    tool?: { readonly name: string; readonly arguments: string },
+  ): Promise<{ loaded: Context; agent: Agent }> {
+    const loaded = await boot('ROUTED_OK', sequence, { subagents: true }, tool)
+    const agent = createAgent(loaded, id)
+    await turn(agent, 'First easy turn.')
+    expect(eventsOfType(agent.session.events, 'model-routing/decision')[0]?.data)
+      .toMatchObject({ outcome: 'downgraded', sticky: { active: true } })
+    // The parent's latest header carries the routed candidate, not its manual route.
+    expect(agent.session.requestHeader()?.config.model).toBe(CANDIDATE_MODEL)
+    return { loaded, agent }
+  }
+
+  it('a fresh child the parent spawns runs the manual route, and the child-route listener is told that route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    // Step 1 asks for one subagent call; the child and the parent's step 2 answer with text.
+    const tool = { name: 'subagent', arguments: JSON.stringify({ description: 'scan', prompt: 'list the files' }) }
+    const { agent } = await heldParent('router-parent-spawns', ['tool_call_success', 'success'], tool)
+
+    // Parent step 1 on the candidate, the child on the manual route, parent step 2 still held.
+    expect([0, 1, 2].map(requestedModel)).toEqual([CANDIDATE_MODEL, MANUAL_MODEL, CANDIDATE_MODEL])
+    expect(childRouteInherited).toEqual([MANUAL])
+    // Nothing routed the child: its only decision log is the parent's.
+    expect(eventsOfType(agent.session.events, 'model-routing/decision').every(event => event.data.outcome === 'downgraded')).toBe(true)
+  })
+
+  it('a fork child runs the manual route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const { loaded, agent } = await heldParent('router-parent-forks')
+    const before = server?.requests.length ?? 0
+    const run = await loaded.subagents.start('fork', {
+      prompt: [{ type: 'text', text: 'continue from here' }],
+      parent: agent,
+      signal: new AbortController().signal,
+    })
+    await run.result
+    expect(requestedModel(before)).toBe(MANUAL_MODEL)
+    await run.dispose()
+  })
+
+  it('a continuable child records and runs the manual route as its descriptor route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const { loaded, agent } = await heldParent('router-parent-continuable')
+    const before = server?.requests.length ?? 0
+    const started = await loaded.subagents.startContinuable({
+      provider: 'spawn',
+      label: 'child task',
+      request: { prompt: [{ type: 'text', text: 'child task' }], parent: agent },
+      signal: new AbortController().signal,
+    })
+    await vi.waitFor(() => { expect(server?.requests.length).toBeGreaterThan(before) })
+    expect(requestedModel(before)).toBe(MANUAL_MODEL)
+    await vi.waitFor(async () => {
+      const persisted = await loaded.sessionPersistence.load(started.childId)
+      expect(persisted.events.find(event => event.type === 'subagent/descriptor')?.data)
+        .toMatchObject({ agentProvider: PROVIDER, agentModel: MANUAL_MODEL })
+    })
   })
 })

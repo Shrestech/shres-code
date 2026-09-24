@@ -40,7 +40,7 @@ function fakeAgent(id = 'parent-1'): Agent {
     // no ctx services and no logged request header in the default stub.
     ctx: { get: () => undefined },
     options: {},
-    session: { header: {}, requestHeader: () => undefined },
+    session: { header: {}, events: [], requestHeader: () => undefined },
   } as unknown as Agent
 }
 
@@ -124,7 +124,7 @@ describe('shres-tool-subagent', () => {
     // Schema omission is advertising, not enforcement: the arg validator
     // allows undeclared keys, so the opt-out must also hold in execute().
     const ctx = await setup({ provider: 'mock', enableRunInBackground: false })
-    const parent = { id: SessionId('sess-off'), inject: () => {}, options: {}, ctx: { get: () => undefined }, session: { header: { version: 0, id: 'sess-off', createdAt: 0 }, requestHeader: () => undefined } } as unknown as Agent
+    const parent = { id: SessionId('sess-off'), inject: () => {}, options: {}, ctx: { get: () => undefined }, session: { header: { version: 0, id: 'sess-off', createdAt: 0 }, events: [], requestHeader: () => undefined } } as unknown as Agent
 
     const forced = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: true }, { agent: parent })
     expect(forced.isError).toBe(true)
@@ -802,7 +802,7 @@ describe('shres-tool-subagent background mode', () => {
       ctx: scopeFiber.ctx,
       inject,
       options: {},
-      session: { id, header: { version: 0, id, createdAt: 0 }, requestHeader: () => undefined },
+      session: { id, header: { version: 0, id, createdAt: 0 }, events: [], requestHeader: () => undefined },
     } as unknown as Agent
     ctx.agents.register(agent)
     return agent
@@ -1200,7 +1200,7 @@ describe('background preflight failure (no orphaned child, by construction)', ()
       ctx: scopeFiber.ctx,
       inject: () => {},
       options: {},
-      session: { id, header: { version: 0, id, createdAt: 0 }, requestHeader: () => undefined },
+      session: { id, header: { version: 0, id, createdAt: 0 }, events: [], requestHeader: () => undefined },
     } as unknown as Agent
     ctx.agents.register(parent)
 
