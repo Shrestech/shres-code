@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -7,6 +7,7 @@ import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
 import AgentRegistry from '@shres-code/shres-code-agent'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import type { Agent } from '@shres-code/shres-code-agent'
 import AgentDefaultModel from '@shres-code/shres-code-agent-default-model'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
@@ -22,6 +23,7 @@ import SessionProjectionRegistry from '@shres-code/shres-code-session-projection
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import ModelRoutingController, { KEEP_CURRENT_OPTION_ID, ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
+import * as ModelRouterInvariant from '../src/invariant.ts'
 import { FakeJudgment, SCRIPTED_CANDIDATE, SCRIPTED_ENGINE, SCRIPTED_OTHER_CANDIDATE } from './fake-judgment-provider.ts'
 
 /**
@@ -96,14 +98,24 @@ afterEach(async () => {
   root = undefined
 })
 
+/** Optional rows one boot adds to the spine. */
+interface SpineOptions {
+  /** Deployment persona template for the system-prompt row. */
+  readonly persona?: string
+  /** Compose the invariant registry and this package's companion. */
+  readonly invariants?: boolean
+}
+
 /** Boot one test-only cordis.yml through the real Loader and its include builtin. */
-async function loadSpine(baseURL: string): Promise<Context> {
+async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'shres-model-router-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     "- name: '@shres-code/shres-code-llm'",
     "- name: '@shres-code/shres-code-session'",
     "- name: '@shres-code/shres-code-system-prompt'",
+    // A double-quoted YAML scalar keeps the persona's `{{variable}}` braces literal.
+    ...options.persona === undefined ? [] : ['  config:', `    persona: ${JSON.stringify(options.persona)}`],
     "- name: '@shres-code/shres-code-tools'",
     "- name: '@shres-code/shres-code-agent'",
     "- name: '@shres-code/shres-code-commands'",
@@ -122,6 +134,9 @@ async function loadSpine(baseURL: string): Promise<Context> {
     "- name: '@shres-code/shres-code-model-router'",
     '  config:',
     ...ROUTER_CONFIG,
+    ...options.invariants === true
+      ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
+      : [],
     '',
   ].join('\n'))
 
@@ -142,6 +157,8 @@ async function loadSpine(baseURL: string): Promise<Context> {
     ['@shres-code/shres-code-llm-deepseek', DeepSeekPlugin],
     ['@test/model-router-judgment', FakeJudgment],
     ['@shres-code/shres-code-model-router', ModelRoutingController],
+    ['@shres-code/shres-code-invariants', InvariantRegistry],
+    ['@shres-code/shres-code-model-router/invariant', ModelRouterInvariant],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -162,9 +179,10 @@ async function loadSpine(baseURL: string): Promise<Context> {
 async function boot(
   successText = 'ROUTED_OK',
   sequence: readonly MockLlmBehavior[] = ['success'],
+  options: SpineOptions = {},
 ): Promise<Context> {
   server = await startMockLlmServer({ sequence, repeatLast: true, chunkSize: 4096, successText })
-  return loadSpine(server.baseURL)
+  return loadSpine(server.baseURL, options)
 }
 
 /** The scripted judgment engine the composition mounted. */
@@ -185,8 +203,8 @@ async function pinManualRoute(loaded: Context, agent: Agent): Promise<void> {
 }
 
 /** Create the one root agent on the manual route with its live model selection installed. */
-function createAgent(loaded: Context, id: string): Agent {
-  const agent = loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL })
+function createAgent(loaded: Context, id: string, cwd?: string): Agent {
+  const agent = loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL }, cwd === undefined ? {} : { cwd })
   loaded.agentDefaultModel.selectionFor(agent)
   return agent
 }
@@ -212,6 +230,42 @@ function requestedModel(index: number): unknown {
 }
 
 describe('real Loader composition', () => {
+  it('downgraded request system prompt does not name the manual model', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    // The shipped headless persona, read from its bundle patch so this case
+    // follows the product text; the invariant companion guards the same rule.
+    const patch = await readFile(new URL('../../../bundle/headless/cordis.patch.yml', import.meta.url), 'utf8')
+    const persona = /persona: >-\n\s+(\S.*)\n/.exec(patch)?.[1]
+    if (persona === undefined) throw new Error('the headless bundle patch declares no folded persona line')
+    const loaded = await boot('ROUTED_OK', ['success'], { persona, invariants: true })
+    const cwd = root!
+    const agent = createAgent(loaded, 'router-persona', cwd)
+    await turn(agent, 'Summarize the failing test name.')
+
+    const log = agent.session.events
+    const [decision] = eventsOfType(log, 'model-routing/decision')
+    expect(decision?.data).toMatchObject({ outcome: 'downgraded', sticky: { entryBase: { model: MANUAL_MODEL } } })
+    const [header] = eventsOfType(log, 'request/header')
+    expect(header?.data.header.config).toMatchObject({ model: CANDIDATE_MODEL })
+    expect(header?.data.header.system).toContain(persona.replace('{{cwd}}', cwd))
+    expect(header?.data.header.system).not.toContain(MANUAL_MODEL)
+    expect(eventsOfType(log, 'turn/end')[0]?.data.reason.kind).toBe('completed')
+  })
+
+  it('refuses a routed request whose persona names the manual model', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { persona: 'You are powered by the {{model}} model.', invariants: true })
+    const agent = createAgent(loaded, 'router-persona-model')
+    await turn(agent, 'Summarize the failing test name.')
+
+    const log = agent.session.events
+    expect(eventsOfType(log, 'model-routing/decision')[0]?.data.outcome).toBe('downgraded')
+    // The guard rejects the routed header before publication, so none is logged.
+    expect(eventsOfType(log, 'request/header')).toEqual([])
+    expect(server?.requests).toEqual([])
+    const ended = eventsOfType(log, 'turn/end')[0]?.data.reason
+    expect(ended?.kind).toBe('error')
+    expect(JSON.stringify(ended)).toContain('routed request names the manual model')
+  })
+
   it('downgrades a judged turn and the consumed request header carries the decision selection', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
 

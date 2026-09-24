@@ -18,7 +18,8 @@ export const inject = ['invariants']
 /**
  * Install the routing contract the log must always satisfy: inside the turn that
  * took it, a downgrade or error-recovery decision is followed by a
- * `request/header` whose config carries the selected route.
+ * `request/header` whose config carries the selected route, and a downgraded
+ * request's system prompt does not name the manual model.
  *
  * That relation is the whole point of the feature — the decision is only
  * meaningful if the loop actually ran the downgraded route — and it is owned
@@ -78,6 +79,18 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       fail(
         `the request header after a routing decision (${config.provider}/${config.model})`
         + ` does not match the selected route (${selection.provider}/${selection.model})`,
+      )
+    }
+    // The prompt is assembled for the manual route before routing rewrites the
+    // config, and a downgraded route never names the manual model (eligibility
+    // excludes it), so a routed prompt naming that model tells the candidate it
+    // is a model it is not. The comparison is a substring match on the model id.
+    const manual = decided.sticky.entryBase
+    const system = event.data.header.system
+    if (!recovery && manual !== undefined && system !== undefined && system.includes(manual.model)) {
+      fail(
+        `routed request names the manual model: the system prompt of the ${config.provider}/${config.model}`
+        + ` request contains "${manual.model}"`,
       )
     }
   }, { global: true })

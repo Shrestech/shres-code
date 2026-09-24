@@ -47,9 +47,12 @@ function decision(
   ) as unknown as ModelRoutingDecision
 }
 
-/** Append one full request-header snapshot for a route. */
-function header(session: Session, provider: string, model: string): void {
-  session.append('request/header', { header: { config: { provider, model } }, reason: 'initial' })
+/** Append one full request-header snapshot for a route, with an optional rendered system prompt. */
+function header(session: Session, provider: string, model: string, system?: string): void {
+  session.append('request/header', {
+    header: { config: { provider, model }, ...system === undefined ? {} : { system } },
+    reason: 'initial',
+  })
 }
 
 describe('model-router invariant companion', () => {
@@ -160,6 +163,36 @@ describe('model-router invariant companion', () => {
     expect(() => { header(session, 'strong', 'manual') }).not.toThrow()
     session.append('turn/start', { turn: 2 })
     expect(() => { header(session, 'cheap-provider', 'cheap-model') }).not.toThrow()
+  })
+
+  it('rejects a routed header whose system prompt names the manual model', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    session.append('turn/start', { turn: 1 })
+    session.append('model-routing/decision', decision({
+      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 1, entryBase: { provider: 'strong', model: 'strong-model' } },
+    }))
+
+    expect(() => { header(session, 'cheap-provider', 'cheap-model', 'You are a coding agent powered by the strong-model model.') })
+      .toThrow(/routed request names the manual model/)
+    expect(session.events.some(event => event.type === 'request/header')).toBe(false)
+    // A routed prompt that names no manual model, and a prompt-less header, pass.
+    expect(() => {
+      header(session, 'cheap-provider', 'cheap-model', 'You are a coding agent.')
+      header(session, 'cheap-provider', 'cheap-model')
+    }).not.toThrow()
+  })
+
+  it('accepts the manual model name on a route-error recovery request', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    session.append('turn/start', { turn: 1 })
+    session.append('model-routing/decision', decision({
+      outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
+      sticky: { active: false, turnsElapsed: 0, entryBase: { provider: 'strong', model: 'strong-model' } },
+    }))
+    // The recovery request runs the manual route, so naming it is accurate.
+    expect(() => { header(session, 'strong', 'strong-model', 'You are the strong-model model.') }).not.toThrow()
   })
 
   it('refuses a recovery request whose decision has no recorded manual route', async () => {
