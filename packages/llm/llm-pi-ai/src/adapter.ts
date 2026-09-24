@@ -65,7 +65,7 @@ interface PiAiSnapshot {
   models: Models
 }
 
-/** Constructor options for {@link PiAiAdapter}: the two resolution hooks the plugin owns. */
+/** Constructor options for {@link PiAiAdapter}: the resolution and observation hooks the route's owner supplies. */
 export interface PiAiAdapterOptions {
   /** Current validated profiles by provider route; called once per operation. */
   profiles: () => ReadonlyMap<string, ResolvedPiAiProviderProfile>
@@ -100,6 +100,13 @@ export interface PiAiAdapterOptions {
    * body.
    */
   onPayload?: (payload: unknown, request: PiAiPayloadRequest) => unknown
+  /**
+   * Prompt-cache lifetime to declare on one model's metadata, in milliseconds,
+   * or `undefined` to declare none. The route's owner supplies it because only
+   * the owner knows which upstream serves the route and how long that upstream
+   * keeps a prefix; the protocol alone does not determine it.
+   */
+  promptCacheTtlMs?: (provider: string, model: string) => number | undefined
 }
 
 /**
@@ -310,6 +317,15 @@ export class PiAiAdapter extends LlmAdapter {
     return tools === undefined ? {} : { hostedTools: [...tools] }
   }
 
+  /** The owner-declared prompt-cache lifetime for one model, or nothing to declare none. */
+  private promptCacheTtlOf(
+    provider: string,
+    modelId: string,
+  ): { promptCacheTtlMs: number } | Record<string, never> {
+    const ttl = this.config.promptCacheTtlMs?.(provider, modelId)
+    return ttl === undefined ? {} : { promptCacheTtlMs: ttl }
+  }
+
   override providerInfo(provider: string): LlmProviderInfo {
     // The configured name, not the route key: `displayName` exists so a
     // deployment can label a route, and a label only the configuration surface
@@ -331,6 +347,7 @@ export class PiAiAdapter extends LlmAdapter {
         name: model.name,
         inputModalities: [...model.input],
         ...this.hostedToolsOf(profile, model.id),
+        ...this.promptCacheTtlOf(provider, model.id),
       }))
     })
   }
@@ -354,6 +371,7 @@ export class PiAiAdapter extends LlmAdapter {
         name: resolvedModel.name,
         inputModalities: [...resolvedModel.input],
         ...this.hostedToolsOf(profile, model),
+        ...this.promptCacheTtlOf(provider, model),
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),
