@@ -55,7 +55,7 @@
     workspaceContext:
       maxBytes: 65536
     persona: |
-      You are headless-agent, a coding assistant powered by the {{model}} model.
+      You are headless-agent, a coding assistant.
 
       Verify your work by running the code or tests. Keep answers brief and
       factual.

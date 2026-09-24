@@ -39,15 +39,17 @@ const zeroBuckets = (): TokenUsageProjection => ({
 })
 
 /**
- * One call's buckets. Unreported input stays out of the uncached bucket, and an
- * unreported cache count contributes nothing to the reported-count buckets.
+ * One call's buckets. The read count decides whether the call is reported: an
+ * unreported call's whole prompt, including a write count carried without a
+ * read count, is unreported input, and an unreported cache count contributes
+ * nothing to the reported-count buckets.
  */
 const bucketsFrom = (usage: TokenUsage): TokenUsageProjection => {
   const read = cacheCount(usage, 'read')
   const write = cacheCount(usage, 'write')
   return {
     uncachedInputTokens: read === undefined ? 0 : usage.inputTokens,
-    unreportedInputTokens: read === undefined ? usage.inputTokens : 0,
+    unreportedInputTokens: read === undefined ? promptTokens(usage) : 0,
     outputTokens: usage.outputTokens,
     cacheReadTokens: read === undefined ? 0 : read,
     cacheWriteTokens: write === undefined ? 0 : write,
@@ -151,7 +153,8 @@ ProjectionDefinition<'tokenUsage', TokenUsageState> = {
     }
   },
   view: state => state.totals,
-  stateVersion: 2,
+  // A write carried without a read count is unreported input.
+  stateVersion: 3,
 }
 
 /**

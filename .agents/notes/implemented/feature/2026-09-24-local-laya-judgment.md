@@ -32,6 +32,8 @@ The model router consults `ctx.judgment` at the first step of every turn. With t
 | Same with a 793-token state | gateway P50 271.6 ms, P95 286.0 ms; client P50 278.1 ms, P95 293.3 ms (FP16) |
 | FP32, short and long states | client P50 50.9 ms and 337.4 ms |
 
+**Deadlines.** `requestTimeoutMs` (default 2,000 ms) is the provider's backstop, not the routing budget. It bounds every ask from a consumer with no deadline of its own (compaction-jev, judgment-guardrails, and worker-escalation set none), the health check, and the startup smoke ask, the first inference after the checkpoint loads. The model router's `judgmentDeadlineMs` (default 1,500 ms) is the routing budget: it expires first on a slow routing ask, and the decision records `engineFailure.code: 'DEADLINE'`. The Shield wire client reports its own timeout as `UNAVAILABLE`, the same code as a gateway that is not ready, has exited, or returned an HTTP error, and a decision records only the code. The measured routing-shaped P95 of 293 ms leaves both limits far above normal latency.
+
 The checkpoint ships a `choice:11+` temperature outside laya's calibrated range, which upstream clamps; confidence for choices with 11 or more options is uncalibrated. Routing accuracy is unmeasured: fidelity establishes that laya-mlx reproduces Laya, not that Laya routes well.
 
 **Upstream tracking.** The gateway depends on the PyPI release `laya-mlx==0.2.0`, hash-locked in `uv.lock`. Its sdist and wheel were compared file by file with upstream commit `0a859518634112655cb97c745dbf04f5191aaf13` of `mizorewww/laya-mlx` (the port's v0.3.5 sync) and are identical, including `pyproject.toml`, `NOTICE`, and `LICENSE`. The `parthmstech/laya` and `parthmstech/laya-mlx` forks carry no commits of their own and serve only as patch staging. `pnpm run check:laya-upstream` reports drift between these pins and PyPI, the pinned Hugging Face repositories, and the upstream source heads; a pin bump is its own change carrying a fresh fidelity check and offline routing replay.
@@ -51,6 +53,8 @@ The checkpoint ships a `choice:11+` temperature outside laya's calibrated range,
 **Build the environment on whichever Python the machine has.** A system or globally installed Python makes the install depend on that interpreter's patch version and on its continued presence: an OS upgrade or `uv python uninstall` elsewhere breaks the virtual environment, and deleting the runtime directory leaves the interpreter behind. Installing a uv-managed CPython into the runtime directory costs a 20–40 MB download on first install (CPython 3.11.15 occupies 75 MB on disk); it is paid for removability and reproducibility.
 
 **Bind a fixed port.** A fixed port races with other processes and with a restarting gateway. Port 0 plus a readiness line reporting the bound port has no race.
+
+**Lower `requestTimeoutMs` below the router's deadline, for example to 1,000 ms, so this provider classifies a slow routing ask.** Rejected: a provider timeout logs `UNAVAILABLE`, which a decision cannot tell apart from a gateway that is down, while the router's own deadline logs `DEADLINE`. The limit also bounds consumers without a deadline, the health check, and the cold smoke ask, and none of these has a measured latency that supports a tighter bound.
 
 **Depend on the forks.** They carry no commits of their own, so pinning them adds staleness without adding content; the PyPI release is verified byte-identical to the upstream commit.
 

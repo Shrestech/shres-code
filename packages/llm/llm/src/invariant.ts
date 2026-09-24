@@ -82,6 +82,9 @@ async function* validateStream(
         usageSeen = true
         validateCacheCount(chunk.usage.cacheReadTokens, 'cacheReadTokens', fail)
         validateCacheCount(chunk.usage.cacheWriteTokens, 'cacheWriteTokens', fail)
+        if (chunk.usage.cacheWriteTokens !== undefined && chunk.usage.cacheReadTokens === undefined) {
+          fail('LLM stream usage reports cacheWriteTokens without cacheReadTokens; the read count decides whether cache counts are reported')
+        }
         break
       case 'finish':
         if (open.size > 0 && chunk.reason.kind !== 'error' && chunk.reason.kind !== 'aborted') {

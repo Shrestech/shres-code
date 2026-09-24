@@ -68,10 +68,12 @@ interface PromptSection {
    * the same bytes on every assembly for a fixed configuration. `'conditional'`
    * declares that it may appear, disappear, or change between assemblies.
    * Every effective conditional section must be ordered after every static
-   * section, otherwise assembly fails, so a toggle cannot change the cached
-   * tool and static-section prefix. A toggle still invalidates cached
-   * conversation messages, which follow the system prompt; text that changes
-   * during a session belongs in {@link SystemPrompt.context} where possible.
+   * section, otherwise assembly fails, so a toggle cannot change the bytes of
+   * the tool and static-section prefix. How much of that prefix a provider's
+   * cache reuses depends on where its cache boundaries fall. A toggle still
+   * invalidates cached conversation messages, which follow the system prompt;
+   * text that changes during a session belongs in
+   * {@link SystemPrompt.context} where possible.
    */
   readonly stability?: 'static' | 'conditional'
 }
@@ -167,7 +169,7 @@ variable(name: string, provider: (context: AssembleContext) => string | undefine
 async assemble(context: AssembleContext = {}): Promise<PromptAssembly>
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:363`](../../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:365`](../../packages/core/system-prompt/src/index.ts)
 
 <a id="system-prompt-events"></a>
 
