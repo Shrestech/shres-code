@@ -477,16 +477,18 @@ describe('report.verdicts', () => {
   }
 
   /**
-   * The arm's trials with the first `withUsage` carrying a cache share.
+   * The arm's trials with the first `withUsage` carrying a root cache-hit share; the
+   * rest reported no cache-read count, so their share is null and their input
+   * is wholly unreported.
    * @param {string} arm - arm name.
    * @param {number} count - trial count.
-   * @param {number} withUsage - how many carry usage data.
+   * @param {number} withUsage - how many carry a cache-hit share.
    * @returns {import('../schema/trial.js').Trial[]}
    */
   function usageTrials(arm, count, withUsage) {
     const trials = []
     for (let i = 0; i < count; i += 1) {
-      trials.push(jevTrial(arm, i, { metrics: { cacheHitShare: i < withUsage ? 0.4 : null } }))
+      trials.push(jevTrial(arm, i, { metrics: i < withUsage ? { cacheHitShare: 0.4, cacheUnreportedShare: 0 } : { cacheHitShare: null, cacheUnreportedShare: 1 } }))
     }
     return trials
   }
@@ -549,7 +551,7 @@ describe('report.verdicts', () => {
     const refused = verdictChurnScreen(below)
     assert.equal(refused.status, 'not-evaluable')
     assert.equal(refused.outcome, null)
-    assert.match(refused.reason, /route-on: cacheHitShare is null on 3 of 10 trials \(70\.0% carry usage data\)/)
+    assert.match(refused.reason, /route-on: cacheHitShare is null on 3 of 10 trials \(70\.0% carry a reported cache-read count\)/)
     // The point of the screen: the churn claim is never made on a partial sample.
     assert.equal(refused.facts.routeOnUsageTrials, 7)
     assert.equal(refused.facts.requiredShare, 0.8)

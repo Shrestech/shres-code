@@ -48,6 +48,8 @@ class SpawnInProcessProvider implements SubagentProvider {
   }
   // Context contract: a spawned child starts fresh — it never sees the parent conversation.
   readonly inheritsParentContext = false
+  // The shared in-process driver creates the child with the request's agentOptions route.
+  readonly runsRequestedModel = true
 
   constructor(readonly name: string) {}
 

@@ -36,15 +36,19 @@ import z from '@shres-code/schemastery'
 import { scopeTarget } from '@shres-code/shres-code-scope'
 import type { Scoped } from '@shres-code/shres-code-scope'
 import { assertObjectJsonSchema } from '@shres-code/shres-code-tools'
+import { InvariantError } from '@shres-code/shres-code-invariants'
 import type { ContentBlock, MessageId } from '@shres-code/shres-code-llm'
-import type { Agent } from '@shres-code/shres-code-agent'
+import type { Agent, AgentOptions } from '@shres-code/shres-code-agent'
 import type { SessionId } from '@shres-code/shres-code-session'
-import { resolveChildDepth } from './child-agent.ts'
+import { effectiveChildRoute, resolveChildDepth } from './child-agent.ts'
 import { assertStartCapabilities } from './start-capabilities.ts'
 import type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
   ResolvedSubagentStartRequest,
+  SubagentChildRoute,
+  SubagentChildRouteInput,
+  SubagentChildRouteRequest,
   SubagentProvider,
   SubagentRun,
   SubagentRunEndInfo,
@@ -53,7 +57,7 @@ import type {
 } from './types.ts'
 import { SubagentError } from './error.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
-import { createActivationObserver, createLifecycleEmitter, observeRun } from './lifecycle.ts'
+import { createActivationObserver, createLifecycleEmitter, observeRun, renderThrown } from './lifecycle.ts'
 import type { ActivationObserver, LifecycleEmitter } from './lifecycle.ts'
 import SubagentContinuationManager from './continuation.ts'
 import type {
@@ -78,6 +82,10 @@ export type {
   ContinuableCreateSpec,
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
+  SubagentChildRoute,
+  SubagentChildRouteInput,
+  SubagentChildRouteKind,
+  SubagentChildRouteRequest,
   SubagentProvider,
   SubagentResult,
   SubagentRun,
@@ -173,6 +181,32 @@ declare module '@shres-code/cordis' {
      * @mode emit
      */
     'subagent/end'(this: Scoped<SubagentRuntime>, info: SubagentRunEndInfo): void
+    /**
+     * Choose the provider/model route of one fresh child before its delegation
+     * consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this
+     * at most once per child, and only when the request names neither a
+     * provider nor a model, the subagent provider runs requested routes, and
+     * the provider does not seed the child with parent history: a fork child
+     * keeps its parent's warm cached prefix and is never routed. Team seats
+     * always name their route, so no seat reaches a listener. The returned
+     * route is merged over `request.inherited`; `undefined` keeps it.
+     *
+     * The waterfall settles before any child resource exists, so a listener
+     * that records its choice appends to `request.parent.session` before
+     * returning and that record precedes the child's creation. A throwing
+     * listener is logged and the child keeps its inherited route, except that
+     * an `InvariantError` raised during the dispatch propagates; a route that
+     * does not resolve to a registered model rejects the delegation.
+     * Scope-filtered dispatch keys the carrier by `request.parent`, so a
+     * listener registered on the parent's context answers only its delegations.
+     * @param request - the fresh child's route question.
+     * @mode waterfall
+     */
+    'subagent/child-route'(
+      this: Scoped<SubagentRuntime>,
+      request: SubagentChildRouteRequest,
+      next: () => Promise<SubagentChildRoute | undefined>,
+    ): Promise<SubagentChildRoute | undefined>
   }
 }
 
@@ -518,6 +552,114 @@ export class SubagentRuntime extends Service {
       release()
       throw error
     }
+  }
+
+  /**
+   * Resolve the `agentOptions` a delegation consumer starts one fresh child
+   * with, dispatching `subagent/child-route` at most once. Consumers pass the
+   * result as the start request's `agentOptions` and derive any reported
+   * route from the same value with `effectiveChildRoute`, so the reported
+   * route and the run route cannot diverge.
+   *
+   * `input.requested` returns unchanged, without dispatch, when it names a
+   * provider or model (explicit routes win), when the provider seeds the child
+   * with parent history (fork), when the provider does not run requested
+   * routes, when no listener answers, or when the answer equals the inherited
+   * route. A throwing listener is logged and the child keeps its inherited
+   * route: routing is an optional cost policy, and a broken policy must not
+   * fail the delegation it would only have made cheaper. An `InvariantError`
+   * raised during the dispatch is not contained: a violated invariant means
+   * the durable log is about to become inconsistent, so it rejects the
+   * delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the
+   * inherited route and resolved against its registered model before return,
+   * so an unregistered route rejects before any child exists; agent creation
+   * itself does not validate a route.
+   * @param name - the subagent provider the child will start on.
+   * @param input - the parent, consumer kind, requested options, task, and signal.
+   * @returns the options to start the child with, or `undefined` when none apply.
+   * @throws {SubagentError} `NO_PROVIDER` for an unregistered subagent provider,
+   *   or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not
+   *   resolve to a registered model.
+   * @throws {InvariantError} when a registered invariant fails during the dispatch.
+   */
+  async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined> {
+    const provider = this.expectProvider(name)
+    const requested = input.requested
+    if (requested?.provider !== undefined || requested?.model !== undefined) return requested
+    if (provider.inheritsParentContext || provider.runsRequestedModel !== true) return requested
+    const inherited = effectiveChildRoute(input.parent, requested)
+    const request: SubagentChildRouteRequest = {
+      parent: input.parent,
+      kind: input.kind,
+      subagentProvider: name,
+      inherited,
+      ...input.agentType !== undefined ? { agentType: input.agentType } : {},
+      prompt: input.prompt,
+      signal: input.signal,
+    }
+    let chosen: SubagentChildRoute | undefined
+    try {
+      chosen = await this.ctx.waterfall(
+        scopeTarget(this, input.parent), 'subagent/child-route', request,
+        () => Promise.resolve(undefined),
+      )
+    } catch (error: unknown) {
+      // A violated invariant means the durable log is about to become
+      // inconsistent, which must fail loudly rather than fall back.
+      if (error instanceof InvariantError) throw error
+      input.signal.throwIfAborted()
+      this.ctx.logger.warn(
+        `subagent/child-route listener failed for a "${input.kind}" child on "${name}"; `
+        + `the child keeps its inherited route: ${renderThrown(error)}`,
+      )
+      return requested
+    }
+    if (chosen === undefined) return requested
+    const route: SubagentChildRoute = {
+      ...inherited,
+      ...chosen.provider !== undefined ? { provider: chosen.provider } : {},
+      ...chosen.model !== undefined ? { model: chosen.model } : {},
+    }
+    if (route.provider === inherited.provider && route.model === inherited.model) return requested
+    const registered = await this.registeredRoute(route, input.signal)
+    return { ...registered, ...requested }
+  }
+
+  /**
+   * Resolve a listener-chosen route against its registered model, rejecting a
+   * route that names no provider or model, that no adapter serves, or whose
+   * model the adapter cannot resolve. Cancellation rejects with its reason.
+   */
+  private async registeredRoute(
+    route: SubagentChildRoute,
+    signal: AbortSignal,
+  ): Promise<{ provider: string; model: string }> {
+    const { provider, model } = route
+    if (provider === undefined || model === undefined) {
+      throw new SubagentError(
+        `subagent/child-route chose an incomplete route (provider ${JSON.stringify(provider)}, `
+        + `model ${JSON.stringify(model)}); a routed child needs both`,
+        'INVALID_CHILD_ROUTE',
+      )
+    }
+    const llm = this.ctx.get('llm')
+    if (llm === undefined) {
+      throw new SubagentError(
+        `subagent/child-route chose "${provider}/${model}", but no llm service is composed to resolve it`,
+        'INVALID_CHILD_ROUTE',
+      )
+    }
+    try {
+      await llm.resolveModelInfo(provider, model, signal)
+    } catch (error: unknown) {
+      signal.throwIfAborted()
+      throw new SubagentError(
+        `subagent/child-route chose "${provider}/${model}", which is not a registered model: ${renderThrown(error)}`,
+        'INVALID_CHILD_ROUTE',
+        { cause: error },
+      )
+    }
+    return { provider, model }
   }
 
   /**

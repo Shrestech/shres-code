@@ -109,6 +109,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 |---|---|
 | Add a model provider | register its adapter on `ctx.llm` |
 | Route each turn across models | mount `@shres-code/shres-code-model-router`; it consults `ctx.judgment` and may replace the manual route with an allowlisted downgrade |
+| Route a fresh delegated child to another model | listen to the `subagent/child-route` waterfall; explicit routes, fork children, and team seats are never asked |
 | Add a model-facing capability | register on `ctx.tools`; its schema joins prompt assembly |
 | Give one session a different capability set | compose an agent preset; a service row there needs an `isolate` realm |
 | Add shell execution | register a `ctx.shell` backend; the local one spawns through `ctx.subprocess` |

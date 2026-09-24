@@ -411,10 +411,20 @@ export function apply(ctx: Context, config: Config): void {
 
         const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
         const label = childLabel(args.description, config.labelPrefix)
-        // Resolved before the start so the logged result reports the same route
-        // the child is created with (per-child overrides, else the parent's
-        // effective model).
-        const route = effectiveChildRoute(parent, config.agentOptions)
+        // Validate the call before routing: a route listener may record its
+        // choice in the parent log, which must not happen for a refused call.
+        const runSpec = resolveDelegationRun(args, { backgroundEnabled, continuable })
+        // One route resolution per child: the start request and the logged
+        // result both derive from these options, so they cannot diverge.
+        const agentOptions = await ctx.subagents.resolveChildRoute(config.provider, {
+          parent,
+          kind: 'subagent',
+          agentType: toolName,
+          prompt: args.prompt,
+          signal: exec.signal,
+          ...config.agentOptions !== undefined ? { requested: config.agentOptions } : {},
+        })
+        const route = effectiveChildRoute(parent, agentOptions)
         const routeFields = {
           ...route.provider !== undefined ? { provider: route.provider } : {},
           ...route.model !== undefined ? { model: route.model } : {},
@@ -423,13 +433,12 @@ export function apply(ctx: Context, config: Config): void {
           label,
           prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
           parent,
-          ...config.agentOptions !== undefined ? { agentOptions: config.agentOptions } : {},
+          ...agentOptions !== undefined ? { agentOptions } : {},
           ...config.persona !== undefined ? { persona: config.persona } : {},
           ...config.toolFilter !== undefined ? { toolFilter: config.toolFilter } : {},
           ...maxDepth !== undefined ? { maxDepth } : {},
         }
 
-        const runSpec = resolveDelegationRun(args, { backgroundEnabled, continuable })
         if (runSpec.runInBackground) {
           if (continuable) {
             // Resolves at inbox acceptance: the child owns its own turns from
