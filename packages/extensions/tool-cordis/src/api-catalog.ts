@@ -463,6 +463,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'claudeCredential',
+    summary: 'Single-flight Claude session-credential service.',
+    description: 'Single-flight Claude session-credential service.\n\nClaudeCredential.managerFor returns the one ClaudeSessionManager memoized for a credential spec, preserving one shared in-flight resolve per source. The memoization caches every spec key for the service\'s lifetime; that is safe because each `current()` call re-reads the store and re-checks freshness at the moment it runs rather than trusting a cached token.',
+    methods: [
+      {
+        signature: 'managerFor(spec: ClaudeSessionOptions): ClaudeSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests refresh the store once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads and refreshes.' }],
+        returns: 'the manager for the spec\'s credential facts.',
+      },
+    ],
+  },
+  {
     key: 'clientModules',
     summary: 'The web plugin table service: incremental `shres.client` scan + wire composition + bundle route + index tap.',
     description: 'The web plugin table service: incremental `shres.client` scan + wire composition + bundle route + index tap. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
@@ -496,6 +509,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Fires after any flush that recomposed the graph (row added/removed, or a rebuilt rev change). Pull model: listeners re-read graph.',
         parameters: [{ name: 'listener', description: 'notified with no payload.' }],
         returns: 'the unsubscriber.',
+      },
+      {
+        signature: 'async fetchBundle(request: Request): Promise<Response>',
+        description: 'Answer one `/plugins/<id>/client.js[.map]` request without a web server: a carrier that owns dispatch (the desktop host\'s pipes) forwards the request here instead of a mounted route.',
+        parameters: [{ name: 'request', description: 'the forwarded bundle request.' }],
+        returns: '405 for non-GET/HEAD, 404 for unknown ids, else the bundle bytes.',
       },
     ],
   },
@@ -3459,6 +3478,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CheckpointJspaceInput',
     declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
+  },
+  {
+    name: 'ClaudeSessionManager',
+    declaration: 'export class ClaudeSessionManager {\n    constructor(options: ClaudeSessionOptions);\n    current(): Promise<ClaudeSessionToken>;\n}',
+  },
+  {
+    name: 'ClaudeSessionOptions',
+    declaration: 'export interface ClaudeSessionOptions {\n    useKeychain: boolean;\n    securityPath: string;\n    authPath: string;\n    keychainAccount: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n    readKeychain?: (service: string) => Promise<string | undefined>;\n    writeKeychain?: (service: string, account: string, json: string) => Promise<void>;\n}',
+  },
+  {
+    name: 'ClaudeSessionToken',
+    declaration: 'export interface ClaudeSessionToken {\n    accessToken: string;\n}',
   },
   {
     name: 'ClientResponse',
