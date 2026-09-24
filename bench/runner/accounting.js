@@ -150,8 +150,8 @@ const WINDOW = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/
  * @typedef {object} TrialAccounting
  * @property {number} calls - billed model calls.
  * @property {{ uncachedInput: number, unreportedInput: number, output: number, cacheRead: number, cacheWrite: number }} tokens -
- *   raw tokens by class; `uncachedInput` is input of calls that reported cache reads, `unreportedInput` input of calls
- *   that did not, and the cache classes sum reported counts.
+ *   raw tokens by class; `uncachedInput` is input of calls that reported cache reads, `unreportedInput` the prompt
+ *   (input plus any reported write) of calls that did not, and the cache classes sum the counts of reported calls.
  * @property {number} unreportedCalls - calls without a reported cache-read count.
  * @property {number | null} cacheHitShare - cache reads over the prompt tokens of reported calls; null when none.
  * @property {number | null} unreportedShare - unreported input over all prompt tokens; null when none.
@@ -479,16 +479,33 @@ export function emptyAccounting() {
 }
 
 /**
+ * The cache-hit and unreported shares of presence-split prompt tokens: the one
+ * arithmetic the root-session metrics and the closure accounting share. A call
+ * without a reported cache-read count adds its whole prompt to
+ * `unreportedPrompt` and nothing to `reportedPrompt`, so it is never a miss.
+ * @param {{ reportedPrompt: number, cacheRead: number, unreportedPrompt: number }} prompt -
+ *   prompt tokens (input plus cache reads and writes) of reported calls, their cache reads, and the prompt of
+ *   unreported calls.
+ * @returns {{ cacheHitShare: number | null, unreportedShare: number | null }} null when the denominator is zero.
+ */
+export function cacheShares({ reportedPrompt, cacheRead, unreportedPrompt }) {
+  const allPrompt = reportedPrompt + unreportedPrompt
+  return {
+    cacheHitShare: reportedPrompt === 0 ? null : cacheRead / reportedPrompt,
+    unreportedShare: allPrompt === 0 ? null : unreportedPrompt / allPrompt,
+  }
+}
+
+/**
  * Recompute the derived shares from the token sums.
  * @param {TrialAccounting} accounting - mutated in place.
  * @returns {TrialAccounting} the same record.
  */
 function deriveShares(accounting) {
   const { uncachedInput, unreportedInput, cacheRead, cacheWrite } = accounting.tokens
-  const reportedPrompt = uncachedInput + cacheRead + cacheWrite
-  const allPrompt = reportedPrompt + unreportedInput
-  accounting.cacheHitShare = reportedPrompt === 0 ? null : cacheRead / reportedPrompt
-  accounting.unreportedShare = allPrompt === 0 ? null : unreportedInput / allPrompt
+  const shares = cacheShares({ reportedPrompt: uncachedInput + cacheRead + cacheWrite, cacheRead, unreportedPrompt: unreportedInput })
+  accounting.cacheHitShare = shares.cacheHitShare
+  accounting.unreportedShare = shares.unreportedShare
   return accounting
 }
 
@@ -527,13 +544,15 @@ export function priceAccounting(sessions, context) {
       const { usage } = call
       accounting.calls += 1
       if (usage.cacheReadTokens === undefined) {
+        // Unreported as a whole: the input may hold cached tokens, so a write
+        // the call reports joins its unreported prompt.
         accounting.unreportedCalls += 1
-        accounting.tokens.unreportedInput += usage.inputTokens
+        accounting.tokens.unreportedInput += usage.inputTokens + (usage.cacheWriteTokens ?? 0)
       } else {
         accounting.tokens.uncachedInput += usage.inputTokens
         accounting.tokens.cacheRead += usage.cacheReadTokens
+        accounting.tokens.cacheWrite += usage.cacheWriteTokens ?? 0
       }
-      accounting.tokens.cacheWrite += usage.cacheWriteTokens ?? 0
       accounting.tokens.output += usage.outputTokens
 
       if (call.provider !== null && local.has(call.provider)) {
@@ -646,18 +665,6 @@ export function mergeAccounting(left, right) {
  */
 export function trialSpend(accounting) {
   return accounting.dollarsUpperBound + accounting.judge.dollarsUpperBound
-}
-
-/**
- * A trial's cache-hit share: `accounting.cacheHitShare`, the one presence-based
- * reading every report, aggregate, and verdict uses. Null when the trial
- * carries no accounting (recorded before the bench priced trials) or no call
- * reported a cache-read count.
- * @param {{ accounting?: TrialAccounting }} trial
- * @returns {number | null}
- */
-export function trialCacheHitShare(trial) {
-  return trial.accounting?.cacheHitShare ?? null
 }
 
 /**

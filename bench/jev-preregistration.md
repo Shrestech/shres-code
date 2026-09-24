@@ -102,19 +102,20 @@ it is expected to lose, and a losing arm still costs real spend.
 `tokensIncludingDescendants` per resolved trial. Compaction adds the
 verifier-passed rate on `pressureFired` trials.
 
-**DIAGNOSTIC-ONLY** (never a pass/fail gate): `cacheHitShare` (nullable),
+**DIAGNOSTIC-ONLY** (never a pass/fail gate): `cacheHitShare` and
+`cacheUnreportedShare` (nullable),
 `modelTransitions`, `downgradedStreaks`, `downgradedShare`,
 `keptStrongShare`, `routingHintCount` (only if the router logs
 hints), `jevCompactionAcceptedBelowThreshold`, `jevSelectionDegraded`,
 and the existing compaction forensics.
 
 Every metric is derived from the session log and the reported usage, never from
-a model self-report. `cacheHitShare` is the trial's `accounting.cacheHitShare`:
-cache reads over the prompt tokens of the calls whose provider reported a
-cache-read count, over the root session and its descendants. A call with no
-reported count is excluded rather than read as a miss, and the share is
-**null** when no call reported one; the aggregate reports how many trials were
-null, because H4 depends on that count.
+a model self-report. `cacheHitShare` is the root session's cache reads over
+the prompt tokens of its usage records that report a cache-read count. A record
+with no reported count is excluded rather than read as a miss, and
+`cacheUnreportedShare` reports the share of prompt tokens such records
+carried. The share is **null** when no record reported a cache-read count; the
+aggregate reports how many trials were null, because H4 depends on that count.
 
 ## Statistics
 

@@ -27,7 +27,6 @@
  * @module bench/report/verdicts
  */
 
-import { trialCacheHitShare } from '../runner/accounting.js'
 import { bootstrapDeltaCi, bootstrapMeanCi, wilsonInterval } from '../stats/intervals.js'
 import { mcnemarExactP, pairOutcomes } from '../stats/paired.js'
 
@@ -194,10 +193,10 @@ export function verdictRoutingAdoption(trials) {
 /**
  * H4 — the churn screen. `cacheHitShare(route-on) ≥ cacheHitShare(route-off) −
  * 5 points`, applied only when at least 80% of the trials in **both** arms
- * carry a reported cache-read count. The share is the trial's
- * `accounting.cacheHitShare`: a trial whose calls reported no cache-read count
- * has none, because an unreported count is not a measured miss. A shortfall is
- * not-evaluable with the null share as its
+ * carry a reported cache-read count. The share is the root session's
+ * `metrics.cacheHitShare`: a trial whose usage records reported no cache-read
+ * count has none, because an unreported count is not a measured miss. A
+ * shortfall is not-evaluable with the null share as its
  * reason. The point estimate is each arm's mean per-trial share (the aggregate
  * the report shows); the interval is a paired bootstrap over the matched
  * per-pair share deltas.
@@ -214,7 +213,7 @@ export function verdictChurnScreen(trials) {
   }
   const coverage = arm => {
     const list = arm === JEV_ARMS.routingControl ? control : treatment
-    const withUsage = list.filter(t => trialCacheHitShare(t) !== null)
+    const withUsage = list.filter(t => t.metrics.cacheHitShare !== null && t.metrics.cacheHitShare !== undefined)
     return { trials: list.length, withUsage: withUsage.length, nullTrials: list.length - withUsage.length }
   }
   const controlCoverage = coverage(JEV_ARMS.routingControl)
@@ -240,11 +239,9 @@ export function verdictChurnScreen(trials) {
   const controlByKey = byPairKey(control)
   const treatmentByKey = byPairKey(treatment)
   for (const pair of pairs) {
-    const offTrial = controlByKey.get(pairKey(pair))
-    const onTrial = treatmentByKey.get(pairKey(pair))
-    const off = offTrial === undefined ? null : trialCacheHitShare(offTrial)
-    const on = onTrial === undefined ? null : trialCacheHitShare(onTrial)
-    if (off !== null && on !== null) deltas.push(on - off)
+    const off = controlByKey.get(pairKey(pair))?.metrics.cacheHitShare
+    const on = treatmentByKey.get(pairKey(pair))?.metrics.cacheHitShare
+    if (typeof off === 'number' && typeof on === 'number') deltas.push(on - off)
   }
   if (deltas.length < MIN_PAIRS) {
     return notEvaluable('H4', rule, arms, `fewer than ${MIN_PAIRS} matched trial pairs carry a cacheHitShare in both arms (${deltas.length} do)`, {
@@ -255,7 +252,7 @@ export function verdictChurnScreen(trials) {
   // Each arm's estimate is the mean over the trials that carry a share: a
   // null share is a missing datum, and folding it in as 0 would read as a total
   // cache miss and drag the screen in exactly the direction it audits.
-  const sharesOf = list => list.map(trialCacheHitShare).filter(share => share !== null)
+  const sharesOf = list => list.map(t => t.metrics.cacheHitShare).filter(share => typeof share === 'number')
   const meanOn = mean(sharesOf(treatment))
   const meanOff = mean(sharesOf(control))
   const observed = meanOn - meanOff

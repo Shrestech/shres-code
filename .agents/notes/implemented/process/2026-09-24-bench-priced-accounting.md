@@ -26,7 +26,7 @@ The runtime is unchanged: no runtime package carries a price table or a dollar f
 [`bench/runner/accounting.js`](../../../../bench/runner/accounting.js) folds the root session and its descendants into a per-trial `accounting` record; [the bench README](../../../../bench/README.md#priced-accounting) lists the rules. Five of them carry the decision:
 
 - **A billed call is a `usage` chunk.** The stream protocol emits at most one per call, and a failed attempt that reported usage still bills. A step's `assistant/message` adds a call only when the step logged no usage chunk. The token fields of descendant accounting keep their message-only numerator.
-- **Cache counts are read by presence.** The bench restates the `TokenUsage` contract instead of importing `cacheCount`: a present count, including 0, is reported, and an absent one is not. A call without a reported cache-read count leaves the cache-hit share, and its dollars enter only an upper bound that prices its whole input at the uncached input rate.
+- **Cache counts are read by presence.** The bench restates the `TokenUsage` contract instead of importing `cacheCount`: a present count, including 0, is reported, and an absent one is not. A call without a reported cache-read count is unreported as a whole: its prompt, including any write it reports, leaves the cache-hit share and counts toward the unreported share, and its dollars enter only an upper bound that prices its whole input at the uncached input rate.
 - **Unpriced is never $0.** A route missing from `bench/accounting.json`, a model the snapshot lacks, or a null input or output price makes the call unpriced, counted and named. A null cache price bills that class at the input rate. Writes bill at the 5-minute tier because logged usage carries no write TTL. Off-peak prices apply when the request time, the step's `step/start`, falls in a snapshot window in UTC.
 - **Subscription routes are quota, not dollars.** `subscriptionProviders` is an explicit list of route ids. Their calls count as input-equivalent quota tokens: each class weighted by its price relative to the model's input price. A separate `apiEquivalentDollars` figure, with its upper bound, prices them at API list rates so a subscription arm compares with an API arm, and it never enters spend or the cap.
 - **Local is $0, not unpriced.** `localProviders` routes and `localJudgeEngines` judges (the loopback Laya and Shield gateways) count as local calls at zero marginal cost. Both lists are explicit, and the loader refuses an id in two billing lists.
@@ -34,7 +34,12 @@ The runtime is unchanged: no runtime package carries a price table or a dollar f
 
 Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw tokens by class, cache-hit and unreported shares, judge totals, and TTFT and judge-latency p50/p90.
 
-`accounting.cacheHitShare` is the bench's only cache-hit share. The Jev report aggregates (`meanCacheHitShare`, `cacheHitShareNullTrials`) and the routing pre-registration's H4 churn screen read it through `trialCacheHitShare`. No root-session fold computes a share that counts an unreported call's input as a miss. The pre-registration defines `cacheHitShare` this way, and its H4 coverage counts trials that "carry a reported cache-read count"; no confirmatory trial ran under the earlier root-session definition.
+The bench carries cache-hit shares at two named scopes, both computed by one function (`cacheShares`) and both read by presence:
+
+- `metrics.cacheHitShare` and `metrics.cacheUnreportedShare` fold the root session's usage records. The Jev report aggregates (`meanCacheHitShare`, `cacheHitShareNullTrials`, `meanCacheUnreportedShare`) and the routing pre-registration's H4 churn screen read them.
+- `accounting.cacheHitShare` and `accounting.unreportedShare` cover the whole closure per billed call.
+
+Each share sits beside its unreported share, so no report renders unreported input as a measured 0. The pre-registration defines `cacheHitShare` as the root session's presence-based share, and H4 coverage counts trials that "carry a reported cache-read count". No confirmatory trial ran under the earlier definition, which read an absent count as a miss.
 
 ### The dollar cap
 
@@ -58,7 +63,9 @@ Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw
 
 **A write-TTL class that prices 1-hour writes separately.** Deferred: logged usage cannot separate the tiers, so the class would have no producer. Writes bill at the 5-minute tier until usage records the tier.
 
-**Keep a root-session `cacheHitShare` in the trial metrics beside the accounting share.** Rejected: it read an absent cache count as a miss, covered only the root session, and would give the churn screen two different shares under one name.
+**Keep only the closure-wide share and drop the root-session metric.** Rejected: the pre-registered H4 screen and the Jev report read the root session's share, and a root figure stays comparable with the root token fields. Both scopes are kept, named, and computed by the same presence-based arithmetic.
+
+**Keep the root share's earlier definition, which read an absent cache count as a miss.** Rejected: it breaks the `TokenUsage` presence contract, and it turned a provider that reports no cache counts into a cold cache.
 
 **Import the cache readers from `@shres-code/shres-code-llm`.** Rejected: the bench is standalone plain ESM outside the workspace, with no runtime dependencies.
 

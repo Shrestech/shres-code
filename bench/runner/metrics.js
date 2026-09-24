@@ -31,9 +31,17 @@
  * Jev routing/compaction metrics (added for the WP-jev experiment surface) read the
  * model-router and compaction-jev log-only events, so they are null for arms that
  * compose neither (all-null is the honest reading of "never judged", which is why
- * every one of them is nullable rather than zero). The cache-hit share is not
- * folded here: it is `accounting.cacheHitShare` (`accounting.js`), which reads
- * cache counts by presence over the whole session closure.
+ * every one of them is nullable rather than zero):
+ * - cacheHitShare: root session only. Cache reads over the prompt tokens (input
+ *   plus cache reads and writes) of the `assistant/message` usage records that
+ *   report a cache-read count, by the `TokenUsage` presence contract: a record
+ *   without one is unreported and excluded, never read as a miss. Null when no
+ *   record reports one or the reported prompt is zero. The closure-wide,
+ *   per-call figure is `accounting.cacheHitShare` (`accounting.js`); both use
+ *   `cacheShares`.
+ * - cacheUnreportedShare: root session only. The share of prompt tokens carried
+ *   by usage records without a reported cache-read count, so the root share never
+ *   hides unreported input. Null when the root session reported no prompt tokens.
  * - modelTransitions: consecutive `request/header` events whose provider/model differ.
  *   Null when the log carries no readable header.
  * - downgradedStreaks: run lengths of consecutive `model-routing/decision` events with
@@ -67,6 +75,7 @@
 
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { cacheShares } from './accounting.js'
 
 /**
  * @typedef {import('../schema/trial.js').TrialMetrics} TrialMetrics
@@ -279,6 +288,8 @@ export function foldSessionLog(text, armFlags) {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    cacheHitShare: null,
+    cacheUnreportedShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,
@@ -322,6 +333,10 @@ export function foldSessionLog(text, armFlags) {
   // Jev routing/compaction state.
   /** @type {{ provider: string, model: string } | null} */
   let lastHeaderRoute = null
+  // Root-session prompt tokens split by cache-read presence.
+  let reportedPrompt = 0
+  let reportedCacheRead = 0
+  let unreportedPrompt = 0
   let headerEvents = 0
   let modelTransitions = 0
   let routingDecisions = 0
@@ -451,6 +466,14 @@ export function foldSessionLog(text, armFlags) {
         if (typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)) {
           metrics.outputTokens += usage.outputTokens
         }
+        const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
+        const prompt = (count(usage.inputTokens) ? usage.inputTokens : 0) + (count(usage.cacheWriteTokens) ? usage.cacheWriteTokens : 0)
+        if (count(usage.cacheReadTokens)) {
+          reportedPrompt += prompt + usage.cacheReadTokens
+          reportedCacheRead += usage.cacheReadTokens
+        } else {
+          unreportedPrompt += prompt
+        }
         break
       }
       case 'model-routing/decision': {
@@ -552,6 +575,9 @@ export function foldSessionLog(text, armFlags) {
 
   // Jev routing/compaction fold. Every field stays null when its events are
   // absent: a never-judged trial must not read as "judged, never downgraded".
+  const shares = cacheShares({ reportedPrompt, cacheRead: reportedCacheRead, unreportedPrompt })
+  metrics.cacheHitShare = shares.cacheHitShare
+  metrics.cacheUnreportedShare = shares.unreportedShare
   if (headerEvents > 0) metrics.modelTransitions = modelTransitions
   if (routingDecisions > 0) {
     if (openDowngradedRun > 0) downgradedRuns.push(openDowngradedRun)
@@ -624,6 +650,8 @@ export function emptyMetrics() {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    cacheHitShare: null,
+    cacheUnreportedShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,

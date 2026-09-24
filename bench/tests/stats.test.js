@@ -6,7 +6,6 @@ import { describe, it } from 'node:test'
 import { validateTrial } from '../schema/trial.js'
 import { validateReportData } from '../schema/report-data.js'
 import { emptyMetrics } from '../runner/metrics.js'
-import { emptyAccounting } from '../runner/accounting.js'
 import { summarizeArm, summarizeCell, summarizeCells } from '../stats/aggregate.js'
 import { bootstrapDeltaCi, bootstrapMeanCi, mulberry32, wilsonInterval } from '../stats/intervals.js'
 import { gradeComparison, mcnemarExactP, pairOutcomes, passAtK } from '../stats/paired.js'
@@ -474,16 +473,13 @@ describe('report.verdicts', () => {
       trialIndex,
       resolved: overrides.resolved ?? true,
       metrics: overrides.metrics ?? {},
-      // The cache-hit share lives in the trial's accounting, not in metrics.
-      ...(overrides.cacheHitShare === undefined
-        ? {}
-        : { priceSnapshot: '2026-09-24', accounting: { ...emptyAccounting(), cacheHitShare: overrides.cacheHitShare } }),
     })
   }
 
   /**
-   * The arm's trials with the first `withUsage` carrying a cache-hit share; the rest
-   * are priced trials whose calls reported no cache-read count.
+   * The arm's trials with the first `withUsage` carrying a root cache-hit share; the
+   * rest reported no cache-read count, so their share is null and their input
+   * is wholly unreported.
    * @param {string} arm - arm name.
    * @param {number} count - trial count.
    * @param {number} withUsage - how many carry a cache-hit share.
@@ -492,7 +488,7 @@ describe('report.verdicts', () => {
   function usageTrials(arm, count, withUsage) {
     const trials = []
     for (let i = 0; i < count; i += 1) {
-      trials.push(jevTrial(arm, i, { cacheHitShare: i < withUsage ? 0.4 : null }))
+      trials.push(jevTrial(arm, i, { metrics: i < withUsage ? { cacheHitShare: 0.4, cacheUnreportedShare: 0 } : { cacheHitShare: null, cacheUnreportedShare: 1 } }))
     }
     return trials
   }
@@ -562,14 +558,14 @@ describe('report.verdicts', () => {
   })
 
   it('passes the churn screen at exactly the −5 point margin and fails below it', () => {
-    const atMargin = [...usageTrials('route-off', 4, 4).map(t => ({ ...t, accounting: { ...t.accounting, cacheHitShare: 0.5 } })),
-      ...usageTrials('route-on', 4, 4).map(t => ({ ...t, accounting: { ...t.accounting, cacheHitShare: 0.45 } }))]
+    const atMargin = [...usageTrials('route-off', 4, 4).map(t => ({ ...t, metrics: { ...t.metrics, cacheHitShare: 0.5 } })),
+      ...usageTrials('route-on', 4, 4).map(t => ({ ...t, metrics: { ...t.metrics, cacheHitShare: 0.45 } }))]
     const passed = verdictChurnScreen(atMargin)
     assert.equal(passed.outcome, 'pass')
     closeTo(passed.observed, -0.05)
 
-    const below = [...usageTrials('route-off', 4, 4).map(t => ({ ...t, accounting: { ...t.accounting, cacheHitShare: 0.5 } })),
-      ...usageTrials('route-on', 4, 4).map(t => ({ ...t, accounting: { ...t.accounting, cacheHitShare: 0.44 } }))]
+    const below = [...usageTrials('route-off', 4, 4).map(t => ({ ...t, metrics: { ...t.metrics, cacheHitShare: 0.5 } })),
+      ...usageTrials('route-on', 4, 4).map(t => ({ ...t, metrics: { ...t.metrics, cacheHitShare: 0.44 } }))]
     assert.equal(verdictChurnScreen(below).outcome, 'fail')
   })
 
@@ -745,8 +741,8 @@ describe('report.verdicts', () => {
       const routeOff = []
       const routeOn = []
       for (let i = 0; i < 6; i += 1) {
-        routeOff.push(jevTrial(JEV_ARMS.routingControl, i, { cacheHitShare: 0.4, metrics: { tokensIncludingDescendants: 1000 } }))
-        routeOn.push(jevTrial(JEV_ARMS.routingTreatment, i, { cacheHitShare: 0.4, metrics: { tokensIncludingDescendants: 700, downgradedStreaks: [2], downgradedShare: 1, keptStrongShare: 0, modelTransitions: 1 } }))
+        routeOff.push(jevTrial(JEV_ARMS.routingControl, i, { metrics: { cacheHitShare: 0.4, tokensIncludingDescendants: 1000 } }))
+        routeOn.push(jevTrial(JEV_ARMS.routingTreatment, i, { metrics: { cacheHitShare: 0.4, tokensIncludingDescendants: 700, downgradedStreaks: [2], downgradedShare: 1, keptStrongShare: 0, modelTransitions: 1 } }))
       }
       const basic = [0, 1, 2, 3].map(i => compactingTrial(JEV_ARMS.compactionControl, i, { resolved: false, tokens: 1000 }))
       const jev = [0, 1, 2, 3].map(i => compactingTrial(JEV_ARMS.compactionTreatment, i, { resolved: true, tokens: 1200 }))

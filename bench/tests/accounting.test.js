@@ -184,6 +184,16 @@ describe('accounting.priceAccounting', () => {
     assert.equal(exactCost(unreported), null)
   })
 
+  it('treats a call without a reported cache-read count as unreported as a whole, even when it reports a write', async () => {
+    const context = await fixtureContext()
+    const accounting = priceAccounting([foldSessionAccounting(log([
+      ...pricedStep({ step: 1, time: utc(9), provider: 'acme-route', model: 'm1', usage: { inputTokens: 100, outputTokens: 1, cacheWriteTokens: 100 } }),
+    ]))], context)
+    assert.deepEqual(accounting.tokens, { uncachedInput: 0, unreportedInput: 200, output: 1, cacheRead: 0, cacheWrite: 0 })
+    assert.equal(accounting.cacheHitShare, null)
+    assert.equal(accounting.unreportedShare, 1)
+  })
+
   it('computes the cache-hit share over reported calls only and reports the unreported share', async () => {
     const context = await fixtureContext()
     const accounting = priceAccounting([foldSessionAccounting(log([

@@ -4,8 +4,9 @@
  * fields are recomputed from the phase logs — exact counts and shares, with a
  * route change at a phase boundary counted as a real transition — while
  * `downgradedStreaks` stays the phases' lists in order and deliberately never
- * merges a run across a boundary. The cache-hit share is the summed phase
- * accounting's, derived from the phases' token classes.
+ * merges a run across a boundary. The root-scoped cache shares are re-folded
+ * the same way, and the closure accounting's shares derive from the summed
+ * phase token classes; on a chain without descendants the two agree.
  *
  * @module bench/tests/jev-chain-rollup.test
  */
@@ -23,7 +24,10 @@ import { rollupChainJevMetrics, sumPhaseAccounting, sumPhaseMetrics } from '../r
 /** An accounting context that prices nothing: the cache-hit share needs no prices. */
 const UNPRICED = {
   snapshot: { id: '2026-09-24', entries: new Map() },
-  config: { subscriptionProviders: [], priceProviders: {}, judgeEnginePriceProviders: {}, vendorPlanJudgeEngines: [] },
+  config: {
+    subscriptionProviders: [], localProviders: [], priceProviders: {},
+    judgeEnginePriceProviders: {}, vendorPlanJudgeEngines: [], localJudgeEngines: [],
+  },
   configSha256: '',
 }
 
@@ -123,10 +127,11 @@ describe('chain Jev rollup', () => {
       assert.equal(metrics.keptStrongShare, 2 / 7)
       assert.equal(metrics.modelTransitions, 1)
       assert.equal(metrics.routingHintCount, 3)
-      // The share comes from the summed token classes, never the phase shares' mean.
-      assert.equal(accounting.cacheHitShare, 200 / 600)
-      assert.notEqual(accounting.cacheHitShare, (0.5 + 0.25) / 2)
-      assert.ok(!('cacheHitShare' in metrics))
+      // The share comes from the summed token counts, never the phase shares' mean.
+      assert.equal(metrics.cacheHitShare, 200 / 600)
+      assert.notEqual(metrics.cacheHitShare, (0.5 + 0.25) / 2)
+      assert.equal(metrics.cacheUnreportedShare, 0)
+      assert.equal(accounting.cacheHitShare, metrics.cacheHitShare)
       // Streaks are the phases' lists in order: phase 0 ends downgraded and
       // phase 1 opens downgraded, and those two runs stay separate.
       assert.deepEqual(records[0].metrics.downgradedStreaks, [2])
@@ -148,6 +153,7 @@ describe('chain Jev rollup', () => {
         { events: [step] },
         { events: [step, header('route-a'), decision('kept-strong'), usage(50, 0)] },
       ])
+      assert.equal(measured.metrics.cacheHitShare, 0)
       assert.equal(measured.accounting.cacheHitShare, 0)
       assert.equal(measured.metrics.modelTransitions, 0)
       assert.deepEqual(measured.metrics.downgradedStreaks, [])
@@ -158,6 +164,8 @@ describe('chain Jev rollup', () => {
       assert.equal(measured.metrics.jevSelectionDegraded, null)
 
       const empty = await runChain(dir, [{ events: [step] }, { events: [step] }])
+      assert.equal(empty.metrics.cacheHitShare, null)
+      assert.equal(empty.metrics.cacheUnreportedShare, null)
       assert.equal(empty.accounting.cacheHitShare, null)
       assert.equal(empty.metrics.modelTransitions, null)
       assert.equal(empty.metrics.downgradedStreaks, null)

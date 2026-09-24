@@ -22,7 +22,9 @@ export const FAILURE_MODES = Object.freeze([
  */
 
 /**
- * @typedef {object} TrialMetrics
+ * @typedef {object} TrialMetrics - folded from the root session's log unless a field says otherwise
+ *   (the `…IncludingDescendants` fields and `outOfLoopExperiments` span the closure). The trial's
+ *   `accounting` covers the whole closure per billed call; `metrics.*` is the root session only.
  * @property {number} inputTokens - provider-reported input tokens, summed over requests.
  * @property {number} outputTokens - provider-reported output tokens, summed over requests.
  * @property {number} durationMs - wall time of the agent run.
@@ -88,6 +90,14 @@ export const FAILURE_MODES = Object.freeze([
  *   non-researcher arms.
  * @property {number | null} thinDebates - debate pairs whose combined descendant seat-token
  *   volume fell under the thinDebates floor (200); null for non-researcher arms.
+ * @property {number | null} cacheHitShare - root session only: cache reads over the prompt tokens (input plus
+ *   cache reads and writes) of the root session's `assistant/message` usage records that report a cache-read
+ *   count. A record without one is unreported (`TokenUsage` presence contract) and excluded, never read as a
+ *   miss. Null when no record reports one or the reported prompt is zero. The closure-wide, per-call figure is
+ *   `accounting.cacheHitShare`.
+ * @property {number | null} cacheUnreportedShare - root session only: the share of prompt tokens carried by usage
+ *   records without a reported cache-read count, so `cacheHitShare` never hides unreported input. Null when the
+ *   root session reported no prompt tokens. The closure-wide figure is `accounting.unreportedShare`.
  * @property {number | null} modelTransitions - consecutive `request/header` pairs whose
  *   `config.provider`/`config.model` differ. A header logged only to re-state the same route
  *   is not a transition. Null when the log carries no readable header.
@@ -142,8 +152,8 @@ export const FAILURE_MODES = Object.freeze([
  * @property {string} [priceSnapshot] - id (`YYYY-MM-DD`) of the `bench/prices` snapshot the trial
  *   was priced under; absent on trials recorded before the bench priced trials.
  * @property {import('../runner/accounting.js').TrialAccounting} [accounting] - priced, cache-inclusive
- *   accounting over the root session and its descendants; for chains, the sum over phases. Its
- *   `cacheHitShare` is the trial's cache-hit share for every report, aggregate, and verdict.
+ *   accounting over the whole closure (root session and descendants), per billed call; for chains, the sum over
+ *   phases. Its shares are closure-wide; `metrics.cacheHitShare` is the root session's.
  * @property {{ violations: string[] }} [integrity] - arm-integrity audit findings; omitted when clean.
  */
 
@@ -151,7 +161,7 @@ export const FAILURE_MODES = Object.freeze([
 const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'descendantSessions', 'outOfLoopExperiments', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /** TrialMetrics field names that are number|null. */
-const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates', 'cacheHitShare', 'cacheUnreportedShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /** TrialMetrics field names that are boolean|null. */
 const NULLABLE_BOOLEAN_FIELDS = ['danglingCard', 'ledgerAbandoned', 'unverifiedAcceptRecovery']

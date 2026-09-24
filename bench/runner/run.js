@@ -694,7 +694,7 @@ export function sumPhaseMetrics(phases) {
 }
 
 /** Jev routing/compaction fields a chain trial recomputes from its phase logs instead of summing per phase. */
-const JEV_CHAIN_ROLLUP_FIELDS = ['modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'cacheUnreportedShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /**
  * Fold a chain trial's Jev routing/compaction fields from its phases.
@@ -703,9 +703,11 @@ const JEV_CHAIN_ROLLUP_FIELDS = ['modelTransitions', 'downgradedShare', 'keptStr
  * that produced them and count route changes only inside that phase. Re-folding
  * the concatenated phase logs at the trial level recovers the exact counts — a
  * route change at a phase boundary is a real transition — and leaves the null
- * rules to the one fold that owns them. The chain's cache-hit share needs no
- * re-fold: the trial's `accounting` sums the phases' token classes, and its
- * `cacheHitShare` is derived from those sums.
+ * rules to the one fold that owns them: a chain with no reported cache-read count
+ * anywhere keeps `cacheHitShare` null, and a phase without one adds its prompt to
+ * `cacheUnreportedShare`, never a miss to the share. The closure-wide
+ * `accounting` shares need no re-fold: they derive from the summed phase token
+ * classes.
  *
  * `downgradedStreaks` is the one field the concatenation cannot state: each
  * phase is its own session, so a run of downgraded turns spanning a phase
