@@ -582,6 +582,19 @@ describe('CliLlmAdapter', () => {
     expect(() => { void adapter.listModels('missing') }).toThrow(LlmError)
   })
 
+  it('declares the temperature refusal its stream enforces, for listed and unlisted models', async () => {
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => fakeChild(),
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    expect((await adapter.resolveModel('flag-cli', 'flag-4')).acceptsTemperature).toBe(false)
+    expect((await adapter.resolveModel('flag-cli', 'unlisted')).acceptsTemperature).toBe(false)
+    await expect(collect(adapter.stream(options({ temperature: 0.2 }))))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_OPTION' })
+  })
+
   it('rejects temperature, stop, missing route, CLI_EXIT, and parse failure', async () => {
     const adapter = new CliLlmAdapter({
       routes: () => ROUTES,
