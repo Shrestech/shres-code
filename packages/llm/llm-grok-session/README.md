@@ -7,6 +7,7 @@ Using the route bills the CLI's subscription (SuperGrok tiers), not the X API; n
 ## Session credential
 
 The session document is `~/.grok/auth.json` (configurable `authPath`), written by `grok login` (OIDC authorization-code + PKCE, or `--device-auth`). This adapter reads the newest `https://auth.x.ai::<client-id>` entry, serves its access token while it is valid, and at the refresh leeway runs one `refresh_token` grant against `https://auth.x.ai/oauth2/token`, persisting the rotated `key` / `refresh_token` / `expires_at` back into the same entry atomically at owner-only mode. Concurrent callers share one in-flight resolve, and a sibling process that refreshes the same document — the CLI itself — wins: its fresher token is adopted instead of overwritten, on both grant success and failure.
+
 The credential engine itself — reading and selecting the document entry, running the refresh grant, and persisting rotations — is shared, not owned here. It lives in [`@shres-code/shres-code-grok-credential`](../grok-credential/README.md) and is exposed as the `ctx.grokCredential` service: this adapter resolves one single-flight manager per credential spec through `managerFor(spec)` when the service is mounted, so a future consumer (such as image generation) uses the same token engine and the same in-flight refresh against the same document. The credential fields (`authPath`, `refreshLeewayMs`) stay in this adapter's settings section.
 
 Without a signed-in login the route still lists and can be selected; the first request fails loud with `MISSING_CREDENTIAL` and a message naming `grok login`. A failed refresh after the document expired is `AUTH_REFRESH_FAILED`, again naming `grok login`. Diagnostics never quote credential values.
@@ -27,6 +28,14 @@ The optional `llm-grok-session` settings section overlays the composition entry 
 | `hostedWebSearch` | `true` | Serve web search as a hosted backend tool instead of the local `tool-web` tool. While on, the colliding local `web_search` function tool is dropped from the request for this route (hosted wins). Both switches default on, matching the Grok CLI's own sampler. |
 | `hostedXSearch` | `true` | Serve X (Twitter) search as a hosted backend tool. |
 
+## Hosted search
+
+The route can present web search and X (Twitter) search as hosted backend tools - the provider (the Grok proxy) executes the search on the model's behalf - instead of asking a harness tool to run it. Both switches default on, matching the Grok CLI's own sampler.
+
+When a switch is on, the matching Responses tool entry is spliced into the outgoing request's tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build CLI itself sends: {"type": "web_search"} and {"type": "x_search"}. Because the names collide with a harness-local tool-web web_search, hosted wins: while hosted web search is on, the local web_search function tool is dropped from the request so the model can reach only the backend tool; a local tool registered for other names is unaffected. A local function tool also named x_search stays in the request while hostedXSearch is on, and its model-invoked calls are promoted to server-tool-call and never execute locally. The hosted x_search invocation is promoted to a server-tool-call content block in the stream, so the agent loop logs it but never dispatches it as a local tool; search results ride the assistant text the model writes.
+
+The provider executes the search; this route never runs a local web_search for it.
+
 ## Model Experience
 
 ### Subscription chat request
@@ -43,24 +52,6 @@ Usage chunks carry the proxy's reported input/output/reasoning token counts; the
 
 Provider-side. The proxy reports cached input inside its usage when it serves a cache hit; this adapter passes those counts through as `cacheReadTokens` unchanged.
 
-## Hosted search
-
-The route can present web search and X (Twitter) search as hosted backend tools - the provider
-(the Grok proxy) executes the search on the model's behalf - instead of asking a harness tool to
-run it. Both switches default on, matching the Grok CLI's own sampler.
-
-When a switch is on, the matching Responses tool entry is spliced into the outgoing request's
-tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build
-CLI itself sends: {"type": "web_search"} and {"type": "x_search"}. Because the names collide with a
-harness-local tool-web web_search, hosted wins: while hosted web search is on, the local
-web_search function tool is dropped from the request so the model can reach only the backend tool;
-a local tool registered for other names is unaffected. A local function tool also named x_search
-stays in the request while hostedXSearch is on, and its model-invoked calls are promoted to
-server-tool-call and never execute locally. The hosted x_search invocation is promoted
-to a server-tool-call content block in the stream, so the agent loop logs it but never dispatches
-it as a local tool; search results ride the assistant text the model writes.
-
-The provider executes the search; this route never runs a local web_search for it.
 ## Known Limitations and Deferred Work
 
 - **Unofficial wire** — `auth.json`'s format, the proxy's paths, and the CLI's client id are the Grok Build CLI's implementation details, not a published contract; a CLI self-update can change them, and this package pins no client id (the credential's own is echoed at refresh).

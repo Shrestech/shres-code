@@ -35,6 +35,14 @@ The reviewer-visible digest is logged as the child's user message in the child's
 
 No `ctx.jspaceAdvisor` service — every consumer is internal to the plugin, so a service would be API expansion with zero current callers. The plugin row wires tools and prompt directly, like `tool-jspace`. Advice lives in its own `jspace:advisor` prompt section (order 56, after the whole jspace block 44–55), framed untrusted, never entering the card fold.
 
+## Alternatives considered
+
+**A continuable child for consult.** Rejected: `startContinuable` and `followup` resolve at inbox acceptance and never yield a reply, so a continuable channel cannot return the reply directly as tool output.
+
+**A bare card update as a proactive trigger.** Rejected: card updates fire per step, so a trigger on them would fire on every step rather than on a signal worth a review.
+
+**A `ctx.jspaceAdvisor` service.** Rejected: every consumer is internal to the plugin, so a service would be API expansion with zero current callers.
+
 ## Consequences
 
 - The advisor is default-off and absent from shipped/snapshot profiles; no ACP snapshot is added.
