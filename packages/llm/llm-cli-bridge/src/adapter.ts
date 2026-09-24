@@ -93,6 +93,9 @@ export class CliLlmAdapter extends LlmAdapter {
       name: configured?.name ?? model,
       context: { contextWindow: route.contextWindow },
       defaultMaxTokens: route.defaultMaxTokens,
+      // No CLI takes a sampling temperature, and stream() refuses one; declaring
+      // it lets a caller learn that before its request.
+      acceptsTemperature: false,
       // A route with no effort flags (cursor-agent) declares no reasoning
       // metadata at all; the seam requires at least one advertised effort
       // whenever `reasoning` is present.

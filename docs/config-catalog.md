@@ -1336,6 +1336,54 @@ export interface LayaRestartPolicy {
 
 Source: [`packages/llm/judgment-laya/src/types.ts:33`](../packages/llm/judgment-laya/src/types.ts)
 
+<a id="shres-codeshres-code-judgment-llm"></a>
+
+## `@shres-code/shres-code-judgment-llm`
+
+Requires: `judgmentEngines` · `llm`
+
+```ts config-catalog
+/** Composition config for one LLM judgment engine. */
+export interface LlmJudgmentConfig {
+  /** Registered `ctx.llm` provider route that answers every ask. */
+  provider: string
+  /** Model id on that route. */
+  model: string
+  /**
+   * Where that route sends the state: `local` only when this machine serves
+   * the route's endpoint, `remote` for every other route, a LAN host
+   * included. Required, because the llm seam records no route locality and a
+   * provider's name proves nothing.
+   */
+  egress: LlmJudgmentEgress
+  /** Adapter-owned reasoning effort for the judge request; validated against the model. */
+  reasoningEffort?: string
+  /**
+   * Largest state, after redaction, one ask may send. Enforced as a UTF-8 byte
+   * count: every tokenizer emits at most one token per byte, so a state within
+   * this many bytes stays within this many tokens.
+   */
+  maxStateTokens: number
+  /** Bound on one ask's model request in milliseconds; defaults to {@link DEFAULT_TIMEOUT_MS}. */
+  timeoutMs?: number
+  /**
+   * Sampling temperature for the judge request. A route that declares the
+   * model refuses a stated temperature leaves the engine `unconfigured`.
+   */
+  temperature?: number
+}
+
+/**
+ * Where the configured route sends the judged state. `local` means this
+ * machine: the route's endpoint is served by this host. A route that serves
+ * from any other host, a machine on the same LAN included, is `remote`,
+ * whatever its name.
+ */
+export type LlmJudgmentEgress = 'local' | 'remote'
+```
+
+Source: [`packages/llm/judgment-llm/src/config.ts:22`](../packages/llm/judgment-llm/src/config.ts)
+
 <a id="shres-codeshres-code-judgment-shield"></a>
 
 ## `@shres-code/shres-code-judgment-shield`

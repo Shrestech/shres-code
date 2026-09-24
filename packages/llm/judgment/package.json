@@ -39,12 +39,14 @@
   "peerDependencies": {
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-settings-file": "workspace:^",
     "@shres-code/cordis": "workspace:^"

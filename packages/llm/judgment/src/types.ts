@@ -8,6 +8,7 @@
  */
 
 import type { Branded } from '@shres-code/shres-code-brand'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
 
 /** Nominal id correlating one question with the answer it produced inside a single ask. */
 export type JudgmentQuestionId = Branded<'JudgmentQuestionId'>
@@ -184,6 +185,15 @@ export interface JudgmentResult {
    * `ctx.judgment` directly.
    */
   engineId?: JudgmentEngineId
+  /**
+   * Token usage of the model request the engine made for this ask, exactly as
+   * the route's adapter reported it, so {@link TokenUsage}'s presence contract
+   * holds: a cache count is present exactly when the provider reported it.
+   * Absent when the engine made no model request through `ctx.llm` or its
+   * route reported no usage. A consumer that logs its decision records this
+   * value so the ask's own cost can be priced from the session log.
+   */
+  usage?: TokenUsage
 }
 
 /** Ordered complete state alternatives for one atomic capacity check and judgment. */
@@ -252,6 +262,16 @@ export interface JudgmentFittingEngine {
  * The judgment capability every provider implements. Implementations own
  * transport, credential resolution, and wire validation; consumers own every
  * question string, threshold, and decision made from an answer.
+ *
+ * A provider's `ask` answers every asked question with an answer of its
+ * kind and gives a probability to every option of a choice question; an
+ * omitted option is `INVALID_ANSWER`. It reports `confidence` as a
+ * concentration measure its own documentation defines, the exact answering
+ * `model`, and the ask's `latencyMs`. It honours `input.signal` at every
+ * await as {@link JudgmentInput.signal} requires, consults
+ * `ctx.judgmentRedactor` exactly once per state, and repeats a request only
+ * under a retry policy it documents. Its registry descriptor declares
+ * `egress`, `calibration`, and `supportsFitting` truthfully.
  */
 export interface JudgmentEngine {
   /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */

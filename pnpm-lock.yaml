@@ -6459,6 +6459,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
@@ -6603,6 +6606,49 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+
+  packages/llm/judgment-llm:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
 
   packages/llm/judgment-shield:
     dependencies:

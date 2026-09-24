@@ -123,7 +123,7 @@ interface JudgmentScoreAnswer {
 
 ## One ask
 
-An ask carries the state, the questions, an optional tier, the caller's cancellation signal, and an optional consumer id. `tier` is the seam's speed-against-accuracy axis: a provider maps each tier to its own model id, and an omitted tier resolves to `accurate` so silence never weakens a decision. The result reports one answer per question, the engine that served the ask, the exact model that answered — a provider serving tier aliases reports the id the alias resolved to — and the ask's wall-clock duration. A dispatcher routes the ask by its `consumer` id and stamps the result with `engineId`, the registry id of the engine that answered.
+An ask carries the state, the questions, an optional tier, the caller's cancellation signal, and an optional consumer id. `tier` is the seam's speed-against-accuracy axis: a provider maps each tier to its own model id, and an omitted tier resolves to `accurate` so silence never weakens a decision. The result reports one answer per question, the engine that served the ask, the exact model that answered — a provider serving tier aliases reports the id the alias resolved to — and the ask's wall-clock duration. A dispatcher routes the ask by its `consumer` id and stamps the result with `engineId`, the registry id of the engine that answered. An engine that answers through a `ctx.llm` route reports that request's `usage`, so a consumer that logs its decision can price the ask.
 
 ```ts type-equiv
 /** One ask: the state every question is evaluated against, and the questions. */
@@ -186,12 +186,23 @@ interface JudgmentResult {
    * `ctx.judgment` directly.
    */
   engineId?: JudgmentEngineId
+  /**
+   * Token usage of the model request the engine made for this ask, exactly as
+   * the route's adapter reported it, so {@link TokenUsage}'s presence contract
+   * holds: a cache count is present exactly when the provider reported it.
+   * Absent when the engine made no model request through `ctx.llm` or its
+   * route reported no usage. A consumer that logs its decision records this
+   * value so the ask's own cost can be priced from the session log.
+   */
+  usage?: TokenUsage
 }
 ```
 
 ## The engine contract
 
 Every engine implements `JudgmentEngine`, and so does the service mounted as `ctx.judgment`. The engine providers are [`judgment-typesafe`](../../packages/llm/judgment-typesafe/README.md), which calls a remote engine, [`judgment-shield`](../../packages/llm/judgment-shield/README.md), which calls a deployment-run loopback gateway, and [`judgment-laya`](../../packages/llm/judgment-laya/README.md), which supervises a local laya-mlx gateway on Apple silicon; the last two share one Shield wire client. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
+
+Every provider meets one contract. It answers every asked question with an answer of its kind and gives a probability to every option of a choice question; an omitted option is `INVALID_ANSWER`. It reports `confidence` as a concentration measure its own documentation defines, so a threshold tuned on one engine's confidence does not transfer to another. It reports the exact model that answered and the ask's `latencyMs`, honours `input.signal` at every await as the cancellation paragraph below requires, consults the redaction hook exactly once per state, and repeats a request only under a retry policy it documents. Its registry descriptor declares `egress`, `calibration`, and `supportsFitting` truthfully: `egress: 'local'` only for an engine whose requests stay on this machine, and `calibration: 'verbalized'` for probabilities a model states as text rather than a calibrated classifier or token log-probabilities produce.
 
 `fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
 
@@ -276,6 +287,16 @@ interface JudgmentFittingEngine {
  * The judgment capability every provider implements. Implementations own
  * transport, credential resolution, and wire validation; consumers own every
  * question string, threshold, and decision made from an answer.
+ *
+ * A provider's `ask` answers every asked question with an answer of its
+ * kind and gives a probability to every option of a choice question; an
+ * omitted option is `INVALID_ANSWER`. It reports `confidence` as a
+ * concentration measure its own documentation defines, the exact answering
+ * `model`, and the ask's `latencyMs`. It honours `input.signal` at every
+ * await as {@link JudgmentInput.signal} requires, consults
+ * `ctx.judgmentRedactor` exactly once per state, and repeats a request only
+ * under a retry policy it documents. Its registry descriptor declares
+ * `egress`, `calibration`, and `supportsFitting` truthfully.
  */
 interface JudgmentEngine {
   /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */
@@ -296,7 +317,7 @@ interface JudgmentEngine {
 
 ## Engines and dispatch
 
-A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe`, `shield`, and `laya` — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
+A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe`, `shield`, `laya`, and `llm:<provider>/<model>` for [judgment-llm](../../packages/llm/judgment-llm) — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
 
 Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
 

@@ -218,6 +218,7 @@
     { "path": "./packages/llm/llm-pi-ai" },
     { "path": "./packages/llm/judgment" },
     { "path": "./packages/llm/judgment-dispatch" },
+    { "path": "./packages/llm/judgment-llm" },
     { "path": "./packages/llm/judgment-typesafe" },
     { "path": "./packages/llm/judgment-shield" },
     { "path": "./packages/llm/judgment-laya" },

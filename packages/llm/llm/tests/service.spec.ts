@@ -845,6 +845,33 @@ describe('LlmRuntime', () => {
     },
   )
 
+  it.each([false, true])('carries the adapter-declared temperature fact %s through model resolution', async (acceptsTemperature) => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['route'], new class extends ScriptedAdapter {
+      override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider, id: model, name: model, acceptsTemperature })
+      }
+    }(SCRIPT))
+
+    expect((await ctx.llm.resolveModelInfo('route', 'model')).acceptsTemperature).toBe(acceptsTemperature)
+  })
+
+  it('rejects non-boolean adapter temperature metadata', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['route'], new class extends ScriptedAdapter {
+      override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider, id: model, name: model, acceptsTemperature: 'no' as unknown as boolean })
+      }
+    }(SCRIPT))
+
+    await expect(ctx.llm.resolveModelInfo('route', 'model')).rejects.toMatchObject({
+      code: 'INVALID_MODEL_INFO',
+      message: 'adapter returned invalid temperature metadata for provider "route" model "model"',
+    })
+  })
+
   it.each([
     [{ efforts: [] }, 'empty effort list'],
     [{ efforts: [{ id: '', name: 'Empty' }] }, 'empty id'],
