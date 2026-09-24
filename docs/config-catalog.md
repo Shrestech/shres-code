@@ -1340,9 +1340,10 @@ export interface LlmJudgmentConfig {
   /** Model id on that route. */
   model: string
   /**
-   * Where that route sends the state: `local` only when it runs on this
-   * machine, `remote` for every other route. Required, because the llm seam
-   * records no route locality and a provider's name proves nothing.
+   * Where that route sends the state: `local` only when this machine serves
+   * the route's endpoint, `remote` for every other route, a LAN host
+   * included. Required, because the llm seam records no route locality and a
+   * provider's name proves nothing.
    */
   egress: LlmJudgmentEgress
   /** Adapter-owned reasoning effort for the judge request; validated against the model. */
@@ -1362,11 +1363,16 @@ export interface LlmJudgmentConfig {
   temperature?: number
 }
 
-/** Where the configured route sends the judged state. */
+/**
+ * Where the configured route sends the judged state. `local` means this
+ * machine: the route's endpoint is served by this host. A route that serves
+ * from any other host, a machine on the same LAN included, is `remote`,
+ * whatever its name.
+ */
 export type LlmJudgmentEgress = 'local' | 'remote'
 ```
 
-Source: [`packages/llm/judgment-llm/src/config.ts:17`](../packages/llm/judgment-llm/src/config.ts)
+Source: [`packages/llm/judgment-llm/src/config.ts:22`](../packages/llm/judgment-llm/src/config.ts)
 
 <a id="shres-codeshres-code-judgment-shield"></a>
 

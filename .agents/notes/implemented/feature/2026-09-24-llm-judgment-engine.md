@@ -12,7 +12,7 @@ Three facts constrain the design. The llm seam records no route locality, so a d
 
 [judgment-llm](../../../../packages/llm/judgment-llm/README.md) registers one engine per plugin row under `llm:<provider>/<model>`, branded with `judgmentEngineId`.
 
-**Egress is configured, never inferred.** The row's required `egress` field is `local` only for a route that runs on this machine and `remote` otherwise, and the descriptor reports it unchanged. The engine never reads the provider name to guess, so a route named `ollama-local` that points at a remote host is still declared by the deployment that knows.
+**Egress is configured, never inferred.** The row's required `egress` field is `local` only for a route whose endpoint this machine serves and `remote` otherwise, a LAN host included, and the descriptor reports it unchanged. The engine never reads the provider name to guess, so a route named `ollama-local` that points at a remote host is still declared by the deployment that knows.
 
 **Structured output is one tool call.** The request carries a fixed system prompt, one user message holding the redacted state and the questions, and one `judgment_answer` tool whose parameter schema requires every question and every option or level. `readAnswers` enforces the seam's provider contract on the arguments:
 

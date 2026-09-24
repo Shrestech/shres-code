@@ -10,7 +10,12 @@ import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 /** Default bound on one ask's model request, shared with the other judgment providers. */
 export const DEFAULT_TIMEOUT_MS = 30_000
 
-/** Where the configured route sends the judged state. */
+/**
+ * Where the configured route sends the judged state. `local` means this
+ * machine: the route's endpoint is served by this host. A route that serves
+ * from any other host, a machine on the same LAN included, is `remote`,
+ * whatever its name.
+ */
 export type LlmJudgmentEgress = 'local' | 'remote'
 
 /** Composition config for one LLM judgment engine. */
@@ -20,9 +25,10 @@ export interface LlmJudgmentConfig {
   /** Model id on that route. */
   model: string
   /**
-   * Where that route sends the state: `local` only when it runs on this
-   * machine, `remote` for every other route. Required, because the llm seam
-   * records no route locality and a provider's name proves nothing.
+   * Where that route sends the state: `local` only when this machine serves
+   * the route's endpoint, `remote` for every other route, a LAN host
+   * included. Required, because the llm seam records no route locality and a
+   * provider's name proves nothing.
    */
   egress: LlmJudgmentEgress
   /** Adapter-owned reasoning effort for the judge request; validated against the model. */

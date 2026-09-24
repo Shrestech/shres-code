@@ -5,9 +5,10 @@ An LLM-as-judge engine for the [typed-judgment seam](../judgment/README.md). It 
 ## Config
 
 ```yaml
+# The `ollama` route is served by Ollama on this machine, at http://127.0.0.1:11434.
 - name: '@shres-code/shres-code-judgment-llm'
   config:
-    provider: ollama-local
+    provider: ollama
     model: qwen3:8b
     egress: local
     maxStateTokens: 8192
@@ -18,11 +19,13 @@ An LLM-as-judge engine for the [typed-judgment seam](../judgment/README.md). It 
 |---|---|
 | `provider` | Registered `ctx.llm` provider route that answers every ask. Required. |
 | `model` | Model id on that route. Required. With `provider`, it forms the registry id. |
-| `egress` | `local` only for a route that runs on this machine, `remote` for every other route. Required: the llm seam records no route locality, so the engine never infers it from the provider name. The descriptor reports this value. |
+| `egress` | `local` only for a route whose endpoint this machine serves, `remote` for every other route. Required: the llm seam records no route locality, so the engine never infers it from the provider name. The descriptor reports this value. |
 | `reasoningEffort` | Adapter-owned effort for the judge request, validated against the model when the route resolves. |
 | `maxStateTokens` | Largest redacted state one ask may send, enforced as a UTF-8 byte count. A tokenizer emits at most one token per byte, so the bound holds for every route. Required. |
 | `timeoutMs` | Bound on one ask's model request, default 30000. |
 | `temperature` | Sampling temperature for the judge request. |
+
+`local` means this machine: the route's endpoint is served by this host, on a loopback address. A route that serves from any other host, a machine on the same LAN included, is `remote` whatever its name, so a route named `ollama-local` whose endpoint is another machine on the network declares `egress: remote`.
 
 A row with an unknown key, a missing required field, or an out-of-range number fails load by name.
 
