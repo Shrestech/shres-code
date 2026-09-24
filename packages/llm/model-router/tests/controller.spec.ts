@@ -1074,9 +1074,14 @@ describe('judgment failures', () => {
     const b = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 30_000 } })
     openTurn(b.session, 1)
     user(b.session, 'a small change')
-    b.engine.askOverride = hangs
+    const asking = Promise.withResolvers<undefined>()
+    b.engine.askOverride = (input) => {
+      asking.resolve(undefined)
+      return hangs(input)
+    }
     const turn = new AbortController()
     const pending = b.resolve(1, STRONG, turn.signal)
+    await asking.promise
     turn.abort(new Error('the user cancelled the turn'))
     await expect(pending).rejects.toThrow('the user cancelled the turn')
     expect(b.decisions()).toHaveLength(0)
