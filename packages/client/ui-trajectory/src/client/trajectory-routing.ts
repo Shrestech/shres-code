@@ -16,8 +16,10 @@ import type { TrajectoryRequestRoute, TrajectoryRoutingRow, TrajectoryRoutingStr
  *
  * The entering decision records step 0 of its streak. A re-judged retry of
  * that step records step 0 again, so the preceding loaded decision
- * distinguishes continuation from entry. A decision whose sticky state carries
- * `brokenBy` ended a streak.
+ * distinguishes continuation from entry. Decisions logged before the router
+ * counted streaks in steps carry `turnsElapsed` instead of `stepsElapsed`, with
+ * 0 on the entering decision, so that field is the fallback. A decision whose
+ * sticky state carries `brokenBy` ended a streak.
  * @param decision - the logged decision.
  * @param previous - the preceding routing decision in the loaded window, when present.
  * @returns the transition, or undefined when the decision neither entered nor ended a streak.
@@ -33,7 +35,10 @@ export function trajectoryRoutingStreak(
       && previous.selection?.candidateId === decision.selection?.candidateId
       && previous.selection?.provider === decision.selection?.provider
       && previous.selection?.model === decision.selection?.model) return undefined
-    return sticky.stepsElapsed === 0 && sticky.enteredTurn !== undefined
+    // A durable record from before step counting has no `stepsElapsed`.
+    const counted: { readonly stepsElapsed?: number; readonly turnsElapsed?: number } = sticky
+    const elapsed = counted.stepsElapsed ?? counted.turnsElapsed
+    return elapsed === 0 && sticky.enteredTurn !== undefined
       ? { kind: 'entered', turn: sticky.enteredTurn }
       : undefined
   }
