@@ -37,6 +37,7 @@ import LlmRuntime, {
   CallId,
   LlmAdapter,
   ReasoningEffortId,
+  createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@shres-code/shres-code-llm'
@@ -77,6 +78,7 @@ const MID = { provider: 'mid-provider', model: 'mid-model' }
 const CONFIG: ModelRouterConfig = {
   initialMode: 'on',
   candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a small change in familiar code' }],
+  routeFrom: [{ provider: STRONG.provider, model: STRONG.model, objective: 'dollars' }],
   downgradeThreshold: 0.8,
   downgradeMargin: 0.1,
   routeInstructions: 'Pick the cheapest route that can finish this turn.',
@@ -793,8 +795,34 @@ describe('the downgrade gate', () => {
     expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'unknown-candidate' })
   })
 
+  it('keeps strong without asking from a budget-thinking base', async () => {
+    const b = await bench({ capabilities: { [`${STRONG.provider}/${STRONG.model}`]: { thinkingMode: 'budget' } } })
+    // The base resolves its low default effort, which enables budget thinking.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'thinking-mode-incompatible',
+      candidateEligibility: { eligibleCandidates: [], assessments: [{ id: 'cheap', reason: 'thinking-mode-incompatible' }] },
+      sticky: { active: false },
+    })
+
+    // A held streak whose base turns budget-thinking ends as candidate-ineligible.
+    const held = await bench({ settings: true })
+    openTurn(held.session, 1)
+    user(held.session, 'a small change')
+    expect(await held.resolve(1)).toEqual(CHEAP)
+    closeTurn(held.session, 1)
+    openTurn(held.session, 2)
+    startStep(held.session, 2)
+    held.adapter.setModelInfo(STRONG.provider, STRONG.model, { thinkingMode: 'budget' })
+    expect(await held.resolve(2)).toBeUndefined()
+    expect(held.decision(1)).toMatchObject({ reason: 'candidate-ineligible', sticky: { brokenBy: 'candidate-ineligible' } })
+  })
+
   it('reports candidate-equals-base without asking when every candidate is the manual route', async () => {
-    const b = await bench()
+    // The pool model is also listed as a strong route, so routing starts from it.
+    const b = await bench({ config: { ...CONFIG, routeFrom: [...CONFIG.routeFrom ?? [], { provider: CHEAP.provider, model: CHEAP.model, objective: 'dollars' }] } })
     expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model })).toBeUndefined()
     expect(b.engine.asks).toHaveLength(0)
     expect(b.decision()).toMatchObject({
@@ -806,7 +834,11 @@ describe('the downgrade gate', () => {
 
   it('treats a same-model candidate at another reasoning effort as the manual route', async () => {
     const b = await bench({
-      config: { ...CONFIG, candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }] },
+      config: {
+        ...CONFIG,
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low', description: 'a test candidate' }],
+        routeFrom: [{ provider: CHEAP.provider, model: CHEAP.model, objective: 'dollars' }],
+      },
     })
     // An effort change on the model already in force is no downgrade: on
     // providers that render effort into the cached request it only re-prefills.
@@ -823,8 +855,8 @@ describe('the downgrade gate', () => {
       config: {
         ...CONFIG,
         candidates: [
-          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
-          { id: 'strong-low', provider: STRONG.provider, model: STRONG.model, reasoningEffort: 'low' },
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' },
+          { id: 'strong-low', provider: STRONG.provider, model: STRONG.model, reasoningEffort: 'low', description: 'a test candidate' },
         ],
       },
     })
@@ -842,8 +874,8 @@ describe('the downgrade gate', () => {
       config: {
         ...CONFIG,
         candidates: [
-          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
-          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model, description: 'a test candidate' },
         ],
       },
       capabilities: { [`${CHEAP.provider}/${CHEAP.model}`]: { context: { contextWindow: 1_000 } } },
@@ -1257,8 +1289,8 @@ describe('the sticky streak', () => {
     const twoCandidates: ModelRouterConfig = {
       ...config,
       candidates: [
-        { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
-        { id: 'mid', provider: MID.provider, model: MID.model },
+        { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' },
+        { id: 'mid', provider: MID.provider, model: MID.model, description: 'a test candidate' },
       ],
     }
     const switching = await entered({ config: twoCandidates })
@@ -1391,8 +1423,8 @@ describe('the sticky streak', () => {
       config: {
         ...config,
         candidates: [
-          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
-          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model, description: 'a test candidate' },
         ],
       },
     })
@@ -1457,7 +1489,7 @@ describe('the sticky streak', () => {
         config: {
           ...config,
           escalateBack: { scoreThreshold: 3 },
-          candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }],
+          candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low', description: 'a test candidate' }],
           ...difficultyToEffort === undefined ? {} : { difficultyToEffort },
         },
       })
@@ -1468,7 +1500,7 @@ describe('the sticky streak', () => {
       openTurn(b.session, 2)
       startStep(b.session, 2)
       await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
-        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'medium' }],
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'medium', description: 'a test candidate' }],
       })
 
       // Below the horizon the held effort stands, as for any candidate change.
@@ -1537,7 +1569,7 @@ describe('the sticky streak', () => {
     })
   })
 
-  it('does not hold a candidate after settings remove it from the allowlist', async () => {
+  it('removing a held pool candidate ends the streak', async () => {
     const b = await bench({ settings: true, config: { ...CONFIG, hold: { minSteps: 2 } } })
     openTurn(b.session, 1)
     user(b.session, 'a small change')
@@ -1557,6 +1589,59 @@ describe('the sticky streak', () => {
       reason: 'unknown-candidate',
       sticky: { active: false, stepsElapsed: 0, brokenBy: 'unknown-candidate' },
     })
+  })
+
+  it('base-unlisted keeps strong without judging', async () => {
+    const b = await bench()
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    const other = { provider: 'other-provider', model: 'other-model' }
+    expect(await b.resolve(1, other)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'base-unlisted', sticky: { active: false } })
+    expect(b.decision()).not.toHaveProperty('objective')
+    expect(b.decision()).not.toHaveProperty('candidateEligibility')
+    // The manual route stands for the rest of the turn.
+    expect(await b.resolve(1, other, b.signal, 2)).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+
+    // A listed route records its objective on every decision it resolves.
+    const listed = await bench()
+    expect(await listed.resolve(1)).toEqual(CHEAP)
+    expect(listed.decision()).toMatchObject({ reason: 'gate-passed', objective: 'dollars' })
+    listed.engine.choice = LOW_CONFIDENCE
+    const quota = await bench({
+      config: { ...CONFIG, routeFrom: [{ provider: STRONG.provider, model: STRONG.model, objective: 'quota', allowEveryTurn: true }] },
+    })
+    quota.engine.choice = LOW_CONFIDENCE
+    expect(await quota.resolve(1)).toBeUndefined()
+    expect(quota.decision()).toMatchObject({ reason: 'low-confidence', objective: 'quota' })
+  })
+
+  it('ends a held streak with base-unlisted when settings remove its route from routeFrom', async () => {
+    const b = await bench({ settings: true, config: { ...CONFIG, hold: { minSteps: 2 } } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    closeTurn(b.session, 1)
+    openTurn(b.session, 2)
+    startStep(b.session, 2)
+
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+      routeFrom: [{ provider: 'other-provider', model: 'other-model', objective: 'dollars' }],
+    })
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'base-unlisted',
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'base-unlisted' },
+    })
+    expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'base-unlisted' })
+
+    // A write that leaves routing on with nothing to route from is refused by name.
+    await expect(b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { routeFrom: [] }))
+      .rejects.toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
   })
 
   it('ends the streak as a manual deviation when the manual provider/model moves off the entry base', async () => {
@@ -1847,7 +1932,7 @@ describe('the reported session selection', () => {
       config: {
         ...CONFIG,
         hold: { minSteps: 2 },
-        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }],
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low', description: 'a test candidate' }],
       },
     })
     openTurn(b.session, 1)
@@ -2216,7 +2301,8 @@ describe('the consult beyond the first judgment', () => {
     const b = await bench({
       config: {
         initialMode: 'on',
-        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model }],
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' }],
+        routeFrom: [{ provider: STRONG.provider, model: STRONG.model, objective: 'dollars' }],
         downgradeThreshold: 0.8,
         downgradeMargin: 0.1,
         routeInstructions: 'Pick the cheapest route that can finish this turn.',
@@ -2390,6 +2476,63 @@ describe('the projection unit', () => {
     expect(projectionOf(b.ctx, b.session)).toMatchObject({ active: true, pending: false })
   })
 
+  it('observes whether the first reply after an ended streak carried thinking', async () => {
+    /** One assistant reply in the open turn, with or without a reasoning block. */
+    function reply(b: Bench, turn: number, thinking: boolean): void {
+      b.session.append('assistant/message', {
+        turn,
+        step: 1,
+        message: createAssistantMessage({
+          content: [...thinking ? [{ type: 'reasoning' as const, text: 'plan' }] : [], { type: 'text' as const, text: 'done' }],
+          source: { provider: STRONG.provider, model: STRONG.model },
+        }),
+      }, { surfaceOp: 'append' })
+    }
+    const b = await bench({ projections: true })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    reply(b, 1, false)
+    // No streak has ended yet, so the routed reply is not a return.
+    expect(projectionOf(b.ctx, b.session)).not.toHaveProperty('returnThinking')
+    closeTurn(b.session, 1)
+
+    openTurn(b.session, 2)
+    b.engine.score = { ...EASY, score: 4 }
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({ reason: 'escalated' })
+    reply(b, 2, true)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    // Later replies do not overwrite the observed return.
+    reply(b, 2, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    closeTurn(b.session, 2)
+
+    // A strong decision that ended no streak starts no new observation.
+    openTurn(b.session, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decision(2)).toMatchObject({ reason: 'reentry-cooldown' })
+    reply(b, 3, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('present')
+    closeTurn(b.session, 3)
+
+    // The next ended streak's return replaces it.
+    for (const turn of [4, 5]) {
+      openTurn(b.session, turn)
+      await b.resolve(turn)
+      closeTurn(b.session, turn)
+    }
+    openTurn(b.session, 6)
+    b.engine.score = EASY
+    expect(await b.resolve(6)).toEqual(CHEAP)
+    closeTurn(b.session, 6)
+    openTurn(b.session, 7)
+    b.engine.score = { ...EASY, score: 4 }
+    expect(await b.resolve(7)).toBeUndefined()
+    reply(b, 7, false)
+    expect(projectionOf(b.ctx, b.session).returnThinking).toBe('absent')
+  })
+
   it('reports the last decision and the sticky streak with its elapsed steps', async () => {
     const b = await bench({ projections: true })
     openTurn(b.session, 1)
@@ -2483,10 +2626,10 @@ describe('the projection unit', () => {
     openTurn(b.session, 1)
     user(b.session, 'a small change')
 
-    // The session already runs the allowlisted candidate, so the gate refuses it
-    // as no downgrade and no streak ever recorded a route to restore.
+    // The session already runs the pool candidate, which routing does not start
+    // from, and no streak ever recorded a route to restore.
     expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model })).toBeUndefined()
-    expect(b.decision(0)).toMatchObject({ reason: 'candidate-equals-base', sticky: { active: false } })
+    expect(b.decision(0)).toMatchObject({ reason: 'base-unlisted', sticky: { active: false } })
     expect(projectionOf(b.ctx, b.session).lastStrong).toBeUndefined()
   })
 
@@ -2620,7 +2763,7 @@ describe('configuration at plugin load', () => {
     // omitted required field fails at plugin load with the schema's own issue
     // instead of reaching resolveConfig.
     await expect(ctx.plugin(ModelRoutingController, {
-      candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model }],
+      candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, description: 'a test candidate' }],
       downgradeThreshold: 0.8,
       downgradeMargin: 0.1,
       routeInstructions: 'Pick the cheapest route that can finish this turn.',
@@ -2697,6 +2840,7 @@ describe('in-turn fallback', () => {
       stateSeqs: b.decision(0).stateSeqs,
       failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model },
       failedChunkSeq,
+      objective: 'dollars',
       sticky: { active: false, stepsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG },
     })
 
@@ -2881,8 +3025,33 @@ describe('capability exits and cancellation', () => {
     expect(b.decision(1)).toMatchObject({
       outcome: 'kept-strong',
       reason: 'unknown-candidate',
+      objective: 'dollars',
       sticky: { active: false, stepsElapsed: 0, brokenBy: 'unknown-candidate' },
     })
+  })
+
+  it('breaks a same-step retry when settings remove its base from routeFrom', async () => {
+    const b = await bench({ settings: true })
+    expect(await b.resolve(1)).toEqual(CHEAP)
+
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+      routeFrom: [{ provider: 'other-provider', model: 'other-model', objective: 'dollars' }],
+    })
+
+    // The retry of the same step keeps the manual route and logs exactly one exit.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decisions()).toHaveLength(2)
+    expect(b.decisions().filter(decision => decision.reason === 'base-unlisted')).toHaveLength(1)
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'base-unlisted',
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'base-unlisted' },
+    })
+    expect(b.decision(1)).not.toHaveProperty('objective')
+    expect(b.decision(1)).not.toHaveProperty('candidateEligibility')
+    // A configuration exit starts no re-entry cooldown.
+    expect(stickyState(b.session.events).cooldownTurn).toBeUndefined()
   })
 
   it('breaks a same-turn pin when the LLM runtime disappears', async () => {
@@ -2904,7 +3073,7 @@ describe('capability exits and cancellation', () => {
     const b = await bench({
       config: {
         ...CONFIG,
-        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }],
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low', description: 'a test candidate' }],
       },
     })
 

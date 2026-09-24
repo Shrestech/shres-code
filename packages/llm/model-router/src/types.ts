@@ -8,7 +8,7 @@
  * @module @shres-code/shres-code-model-router/types
  */
 
-import type { HostedTool, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
 import type {
   JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
 } from '@shres-code/shres-code-judgment'
@@ -27,8 +27,33 @@ export interface ModelRoutingCandidateConfig {
   model: string
   /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
   reasoningEffort?: string
-  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
-  description?: string
+  /**
+   * Tasks this candidate can handle, included with its model identity in every
+   * judgment question. Required, at most 160 characters.
+   */
+  description: string
+}
+
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+
+/** One strong route that routing may start from, as configuration states it. */
+export interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route. The per-turn entry policy
+   * refuses a quota route without it.
+   */
+  allowEveryTurn?: boolean
 }
 
 /** One resolved allowlisted downgrade candidate. */
@@ -46,13 +71,27 @@ export interface ModelRoutingCandidate {
    */
   reasoningEffort?: ReasoningEffortId
   /** Tasks this candidate can handle, included with its model identity in the judgment question. */
-  description?: string
+  description: string
+}
+
+/** One resolved strong route that routing may start from. */
+export interface ModelRoutingRouteFrom {
+  /** Registered provider route of the strong model. */
+  readonly provider: string
+  /** Provider-owned model id of the strong model. */
+  readonly model: string
+  /** How this strong route is billed. */
+  readonly objective: ModelRoutingObjective
+  /** Whether per-turn entry from a `quota` route is allowed. */
+  readonly allowEveryTurn: boolean
 }
 
 /**
  * Stable result of one candidate check. `equals-base` marks a candidate naming
- * the manual provider/model at any effort; every other reason is a capability
- * result.
+ * the manual provider/model at any effort; `thinking-mode-incompatible` marks
+ * every other candidate while the manual route runs budget thinking, because a
+ * return after a routed segment would run it without thinking; every other
+ * reason is a capability result.
  */
 export type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
@@ -68,6 +107,7 @@ export type ModelRoutingCandidateEligibilityReason =
   | 'context-too-small'
   | 'max-tokens-exceeds-context'
   | 'hosted-tools-incompatible'
+  | 'thinking-mode-incompatible'
 
 /** Detached, JSON-safe facts recorded for one configured candidate. */
 export interface ModelRoutingCandidateAssessment {
@@ -105,6 +145,8 @@ export interface ModelRoutingCandidateRequirements {
   readonly contextWindow?: number
   /** Manual hosted-tool floor, when its metadata declares one. */
   readonly hostedTools?: readonly HostedTool[]
+  /** Manual route's thinking mode, when its metadata declares one. */
+  readonly thinkingMode?: LlmThinkingMode
 }
 
 /** Candidate list and detached capability assessments for one routing request. */
@@ -162,6 +204,8 @@ export type ModelRoutingReason =
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
   | 'no-candidates'
+  /** The manual route is not listed in `routeFrom`, so routing never starts from it and no judgment runs. */
+  | 'base-unlisted'
   /** No generation runtime is available to validate candidate routes. */
   | 'model-unavailable'
   /** Candidate capabilities cannot preserve the current request's requirements. */
@@ -178,6 +222,12 @@ export type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The manual route runs budget thinking with reasoning enabled, so every
+   * other candidate is excluded and no judgment runs: returning to it after a
+   * routed segment would run the manual model without thinking.
+   */
+  | 'thinking-mode-incompatible'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
   /** The difficulty answer prevents entry into a downgraded streak. */
@@ -213,6 +263,7 @@ export type ModelRoutingBreakReason =
   | 'route-errors'
   | 'route-failed'
   | 'hold-cap'
+  | 'base-unlisted'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -347,6 +398,8 @@ export interface ModelRoutingDecision {
   failedChunkSeq?: number
   /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
   engineFailure?: ModelRoutingEngineFailure
+  /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
+  objective?: ModelRoutingObjective
 }
 
 /** A failed judgment call as a decision records it. */
@@ -428,6 +481,14 @@ export interface ModelRoutingProjection {
    * streak has been entered.
    */
   lastStrong?: ModelRoutingEntryBaseView
+  /**
+   * Whether the first `assistant/message` after the last streak a decision
+   * ended — the return to the manual route — carried a reasoning block. Only a
+   * decision that ends a streak arms it: a streak ended by a mode switch to off
+   * or by the route-errors recovery leaves it unchanged. `absent` also covers
+   * a manual route that never reasons. Absent until one such reply.
+   */
+  returnThinking?: 'present' | 'absent'
 }
 
 declare module '@shres-code/shres-code-session/types' {

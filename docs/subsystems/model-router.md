@@ -6,13 +6,17 @@ Source: [`packages/llm/model-router/src/index.ts`](../../packages/llm/model-rout
 
 ## The consult
 
-`installModelSelection` ([shres-agent](../../packages/core/agent/src/model-selection.ts)) asks the optional service through its `ModelRoutingConsult` interface after the manual selection rewrote the request: a resolved route replaces provider, model, and reasoning effort, and `undefined` leaves the manual route in force. The initial request is judged once. While a downgrade is held, each later new step gets a fresh route and difficulty judgment over the latest surface with full capability assessment; a retry at the same step reuses that step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. The consult writes no prompt, no tool, and no request of its own; its only durable output is the decision event below. The system prompt is assembled for the manual route before the consult runs and the consult never changes it, so a routed request carries the prompt the manual route would have received. The package's invariant companion rejects a routed `request/header` whose system prompt contains the manual model id, which is why no routing composition's persona interpolates `{{model}}`.
+`installModelSelection` ([shres-agent](../../packages/core/agent/src/model-selection.ts)) asks the optional service through its `ModelRoutingConsult` interface after the manual selection rewrote the request: a resolved route replaces provider, model, and reasoning effort, and `undefined` leaves the manual route in force. The initial request is judged once. While a downgrade is held, each later new step gets a fresh route and difficulty judgment over the latest surface with full capability assessment; a retry at the same step reuses that step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, `routeFrom` and pool membership, and capabilities. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. The consult writes no prompt, no tool, and no request of its own; its only durable output is the decision event below. The system prompt is assembled for the manual route before the consult runs and the consult never changes it, so a routed request carries the prompt the manual route would have received. The package's invariant companion rejects a routed `request/header` whose system prompt contains the manual model id, which is why no routing composition's persona interpolates `{{model}}`.
 
 The latest explicit `agent/model-selection` event is the manual selection authority, even when no request header exists or its provider/model/effort matches a routed header byte for byte. Resume and fork therefore recover manual intent before consulting the router's sticky base or a logged request header. Routing policy is unchanged: the consult may select only an eligible configured candidate for the current request, and the manual selection remains the fallback when the consult returns no route.
 
+## Where routing may start and go
+
+`candidates` is the one shared pool of downgrade targets, and `routeFrom` is the fail-closed allowlist of strong routes routing may start from, each with a required billing `objective` (`quota`, `dollars`, or `latency`). A consult whose manual provider/model is not listed records `kept-strong` / `base-unlisted` without assessing a candidate or asking the judgment engine, and a held streak whose route is removed from the list ends the same way with `brokenBy: 'base-unlisted'`. Every decision resolved against a listed route records its `objective`. The two lists impose no cost or strength order: a pool model can be a lateral or upward move from some listed route, which the equals-base rule and the capability checks below do not prevent.
+
 ## Candidate eligibility and fitted state
 
-Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task.
+Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task. While the manual route declares `thinkingMode: 'budget'` and its prepared effort enables reasoning, every other candidate is excluded as `thinking-mode-incompatible` before any lookup and the consult records `thinking-mode-incompatible` without a judgment call, because a return to that route after a routed segment would run without thinking. The projection's `returnThinking` records whether the first `assistant/message` after the last ended streak carried a reasoning block.
 
 The router builds complete state alternatives from one live session surface snapshot. The first retains the configured context window, then older whole entries are removed progressively; the final alternative retains the current entry alone. `state.maxFitCandidates` bounds the alternatives offered, including that final current-entry alternative, and rejects values below `2`. No alternative is sliced mid-entry.
 
@@ -21,8 +25,10 @@ When `ctx.judgment.fitting` is available, the router sends the ordered alternati
 ```ts type-equiv
 /**
  * Stable result of one candidate check. `equals-base` marks a candidate naming
- * the manual provider/model at any effort; every other reason is a capability
- * result.
+ * the manual provider/model at any effort; `thinking-mode-incompatible` marks
+ * every other candidate while the manual route runs budget thinking, because a
+ * return after a routed segment would run it without thinking; every other
+ * reason is a capability result.
  */
 type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
@@ -38,6 +44,7 @@ type ModelRoutingCandidateEligibilityReason =
   | 'context-too-small'
   | 'max-tokens-exceeds-context'
   | 'hosted-tools-incompatible'
+  | 'thinking-mode-incompatible'
 ```
 
 ```ts type-equiv
@@ -79,6 +86,8 @@ interface ModelRoutingCandidateRequirements {
   readonly contextWindow?: number
   /** Manual hosted-tool floor, when its metadata declares one. */
   readonly hostedTools?: readonly HostedTool[]
+  /** Manual route's thinking mode, when its metadata declares one. */
+  readonly thinkingMode?: LlmThinkingMode
 }
 ```
 
@@ -133,6 +142,8 @@ type ModelRoutingReason =
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
   | 'no-candidates'
+  /** The manual route is not listed in `routeFrom`, so routing never starts from it and no judgment runs. */
+  | 'base-unlisted'
   /** No generation runtime is available to validate candidate routes. */
   | 'model-unavailable'
   /** Candidate capabilities cannot preserve the current request's requirements. */
@@ -149,6 +160,12 @@ type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The manual route runs budget thinking with reasoning enabled, so every
+   * other candidate is excluded and no judgment runs: returning to it after a
+   * routed segment would run the manual model without thinking.
+   */
+  | 'thinking-mode-incompatible'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'
   /** The difficulty answer prevents entry into a downgraded streak. */
@@ -234,6 +251,8 @@ interface ModelRoutingDecision {
   failedChunkSeq?: number
   /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
   engineFailure?: ModelRoutingEngineFailure
+  /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
+  objective?: ModelRoutingObjective
 }
 ```
 
@@ -269,7 +288,7 @@ The router listens on the `agent/request-error` waterfall. Its listener calls `n
 
 ## The sticky streak
 
-A streak is entered only when the difficulty score is below `difficulty.entryScoreCeiling` (documented 2), and a held downgrade survives a failed gate or a different candidate until `hold.minSteps` model steps have elapsed; the documented horizon is 20, and `0` disables stickiness so every step is judged on its own. Every `step/start` logged while the streak holds counts, including later steps of the entering turn, and the entering decision records its turn and step. When `hold.maxSteps` (documented 40) steps have elapsed, the next consult ends the streak with `hold-cap` without a judgment call. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 3). A score between the entry ceiling and that threshold holds the streak but does not enter one, so in that band a different candidate never replaces the held selection. The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, when a downgraded request fails and the in-turn fallback retries its step on the manual route (`route-failed`), and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). That streak counts terminal failures of a held route, and `route-failed` decisions for one candidate across streaks; a completed turn on that candidate or a route-error break resets the latter count. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. An `escalated`, `current-preferred`, or `route-failed` exit starts the re-entry cooldown: the next `reentryCooldownTurns` turns (documented 2) keep the manual route with `reentry-cooldown` and no judgment call. The fold records the ending decision's turn, so the cooldown is a function of the log. The horizon and the cap count steps, not turns.
+A streak is entered only when the difficulty score is below `difficulty.entryScoreCeiling` (documented 2), and a held downgrade survives a failed gate or a different candidate until `hold.minSteps` model steps have elapsed; the documented horizon is 20, and `0` disables stickiness so every step is judged on its own. Every `step/start` logged while the streak holds counts, including later steps of the entering turn, and the entering decision records its turn and step. When `hold.maxSteps` (documented 40) steps have elapsed, the next consult ends the streak with `hold-cap` without a judgment call. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, `routeFrom` and pool membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 3). A score between the entry ceiling and that threshold holds the streak but does not enter one, so in that band a different candidate never replaces the held selection. The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, when a downgraded request fails and the in-turn fallback retries its step on the manual route (`route-failed`), and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). That streak counts terminal failures of a held route, and `route-failed` decisions for one candidate across streaks; a completed turn on that candidate or a route-error break resets the latter count. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. An `escalated`, `current-preferred`, or `route-failed` exit starts the re-entry cooldown: the next `reentryCooldownTurns` turns (documented 2) keep the manual route with `reentry-cooldown` and no judgment call. The fold records the ending decision's turn, so the cooldown is a function of the log. The horizon and the cap count steps, not turns.
 
 These judgments use the latest bounded surface and establish routing mechanics only; they do not establish real-model task quality, completion, or security.
 
@@ -288,6 +307,7 @@ type ModelRoutingBreakReason =
   | 'route-errors'
   | 'route-failed'
   | 'hold-cap'
+  | 'base-unlisted'
 ```
 
 ```ts type-equiv
@@ -404,6 +424,32 @@ interface ModelRoutingStateConfig {
 ```
 
 ```ts type-equiv
+/** One strong route that routing may start from, as configuration states it. */
+interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route. The per-turn entry policy
+   * refuses a quota route without it.
+   */
+  allowEveryTurn?: boolean
+}
+```
+
+```ts type-equiv
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+```
+
+```ts type-equiv
 /**
  * The streak horizon, counted in model steps: every `step/start` the loop logs
  * while a downgrade is held advances it, including later steps of the turn that
@@ -467,10 +513,17 @@ interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist whose relative capability and cost the deployment owns.
-   * An empty list leaves every turn on the manual route with `no-candidates`.
+   * The one shared pool of downgrade candidates, whose relative capability and
+   * cost the deployment owns. An empty pool leaves every turn on the manual
+   * route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
+  /**
+   * Strong routes routing may start from, each with its billing objective. A
+   * manual route not listed here keeps its model with `base-unlisted` and no
+   * judgment call. Must be non-empty unless `initialMode` is `off`.
+   */
+  routeFrom?: ModelRoutingRouteFromConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
@@ -542,7 +595,7 @@ interface ModelRouterConfig {
 }
 ```
 
-`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, and model, and no two candidates may share an id; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
+`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, model, and description of at most 160 characters, and no two candidates may share an id; a `routeFrom` route is listed once with a known objective, a `latency` route requires `judgmentDeadlineMs` of at most 200, a `quota` route requires `allowEveryTurn: true` under the per-turn entry policy, and an empty `routeFrom` is refused unless `initialMode` is `off`; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
 
 `/route` reports the mode in force and any held streak; `/route on` and `/route off` select a persistent user mode. A same-valued choice records user authority immediately. A changed value during an open turn waits for the next accepted pre-step; rejection or cancellation does not commit it. Deployment defaults use `model-routing/configuration` and stop affecting a session after its first explicit `model-routing/mode`. Cold sessions retain their log-derived mode until they acquire a live routing owner. Status and invalid commands never create a pending mode indication.
 
@@ -612,7 +665,7 @@ set(agent: Agent, active: boolean): 'committed' | 'queued' | 'cancelled' | 'noop
  *
  * Each new downgraded step reassesses the latest task evidence. Same-step
  * retries reuse the judgment only while its complete candidate inputs are
- * unchanged, and recheck manual authority, allowlist membership, and
+ * unchanged, and recheck manual authority, `routeFrom` and pool membership, and
  * capabilities. A manual-model decision lasts for the turn.
  * @param agent - the agent whose turn is being prepared.
  * @param turn - the turn number, as the loop dispatched it.
@@ -645,5 +698,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:362`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:381`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

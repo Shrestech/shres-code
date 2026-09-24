@@ -582,6 +582,13 @@ export interface CompactionPolicyConfig {
   summarizationProvider?: string
   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
   summarizationModel?: string
+  /**
+   * Route the summary runs on when no summarization pair is set. `manual`
+   * summarizes on the session's manual route, the entry route of a held model-
+   * routing streak rather than the routed candidate; `request` summarizes on
+   * the latest request's route. Defaults to `manual`.
+   */
+  summarizationRoute?: SummarizationRoute
   /** Provider generation cap for summarization. Defaults to `8192`. */
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
@@ -602,9 +609,12 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
   /** Exact routed model id to match within `provider`. */
   model: string
 }
+
+/** Which route a summary without a configured summarization pair runs on. */
+export type SummarizationRoute = 'manual' | 'request'
 ```
 
-Source: [`packages/compaction/compaction-basic/src/types.ts:43`](../packages/compaction/compaction-basic/src/types.ts)
+Source: [`packages/compaction/compaction-basic/src/types.ts:53`](../packages/compaction/compaction-basic/src/types.ts)
 
 <a id="shres-codeshres-code-compaction-jev"></a>
 
@@ -2460,10 +2470,17 @@ export interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist whose relative capability and cost the deployment owns.
-   * An empty list leaves every turn on the manual route with `no-candidates`.
+   * The one shared pool of downgrade candidates, whose relative capability and
+   * cost the deployment owns. An empty pool leaves every turn on the manual
+   * route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
+  /**
+   * Strong routes routing may start from, each with its billing objective. A
+   * manual route not listed here keeps its model with `base-unlisted` and no
+   * judgment call. Must be non-empty unless `initialMode` is `off`.
+   */
+  routeFrom?: ModelRoutingRouteFromConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
@@ -2551,8 +2568,26 @@ export interface ModelRoutingCandidateConfig {
   model: string
   /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
   reasoningEffort?: string
-  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
-  description?: string
+  /**
+   * Tasks this candidate can handle, included with its model identity in every
+   * judgment question. Required, at most 160 characters.
+   */
+  description: string
+}
+
+/** One strong route that routing may start from, as configuration states it. */
+export interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route. The per-turn entry policy
+   * refuses a quota route without it.
+   */
+  allowEveryTurn?: boolean
 }
 
 /**
@@ -2646,9 +2681,16 @@ export interface ModelRoutingStateConfig {
   /** Maximum complete context alternatives offered to a tokenizer-aware provider. Defaults to 8. */
   maxFitCandidates?: number
 }
+
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:111`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:117`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

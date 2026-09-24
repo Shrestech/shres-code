@@ -72,6 +72,7 @@ import {
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   DEFAULT_DIFFICULTY_LEVELS,
   KEEP_CURRENT_OPTION_ID,
+  MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
@@ -96,6 +97,7 @@ import type {
   ModelRoutingLastDecision,
   ModelRoutingProjection,
   ModelRoutingReason,
+  ModelRoutingRouteFrom,
   ModelRoutingSelection,
   ModelRoutingSelectionView,
 } from './types.ts'
@@ -119,7 +121,9 @@ export {
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   KEEP_CURRENT_OPTION_ID,
+  MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
+  MAX_LATENCY_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
@@ -188,6 +192,9 @@ interface ModelRoutingUnitState {
   last: ModelRoutingLastDecision | null
   sticky: ModelRoutingStickyFoldState
   lastStrong: ModelRoutingEntryBaseView | null
+  /** A streak just ended and its first manual-route reply has not arrived. */
+  returnPending: boolean
+  returnThinking: 'present' | 'absent' | null
 }
 
 /** Project one in-process selection onto its plain wire view. */
@@ -262,6 +269,17 @@ function entryBaseOf(sticky: ModelRoutingStickyState, base: ModelSelection): Mod
 }
 
 /**
+ * The `routeFrom` entry for one manual route: provider and model match, and
+ * the reasoning effort is not compared.
+ * @param config - the resolved configuration.
+ * @param base - the manual route in force.
+ * @returns the matching entry, or undefined when routing never starts from this route.
+ */
+function routeFromFor(config: ResolvedModelRouterConfig, base: ModelSelection): ModelRoutingRouteFrom | undefined {
+  return config.routeFrom.find(entry => entry.provider === base.provider && entry.model === base.model)
+}
+
+/**
  * The entry position a decision continuing a held streak records: the turn and
  * step the fold carries for it, each omitted when the entering record lacked it.
  * @param sticky - the sticky state of the held streak.
@@ -306,6 +324,7 @@ const modelRoutingProjectionSchema = zod.object({
     model: zod.string(),
     reasoningEffort: zod.string(),
   }).partial({ reasoningEffort: true }).optional(),
+  returnThinking: zod.union([zod.literal('present'), zod.literal('absent')]).optional(),
 }) as unknown as ZodType<ModelRoutingProjection>
 
 /**
@@ -371,7 +390,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       provider: z.string().required(),
       model: z.string().required(),
       reasoningEffort: z.string(),
-      description: z.string(),
+      description: z.string().max(MAX_CANDIDATE_DESCRIPTION_CHARS).required(),
+    })).default([]),
+    routeFrom: z.array(z.object({
+      provider: z.string().required(),
+      model: z.string().required(),
+      objective: z.union(['quota', 'dollars', 'latency']).required(),
+      allowEveryTurn: z.boolean(),
     })).default([]),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
@@ -473,6 +498,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           last: null,
           sticky: createStickyFoldState(),
           lastStrong: null,
+          returnPending: false,
+          returnThinking: null,
         }),
         apply: (state, event) => {
           const sticky = advanceStickyFoldState(state.sticky, event)
@@ -500,8 +527,18 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
                 // Only an active record carries a base, so the retained route
                 // outlives the streak: ending one reports nothing itself.
                 lastStrong: data.sticky.entryBase ?? state.lastStrong,
+                // The next reply is the first on the manual route after the streak.
+                returnPending: state.sticky.active && !sticky.active ? true : state.returnPending,
               }
             }
+            // The sticky fold ignores replies, so its accumulator is unchanged here.
+            case 'assistant/message':
+              if (!state.returnPending) return state
+              return {
+                ...state,
+                returnPending: false,
+                returnThinking: event.data.message.content.some(block => block.type === 'reasoning') ? 'present' : 'absent',
+              }
             default:
               return sticky === state.sticky ? state : { ...state, sticky }
           }
@@ -513,6 +550,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             pending: state.wanted !== null && state.wanted !== state.active,
             ...state.last === null ? {} : { last: state.last },
             ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
+            ...state.returnThinking === null ? {} : { returnThinking: state.returnThinking },
             sticky: {
               active: sticky.active,
               stepsElapsed: sticky.stepsElapsed,
@@ -520,8 +558,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // The accumulator counts held steps and failed judgment calls, and records the re-entry cooldown turn.
-        stateVersion: 8,
+        // The unit state records whether the first manual-route reply after a streak carried thinking.
+        stateVersion: 9,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -687,7 +725,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    *
    * Each new downgraded step reassesses the latest task evidence. Same-step
    * retries reuse the judgment only while its complete candidate inputs are
-   * unchanged, and recheck manual authority, allowlist membership, and
+   * unchanged, and recheck manual authority, `routeFrom` and pool membership, and
    * capabilities. A manual-model decision lasts for the turn.
    * @param agent - the agent whose turn is being prepared.
    * @param turn - the turn number, as the loop dispatched it.
@@ -751,8 +789,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     state ??= this.buildState(session, config)
     const sticky = stickyState(session.events)
     const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request)
+    const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
+      ...from === undefined ? {} : { objective: from.objective },
       stateProjection: resolved.stateProjection ?? {
         renderer: 'conversation-v1' as const,
         contextTurns: config.state.contextTurns,
@@ -806,6 +846,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       stateSeqs: routed.stateSeqs,
       failure: { code: failure.code, provider: selection.provider, model: selection.model },
       ...failedChunk === undefined ? {} : { failedChunkSeq: failedChunk.seq },
+      /* v8 ignore next -- a downgrade is only resolved against a listed route, which records its objective */
+      ...routed.objective === undefined ? {} : { objective: routed.objective },
       sticky: {
         active: false,
         stepsElapsed: 0,
@@ -818,7 +860,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     return { kind: 'retry' }
   }
 
-  /** Recheck a retry's held route against manual authority and current provider registrations. */
+  /**
+   * Recheck a retry's held route against manual authority, the `routeFrom`
+   * allowlist, the candidate pool, and current provider registrations.
+   */
   private async revalidatePinned(
     agent: Agent,
     turn: number,
@@ -835,10 +880,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const entryBase = previous.sticky.entryBase
     const candidate = config.candidates.find(entry => entry.id === selection.candidateId
       && entry.provider === selection.provider && entry.model === selection.model)
-    let reason: 'manual-deviation' | 'unknown-candidate' | 'candidate-ineligible' | undefined
+    const from = routeFromFor(config, base)
+    let reason: 'manual-deviation' | 'base-unlisted' | 'unknown-candidate' | 'candidate-ineligible' | undefined
     let candidateEligibility: ModelRoutingDecision['candidateEligibility']
     if (entryBase !== undefined && (entryBase.provider !== base.provider || entryBase.model !== base.model)) {
       reason = 'manual-deviation'
+    } else if (from === undefined) {
+      // As in a fresh consult: the retry keeps the manual route once settings
+      // remove it from `routeFrom`, and the ended streak starts no cooldown.
+      reason = 'base-unlisted'
     } else if (candidate === undefined) {
       reason = 'unknown-candidate'
     } else {
@@ -870,6 +920,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         omittedSeqs: state.omittedSeqs,
       },
       ...candidateEligibility === undefined ? {} : { candidateEligibility },
+      ...from === undefined ? {} : { objective: from.objective },
       sticky: { active: false, stepsElapsed: 0, brokenBy: reason },
     }
     this.log(agent.session, decision)
@@ -970,6 +1021,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, stepsElapsed: 0, brokenBy: 'manual-deviation' },
       }
     }
+    // Routing starts only from a listed strong route: an unlisted one is never
+    // judged, and a held streak ends when its route is removed from the list.
+    if (routeFromFor(config, base) === undefined) {
+      return {
+        ...keep('base-unlisted'),
+        sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'base-unlisted' as const } },
+      }
+    }
     // The cap bounds every hold, including one inside its entering turn, and
     // returns to the manual route while its cache is still warm.
     if (held !== undefined && sticky.stepsElapsed >= config.hold.maxSteps) {
@@ -1003,6 +1062,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       // can change nothing, which the routing UI reports as its idle state.
       if (held === undefined && eligibility.assessments.every(assessment => assessment.reason === 'equals-base')) {
         return keep('candidate-equals-base')
+      }
+      if (held === undefined && eligibility.assessments.some(assessment => assessment.reason === 'thinking-mode-incompatible')) {
+        return keep('thinking-mode-incompatible')
       }
       return {
         ...keep('candidate-ineligible'),
@@ -1376,7 +1438,7 @@ function routeQuestion(config: ResolvedModelRouterConfig, base: ModelSelection):
       },
       ...config.candidates.map(candidate => ({
         option: candidate.id,
-        description: `Use ${routeDescription(candidate)}.${candidate.description === undefined ? '' : ` ${candidate.description}`}`,
+        description: `Use ${routeDescription(candidate)}. ${candidate.description}`,
       })),
     ],
   }

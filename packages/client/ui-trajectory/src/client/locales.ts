@@ -38,6 +38,7 @@ export type TrajectoryKey =
   | 'routing.reason.breakerOpen'
   | 'routing.reason.invalidAnswer'
   | 'routing.reason.noCandidates'
+  | 'routing.reason.baseUnlisted'
   | 'routing.reason.modelUnavailable'
   | 'routing.reason.candidateIneligible'
   | 'routing.reason.stateTooLarge'
@@ -46,6 +47,7 @@ export type TrajectoryKey =
   | 'routing.reason.lowConfidence'
   | 'routing.reason.thinMargin'
   | 'routing.reason.candidateEqualsBase'
+  | 'routing.reason.thinkingModeIncompatible'
   | 'routing.reason.currentPreferred'
   | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
@@ -100,6 +102,7 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.breakerOpen': 'judgment paused after repeated failures',
   'routing.reason.invalidAnswer': 'invalid answer',
   'routing.reason.noCandidates': 'no candidates configured',
+  'routing.reason.baseUnlisted': 'routing does not start from this model',
   'routing.reason.modelUnavailable': 'model capabilities unavailable',
   'routing.reason.candidateIneligible': 'candidate cannot preserve request capabilities',
   'routing.reason.stateTooLarge': 'current request exceeds routing context budget',
@@ -108,6 +111,7 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.lowConfidence': 'low confidence',
   'routing.reason.thinMargin': 'thin top-two margin',
   'routing.reason.candidateEqualsBase': 'already on the routed model',
+  'routing.reason.thinkingModeIncompatible': 'manual model thinks on a fixed budget, which a return would lose',
   'routing.reason.currentPreferred': 'current model preferred',
   'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
@@ -144,6 +148,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'breaker-open': 'routing.reason.breakerOpen',
   'invalid-answer': 'routing.reason.invalidAnswer',
   'no-candidates': 'routing.reason.noCandidates',
+  'base-unlisted': 'routing.reason.baseUnlisted',
   'model-unavailable': 'routing.reason.modelUnavailable',
   'candidate-ineligible': 'routing.reason.candidateIneligible',
   'state-too-large': 'routing.reason.stateTooLarge',
@@ -152,6 +157,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'low-confidence': 'routing.reason.lowConfidence',
   'thin-margin': 'routing.reason.thinMargin',
   'candidate-equals-base': 'routing.reason.candidateEqualsBase',
+  'thinking-mode-incompatible': 'routing.reason.thinkingModeIncompatible',
   'current-preferred': 'routing.reason.currentPreferred',
   'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',
@@ -170,6 +176,7 @@ export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> 
   'candidate-ineligible': 'routing.reason.candidateIneligible',
   'gate-failed': 'routing.reason.gateFailed',
   'hold-cap': 'routing.reason.holdCap',
+  'base-unlisted': 'routing.reason.baseUnlisted',
   'current-preferred': 'routing.reason.currentPreferred',
   'unknown-candidate': 'routing.reason.unknownCandidate',
   escalated: 'routing.reason.escalated',

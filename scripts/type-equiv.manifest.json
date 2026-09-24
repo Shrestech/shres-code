@@ -58,6 +58,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmThinkingMode",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmModelDiscoveryRequest",
       "source": "packages/llm/llm/src/types.ts"
     },
@@ -2574,6 +2579,16 @@
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStateConfig",
       "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingRouteFromConfig",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingObjective",
+      "source": "packages/llm/model-router/src/types.ts"
     },
     {
       "doc": "docs/subsystems/model-router.md",
