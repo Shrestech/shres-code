@@ -122,14 +122,16 @@ function roundedIntegerPercent(cacheReadTokens: number, denominator: number): nu
 }
 
 /**
- * Display-ready cache-hit share of prompt-side input over the whole durable log.
+ * Display-ready cache-hit share of prompt-side input over the whole durable
+ * log, counting only calls whose provider reported cache reads: unreported
+ * input may hold hits the provider never counted.
  * @param usage - the session's token-usage projection value.
  * @returns integer text when integer rounding stays below 100, otherwise the
  * minimum decimal precision that still rounds below 100; a full hit returns
- * 100, and no billed input returns null.
+ * 100, and no reported input returns null.
  */
 export function cacheHitPercent(usage: TokenUsageProjection): string | null {
-  const denominator = billedInputTokens(usage)
+  const denominator = reportedInputTokens(usage)
   if (denominator === 0) return null
   const missedInputTokens = usage.uncachedInputTokens + usage.cacheWriteTokens
   if (missedInputTokens === 0) return '100'
@@ -161,13 +163,18 @@ export function cacheHitPercent(usage: TokenUsageProjection): string | null {
   return `99.${'9'.repeat(decimalPlaces - 1)}${10 - roundedLoss}`
 }
 
+/** Prompt-side input from calls whose provider reported cache reads. */
+function reportedInputTokens(usage: TokenUsageProjection): number {
+  return usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
+}
+
 /**
- * Sum the three disjoint prompt-side billing buckets.
+ * Sum the four disjoint prompt-side billing buckets.
  * @param usage - the session's token-usage projection value.
  * @returns billed input tokens.
  */
 export function billedInputTokens(usage: TokenUsageProjection): number {
-  return usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
+  return reportedInputTokens(usage) + usage.unreportedInputTokens
 }
 
 interface ContextOccupancy {
@@ -246,6 +253,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)) {
     const cacheHit = cacheHitPercent(usage)
     if (cacheHit !== null) groups.push(t('stats.cacheHit', { percent: cacheHit }))
+    else if (usage.unreportedInputTokens > 0) groups.push(t('stats.cacheNotReported'))
     groups.push(t('stats.tokens', {
       input: formatTokens(billedInputTokens(usage)),
       output: formatTokens(usage.outputTokens),

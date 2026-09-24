@@ -76,7 +76,7 @@ DeepSeek request identity is separate from app attribution. After credential res
 - The first thinking-mode chunk carries `reasoning_content: ""` — handled (no spurious reasoning block).
 - **Reasoning passback rule**: every assistant turn that carried reasoning serializes `reasoning_content` back in history. Thinking mode requires it on tool-call turns; DeepSeek ignores it elsewhere, while a gateway re-encoding the conversation for another vendor recovers that turn's upstream thinking signature by hashing the replayed text.
 - Image-capable catalog entries declare `inputModalities: [text, image]` and may set `imagePixelBudget`, `imageMaxBytes`, or `imageDetail: low`. The default catalog includes `deepseek-v4-flash-vision-exp`. The adapter uploads deterministic request versions through the Files API (`file_id`) and falls back to inline base64 when file resolution fails. Text-only routes receive deterministic attachment placeholders; durable history keeps the original references.
-- Cache accounting: `cacheReadTokens` ← `prompt_cache_hit_tokens` / `prompt_tokens_details.cached_tokens`; DeepSeek reports no cache-write metric.
+- Cache accounting: `cacheReadTokens` ← `prompt_cache_hit_tokens` / `prompt_tokens_details.cached_tokens`, present exactly when the wire carries one of them, a miss as 0; absent means the response reported no cache count and `inputTokens` is the whole prompt. DeepSeek reports no cache-write metric, so `cacheWriteTokens` is always absent.
 
 ## Errors
 

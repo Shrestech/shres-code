@@ -39,6 +39,9 @@
       "path": "../../jspace/jspace"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../../llm/model-router"
     },
     {

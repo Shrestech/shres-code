@@ -1266,7 +1266,7 @@ describe('TrajectoryView state', () => {
             sticky: {
               active: true,
               routeErrorLimit: 2,
-              turnsElapsed: 0,
+              stepsElapsed: 0,
               enteredTurn: 1,
               entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
             },
@@ -1350,7 +1350,7 @@ describe('TrajectoryView state', () => {
               sticky: {
                 active: true,
                 routeErrorLimit: 2,
-                turnsElapsed: 0,
+                stepsElapsed: 0,
                 enteredTurn: 1,
                 entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
               },
@@ -1367,7 +1367,7 @@ describe('TrajectoryView state', () => {
               route: { choice: 'keep-current', confidence: 0.9, probabilities: { 'keep-current': 0.9 } },
               sticky: {
                 active: false,
-                turnsElapsed: 0,
+                stepsElapsed: 0,
                 brokenBy: 'gate-failed',
               },
             },

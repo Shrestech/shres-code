@@ -87,6 +87,13 @@ export interface PiAiEndpointVariant {
  */
 export type PiAiPromptCacheKey = 'session' | 'off'
 
+/**
+ * Whether a route's provider reports prompt-cache counts on every call.
+ * `reported`: usage carries both cache counts, zeros included. `unreported`:
+ * usage carries neither, and `inputTokens` is the whole prompt.
+ */
+export type PiAiCacheUsage = 'reported' | 'unreported'
+
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
   /** Credential reference (environment-variable name) resolved per request through `ctx.credentials`. */
@@ -179,6 +186,13 @@ export interface PiAiProviderProfile {
   thinkingBudgets?: ThinkingBudgets
   /** Prompt-cache retention preference. */
   cacheRetention?: CacheRetention
+  /**
+   * Whether this route's provider reports prompt-cache counts on every call.
+   * pi-ai reports 0 both for a cache miss and for a response that carried no
+   * cache counts, so only the route can say which a 0 means. Omission resolves
+   * per model from its protocol through {@link resolveCacheUsage}.
+   */
+  cacheUsage?: PiAiCacheUsage
   /** Streaming transport preference. */
   transport?: Transport
   /** HTTP/provider SDK timeout in milliseconds. */
@@ -323,6 +337,7 @@ const profile = z.object({
   thinkingBudgets,
   cacheRetention: z.union(['none', 'short', 'long']),
   promptCacheKey: z.union(['session', 'off']).default('off'),
+  cacheUsage: z.union(['reported', 'unreported']),
   transport: z.union(['sse', 'websocket', 'websocket-cached', 'auto']),
   timeoutMs: z.natural(),
   websocketConnectTimeoutMs: z.natural(),
@@ -330,6 +345,35 @@ const profile = z.object({
   retryPolicy: RetryPolicySchema,
   enabled: z.boolean().default(true),
 })
+
+/**
+ * Protocols whose responses carry cache counts on every call. Anthropic
+ * Messages reports `cache_read_input_tokens` and `cache_creation_input_tokens`
+ * in every usage block, and the OpenAI Responses family reports cached and
+ * cache-write input under `input_tokens_details`. Every other protocol a catalog
+ * model can speak (chat completions, Gemini, Vertex, Bedrock, Mistral) includes
+ * cache counts only when its provider implements them, so a route on one of
+ * those declares `reported` only when its provider does.
+ */
+const REPORTING_PROTOCOLS: ReadonlySet<string> = new Set([
+  'anthropic-messages',
+  'openai-responses',
+  'azure-openai-responses',
+  'openai-codex-responses',
+])
+
+/**
+ * Resolve one request's cache-count reporting: the route's declaration, else
+ * `reported` for a {@link REPORTING_PROTOCOLS} model and `unreported` for any
+ * other, so an unproven protocol never presents a missing count as a miss.
+ * @param declared - the route's {@link PiAiProviderProfile.cacheUsage}, if set.
+ * @param api - the requested model's resolved wire protocol.
+ * @returns the reporting the request's usage is mapped under.
+ */
+export function resolveCacheUsage(declared: PiAiCacheUsage | undefined, api: string): PiAiCacheUsage {
+  if (declared !== undefined) return declared
+  return REPORTING_PROTOCOLS.has(api) ? 'reported' : 'unreported'
+}
 
 /** Runtime schema for {@link Config}. */
 export const Config: z<Config> = z.object({

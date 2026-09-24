@@ -1918,6 +1918,13 @@ export interface PiAiProviderProfile {
   thinkingBudgets?: ThinkingBudgets
   /** Prompt-cache retention preference. */
   cacheRetention?: CacheRetention
+  /**
+   * Whether this route's provider reports prompt-cache counts on every call.
+   * pi-ai reports 0 both for a cache miss and for a response that carried no
+   * cache counts, so only the route can say which a 0 means. Omission resolves
+   * per model from its protocol through {@link resolveCacheUsage}.
+   */
+  cacheUsage?: PiAiCacheUsage
   /** Streaming transport preference. */
   transport?: Transport
   /** HTTP/provider SDK timeout in milliseconds. */
@@ -2065,6 +2072,13 @@ export type PiAiModality = Model<Api>['input'][number]
 export type PiAiPromptCacheKey = 'session' | 'off'
 
 /**
+ * Whether a route's provider reports prompt-cache counts on every call.
+ * `reported`: usage carries both cache counts, zeros included. `unreported`:
+ * usage carries neither, and `inputTokens` is the whole prompt.
+ */
+export type PiAiCacheUsage = 'reported' | 'unreported'
+
+/**
  * Selectable reasoning efforts for one model: each key is a level the model
  * offers (and selectors show), and its value is the wire spelling dispatch
  * sends for it. `off` alone may leave its value empty — "supported, send
@@ -2090,7 +2104,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template' | 'baseten'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:233`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:247`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -2384,18 +2398,23 @@ export interface ModelRouterConfig {
   downgradeThreshold: number
   /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
   downgradeMargin: number
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
   /**
-   * Turns a downgraded streak is held before a failed gate may end it. `0`
-   * disables stickiness (each turn is judged on its own), which keeps the
-   * non-sticky design reachable and falsifiable. Defaults to 5.
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
    */
-  minTurnsDowngraded?: number
+  reentryCooldownTurns?: number
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required by stickiness, `hardHint`, and
-   * `difficultyToEffort`. When configured, every consult asks it and checks
-   * the difficulty limit before allowing a downgrade.
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
   /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
@@ -2411,6 +2430,14 @@ export interface ModelRouterConfig {
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
   /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
@@ -2458,6 +2485,36 @@ export interface ModelRoutingCandidateConfig {
   description?: string
 }
 
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so every step is judged
+   * on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
 /** The escalation operating point. */
 export interface ModelRoutingEscalateBackConfig {
   /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
@@ -2467,12 +2524,38 @@ export interface ModelRoutingEscalateBackConfig {
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
 /** What a failed downgraded request means for its step. */
 export type ModelRoutingInTurnFallback = 'manual' | 'off'
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
   scoreThreshold: number
   /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
@@ -2495,7 +2578,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:55`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:111`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

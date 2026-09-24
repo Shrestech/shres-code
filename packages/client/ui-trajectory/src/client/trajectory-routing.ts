@@ -14,9 +14,10 @@ import type { TrajectoryRequestRoute, TrajectoryRoutingRow, TrajectoryRoutingStr
 /**
  * The streak transition one decision caused.
  *
- * Several steps can be judged on the entering turn, all at elapsed turn 0.
- * The preceding loaded decision distinguishes continuation from entry. A
- * decision whose sticky state carries `brokenBy` ended a streak.
+ * The entering decision records step 0 of its streak. A re-judged retry of
+ * that step records step 0 again, so the preceding loaded decision
+ * distinguishes continuation from entry. A decision whose sticky state carries
+ * `brokenBy` ended a streak.
  * @param decision - the logged decision.
  * @param previous - the preceding routing decision in the loaded window, when present.
  * @returns the transition, or undefined when the decision neither entered nor ended a streak.
@@ -32,7 +33,7 @@ export function trajectoryRoutingStreak(
       && previous.selection?.candidateId === decision.selection?.candidateId
       && previous.selection?.provider === decision.selection?.provider
       && previous.selection?.model === decision.selection?.model) return undefined
-    return sticky.turnsElapsed === 0 && sticky.enteredTurn !== undefined
+    return sticky.stepsElapsed === 0 && sticky.enteredTurn !== undefined
       ? { kind: 'entered', turn: sticky.enteredTurn }
       : undefined
   }

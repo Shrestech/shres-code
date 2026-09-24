@@ -15,6 +15,7 @@ import AgentLoop from '@shres-code/shres-code-agent-loop'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
 import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
+import * as LlmRetryPlugin from '@shres-code/shres-code-llm-retry'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
@@ -33,6 +34,7 @@ const CREDENTIALS_SPECIFIER = '@test/model-router-credentials'
 type ProviderKind = 'typesafe' | 'shield'
 const SHIELD_MODEL = 'convaiinnovations/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982'
 const ROUTER_SPECIFIER = '@shres-code/shres-code-model-router'
+const RETRY_SPECIFIER = '@shres-code/shres-code-llm-retry'
 const PROVIDER = 'deepseek-official'
 const MANUAL_MODEL = 'deepseek-v4-pro'
 const CANDIDATE_ID = 'flash'
@@ -239,8 +241,20 @@ afterEach(async () => {
   root = undefined
 })
 
-/** Boot the real agent spine, selected judgment provider, and model router through Loader. */
-async function loadSpine(endpoint: string, provider: ProviderKind): Promise<Context> {
+/** Where llm-retry sits relative to the router in the composition, when it is composed. */
+type RetryPlacement = 'before-router' | 'after-router'
+
+/** The llm-retry entry, which applies the DeepSeek route's normal-mode policy. */
+const RETRY_ENTRY = [`- name: '${RETRY_SPECIFIER}'`]
+
+/**
+ * Boot the real agent spine, selected judgment provider, and model router through Loader.
+ * @param endpoint - the loopback judgment endpoint.
+ * @param provider - the judgment provider to compose.
+ * @param retry - where to compose llm-retry, with a one-retry normal policy on the DeepSeek route.
+ * @returns the loaded context.
+ */
+async function loadSpine(endpoint: string, provider: ProviderKind, retry?: RetryPlacement): Promise<Context> {
   const judgmentSpecifier = `@shres-code/shres-code-judgment-${provider}`
   root = await mkdtemp(join(tmpdir(), 'shres-model-router-provider-loader-'))
   const configPath = join(root, 'cordis.yml')
@@ -262,6 +276,13 @@ async function loadSpine(endpoint: string, provider: ProviderKind): Promise<Cont
     "- name: '@shres-code/shres-code-llm-deepseek'",
     '  config:',
     `    baseURL: '${modelServer?.baseURL}/v1'`,
+    ...retry === undefined ? [] : [
+      '    retryPolicy:',
+      '      mode: normal',
+      '      maxRetries: 1',
+      '      backoff: { initialDelayMs: 1, maxDelayMs: 10, jitterRatio: 0 }',
+    ],
+    ...retry === 'before-router' ? RETRY_ENTRY : [],
     `- name: '${CREDENTIALS_SPECIFIER}'`,
     '  config:',
     '    TYPESAFE_API_KEY: loader-key',
@@ -280,9 +301,10 @@ async function loadSpine(endpoint: string, provider: ProviderKind): Promise<Cont
     `        model: ${CANDIDATE_MODEL}`,
     '    downgradeThreshold: 0.7',
     '    downgradeMargin: 0.5',
-    '    minTurnsDowngraded: 0',
+    '    hold: { minSteps: 0 }',
     '    routeInstructions: Choose a cheaper model only when it is suitable for this turn.',
     '    difficultyInstructions: Rate how much reasoning this turn needs.',
+    ...retry === 'after-router' ? RETRY_ENTRY : [],
     '',
   ].join('\n'))
 
@@ -304,6 +326,7 @@ async function loadSpine(endpoint: string, provider: ProviderKind): Promise<Cont
     [CREDENTIALS_SPECIFIER, MemoryCredentials],
     [judgmentSpecifier, provider === 'typesafe' ? TypesafeJudgmentEngine : ShieldJudgmentEngine],
     [ROUTER_SPECIFIER, ModelRoutingController],
+    [RETRY_SPECIFIER, LlmRetryPlugin],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -366,9 +389,9 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
   it('sends keep-current with one candidate and honors manual/high-difficulty decisions', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     modelServer = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
     judgmentServer = new LoopbackJudgmentServer([
-      { choice: KEEP_CURRENT_OPTION_ID, score: 2 },
+      { choice: KEEP_CURRENT_OPTION_ID, score: 1 },
       { choice: CANDIDATE_ID, score: 4 },
-      { choice: CANDIDATE_ID, score: 2 },
+      { choice: CANDIDATE_ID, score: 1 },
     ], provider)
     const judgmentURL = await judgmentServer.start()
     const loaded = await loadSpine(judgmentURL, provider)
@@ -405,7 +428,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
       reason: 'gate-passed',
       selection: { candidateId: CANDIDATE_ID, model: CANDIDATE_MODEL },
       route: { choice: CANDIDATE_ID, confidence: ROUTE_CONFIDENCE },
-      difficulty: { score: 2 },
+      difficulty: { score: 1 },
     })
     expect(requestedModel(2)).toBe(CANDIDATE_MODEL)
 
@@ -419,7 +442,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
 
   it('a 500 from the candidate completes the turn on the manual model', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     modelServer = await startMockLlmServer({ sequence: ['server_error', 'success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
-    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 2 }], provider)
+    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 1 }], provider)
     const loaded = await loadSpine(await judgmentServer.start(), provider)
     const agent = createAgent(loaded, 'provider-candidate-500')
 
@@ -434,7 +457,7 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
     expect(decisions[1]).toMatchObject({
       outcome: 'kept-strong',
       failure: { provider: PROVIDER, model: CANDIDATE_MODEL },
-      failedChunkSeq: expect.any(Number),
+      failedChunkSeq: expect.any(Number) as unknown,
       sticky: { active: false, brokenBy: 'route-failed', entryBase: { provider: PROVIDER, model: MANUAL_MODEL } },
     })
     const headers = eventsOfType(log, 'request/header').map(event => event.data.header.config.model)
@@ -446,5 +469,61 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
     expect(eventsOfType(log, 'assistant/message').at(-1)?.data.message.source).toMatchObject({ model: MANUAL_MODEL })
     // The judgment was asked once; the retry reused the step's manual pin.
     expect(judgmentServer.requests).toHaveLength(1)
+  })
+})
+
+/*
+ * The llm-retry entry's position in the YAML does not reverse the
+ * agent/request-error waterfall: in both placements the router's listener runs
+ * first and reaches llm-retry through next(). These cases pin behaviour under
+ * both composition orders; they do not test llm-retry running ahead of the
+ * router. The router's order independence rests on calling next() before it
+ * falls back, by construction.
+ */
+describe.each<RetryPlacement>(['before-router', 'after-router'])('real llm-retry and model-router composition (llm-retry entry %s; same waterfall order)', (placement) => {
+  /** One routed turn against the scripted model endpoint; returns the durable log. */
+  async function routedTurn(sequence: ('server_error' | 'auth_error' | 'success')[], id: string): Promise<readonly SessionEvent[]> {
+    modelServer = await startMockLlmServer({ sequence, repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
+    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 1 }], 'typesafe')
+    const loaded = await loadSpine(await judgmentServer.start(), 'typesafe', placement)
+    const agent = createAgent(loaded, id)
+    await turn(agent, 'Use the cheaper route for this small lookup.')
+    return agent.session.events
+  }
+
+  it('llm-retry retries a transient candidate failure on the candidate, and the router passes it through', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const events = await routedTurn(['server_error', 'success'], `retry-transient-${placement}`)
+
+    expect([requestedModel(0), requestedModel(1)]).toEqual([CANDIDATE_MODEL, CANDIDATE_MODEL])
+    expect(modelServer?.requests).toHaveLength(2)
+    const retries = eventsOfType(events, 'llm/retry')
+    expect(retries).toHaveLength(1)
+    expect(retries[0]?.data).toMatchObject({ provider: PROVIDER, retry: 1, failure: { code: 'SERVER' } })
+    // The retry reused the step's downgraded decision: one judgment, no fallback.
+    expect(eventsOfType(events, 'model-routing/decision').map(event => event.data.reason)).toEqual(['gate-passed'])
+    expect(judgmentServer?.requests).toHaveLength(1)
+    expect(eventsOfType(events, 'turn/end').map(event => event.data.reason.kind)).toEqual(['completed'])
+  })
+
+  it('a non-transient candidate failure falls back to the manual route through route-failed', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const events = await routedTurn(['auth_error', 'success'], `retry-permanent-${placement}`)
+
+    expect([requestedModel(0), requestedModel(1)]).toEqual([CANDIDATE_MODEL, MANUAL_MODEL])
+    expect(eventsOfType(events, 'llm/retry')).toHaveLength(0)
+    const decisions = eventsOfType(events, 'model-routing/decision').map(event => event.data)
+    expect(decisions.map(decision => decision.reason)).toEqual(['gate-passed', 'route-failed'])
+    expect(decisions[1]).toMatchObject({ failure: { code: 'AUTH', provider: PROVIDER, model: CANDIDATE_MODEL } })
+    expect(eventsOfType(events, 'turn/end').map(event => event.data.reason.kind)).toEqual(['completed'])
+  })
+
+  it('a transient failure that exhausts its retries falls back to the manual route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const events = await routedTurn(['server_error', 'server_error', 'success'], `retry-exhausted-${placement}`)
+
+    expect([requestedModel(0), requestedModel(1), requestedModel(2)]).toEqual([CANDIDATE_MODEL, CANDIDATE_MODEL, MANUAL_MODEL])
+    expect(eventsOfType(events, 'llm/retry')).toHaveLength(1)
+    const decisions = eventsOfType(events, 'model-routing/decision').map(event => event.data)
+    expect(decisions.map(decision => decision.reason)).toEqual(['gate-passed', 'route-failed'])
+    expect(decisions[1]).toMatchObject({ failure: { code: 'SERVER', model: CANDIDATE_MODEL } })
+    expect(eventsOfType(events, 'turn/end').map(event => event.data.reason.kind)).toEqual(['completed'])
   })
 })

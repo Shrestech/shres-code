@@ -4,6 +4,8 @@ import { promisify } from 'node:util'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { cacheCount, promptTokens } from '@shres-code/shres-code-llm'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
@@ -39,10 +41,14 @@ describe('headless-agent keyless smoke', () => {
     expect(events.some(event => event.type === 'tool/call' && event.data.name === 'bash')).toBe(true)
     const toolResult = events.find(event => event.type === 'tool/result')
     expect(JSON.stringify(toolResult)).toContain('CLI_TOOL_ROUND_TRIP')
-    expect(result).toMatchObject({
-      type: 'result',
-      usage: { inputTokens: 18, outputTokens: 8, cacheReadTokens: 2, reasoningTokens: 1 },
-    })
+    expect(result).toMatchObject({ type: 'result', usage: { outputTokens: 8, reasoningTokens: 1 } })
+    // The mock reports a cache read on the tool step and none on the final step,
+    // so the turn's aggregate cannot claim a measured read: both cache counts
+    // stay absent and the reported read folds into the 20-token prompt.
+    const usage = result?.['usage'] as TokenUsage
+    expect(cacheCount(usage, 'read')).toBeUndefined()
+    expect(cacheCount(usage, 'write')).toBeUndefined()
+    expect(promptTokens(usage)).toBe(20)
     expect(String(result?.['output'])).toContain('CLI_TOOL_ROUND_TRIP')
     expect(persistedHeader).toMatchObject({ type: 'session' })
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

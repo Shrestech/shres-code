@@ -11,6 +11,7 @@ import { CompactionId } from '@shres-code/shres-code-compaction'
 
 const ZERO: TokenUsageProjection = {
   uncachedInputTokens: 0,
+  unreportedInputTokens: 0,
   outputTokens: 0,
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
@@ -117,6 +118,7 @@ describe('tokenUsage session projection', () => {
 
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 10,
+      unreportedInputTokens: 0,
       outputTokens: 4,
       cacheReadTokens: 7,
       cacheWriteTokens: 2,
@@ -141,6 +143,7 @@ describe('tokenUsage session projection', () => {
 
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 14,
+      unreportedInputTokens: 0,
       outputTokens: 5,
       cacheReadTokens: 8,
       cacheWriteTokens: 1,
@@ -176,8 +179,11 @@ describe('tokenUsage session projection', () => {
       cacheWriteTokens: 4,
     }, 1, 2, [second])
 
+    // The second step reported writes but not reads, so its input may hold
+    // cache hits and stays out of the uncached bucket.
     expect(projected(ctx, session)).toEqual({
-      uncachedInputTokens: 30,
+      uncachedInputTokens: 10,
+      unreportedInputTokens: 20,
       outputTokens: 15,
       cacheReadTokens: 2,
       cacheWriteTokens: 4,
@@ -190,7 +196,8 @@ describe('tokenUsage session projection', () => {
     usageChunk(session, { inputTokens: 9, outputTokens: 1 }, 1, 1)
     session.append('step/end', { turn: 1, step: 1 })
     expect(projected(ctx, session)).toEqual({
-      uncachedInputTokens: 9,
+      uncachedInputTokens: 0,
+      unreportedInputTokens: 9,
       outputTokens: 1,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
@@ -216,8 +223,27 @@ describe('tokenUsage session projection', () => {
     })
 
     expect(projected(ctx, session)).toEqual({
-      uncachedInputTokens: 12,
+      uncachedInputTokens: 0,
+      unreportedInputTokens: 12,
       outputTokens: 3,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
+  it('separates input whose provider reported cache reads from input it did not', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: 40, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 }, 1, 1)
+    session.append('step/end', { turn: 1, step: 1 })
+    startStep(session, 1, 2)
+    usageChunk(session, { inputTokens: 60, outputTokens: 1 }, 1, 2)
+    session.append('step/end', { turn: 1, step: 2 })
+    // A reported zero is a measured miss; an absent count is no measurement.
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 40,
+      unreportedInputTokens: 60,
+      outputTokens: 2,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     })
@@ -235,8 +261,10 @@ describe('tokenUsage session projection', () => {
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('tokenUsage')
 
     await ctx.plugin(TokenMeter)
+    expect(checkpoint.tokenUsage?.ver).toBe(2)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).tokenUsage).toEqual({
       uncachedInputTokens: 8,
+      unreportedInputTokens: 0,
       outputTokens: 2,
       cacheReadTokens: 5,
       cacheWriteTokens: 0,

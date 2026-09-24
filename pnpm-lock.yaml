@@ -3602,6 +3602,9 @@ importers:
       '@shres-code/shres-code-jspace':
         specifier: workspace:^
         version: link:../../jspace/jspace
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
       '@shres-code/shres-code-model-router':
         specifier: workspace:^
         version: link:../../llm/model-router
@@ -7001,6 +7004,9 @@ importers:
       '@shres-code/shres-code-llm-mock-server':
         specifier: workspace:^
         version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-llm-retry':
+        specifier: workspace:^
+        version: link:../llm-retry
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session

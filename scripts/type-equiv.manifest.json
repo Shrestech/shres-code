@@ -2502,12 +2502,37 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingEngineFailure",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStickyState",
       "source": "packages/llm/model-router/src/folds.ts"
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingJudgmentFailures",
+      "source": "packages/llm/model-router/src/folds.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStateConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingHoldConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingDifficultyConfig",
+      "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingJudgmentFailuresConfig",
       "source": "packages/llm/model-router/src/config.ts"
     },
     {

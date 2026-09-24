@@ -73,7 +73,7 @@ function decisionEvent(outcome, time, extra = {}) {
     reason: 'gate-passed',
     stateHash: 'state-hash',
     stateSeqs: [1],
-    sticky: { active: outcome === 'downgraded', turnsElapsed: 0 },
+    sticky: { active: outcome === 'downgraded', stepsElapsed: 0 },
     ...extra,
   }, time)
 }
