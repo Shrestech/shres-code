@@ -32,9 +32,16 @@
  * model-router and compaction-jev log-only events, so they are null for arms that
  * compose neither (all-null is the honest reading of "never judged", which is why
  * every one of them is nullable rather than zero):
- * - cacheHitShare: cacheReadTokens over billed input (inputTokens + cacheReadTokens +
- *   cacheWriteTokens, the disjoint `TokenUsage` counts). Null when the log carries no
- *   usage record or the denominator is zero.
+ * - cacheHitShare: root session only. Cache reads over the prompt tokens (input
+ *   plus cache reads and writes) of the `assistant/message` usage records that
+ *   report a cache-read count, by the `TokenUsage` presence contract: a record
+ *   without one is unreported and excluded, never read as a miss. Null when no
+ *   record reports one or the reported prompt is zero. The closure-wide,
+ *   per-call figure is `accounting.cacheHitShare` (`accounting.js`); both use
+ *   `cacheShares`.
+ * - cacheUnreportedShare: root session only. The share of prompt tokens carried
+ *   by usage records without a reported cache-read count, so the root share never
+ *   hides unreported input. Null when the root session reported no prompt tokens.
  * - modelTransitions: consecutive `request/header` events whose provider/model differ.
  *   Null when the log carries no readable header.
  * - downgradedStreaks: run lengths of consecutive `model-routing/decision` events with
@@ -68,6 +75,7 @@
 
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { cacheShares } from './accounting.js'
 
 /**
  * @typedef {import('../schema/trial.js').TrialMetrics} TrialMetrics
@@ -281,6 +289,7 @@ export function foldSessionLog(text, armFlags) {
     unverifiedAcceptRecovery: null,
     thinDebates: null,
     cacheHitShare: null,
+    cacheUnreportedShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,
@@ -322,11 +331,12 @@ export function foldSessionLog(text, armFlags) {
   const debateByEpoch = new Map()
 
   // Jev routing/compaction state.
-  let usageEvents = 0
-  let cacheReadTokens = 0
-  let cacheWriteTokens = 0
   /** @type {{ provider: string, model: string } | null} */
   let lastHeaderRoute = null
+  // Root-session prompt tokens split by cache-read presence.
+  let reportedPrompt = 0
+  let reportedCacheRead = 0
+  let unreportedPrompt = 0
   let headerEvents = 0
   let modelTransitions = 0
   let routingDecisions = 0
@@ -449,10 +459,6 @@ export function foldSessionLog(text, armFlags) {
       case 'assistant/message': {
         const rawUsage = data.usage
         if (typeof rawUsage !== 'object' || rawUsage === null) break
-        // Any usage record counts as reported usage, so the cache fields are
-        // read as reported: an absent count contributes 0, which is what the
-        // adapters that omit a zero cache count report.
-        usageEvents += 1
         const usage = /** @type {Record<string, unknown>} */ (rawUsage)
         if (typeof usage.inputTokens === 'number' && Number.isFinite(usage.inputTokens)) {
           metrics.inputTokens += usage.inputTokens
@@ -460,11 +466,13 @@ export function foldSessionLog(text, armFlags) {
         if (typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)) {
           metrics.outputTokens += usage.outputTokens
         }
-        if (typeof usage.cacheReadTokens === 'number' && Number.isFinite(usage.cacheReadTokens)) {
-          cacheReadTokens += usage.cacheReadTokens
-        }
-        if (typeof usage.cacheWriteTokens === 'number' && Number.isFinite(usage.cacheWriteTokens)) {
-          cacheWriteTokens += usage.cacheWriteTokens
+        const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
+        const prompt = (count(usage.inputTokens) ? usage.inputTokens : 0) + (count(usage.cacheWriteTokens) ? usage.cacheWriteTokens : 0)
+        if (count(usage.cacheReadTokens)) {
+          reportedPrompt += prompt + usage.cacheReadTokens
+          reportedCacheRead += usage.cacheReadTokens
+        } else {
+          unreportedPrompt += prompt
         }
         break
       }
@@ -567,10 +575,9 @@ export function foldSessionLog(text, armFlags) {
 
   // Jev routing/compaction fold. Every field stays null when its events are
   // absent: a never-judged trial must not read as "judged, never downgraded".
-  const billedInput = metrics.inputTokens + cacheReadTokens + cacheWriteTokens
-  if (usageEvents > 0 && billedInput > 0) {
-    metrics.cacheHitShare = cacheReadTokens / billedInput
-  }
+  const shares = cacheShares({ reportedPrompt, cacheRead: reportedCacheRead, unreportedPrompt })
+  metrics.cacheHitShare = shares.cacheHitShare
+  metrics.cacheUnreportedShare = shares.unreportedShare
   if (headerEvents > 0) metrics.modelTransitions = modelTransitions
   if (routingDecisions > 0) {
     if (openDowngradedRun > 0) downgradedRuns.push(openDowngradedRun)
@@ -644,6 +651,7 @@ export function emptyMetrics() {
     unverifiedAcceptRecovery: null,
     thinDebates: null,
     cacheHitShare: null,
+    cacheUnreportedShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,

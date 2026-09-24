@@ -1164,3 +1164,66 @@ describe('route prompt cache key', () => {
     ])
   })
 })
+
+describe('cache-count reporting', () => {
+  /** A chat-completions turn whose wire reports 2 of 5 prompt tokens as cached. */
+  const cachedTextEvents = [
+    textEvents[0]!,
+    textEvents[1]!,
+    '{"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":2}}}',
+    '[DONE]',
+  ]
+
+  /** Mount one openai-responses route over the mock server. */
+  async function responsesRoute(baseURL: string, overrides: Record<string, unknown> = {}): Promise<Context> {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'responses-mock': {
+          apiKeyEnv: 'PI_TEST_KEY',
+          api: 'openai-responses',
+          baseURL,
+          models: [{ id: 'responses-mock-model' }],
+          ...overrides,
+        },
+      },
+    })
+    return ctx
+  }
+
+  it('emits a reported zero on a route whose protocol reports cache counts', async () => {
+    const server = await mockServer([{ events: responsesTextEvents({ input: 5, output: 1 }) }])
+    const ctx = await responsesRoute(server.url)
+    const result = await assemble(ctx, { provider: 'responses-mock', model: 'responses-mock-model', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })
+  })
+
+  it('omits both counts and keeps the whole prompt on an undeclared chat-completions route', async () => {
+    const server = await mockServer([{ events: cachedTextEvents }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1 })
+  })
+
+  it('reports the parsed counts when a chat-completions route declares reported', async () => {
+    const server = await mockServer([{ events: cachedTextEvents }])
+    const ctx = await harness(server.url, { cacheUsage: 'reported' })
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, cacheReadTokens: 2, cacheWriteTokens: 0 })
+  })
+
+  it('emits cacheReadTokens 0 for a miss on a reported route', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await harness(server.url, { cacheUsage: 'reported' })
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })
+  })
+
+  it('omits both counts when a route declares unreported over a reporting protocol', async () => {
+    const server = await mockServer([{ events: responsesTextEvents({ input: 5, output: 1 }) }])
+    const ctx = await responsesRoute(server.url, { cacheUsage: 'unreported' })
+    const result = await assemble(ctx, { provider: 'responses-mock', model: 'responses-mock-model', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1 })
+  })
+})

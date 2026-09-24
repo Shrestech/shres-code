@@ -10,7 +10,7 @@ import { CompactionEngine, ManualCompactionError } from '@shres-code/shres-code-
 import type { CompactionFailureFacts, CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
 import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session } from '@shres-code/shres-code-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever, errorChain } from '@shres-code/shres-code-llm'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever, errorChain, promptTokens } from '@shres-code/shres-code-llm'
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
@@ -191,7 +191,7 @@ function summarizationOverflowExhausted(
   const target = facts === undefined ? 'an unreported target' : `${facts.provider}/${facts.model}`
   const usage = facts?.usage === undefined
     ? 'no usage'
-    : `${facts.usage.inputTokens + (facts.usage.cacheReadTokens ?? 0) + (facts.usage.cacheWriteTokens ?? 0)} prompt tokens`
+    : `${promptTokens(facts.usage)} prompt tokens`
   const message = `compaction could not summarize a ${overflowed.regionTokens}-token region after ${attempts} `
     + `${attempts === 1 ? 'attempt' : 'attempts'} (summarizer ${target}; last attempt reported ${usage}: `
     + `${errorChain(overflowed.error)}); reduce the retained history, point summarization at `

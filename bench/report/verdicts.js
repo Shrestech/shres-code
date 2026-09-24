@@ -11,7 +11,7 @@
  * stratum floor is not computed — see bench/README.md):
  * - H2 token reduction on the trials where routing acted.
  * - H3 routing adoption, which gates H2.
- * - H4 the churn screen, which is applied only when both arms carry usage data.
+ * - H4 the churn screen, which is applied only when both arms carry cache-read reports.
  * - H5 the compaction pass-rate delta and token ceiling, gated by H6.
  * - H6 compaction-verification adoption.
  *
@@ -42,7 +42,7 @@ export const JEV_ARMS = Object.freeze({
 const ADOPTION_PART = 2
 const ADOPTION_WHOLE = 3
 
-/** Churn-screen coverage floor: 80% of trials in each arm carry usage data. */
+/** Churn-screen coverage floor: 80% of trials in each arm carry a cache-hit share. */
 const COVERAGE_PART = 4
 const COVERAGE_WHOLE = 5
 
@@ -193,7 +193,10 @@ export function verdictRoutingAdoption(trials) {
 /**
  * H4 — the churn screen. `cacheHitShare(route-on) ≥ cacheHitShare(route-off) −
  * 5 points`, applied only when at least 80% of the trials in **both** arms
- * carry usage data; a shortfall is not-evaluable with the null share as its
+ * carry a reported cache-read count. The share is the root session's
+ * `metrics.cacheHitShare`: a trial whose usage records reported no cache-read
+ * count has none, because an unreported count is not a measured miss. A
+ * shortfall is not-evaluable with the null share as its
  * reason. The point estimate is each arm's mean per-trial share (the aggregate
  * the report shows); the interval is a paired bootstrap over the matched
  * per-pair share deltas.
@@ -201,7 +204,7 @@ export function verdictRoutingAdoption(trials) {
  * @returns {ReportVerdict} the churn-screen verdict.
  */
 export function verdictChurnScreen(trials) {
-  const rule = `cacheHitShare(${JEV_ARMS.routingTreatment}) ≥ cacheHitShare(${JEV_ARMS.routingControl}) − 5 points, applied only when ≥80% of trials in both arms carry usage data`
+  const rule = `cacheHitShare(${JEV_ARMS.routingTreatment}) ≥ cacheHitShare(${JEV_ARMS.routingControl}) − 5 points, applied only when ≥80% of trials in both arms carry a reported cache-read count`
   const arms = [JEV_ARMS.routingControl, JEV_ARMS.routingTreatment]
   const control = armTrials(trials, JEV_ARMS.routingControl)
   const treatment = armTrials(trials, JEV_ARMS.routingTreatment)
@@ -221,7 +224,7 @@ export function verdictChurnScreen(trials) {
   ].filter(([, c]) => !meetsShare(c.withUsage, c.trials, COVERAGE_PART, COVERAGE_WHOLE))
   if (shortfalls.length > 0) {
     const detail = shortfalls
-      .map(([arm, c]) => `${arm}: cacheHitShare is null on ${c.nullTrials} of ${c.trials} trials (${(100 * c.withUsage / c.trials).toFixed(1)}% carry usage data)`)
+      .map(([arm, c]) => `${arm}: cacheHitShare is null on ${c.nullTrials} of ${c.trials} trials (${(100 * c.withUsage / c.trials).toFixed(1)}% carry a reported cache-read count)`)
       .join('; ')
     return notEvaluable('H4', rule, arms, `the 80% usage-data screen fails — ${detail}`, {
       routeOffUsageTrials: controlCoverage.withUsage,
@@ -249,8 +252,9 @@ export function verdictChurnScreen(trials) {
   // Each arm's estimate is the mean over the trials that carry a share: a
   // null share is a missing datum, and folding it in as 0 would read as a total
   // cache miss and drag the screen in exactly the direction it audits.
-  const meanOn = mean(treatment.filter(t => typeof t.metrics.cacheHitShare === 'number').map(t => /** @type {number} */ (t.metrics.cacheHitShare)))
-  const meanOff = mean(control.filter(t => typeof t.metrics.cacheHitShare === 'number').map(t => /** @type {number} */ (t.metrics.cacheHitShare)))
+  const sharesOf = list => list.map(t => t.metrics.cacheHitShare).filter(share => typeof share === 'number')
+  const meanOn = mean(sharesOf(treatment))
+  const meanOff = mean(sharesOf(control))
   const observed = meanOn - meanOff
   return {
     id: 'H4',

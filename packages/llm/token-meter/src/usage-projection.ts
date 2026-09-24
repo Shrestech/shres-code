@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod'
+import { cacheCount, promptTokens } from '@shres-code/shres-code-llm'
 import type { TokenUsage } from '@shres-code/shres-code-llm'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
@@ -21,39 +22,56 @@ interface TokenUsageState {
   last: UsageSample | null
 }
 
+const BUCKETS = [
+  'uncachedInputTokens',
+  'unreportedInputTokens',
+  'outputTokens',
+  'cacheReadTokens',
+  'cacheWriteTokens',
+] as const satisfies readonly (keyof TokenUsageProjection)[]
+
 const zeroBuckets = (): TokenUsageProjection => ({
   uncachedInputTokens: 0,
+  unreportedInputTokens: 0,
   outputTokens: 0,
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
 })
 
-const bucketsFrom = (usage: TokenUsage): TokenUsageProjection => ({
-  uncachedInputTokens: usage.inputTokens,
-  outputTokens: usage.outputTokens,
-  cacheReadTokens: usage.cacheReadTokens ?? 0,
-  cacheWriteTokens: usage.cacheWriteTokens ?? 0,
-})
+/**
+ * One call's buckets. Unreported input stays out of the uncached bucket, and an
+ * unreported cache count contributes nothing to the reported-count buckets.
+ */
+const bucketsFrom = (usage: TokenUsage): TokenUsageProjection => {
+  const read = cacheCount(usage, 'read')
+  const write = cacheCount(usage, 'write')
+  return {
+    uncachedInputTokens: read === undefined ? 0 : usage.inputTokens,
+    unreportedInputTokens: read === undefined ? usage.inputTokens : 0,
+    outputTokens: usage.outputTokens,
+    cacheReadTokens: read === undefined ? 0 : read,
+    cacheWriteTokens: write === undefined ? 0 : write,
+  }
+}
 
 const bucketsEqual = (left: TokenUsageProjection, right: TokenUsageProjection): boolean =>
-  left.uncachedInputTokens === right.uncachedInputTokens
-  && left.outputTokens === right.outputTokens
-  && left.cacheReadTokens === right.cacheReadTokens
-  && left.cacheWriteTokens === right.cacheWriteTokens
+  BUCKETS.every(bucket => left[bucket] === right[bucket])
 
 const addReplacing = (
   totals: TokenUsageProjection,
   previous: TokenUsageProjection | undefined,
   next: TokenUsageProjection,
-): TokenUsageProjection => ({
-  uncachedInputTokens: totals.uncachedInputTokens - (previous?.uncachedInputTokens ?? 0) + next.uncachedInputTokens,
-  outputTokens: totals.outputTokens - (previous?.outputTokens ?? 0) + next.outputTokens,
-  cacheReadTokens: totals.cacheReadTokens - (previous?.cacheReadTokens ?? 0) + next.cacheReadTokens,
-  cacheWriteTokens: totals.cacheWriteTokens - (previous?.cacheWriteTokens ?? 0) + next.cacheWriteTokens,
-})
+): TokenUsageProjection => {
+  const result = zeroBuckets()
+  for (const bucket of BUCKETS) {
+    result[bucket] = totals[bucket] - (previous === undefined ? 0 : previous[bucket]) + next[bucket]
+  }
+  return result
+}
 
 const projectionSchema = z.object({
   uncachedInputTokens: z.number().int().nonnegative(),
+  unreportedInputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative(),
   cacheWriteTokens: z.number().int().nonnegative(),
@@ -67,9 +85,6 @@ const pressureSchema = z.object({
   contextWindow: z.number().int().positive().optional(),
 }).strict() as unknown as z.ZodType<ContextPressureProjection>
 
-/** Prompt-side pressure of one request: input plus cache traffic, no output. */
-const pressureFrom = (usage: TokenUsage): number =>
-  usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
 
 /** The usage a chunk or finalized message reports for its step, if any. */
 const usageOf = (event: SessionEvent): TokenUsage | undefined =>
@@ -136,7 +151,7 @@ ProjectionDefinition<'tokenUsage', TokenUsageState> = {
     }
   },
   view: state => state.totals,
-  stateVersion: 1,
+  stateVersion: 2,
 }
 
 /**
@@ -181,7 +196,7 @@ ProjectionDefinition<'contextPressure', ContextPressureState> = {
     }
     const usage = usageOf(event)
     if (usage !== undefined) {
-      const pressureTokens = pressureFrom(usage)
+      const pressureTokens = promptTokens(usage)
       if (pressureTokens !== next.pressureTokens || next.sampledSurfaceTokens !== next.surfaceTokens) {
         next = { ...next, pressureTokens, sampledSurfaceTokens: next.surfaceTokens }
       }

@@ -68,10 +68,27 @@ describe('LLM stream invariants', () => {
     ], /usage more than once/],
     [[{ type: 'block-start', index: 0, blockType: 'text' }, finish], /finished with 1 open block/],
     [[finish, { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } }], /usage after terminal finish/],
+    [[
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: -1 } },
+    ], /cacheReadTokens must be a non-negative safe integer when reported, got -1/],
+    [[
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheWriteTokens: 1.5 } },
+    ], /cacheWriteTokens must be a non-negative safe integer when reported, got 1.5/],
     [[], /ended without a terminal finish/],
   ] as Array<[StreamChunk[], RegExp]>)('rejects malformed stream %#', async (chunks, message) => {
     const ctx = await setup()
     await expect(consume(ctx, chunks)).rejects.toThrow(message)
+  })
+
+  it('accepts reported-zero and absent cache counts', async () => {
+    const ctx = await setup()
+    const reported: StreamChunk[] = [
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } },
+      finish,
+    ]
+    const unreported: StreamChunk[] = [{ type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } }, finish]
+    await expect(consume(ctx, reported)).resolves.toEqual(reported)
+    await expect(consume(ctx, unreported)).resolves.toEqual(unreported)
   })
 
   it('preserves provider exceptions without inventing a missing-finish failure', async () => {

@@ -63,6 +63,16 @@ import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
+import {
+  DEFAULT_ACCOUNTING_CONFIG,
+  DEFAULT_PRICES_DIR,
+  emptyAccounting,
+  exactCost,
+  mergeAccounting,
+  priceAccounting,
+  resolveAccountingContext,
+} from './accounting.js'
+import { createDollarBudget } from './dollar-budget.js'
 import { createSerialQueue, mapPool } from './pool.js'
 import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
@@ -92,6 +102,11 @@ Options:
   --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
   --max-total-tokens <n>  live token cap per trial: observed root+descendant usage
                         above the cap terminates the trial as BUDGET_EXCEEDED
+  --max-dollars <usd>   experiment-wide cap in API-equivalent dollars from the price
+                        snapshot: no new trial launches once the cap would be exceeded;
+                        in-flight trials finish. Subscription and unpriced calls are not counted.
+  --price-snapshot <id> bench/prices snapshot (YYYY-MM-DD) to price trials under
+                        (default: the newest snapshot)
   --resume               continue an interrupted experiment: reuse its manifest and
                         skip (task, trial, arm) triples already recorded with a
                         delivered verdict (status success); retried provider-error
@@ -105,6 +120,9 @@ const EXIT_USAGE = 2
 
 /** Exit code when SIGINT/SIGTERM abort the run after in-flight trials drain. */
 const EXIT_ABORTED = 130
+
+/** Exit code when `--max-dollars` stopped launching trials before the plan finished. */
+const EXIT_BUDGET_STOP = 3
 
 /** Default model/temperature pins, overridable by flag or env; recorded in run.json. */
 const DEFAULT_MODEL = 'deepseek-v4-flash'
@@ -147,6 +165,9 @@ export class UsageError extends Error {
  *   root+descendant usage exceeds it is terminated and recorded `BUDGET_EXCEEDED`.
  * @property {boolean} [resume] - continue an interrupted experiment instead of refusing
  *   its existing manifests; delivered-verdict trials are skipped, error trials rerun.
+ * @property {number} [maxDollars] - experiment-wide cap in API-equivalent dollars; no trial
+ *   launches once settled spend plus the in-flight projection would exceed it.
+ * @property {string} [priceSnapshot] - `bench/prices` snapshot id; omission resolves to the newest.
  */
 
 /**
@@ -170,6 +191,8 @@ export function parseArgs(argv) {
     tierPatches: [],
     concurrency: 1,
     maxTotalTokens: undefined,
+    maxDollars: undefined,
+    priceSnapshot: undefined,
     resume: false,
   }
   let armsSeen = false
@@ -234,6 +257,19 @@ export function parseArgs(argv) {
         const parsed = Number(value())
         if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--max-total-tokens must be a positive integer')
         options.maxTotalTokens = parsed
+        break
+      }
+      case '--max-dollars': {
+        const raw = value()
+        const parsed = Number(raw)
+        if (raw.trim() === '' || !Number.isFinite(parsed) || parsed <= 0) throw new UsageError('--max-dollars must be a positive number')
+        options.maxDollars = parsed
+        break
+      }
+      case '--price-snapshot': {
+        const id = value()
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) throw new UsageError('--price-snapshot must be a YYYY-MM-DD snapshot id')
+        options.priceSnapshot = id
         break
       }
       case '--resume':
@@ -545,7 +581,7 @@ function spawnFailureDetail(outcome, execution, where = '') {
 
 /**
  * Execute one harness spawn — a whole single-session trial or one chain phase —
- * and fold its session log into metrics.
+ * and fold its session log into metrics and priced accounting.
  * @param {object} options
  * @param {string} options.repoRoot - harness repository root.
  * @param {{ name: string, jspace: Record<string, unknown> }} options.arm - the arm entry.
@@ -557,9 +593,11 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @param {AbortSignal} [options.signal]
- * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
+ * @param {number} [options.maxTotalTokens] - live per-trial token cap.
+ * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
+ * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null, accounting: import('./accounting.js').TrialAccounting }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
   await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
@@ -572,8 +610,11 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
         expectsResearcher: arm.expectsResearcher ?? false,
       })
   metrics.durationMs = execution.durationMs
+  let accounting = emptyAccounting()
   if (execution.sessionLogPath !== null) {
     const descendants = await descendantUsage(sessionLogRoot, execution.sessionLogPath)
+    accounting = priceAccounting(descendants.sessions, accountingContext)
+    metrics.costIncludingDescendants = exactCost(accounting)
     if (descendants.tokensIncludingDescendants !== null) {
       metrics.tokensIncludingDescendants = descendants.tokensIncludingDescendants
       metrics.descendantSessions = descendants.descendantSessions
@@ -586,7 +627,16 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
   const sessionFile = execution.sessionLogPath === null
     ? null
     : relative(armDir, execution.sessionLogPath).split(sep).join('/')
-  return { execution, metrics, sessionFile }
+  return { execution, metrics, sessionFile, accounting }
+}
+
+/**
+ * Sum the accounting of chain phases; a phase recorded without accounting adds nothing.
+ * @param {import('../schema/trial.js').PhaseRecord[]} phases
+ * @returns {import('./accounting.js').TrialAccounting}
+ */
+export function sumPhaseAccounting(phases) {
+  return phases.reduce((sum, phase) => mergeAccounting(sum, phase.accounting ?? emptyAccounting()), emptyAccounting())
 }
 
 /** Fields summed across phases. */
@@ -637,11 +687,14 @@ export function sumPhaseMetrics(phases) {
     total.ledgerAbandoned = totalDecisions === 0
     total.unverifiedAcceptRecovery = (total.unverifiedRunRefusals ?? 0) > 0 && totalDecisions > 0
   }
+  total.costIncludingDescendants = phases.every(phase => phase.accounting !== undefined)
+    ? exactCost(sumPhaseAccounting(phases))
+    : null
   return total
 }
 
 /** Jev routing/compaction fields a chain trial recomputes from its phase logs instead of summing per phase. */
-const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'cacheUnreportedShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /**
  * Fold a chain trial's Jev routing/compaction fields from its phases.
@@ -650,9 +703,11 @@ const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'modelTransitions', 'downgrade
  * that produced them and count route changes only inside that phase. Re-folding
  * the concatenated phase logs at the trial level recovers the exact counts — a
  * route change at a phase boundary is a real transition — and leaves the null
- * rules to the one fold that owns them: a chain with no usage anywhere keeps
- * `cacheHitShare` null, and a phase that logged no usage contributes nothing to
- * the denominator, so it cannot turn a measurable trial into zero.
+ * rules to the one fold that owns them: a chain with no reported cache-read count
+ * anywhere keeps `cacheHitShare` null, and a phase without one adds its prompt to
+ * `cacheUnreportedShare`, never a miss to the share. The closure-wide
+ * `accounting` shares need no re-fold: they derive from the summed phase token
+ * classes.
  *
  * `downgradedStreaks` is the one field the concatenation cannot state: each
  * phase is its own session, so a run of downgraded turns spanning a phase
@@ -722,14 +777,16 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @param {AbortSignal} [options.signal]
+ * @param {number} [options.maxTotalTokens] - live per-trial token cap.
+ * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   if (task.setup !== null) {
     await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
   }
-  const { execution, metrics, sessionFile } = await executeSpawn({
+  const { execution, metrics, sessionFile, accounting } = await executeSpawn({
     repoRoot,
     arm,
     armDir,
@@ -741,6 +798,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     extraPatchPaths,
     signal,
     maxTotalTokens,
+    accountingContext,
   })
   const outcome = classifySpawn(execution)
   const executionEvidence = {
@@ -749,6 +807,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     budgetExceeded: execution.budgetExceeded,
   }
   const endedAt = new Date().toISOString()
+  const priced = { priceSnapshot: accountingContext.snapshot.id, accounting }
   if (outcome === 'provider-error' || outcome === 'harness-error') {
     return {
       ...base,
@@ -759,6 +818,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
       metrics,
       sessionFile,
       execution: executionEvidence,
+      ...priced,
       endedAt,
     }
   }
@@ -773,6 +833,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     metrics,
     sessionFile,
     execution: executionEvidence,
+    ...priced,
     endedAt,
   }
 }
@@ -796,9 +857,11 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  *   phase records are pushed here so a mid-chain runner failure keeps the evidence.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @param {AbortSignal} [options.signal]
+ * @param {number} [options.maxTotalTokens] - live per-trial token cap.
+ * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -808,7 +871,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
     if (task.setup !== null) {
       await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
     }
-    const { execution, metrics, sessionFile } = await executeSpawn({
+    const { execution, metrics, sessionFile, accounting } = await executeSpawn({
       repoRoot,
       arm,
       armDir,
@@ -820,6 +883,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       extraPatchPaths,
       signal,
       maxTotalTokens,
+      accountingContext,
     })
     phases.push({
       phaseIndex: index,
@@ -829,6 +893,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       timedOut: execution.timedOut,
       budgetExceeded: execution.budgetExceeded,
       metrics,
+      accounting,
       startedAt: phaseStartedAt,
       endedAt: new Date().toISOString(),
     })
@@ -845,6 +910,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
         metrics,
         sessionFile: phases.at(-1).sessionFile,
         phases: [...phases],
+        ...pricedPhases(phases, accountingContext),
         endedAt: new Date().toISOString(),
       }
     }
@@ -863,8 +929,19 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
     metrics,
     sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
     phases: [...phases],
+    ...pricedPhases(phases, accountingContext),
     endedAt: new Date().toISOString(),
   }
+}
+
+/**
+ * The trial-level price fields of a chain: its snapshot id and the summed phase accounting.
+ * @param {import('../schema/trial.js').PhaseRecord[]} phases
+ * @param {import('./accounting.js').AccountingContext} accountingContext
+ * @returns {{ priceSnapshot: string, accounting: import('./accounting.js').TrialAccounting }}
+ */
+function pricedPhases(phases, accountingContext) {
+  return { priceSnapshot: accountingContext.snapshot.id, accounting: sumPhaseAccounting(phases) }
 }
 
 /** Session-query tool names checked by the integrity audit. */
@@ -915,6 +992,8 @@ async function scanSessionLog(sessionLogPath) {
  * @property {NodeJS.ProcessEnv} [env] - environment (default: process.env).
  * @property {(line: string) => void} [print] - plan/progress sink (default: console.log).
  * @property {AbortSignal} [signal] - abort in-flight trials; omit for an uninterruptible run.
+ * @property {string} [pricesDir] - dated price snapshots (default: bench/prices beside this runner).
+ * @property {string} [accountingConfigPath] - accounting configuration (default: bench/accounting.json beside this runner).
  */
 
 /**
@@ -1009,6 +1088,20 @@ export async function main(argv, io = {}) {
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
   const experimentDir = join(benchRoot, 'runs', options.experiment)
 
+  /** @type {import('./accounting.js').AccountingContext} */
+  let accountingContext
+  try {
+    accountingContext = await resolveAccountingContext({
+      pricesDir: io.pricesDir ?? DEFAULT_PRICES_DIR,
+      configPath: io.accountingConfigPath ?? DEFAULT_ACCOUNTING_CONFIG,
+      snapshotId: options.priceSnapshot,
+    })
+  } catch (error) {
+    throw new UsageError(`price accounting: ${/** @type {Error} */ (error).message}`)
+  }
+  const priceSnapshot = accountingContext.snapshot.id
+  const maxDollars = options.maxDollars ?? null
+
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
     print(`model: ${model}  temperature: ${temperature}  baseUrl: ${baseUrl ?? '(provider default)'}`)
@@ -1016,6 +1109,7 @@ export async function main(argv, io = {}) {
       ? ''
       : `  tierPatches: ${tierPatchRecords.map(r => `${r.path} (${r.sha256.slice(0, 12)}…)`).join(', ')}`
     print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
+    print(`priceSnapshot: ${priceSnapshot}  maxDollars: ${maxDollars === null ? '(uncapped)' : maxDollars}`)
     print(`tasks: ${taskIds.join(', ')}`)
     // The integrity check a dry run exists for: render every selected arm's
     // overlay at the per-trial root its first plan entry would use, so a
@@ -1068,6 +1162,7 @@ export async function main(argv, io = {}) {
   const armDirs = new Map()
   /** @type {Map<string, Set<string>>} arm -> delivered `(taskId, trialIndex)` keys to skip on resume. */
   const delivered = new Map()
+  const budget = maxDollars === null ? null : createDollarBudget(maxDollars)
   for (const armName of options.arms) {
     const armDir = join(experimentDir, armName)
     if (options.resume) {
@@ -1080,6 +1175,7 @@ export async function main(argv, io = {}) {
       }
       const mismatches = resumePinMismatches(existing, {
         model, baseUrl, temperature, taskIds, tierPatches: tierPatchRecords, maxTotalTokens: options.maxTotalTokens ?? null, apiKeyEnv,
+        maxDollars, priceSnapshot, accountingConfigSha256: accountingContext.configSha256,
       })
       if (mismatches.length > 0) {
         throw new UsageError(
@@ -1092,6 +1188,8 @@ export async function main(argv, io = {}) {
           if (line.trim() === '') continue
           const trial = JSON.parse(line)
           if (trial.status === 'success') done.add(`${trial.taskId}\u0000${trial.trialIndex}`)
+          // Every recorded trial spent, whether or not it reruns.
+          if (budget !== null && trial.accounting !== undefined) budget.settle(trial.accounting)
         }
       } catch {
         // No trials yet: the manifest alone is resumable.
@@ -1115,6 +1213,9 @@ export async function main(argv, io = {}) {
       apiKeyEnv,
       tierPatches: tierPatchRecords,
       maxTotalTokens: options.maxTotalTokens ?? null,
+      maxDollars,
+      priceSnapshot,
+      accountingConfigSha256: accountingContext.configSha256,
       startedAt,
       endedAt: '',
     }
@@ -1135,6 +1236,9 @@ export async function main(argv, io = {}) {
    * `gitCommit` and `startedAt` deliberately excluded: resuming after a pull is
    * allowed only when the tier patches pin the same harness composition; a
    * changed commit with identical overlays is the same measured condition.
+   * `priceSnapshot` and `accountingConfigSha256` compare only when the stored
+   * manifest records them: a manifest written before the bench priced trials
+   * pins no prices, and its runs stay resumable.
    * @param {Record<string, unknown>} stored - the existing manifest.
    * @param {object} pins - the invocation's pins.
    * @returns {string[]} field names that differ.
@@ -1149,11 +1253,17 @@ export async function main(argv, io = {}) {
     if (JSON.stringify(stored.tierPatches) !== JSON.stringify(pins.tierPatches)) diffs.push('tierPatches')
     if ((stored.maxTotalTokens ?? null) !== pins.maxTotalTokens) diffs.push('maxTotalTokens')
     if (stored.apiKeyEnv !== pins.apiKeyEnv) diffs.push('apiKeyEnv')
+    if ((stored.maxDollars ?? null) !== pins.maxDollars) diffs.push('maxDollars')
+    if (stored.priceSnapshot !== undefined && stored.priceSnapshot !== pins.priceSnapshot) diffs.push('priceSnapshot')
+    if (stored.accountingConfigSha256 !== undefined && stored.accountingConfigSha256 !== pins.accountingConfigSha256) {
+      diffs.push('accountingConfigSha256')
+    }
     return diffs
   }
 
   let finished = 0
   let failed = 0
+  let launched = 0
   const recordQueue = createSerialQueue()
 
   /**
@@ -1162,6 +1272,7 @@ export async function main(argv, io = {}) {
    * @param {PlanEntry} entry
    */
   const runPlanEntry = async entry => {
+    launched += 1
     if (signal?.aborted) return
     const done = delivered.get(entry.arm)
     if (done !== undefined && done.has(`${entry.taskId}\u0000${entry.trialIndex}`)) return
@@ -1216,6 +1327,7 @@ export async function main(argv, io = {}) {
           extraPatchPaths,
           signal,
           maxTotalTokens: options.maxTotalTokens,
+          accountingContext,
         })
       } else {
         chainPhases = []
@@ -1227,6 +1339,7 @@ export async function main(argv, io = {}) {
           extraPatchPaths,
           maxTotalTokens: options.maxTotalTokens,
           signal,
+          accountingContext,
         })
       }
     } catch (error) {
@@ -1248,6 +1361,8 @@ export async function main(argv, io = {}) {
         metrics: await partialMetrics(partial, armDir),
         sessionFile: partial?.at(-1)?.sessionFile ?? null,
         ...(partial === undefined ? {} : { phases: [...partial] }),
+        priceSnapshot,
+        accounting: partial === undefined ? emptyAccounting() : sumPhaseAccounting(partial),
         endedAt: new Date().toISOString(),
       }
     }
@@ -1290,6 +1405,7 @@ export async function main(argv, io = {}) {
     const line = `${JSON.stringify(trial)}\n`
     await recordQueue.enqueue(async () => {
       await appendFile(join(armDir, 'trials.jsonl'), line)
+      if (budget !== null && trial.accounting !== undefined) budget.settle(trial.accounting)
       if (trial.status === 'error') failed += 1
       else finished += 1
       print(
@@ -1299,10 +1415,26 @@ export async function main(argv, io = {}) {
     })
   }
 
-  await mapPool(plan, options.concurrency, runPlanEntry, { signal })
+  await mapPool(plan, options.concurrency, runPlanEntry, {
+    signal,
+    ...(budget === null ? {} : { admit: inFlight => budget.admits(inFlight) }),
+  })
   if (signal?.aborted) {
     print(`[${options.experiment}] aborted: ${finished} completed, ${failed} infrastructure errors`)
     return EXIT_ABORTED
+  }
+
+  const stop = budget?.stop() ?? null
+  if (stop !== null) {
+    stop.notLaunched = plan.length - launched
+    print(
+      `[${options.experiment}] stopped: --max-dollars ${stop.maxDollars} would be exceeded: `
+      + `spent $${stop.spentDollars.toFixed(4)} upper bound, projected $${stop.projectedTrialDollars.toFixed(4)} per trial, `
+      + `${stop.inFlight} in flight; ${stop.notLaunched} planned trials not launched`,
+    )
+  }
+  if (budget !== null && budget.unpricedCalls() > 0) {
+    print(`[${options.experiment}] warning: ${budget.unpricedCalls()} calls had no price in snapshot ${priceSnapshot}; --max-dollars did not count them`)
   }
 
   const endedAt = new Date().toISOString()
@@ -1311,10 +1443,14 @@ export async function main(argv, io = {}) {
     const manifestPath = join(armDir, 'run.json')
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     manifest.endedAt = endedAt
+    // A resume that finishes the plan clears the stop an earlier run recorded.
+    if (stop === null) delete manifest.budgetStop
+    else manifest.budgetStop = stop
     validateRunManifest(manifest)
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
   }
   print(`[${options.experiment}] done: ${finished} completed, ${failed} infrastructure errors`)
+  if (stop !== null) return EXIT_BUDGET_STOP
   return failed === plan.length ? 1 : 0
 }
 
