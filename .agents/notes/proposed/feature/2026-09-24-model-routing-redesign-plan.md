@@ -356,7 +356,7 @@ All three workstreams are separate PRs against master.
 
 #### 2.1.1 Does subscription OAuth honour the 1-hour TTL?
 
-This is unverified. Add an e2e probe, `packages/llm/llm-claude-session/tests/e2e/cache-retention.e2e.spec.ts`, which self-skips without the Claude credential.
+This is unverified. Add an e2e probe under `packages/llm/llm-claude-session/tests/` (`e2e/cache-retention.e2e.spec.ts`), which self-skips without the Claude credential.
 
 1. Build a prefix of at least 2,048 tokens: a fixed system prompt plus one user message.
 2. Send request 1 with `cacheRetention: long`. Assert that the raw response has `usage.cache_creation.ephemeral_1h_input_tokens > 0` and `ephemeral_5m_input_tokens == 0`.
