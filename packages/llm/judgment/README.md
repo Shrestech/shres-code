@@ -61,7 +61,7 @@ interface JudgmentEngineEntry {
 }
 ```
 
-`judgmentEngineId(value)` brands a registry id. The registry rejects a descriptor whose `id` differs from the registered id, a `supportsFitting` flag that disagrees with the engine's `fitting`, and a second registration of one id. The shipped registry ids are `typesafe` ([judgment-typesafe](../judgment-typesafe/README.md), remote) and `shield` ([judgment-shield](../judgment-shield/README.md), local gateway).
+`judgmentEngineId(value)` brands a registry id. The registry rejects a descriptor whose `id` differs from the registered id, a `supportsFitting` flag that disagrees with the engine's `fitting`, and a second registration of one id. The shipped registry ids are `typesafe` ([judgment-typesafe](../judgment-typesafe/README.md), remote), `shield` ([judgment-shield](../judgment-shield/README.md), a deployment-run local gateway), and `laya` ([judgment-laya](../judgment-laya/README.md), a supervised laya-mlx gateway on Apple silicon).
 
 ## Settings
 
@@ -183,7 +183,7 @@ Fitting measures alternatives within one independent judgment operation. It does
 - **The toggle gates consumers, not the engine** — `ctx.judgment.ask` answers while the service is mounted regardless of `judgment.enabled`; a consumer reads the toggle itself and takes its own engine-absent path. A deployment that wants the engine physically out of the composition withdraws the plugin instead.
 - **Consumer decisions are out of scope** — the seam reports probabilities and confidence and applies no threshold, margin, or fallback. A consumer that acts on an answer owns the band it treats as safe, and thresholds do not transfer between question kinds.
 - **State is text** — `JudgmentInput.state` is a string, so a consumer with structured state serializes it itself. Sending the engine a JSON object or an array of text values directly is deferred until a consumer needs it.
-- **Engine status is provider-reported** — the shipped `typesafe` and `shield` engines always report `ready` and surface a missing credential or unreachable endpoint per ask; a provider that supervises a process reports its own lifecycle through `status()`.
+- **Engine status is provider-reported** — the `typesafe` and `shield` engines always report `ready` and surface a missing credential or unreachable endpoint per ask; `laya` reports its supervised gateway's lifecycle through `status()`.
 - **Fitting is provider-optional** — `JudgmentEngine.fitting` is absent when a provider cannot measure and judge atomically. Consumers that need ordered candidate selection must handle an absent capability and the explicit `unfit` capacity result.
 - **The redaction hook covers state only** — question instructions, criteria, options, and levels are consumer-authored and pass through unchanged, and nothing here caps their size. A deployment that must bound egress caps the state it builds.
 - **No session event** — an ask is a model request a consumer made, not a session-log record: nothing in this package emits, replays, or persists. A consumer that must reconstruct why it asked logs its own decision.

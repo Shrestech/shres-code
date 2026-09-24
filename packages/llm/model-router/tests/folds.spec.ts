@@ -330,6 +330,67 @@ describe('stickyState break reasons', () => {
     })
   })
 
+  describe('route-failed decisions', () => {
+    /** Enter a fresh streak on `selection` at `turn` and record its in-turn fallback. */
+    function enterAndFall(session: Session, turn: number, selection: ModelRoutingSelection = CHEAP): void {
+      open(session, turn)
+      session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: turn, entryBase: STRONG_BASE }, { selection }))
+      session.append('model-routing/decision', decision(
+        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { reason: 'route-failed', failure: { code: 'AUTH', provider: selection.provider, model: selection.model } },
+      ))
+      close(session, turn)
+    }
+
+    it('route-failed decisions count toward maxRouteErrors across streaks', () => {
+      const session = scripted('route-failed-across-streaks')
+      enterAndFall(session, 1)
+      // One fallback ends its streak without reaching the two-failure limit.
+      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+      enterAndFall(session, 2)
+      expect(stickyState(session.events)).toMatchObject({
+        active: false,
+        brokenBy: 'route-errors',
+        needsStrongTurn: true,
+        entryBase: STRONG_BASE,
+      })
+    })
+
+    it('restarts the count for another candidate and after a completed candidate turn', () => {
+      const other = scripted('route-failed-other-candidate')
+      enterAndFall(other, 1)
+      enterAndFall(other, 2, MID)
+      expect(stickyState(other.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+
+      const recovered = scripted('route-failed-recovered')
+      enterAndFall(recovered, 1)
+      open(recovered, 2)
+      recovered.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 2, entryBase: STRONG_BASE }))
+      close(recovered, 2)
+      enterAndFall(recovered, 3)
+      expect(stickyState(recovered.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+    })
+
+    it('ends a streak that holds no candidate without counting a failure', () => {
+      const session = scripted('route-failed-no-candidate')
+      rawDecision(session, { active: true, routeErrorLimit: ROUTE_ERROR_LIMIT, turnsElapsed: 0, enteredTurn: 1 })
+      session.append('model-routing/decision', decision(
+        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { reason: 'route-failed', failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model } },
+      ))
+      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0, brokenBy: 'route-failed' })
+    })
+
+    it('ignores a route-failed decision the fold saw while strong', () => {
+      const session = scripted('route-failed-while-strong')
+      session.append('model-routing/decision', decision(
+        { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG_BASE },
+        { reason: 'route-failed', failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model } },
+      ))
+      expect(stickyState(session.events)).toEqual({ active: false, turnsElapsed: 0 })
+    })
+  })
+
   it('resets route failures when a held candidate changes', () => {
     const session = entered('break-route-candidate-transition')
     fail(session, 2, 'RATE_LIMIT')

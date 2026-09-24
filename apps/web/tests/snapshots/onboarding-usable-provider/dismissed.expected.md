@@ -99,6 +99,11 @@
       - button "Cancel"
       - button "Apply" [disabled]
     - listitem:
+      - text: Claude (subscription) claude-session
+      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-claude-session)
+      - button "Cancel"
+      - button "Apply" [disabled]
+    - listitem:
       - text: xAI (pay-per-token) xai-apikey
       - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-xai-apikey)
       - button "Cancel"

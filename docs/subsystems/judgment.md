@@ -185,7 +185,7 @@ interface JudgmentResult {
 
 ## The engine contract
 
-Every engine implements `JudgmentEngine`, and so does the service mounted as `ctx.judgment`. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
+Every engine implements `JudgmentEngine`, and so does the service mounted as `ctx.judgment`. The engine providers are [`judgment-typesafe`](../../packages/llm/judgment-typesafe/README.md), which calls a remote engine, [`judgment-shield`](../../packages/llm/judgment-shield/README.md), which calls a deployment-run loopback gateway, and [`judgment-laya`](../../packages/llm/judgment-laya/README.md), which supervises a local laya-mlx gateway on Apple silicon; the last two share one Shield wire client. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
 
 `fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
 
@@ -286,7 +286,7 @@ interface JudgmentEngine {
 
 ## Engines and dispatch
 
-A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe` and `shield` — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
+A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe`, `shield`, and `laya` — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
 
 Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer`, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
 
@@ -319,9 +319,10 @@ interface JudgmentEngineDescriptor {
 
 ```ts type-equiv
 /**
- * Where an engine sends the state it judges: `none` keeps it in the process,
- * `local` sends it to another process on the same host, and `remote` sends it
- * off the host to a third party.
+ * Where an engine sends the state it judges: `none` keeps it within the
+ * harness process and processes the engine's provider supervises on this host,
+ * `local` sends it to a service on this host that the deployment runs, and
+ * `remote` sends it off the host to a third party.
  */
 type JudgmentEngineEgress = 'none' | 'local' | 'remote'
 ```

@@ -47,6 +47,8 @@ import type { Session } from '@shres-code/shres-code-session'
 import { installSettingsSection } from '@shres-code/shres-code-settings'
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@shres-code/shres-code-user-questions'
 import type { Agent, AgentRegistry } from '@shres-code/shres-code-agent'
+import { foldEscalationTriggers, probeInFlight } from '@shres-code/shres-code-progress-signals'
+import type { EscalationTrigger, EscalationTriggerOutcome } from '@shres-code/shres-code-progress-signals'
 // Type-only edges: resolve `ctx.jspace` and `ctx.agentTeams`.
 import type {} from '@shres-code/shres-code-agent-team'
 import type {} from '@shres-code/shres-code-jspace'
@@ -67,7 +69,7 @@ import {
 } from './config.ts'
 import type { ResolvedWorkerEscalationConfig, WorkerEscalationConfig } from './config.ts'
 import { foldWorkerDigest, renderWorkerDigest } from './digest.ts'
-import { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, probeInFlight } from './fold.ts'
+import { foldEscalationAging, foldEscalationCooldown } from './fold.ts'
 import type { EscalationAgingState } from './fold.ts'
 import { composeProgressState } from './progress.ts'
 import type {
@@ -76,8 +78,6 @@ import type {
   EscalationChoice,
   EscalationConsultReason,
   EscalationEngineClass,
-  EscalationTrigger,
-  EscalationTriggerOutcome,
   WorkerEscalationDigest,
 } from './types.ts'
 
@@ -97,13 +97,11 @@ export {
   DEFAULT_MAX_EXCERPT_CHARS,
   DEFAULT_MIN_STEPS_BETWEEN,
   DEFAULT_TRIGGER_THRESHOLDS,
-  ESCALATION_TRIGGERS,
   WORKER_ESCALATION_SETTINGS_NAMESPACE,
   resolveConfig,
 } from './config.ts'
-export { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, foldProgressFacts, triggerSatisfiedAt } from './fold.ts'
-export { canonicalizeArguments, callChainKey, foldToolWindow, isSandboxDenial } from './fold.ts'
-export type { EscalationAgingState, EscalationCooldownState, WorkerToolWindowEntry } from './fold.ts'
+export { foldEscalationAging, foldEscalationCooldown } from './fold.ts'
+export type { EscalationAgingState, EscalationCooldownState } from './fold.ts'
 export { foldTeamMessages, foldWorkerDigest, foldWorkerCharter, renderWorkerDigest } from './digest.ts'
 export type { WorkerAssignmentFold, WorkerDigestCaps } from './digest.ts'
 export { composeProgressState } from './progress.ts'
@@ -599,7 +597,7 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
     // verdict reads a log in which the probe's exclusion is complete.
     if (probeInFlight(session.events)) return
     const anchorSeq = epochAnchorSeq(ctx, session)
-    const outcomes: readonly EscalationTriggerOutcome[] = foldEscalationTriggers(session.events, current, anchorSeq)
+    const outcomes: readonly EscalationTriggerOutcome[] = foldEscalationTriggers(session.events, current.triggers, anchorSeq)
     const firing = outcomes.find(outcome => outcome.fired)
     const triggerSeq = firing?.triggerSeq
     if (firing === undefined || triggerSeq === undefined) return

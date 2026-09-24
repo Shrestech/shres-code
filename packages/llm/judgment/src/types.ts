@@ -306,9 +306,10 @@ export interface JudgmentSettings {
 export type JudgmentErrorCode = 'UNCONFIGURED' | 'UNAVAILABLE' | 'INPUT_TOO_LARGE' | 'INVALID_ANSWER' | 'ABORTED'
 
 /**
- * Where an engine sends the state it judges: `none` keeps it in the process,
- * `local` sends it to another process on the same host, and `remote` sends it
- * off the host to a third party.
+ * Where an engine sends the state it judges: `none` keeps it within the
+ * harness process and processes the engine's provider supervises on this host,
+ * `local` sends it to a service on this host that the deployment runs, and
+ * `remote` sends it off the host to a third party.
  */
 export type JudgmentEngineEgress = 'none' | 'local' | 'remote'
 

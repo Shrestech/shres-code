@@ -454,6 +454,19 @@ interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
+  /**
+   * Provider-executed tools this model's route serves inside the conversation;
+   * absent declares none, so the local tool catalog applies unchanged.
+   */
+  hostedTools?: readonly HostedTool[]
+  /**
+   * Prompt-cache lifetime this route requests, in milliseconds: how long a
+   * cached prefix stays readable after the start of the request that wrote or
+   * last read it, generation time included. `0` declares that the route writes
+   * no prompt cache. The value states what the adapter asks for; an upstream
+   * may retain a prefix for less. Absent means the adapter does not know.
+   */
+  promptCacheTtlMs?: number
 }
 ```
 
@@ -642,6 +655,14 @@ interface LlmDiscoveredModel {
    * route's catalog or `defaultInput` fallback rather than a claim.
    */
   input?: readonly ModelModality[]
+  /**
+   * The endpoint declares audio input (speech-to-text) for this model.
+   * Display metadata only: the chat conversation never constructs audio
+   * parts, so this is not a chat modality and lives outside {@link input}.
+   */
+  audioInput?: boolean
+  /** The endpoint declares audio output (text-to-speech) for this model. */
+  audioOutput?: boolean
 }
 ```
 
@@ -895,7 +916,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:287`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:297`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 

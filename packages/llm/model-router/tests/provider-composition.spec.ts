@@ -424,4 +424,35 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
     expect(Object.keys(routeCriteria(1))).toEqual([KEEP_CURRENT_OPTION_ID, CANDIDATE_ID])
     expect(Object.keys(routeCriteria(2))).toEqual([KEEP_CURRENT_OPTION_ID, CANDIDATE_ID])
   })
+
+  it('a 500 from the candidate completes the turn on the manual model', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    modelServer = await startMockLlmServer({ sequence: ['server_error', 'success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
+    judgmentServer = new LoopbackJudgmentServer([{ choice: CANDIDATE_ID, score: 2 }], provider)
+    const loaded = await loadSpine(await judgmentServer.start(), provider)
+    const agent = createAgent(loaded, 'provider-candidate-500')
+
+    await turn(agent, 'Use the cheaper route for this small lookup.')
+
+    // The candidate request failed; the same step was retried on the manual model.
+    expect([requestedModel(0), requestedModel(1)]).toEqual([CANDIDATE_MODEL, MANUAL_MODEL])
+    expect(modelServer.requests).toHaveLength(2)
+    const log = agent.session.events
+    const decisions = eventsOfType(log, 'model-routing/decision').map(event => event.data)
+    expect(decisions.map(decision => decision.reason)).toEqual(['gate-passed', 'route-failed'])
+    expect(decisions[1]).toMatchObject({
+      outcome: 'kept-strong',
+      failure: { provider: PROVIDER, model: CANDIDATE_MODEL },
+      failedChunkSeq: expect.any(Number),
+      sticky: { active: false, brokenBy: 'route-failed', entryBase: { provider: PROVIDER, model: MANUAL_MODEL } },
+    })
+    const headers = eventsOfType(log, 'request/header').map(event => event.data.header.config.model)
+    expect(headers).toEqual([CANDIDATE_MODEL, MANUAL_MODEL])
+    // The fallback decision precedes the retried request's header.
+    const fallbackSeq = eventsOfType(log, 'model-routing/decision')[1]!.seq
+    expect(fallbackSeq).toBeLessThan(eventsOfType(log, 'request/header')[1]!.seq)
+    expect(eventsOfType(log, 'turn/end').map(event => event.data.reason.kind)).toEqual(['completed'])
+    expect(eventsOfType(log, 'assistant/message').at(-1)?.data.message.source).toMatchObject({ model: MANUAL_MODEL })
+    // The judgment was asked once; the retry reused the step's manual pin.
+    expect(judgmentServer.requests).toHaveLength(1)
+  })
 })

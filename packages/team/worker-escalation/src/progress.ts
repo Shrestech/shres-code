@@ -14,24 +14,23 @@
  * @module @shres-code/shres-code-worker-escalation/progress
  */
 
+import { foldProgressFacts, foldToolWindow } from '@shres-code/shres-code-progress-signals'
+import type { ProgressFacts, ToolWindowEntry } from '@shres-code/shres-code-progress-signals'
 import type { Session } from '@shres-code/shres-code-session'
 import type { ResolvedWorkerEscalationConfig } from './config.ts'
 import { boundText } from './digest.ts'
-import { foldProgressFacts, foldToolWindow } from './fold.ts'
-import type { WorkerToolWindowEntry } from './fold.ts'
-import type { WorkerEscalationProgressFacts } from './types.ts'
 
 /**
  * One trailing tool outcome, as the state renders it.
  * @param entry - the call and the result that answered it.
  * @returns the line: the success marker, the tool name, and the call's seq.
  */
-function toolLine(entry: WorkerToolWindowEntry): string {
+function toolLine(entry: ToolWindowEntry): string {
   return (entry.ok ? 'ok ' : 'FAIL ') + entry.name + ' seq=' + String(entry.seq)
 }
 
 /** The numbers-first block, ahead of every tool line. */
-function numberLines(facts: WorkerEscalationProgressFacts): string[] {
+function numberLines(facts: ProgressFacts): string[] {
   return [
     'Tool outcomes: ok=' + String(facts.ok) + ' fail=' + String(facts.fail),
     'Distinct failed approaches this goal epoch: ' + String(facts.attemptCount),
@@ -55,7 +54,7 @@ export function composeProgressState(
   config: ResolvedWorkerEscalationConfig,
   epochAnchorSeq: number,
 ): string {
-  const lines = numberLines(foldProgressFacts(session.events, config, epochAnchorSeq))
+  const lines = numberLines(foldProgressFacts(session.events, config.triggers, epochAnchorSeq))
   const window = foldToolWindow(session.events, config.maxDigestTools)
   if (window.length > 0) lines.push('Recent tool outcomes:\n' + window.map(toolLine).join('\n'))
   return boundText(lines.join('\n'), config.maxDigestChars)

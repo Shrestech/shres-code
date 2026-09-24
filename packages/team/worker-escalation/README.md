@@ -57,7 +57,7 @@ The package registers the `worker-escalation` settings namespace so a deployment
 
 ## Triggers
 
-Each verdict reports the newest event that satisfies its trigger, so a standing condition keeps pointing at fresh evidence rather than at the moment it began. A trigger that measures failures treats a sandbox policy denial and a charter-discrimination probe run as transparent: they neither count nor reset the run, because the harness's own refusals are not approaches the worker chose. A probe run is dispatched inside the call that registered the probed check, and that call's own result lands after the run's markers, so no verdict is taken while the registering call is open: the exclusion is read from the log rather than from the order its records arrive in.
+The five triggers are folded by [`progress-signals`](../progress-signals/README.md#triggers), which owns their semantics: newest-evidence verdicts, the transparent sandbox denials and charter-probe runs, the durable-failure taxonomy, and the progress floor. This package resolves one row per trigger from its config, passes the goal epoch's anchor, and takes no verdict while a probe-registering call is open. The table maps each row's threshold key to its trigger.
 
 | Trigger | Fires on | Scope |
 |---|---|---|
@@ -67,9 +67,7 @@ Each verdict reports the newest event that satisfies its trigger, so a standing 
 | `stepBudgetExhausted` | `exhaustions` `step-budget/exhausted` records on the epoch. | The goal epoch. |
 | `turnFailureStreak` | Consecutive durable `turn/end` failures reaching `streak`. | Whole log; any other turn end resets the streak. |
 
-A durable turn failure is an `error` reason whose code is neither `ABORTED` nor `UNKNOWN` — the same taxonomy model-routing's route-failure trigger counts. A sandbox denial is recognized by the structured `FS_SANDBOX_DENIED` code or by the rendered `[sandbox: file access denied under <mode> mode]` marker, which are the two carriers the enforcing tool families produce.
-
-The goal epoch's anchor is the jspace card's own `goalOpenedSeq`; without an open card the ladder folds the whole log. The `attemptCount` window then restarts at the newest passing charter `checkpoint` or `ship` run, because verified progress clears the failures before it.
+The goal epoch's anchor is the jspace card's own `goalOpenedSeq`; without an open card the ladder folds the whole log.
 
 ## Decisions and the terminal
 
@@ -170,9 +168,7 @@ None. No conversation prefix changes: the ask is a provider frame, and the optio
 - **The terminal makes no ask** — the epoch's `maxContinues` rule resolves before any consult runs, so the one firing trigger that reports the worker blocked contributes no labeled answer.
 - **The gates are provisional, and the tier is an alias** — `confidence` and `margin` default to model-routing's measured operating points rather than a labeled stuck-worker set, and `judgmentTier` names a seam tier that a provider resolves to a model id, so two tiers resolving to one model are not distinguishable from the decision alone.
 - **A slow engine serializes one session's decisions** — one evaluation runs per session at a time and each waits for its ask, so an engine that takes seconds delays that session's next decision. The ask carries the ladder's lifetime signal, and a provider bounds it with its own timeout.
-- **The durable-failure taxonomy is restated, and it degrades loudly** — model-routing's route-failure predicate is private to that package, so `turnFailureStreak` restates it: a failure a recovery listener absorbs without scheduling a retry leaves no `turn/end` error, a throw the harness flattens to `UNKNOWN` is not attributable, a crash-orphaned turn closes as `interrupted`, and auxiliary calls never log a failure — none of them advances the streak.
 - **A report the mailbox refuses is not recorded** — the terminal decision is appended only after `team_send` accepts the report, so the epoch stays open and a later firing trigger retries it. A worker that is not a Team member (no `agentTeams`, or no roster entry) can therefore never reach the terminal: it keeps logging continues until `maxContinues`, then logs nothing further and warns once per cooldown window.
 - **Epoch scoping needs the jspace card** — `attemptCount` and `stepBudgetExhausted` anchor on `goalOpenedSeq` and fall back to the whole log without an open card. A worker composition without the jspace seat loses the epoch boundary, not the trigger.
 - **A single hung step never reaches another decision** — the cooldown counts `step/end` events, so a worker stuck inside one step is invisible to `minStepsBetween`. A wall-clock cooldown is deferred because it would make the fold non-deterministic on replay.
-- **A denial carried only as prose counts as a failure** — a confining provider that reports neither `FS_SANDBOX_DENIED` nor the rendered marker is counted by `errorBurst` and `attemptCount` as a failed approach.
 - **The digest retains mail under the digest cap** — later team messages share `maxDigestChars` with the render rather than owning a cap of their own, so a long steering history elides older mail first and reports the count.

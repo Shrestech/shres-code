@@ -11,6 +11,8 @@ import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, 
 import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
+import type { Api, Model } from '@earendil-works/pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { resolveProfiles } from '../src/config.ts'
 import { PROMPT_CACHE_KEY_FIELDS } from '../src/provider.ts'
@@ -105,10 +107,14 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.requests[0]).toMatchObject({
       model: 'deepseek-v4-flash',
       temperature: 0.2,
-      max_tokens: 77,
       thinking: { type: 'enabled' },
       reasoning_effort: 'max',
     })
+    // pi-ai owns the output-cap field name — a DeepSeek route resolves to
+    // `max_completion_tokens`, a chutes/Moonshot route to `max_tokens` — so
+    // assert the requested cap reaches the provider without pinning that choice.
+    const body = server.requests[0] as { max_tokens?: number; max_completion_tokens?: number }
+    expect(body.max_tokens ?? body.max_completion_tokens).toBe(77)
   })
 
   it('uses a dynamic request effort and reports unsupported efforts before network I/O', async () => {
@@ -445,26 +451,23 @@ describe('provider profile lifecycle', () => {
       providers: { deepseek: {}, openai: {} },
     })
 
-    await expect(ctx.llm.resolveModelInfo('deepseek', 'deepseek-v4-flash'))
-      .resolves.toMatchObject({
-        reasoning: {
-          efforts: [
-            { id: ReasoningEffortId('off'), name: 'Off' },
-            { id: ReasoningEffortId('low'), name: 'Low' },
-            { id: ReasoningEffortId('high'), name: 'High' },
-            { id: ReasoningEffortId('max'), name: 'Max' },
-          ],
-        },
-      })
-    const extended = await ctx.llm.resolveModelInfo('openai', 'gpt-5.6-sol')
-    expect(extended.reasoning?.efforts.map(effort => effort.id)).toEqual([
-      ReasoningEffortId('off'),
-      ReasoningEffortId('low'),
-      ReasoningEffortId('medium'),
-      ReasoningEffortId('high'),
-      ReasoningEffortId('xhigh'),
-      ReasoningEffortId('max'),
-    ])
+    // The installed catalog owns the level lists — they track the dependency, not
+    // this package. The contract under test is that the adapter reports exactly
+    // the catalog's levels, with a label and no invented provider default.
+    const [catalogModel] = getBuiltinModels('deepseek')
+    if (catalogModel === undefined) throw new Error('the installed catalog ships no deepseek model')
+    const deepseekLevels = getSupportedThinkingLevels(catalogModel as Model<Api>)
+    const info = await ctx.llm.resolveModelInfo('deepseek', catalogModel.id)
+    expect(info.reasoning?.efforts.map(effort => effort.id))
+      .toEqual(deepseekLevels.map(level => ReasoningEffortId(level)))
+    for (const effort of info.reasoning?.efforts ?? []) expect(effort.name.length).toBeGreaterThan(0)
+    expect(info.reasoning?.defaultEffort).toBeUndefined()
+
+    const extendedModel = getBuiltinModels('openai').find(model => model.id === 'gpt-5.6-sol')
+    if (extendedModel === undefined) throw new Error('the installed catalog ships no gpt-5.6-sol')
+    const extended = await ctx.llm.resolveModelInfo('openai', extendedModel.id)
+    expect(extended.reasoning?.efforts.map(effort => effort.id))
+      .toEqual(getSupportedThinkingLevels(extendedModel as Model<Api>).map(level => ReasoningEffortId(level)))
     // A catalog model without reasoning is the same case as a hand-declared
     // one: pi-ai reports the single level `off`, which translates to omitting
     // the reasoning option — exactly what naming no effort already does. The
@@ -791,6 +794,33 @@ describe('provider profile lifecycle', () => {
       for await (const _chunk of adapter.stream({ provider: 'anthropic', model: 'claude-sonnet-4', messages: [] })) { /* drain */ }
     })()).rejects.toMatchObject({ code: 'NO_ADAPTER' })
     expect(new LlmError('x', 'X')).toBeInstanceOf(Error)
+  })
+
+  it('declares the owner-supplied prompt-cache lifetime on listed and resolved models', async () => {
+    const asked: Array<[string, string]> = []
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({ deepseek: {} }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      promptCacheTtlMs: (provider, model) => {
+        asked.push([provider, model])
+        return model === 'deepseek-v4-flash' ? 300_000 : undefined
+      },
+    })
+    const listed = await adapter.listModels('deepseek')
+    expect(listed.find(model => model.id === 'deepseek-v4-flash')?.promptCacheTtlMs).toBe(300_000)
+    // An undefined answer declares nothing rather than a placeholder value.
+    expect(listed.find(model => model.id === 'deepseek-v4-pro')).not.toHaveProperty('promptCacheTtlMs')
+    await expect(adapter.resolveModel('deepseek', 'deepseek-v4-flash'))
+      .resolves.toMatchObject({ promptCacheTtlMs: 300_000 })
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-pro')).not.toHaveProperty('promptCacheTtlMs')
+    expect(asked).toContainEqual(['deepseek', 'deepseek-v4-flash'])
+  })
+
+  it('declares no prompt-cache lifetime when the owner supplies no hook', async () => {
+    const adapter = adapterOf({ deepseek: { cacheRetention: 'long' } })
+    // The profile's retention alone does not name the upstream's lifetime.
+    for (const model of await adapter.listModels('deepseek')) expect(model).not.toHaveProperty('promptCacheTtlMs')
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-flash')).not.toHaveProperty('promptCacheTtlMs')
   })
 
   it('rejects unsupported or unresolved image input before provider I/O', async () => {

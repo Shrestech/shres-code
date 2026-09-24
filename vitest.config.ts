@@ -31,6 +31,9 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/hooks/*',
       'packages/terminal/terminal-bash',
       'packages/sandbox/sandbox-local',
+      // laya-mlx is Apple-silicon only; the supervisor suites drive POSIX
+      // shell fixtures and SIGTERM escalation.
+      'packages/llm/judgment-laya',
     ]
   : []
 

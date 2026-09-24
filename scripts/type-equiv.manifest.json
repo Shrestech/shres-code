@@ -2532,6 +2532,11 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingFailure",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStickyState",
       "source": "packages/llm/model-router/src/folds.ts"
     },
