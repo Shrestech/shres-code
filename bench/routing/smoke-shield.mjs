@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 import { Context } from '../../vendor/cordis/lib/index.js'
+import JudgmentDispatch from '../../packages/llm/judgment-dispatch/lib/index.js'
 import ShieldJudgmentEngine from '../../packages/llm/judgment-shield/lib/index.js'
 
 const { values } = parseArgs({ options: {
@@ -15,6 +16,7 @@ for (const name of ['endpoint', 'model', 'output']) {
 
 const ctx = new Context()
 try {
+  await ctx.plugin(JudgmentDispatch, { defaultEngine: 'shield' })
   await ctx.plugin(ShieldJudgmentEngine, {
     endpoint: values.endpoint,
     models: { fast: values.model, accurate: values.model },
@@ -39,6 +41,7 @@ try {
   const result = await engine.ask({
     state: 'Fix the spelling of instalation to installation in README.', questions,
   })
+  assert.equal(result.engineId, 'shield')
   assert.equal(result.engine, 'shield')
   assert.equal(result.model, values.model)
   assert.deepEqual(result.answers.map(answer => answer.kind), ['choice', 'score', 'binary'])

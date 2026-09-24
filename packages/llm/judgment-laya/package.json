@@ -58,6 +58,7 @@
     "@shres-code/shres-code-commands": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:^",
     "@shres-code/shres-code-judgment-shield": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",

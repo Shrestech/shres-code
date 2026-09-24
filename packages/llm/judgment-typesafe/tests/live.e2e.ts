@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type { JudgmentBinaryQuestion, JudgmentChoiceQuestion } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import TypesafeJudgmentEngine, { DEFAULT_ENDPOINT } from '../src/index.ts'
 import { MemoryCredentials } from './credentials-memory.ts'
 
@@ -55,6 +56,7 @@ describe.skipIf(API_KEY === undefined || API_KEY === '')('judgment-typesafe live
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(MemoryCredentials, { [API_KEY_REF]: API_KEY! })
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
     await ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, timeoutMs: 60_000 })
 
     const result = await ctx.judgment.ask({
@@ -63,6 +65,7 @@ describe.skipIf(API_KEY === undefined || API_KEY === '')('judgment-typesafe live
       questions: [BINARY, CHOICE],
     })
 
+    expect(result.engineId).toBe('typesafe')
     expect(result.engine).toBe('typesafe')
     expect(result.model.length).toBeGreaterThan(0)
     expect(result.answers.map(answer => answer.kind)).toEqual(['binary', 'choice'])

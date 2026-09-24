@@ -176,13 +176,16 @@ export type FinishReason = FinishReasonMap[keyof FinishReasonMap]
  * Adapters whose providers fold cache hits into a total prompt count
  * (DeepSeek's `prompt_tokens`) subtract them out.
  *
- * `cacheReadTokens` and `cacheWriteTokens` each record whether the provider
- * reported that count. Present (including 0): the provider reported the count
- * for this call. Absent: the provider did not report it; `inputTokens` may
- * then include cached input. Adapters MUST emit a reported zero and MUST NOT
- * emit an unreported count. The two fields are independent: a provider that
- * reports cache hits but has no write concept omits `cacheWriteTokens`.
- * Consumers read them through `cacheCount` and `promptTokens`.
+ * `cacheReadTokens` decides whether a call's cache counts are reported.
+ * Present (including 0): the provider reported cache use for this call.
+ * Absent: it did not, and `inputTokens` may then include cached input.
+ * `cacheWriteTokens` is reported only alongside a read count; a provider that
+ * reports cache hits but has no write concept omits it. Adapters MUST emit a
+ * reported zero, MUST NOT emit an unreported count, and MUST NOT emit
+ * `cacheWriteTokens` without `cacheReadTokens`. The LLM stream invariant
+ * rejects that shape, and every consumer reads a usage carrying it as
+ * unreported, with its write counted as unreported input. Consumers read the
+ * counts through `cacheCount` and `promptTokens`.
  */
 export interface TokenUsage {
   inputTokens: number

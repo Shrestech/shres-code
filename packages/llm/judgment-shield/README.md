@@ -1,6 +1,6 @@
 # @shres-code/shres-code-judgment-shield
 
-Local provider for the typed-judgment seam (`ctx.judgment`). Each ask posts the consumer's state and typed questions to an explicitly configured local `/v1/judgments` gateway. The gateway owns the model runtime and artifact provenance; this package owns tier-to-artifact selection, cancellation, response-size limits, and response validation.
+Local engine for the typed-judgment seam, registered in `ctx.judgmentEngines` as `shield` for [judgment-dispatch](../judgment-dispatch/README.md) to route asks to. Each ask posts the consumer's state and typed questions to an explicitly configured local `/v1/judgments` gateway. The gateway owns the model runtime and artifact provenance; this package owns tier-to-artifact selection, cancellation, response-size limits, and response validation.
 
 This provider is separate from the `shres-shield` host seat. The host seat exposes the paid Shield security service through `ctx.shield`; this package does not import that service or reinterpret its binary injection score as a choice or score judgment.
 
@@ -22,6 +22,9 @@ The `accurate` mapping is the default for an omitted tier because the cheap tier
 ## Composition
 
 ```yaml
+- name: '@shres-code/shres-code-judgment-dispatch'
+  config:
+    defaultEngine: shield
 - name: '@shres-code/shres-code-judgment-shield'
   config:
     endpoint: 'http://127.0.0.1:8765'
@@ -30,7 +33,7 @@ The `accurate` mapping is the default for an omitted tier because the cheap tier
       accurate: 'convaiinnovations/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982'
 ```
 
-The package has no credential seam and makes no external calls. The owned gateway is responsible for loading and validating its model artifacts before it serves a request.
+The provider injects `judgmentEngines`, so it loads only where the dispatcher does. Its registry descriptor declares `egress: 'local'`, `calibration: 'calibrated'`, and fitting; its status is always `ready`, because an unreachable gateway surfaces per ask as `UNAVAILABLE`. The package has no credential seam and makes no external calls. The owned gateway is responsible for loading and validating its model artifacts before it serves a request.
 
 ## Request and answer validation
 
@@ -42,7 +45,7 @@ Malformed JSON or an invalid answer is `JudgmentError('INVALID_ANSWER')`. A requ
 
 ## Atomic fit-and-ask
 
-When the provider exposes `ctx.judgment.fitting`, a consumer can send ordered complete state alternatives to `/v1/judgments/fitted`. The provider resolves one pinned model, redacts every state exactly once, and sends all resulting states with the typed questions. The gateway selects a state without truncating it and either returns `kind: 'answered'` with the ordinary validated result or returns `kind: 'unfit'` with one of `state`, `head`, `option`, or `batch` capacity reasons. An unfit response does not run inference.
+When the selected engine is this provider, `ctx.judgment.fitting` routes to its fitting capability, and a consumer can send ordered complete state alternatives to `/v1/judgments/fitted`. The provider resolves one pinned model, redacts every state exactly once, and sends all resulting states with the typed questions. The gateway selects a state without truncating it and either returns `kind: 'answered'` with the ordinary validated result or returns `kind: 'unfit'` with one of `state`, `head`, `option`, or `batch` capacity reasons. An unfit response does not run inference.
 
 An answered fit reports `selectedIndex`, `stateTokens`, one `sequenceTokens` count per question, `paddedTokens`, and tokenizer limits containing `maxSequenceTokens`, `maxHeadTokens`, `maxBatchTokens`, and a 64-character `manifestSha256`. The wire fit omits state text; the provider restores the exact redacted state at `selectedIndex` before returning it. It rejects out-of-range indexes, non-finite or inconsistent counts, limit violations, malformed hashes, identity mismatches, and invalid nested answers. The same deadline, response-size cap, and caller-cancellation rules apply to fitted requests, including cancellation after the gateway has produced a response.
 

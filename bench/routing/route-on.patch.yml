@@ -14,9 +14,11 @@
 # without it the profile default is already the candidate and every turn resolves
 # `candidate-equals-base`.
 #
-# The judgment engine and the router are INSERTED, never patched: the base
-# headless composition mounts neither, and a patch against a missing entry
-# no-ops silently, which would leave the arm measuring its own baseline.
+# The judgment dispatcher, the judgment engine, and the router are INSERTED,
+# never patched: the base headless composition mounts none of them, and a patch
+# against a missing entry no-ops silently, which would leave the arm measuring
+# its own baseline. The dispatcher's defaultEngine names the one engine the arm
+# composes.
 #
 # The judgment engine resolves TYPESAFE_API_KEY through the credentials seam on
 # every ask: only the reference name is pinned here, never a key value.
@@ -32,6 +34,10 @@
     provider: "deepseek-official"
     model: "deepseek-v4-pro"
 - insert:
+    - id: judgment-dispatch
+      name: "@shres-code/shres-code-judgment-dispatch"
+      config:
+        defaultEngine: "typesafe"
     - id: judgment-typesafe
       name: "@shres-code/shres-code-judgment-typesafe"
       config:

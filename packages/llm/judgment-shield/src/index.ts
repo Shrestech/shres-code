@@ -1,5 +1,6 @@
 /**
- * Owned local Shield provider for the typed-judgment seam.
+ * Owned local Shield provider for the typed-judgment seam, registered in
+ * `ctx.judgmentEngines` as `shield` for `judgment-dispatch` to route asks to.
  *
  * The provider sends one redacted typed ask to a loopback-only `/v1/judgments`
  * gateway. The gateway owns model execution and artifact provenance; this
@@ -12,11 +13,15 @@
  * @module @shres-code/shres-code-judgment-shield
  */
 
-import { Context } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { JudgmentService } from '@shres-code/shres-code-judgment'
+import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
+  JudgmentEngine,
+  JudgmentEngineDescriptor,
+  JudgmentEngineId,
+  JudgmentEngineStatus,
   JudgmentFittingEngine,
   JudgmentInput,
   JudgmentResult,
@@ -65,11 +70,36 @@ export type { ShieldJudgmentConfig, ShieldJudgmentModels } from './types.ts'
 /** Config omitted by a direct `ctx.plugin(ShieldJudgmentEngine)` call. */
 const NO_CONFIG = {} as ShieldJudgmentConfig
 
+/** Registry id this provider registers its engine under. */
+export const SHIELD_ENGINE_ID: JudgmentEngineId = judgmentEngineId('shield')
+
 /**
- * Local Shield judgment provider. One instance registers `ctx.judgment` and
- * sends no request unless its explicit loopback endpoint is configured.
+ * Registry facts for the Shield engine: a calibrated classifier served by a
+ * gateway process on the same host, with tokenizer-exact fitting.
  */
-export class ShieldJudgmentEngine extends JudgmentService {
+export const SHIELD_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freeze({
+  id: SHIELD_ENGINE_ID,
+  label: 'Shield (local gateway)',
+  egress: 'local',
+  calibration: 'calibrated',
+  supportsFitting: true,
+})
+
+/**
+ * Status of an engine whose gateway availability is owned by the deployment:
+ * an unreachable gateway surfaces per ask as `UNAVAILABLE`.
+ */
+const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
+
+/**
+ * Local Shield judgment engine. One instance registers in
+ * `ctx.judgmentEngines` as {@link SHIELD_ENGINE_ID} and sends no request unless
+ * its explicit loopback endpoint is configured.
+ */
+export class ShieldJudgmentEngine implements JudgmentEngine {
+  /** The engine registry provided by `judgment-dispatch`. */
+  static inject = ['judgmentEngines']
+
   /**
    * Composition schema consumed by the Loader. Endpoint and model pin
    * validation is repeated by {@link resolveConfig} because direct
@@ -89,17 +119,19 @@ export class ShieldJudgmentEngine extends JudgmentService {
   /** Resolved endpoint, artifact pins, deadline, and request/response body caps. */
   readonly config: ResolvedShieldJudgmentConfig
   /** Atomic tokenizer fitting and judgment supplied by this provider. */
-  override readonly fitting: JudgmentFittingEngine
+  readonly fitting: JudgmentFittingEngine
   /** The shared Shield wire client bound to this provider's configuration. */
   private readonly wire: ShieldWireEngine
+  /** The provider's context, read for the redaction hook on each ask. */
+  private readonly ctx: Context
 
   /**
-   * @param ctx - context receiving `ctx.judgment`.
+   * @param ctx - the provider context whose fiber owns the registration.
    * @param config - explicit loopback endpoint and fast/accurate artifact ids.
    * @throws Error when the endpoint is not loopback-only or any config field is invalid.
    */
   constructor(ctx: Context, config: ShieldJudgmentConfig = NO_CONFIG) {
-    super(ctx)
+    this.ctx = ctx
     this.config = resolveConfig(config)
     this.wire = createShieldWireEngine({
       ...this.config,
@@ -107,6 +139,7 @@ export class ShieldJudgmentEngine extends JudgmentService {
       label: 'judgment-shield',
     })
     this.fitting = this.wire.fitting
+    registerJudgmentEngine(ctx, { engine: this, descriptor: SHIELD_ENGINE_DESCRIPTOR, status: () => READY })
   }
 
   /**
@@ -125,7 +158,7 @@ export class ShieldJudgmentEngine extends JudgmentService {
    *   configured request cap, `INVALID_ANSWER` for malformed JSON or answers,
    *   and `ABORTED` when the caller cancels the ask.
    */
-  override ask(input: JudgmentInput): Promise<JudgmentResult> {
+  ask(input: JudgmentInput): Promise<JudgmentResult> {
     return this.wire.ask(input)
   }
 

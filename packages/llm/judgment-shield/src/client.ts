@@ -12,7 +12,7 @@
  * @module @shres-code/shres-code-judgment-shield/client
  */
 
-import { JudgmentError } from '@shres-code/shres-code-judgment'
+import { abortableJudgmentStep, JudgmentError, throwIfJudgmentAborted } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentErrorCode,
@@ -85,41 +85,17 @@ interface AskCancellation {
 export function createShieldWireEngine(options: ShieldWireEngineOptions): ShieldWireEngine {
   const { label } = options
 
+  /** Diagnostic of every caller cancellation this client reports. */
+  const cancelled = `${label} ask was cancelled by the caller`
+
   /** Convert caller cancellation into the seam's stable error class. */
   const throwIfCallerAborted = (signal: AbortSignal | undefined): void => {
-    if (signal?.aborted === true) {
-      throw new JudgmentError('ABORTED', `${label} ask was cancelled by the caller`)
-    }
+    throwIfJudgmentAborted(signal, cancelled)
   }
 
-  /**
-   * Race same-process redaction against caller cancellation without cancelling
-   * the redactor's underlying work. Settlement handlers remain attached so an
-   * uncooperative redactor cannot later produce an unhandled rejection.
-   */
-  const abortable = <T>(operation: () => T | PromiseLike<T>, signal: AbortSignal | undefined): Promise<T> => {
-    if (signal === undefined) return Promise.resolve().then(() => operation())
-    return new Promise<T>((resolve, reject) => {
-      const onAbort = (): void => {
-        signal.removeEventListener('abort', onAbort)
-        reject(new JudgmentError('ABORTED', `${label} ask was cancelled by the caller`))
-      }
-      signal.addEventListener('abort', onAbort, { once: true })
-      void Promise.resolve().then(() => {
-        throwIfCallerAborted(signal)
-        return operation()
-      }).then(
-        (value) => {
-          signal.removeEventListener('abort', onAbort)
-          resolve(value)
-        },
-        (error: unknown) => {
-          signal.removeEventListener('abort', onAbort)
-          reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
-        },
-      )
-    })
-  }
+  /** Race same-process redaction against caller cancellation; see {@link abortableJudgmentStep}. */
+  const abortable = <T>(operation: () => T | PromiseLike<T>, signal: AbortSignal | undefined): Promise<T> =>
+    abortableJudgmentStep(operation, signal, cancelled)
 
   /** Classify a failed fetch or body read with caller cancellation precedence. */
   const stepFailure = (
@@ -129,7 +105,7 @@ export function createShieldWireEngine(options: ShieldWireEngineOptions): Shield
     message: string,
   ): JudgmentError => {
     if (cancellation.caller?.aborted === true) {
-      return new JudgmentError('ABORTED', `${label} ask was cancelled by the caller`, { cause: failure })
+      return new JudgmentError('ABORTED', cancelled, { cause: failure })
     }
     if (cancellation.deadline.aborted) {
       return new JudgmentError(
@@ -278,7 +254,7 @@ export function createShieldWireEngine(options: ShieldWireEngineOptions): Shield
       }
     } catch (error: unknown) {
       if (input.signal?.aborted === true) {
-        throw new JudgmentError('ABORTED', `${label} ask was cancelled by the caller`, { cause: error })
+        throw new JudgmentError('ABORTED', cancelled, { cause: error })
       }
       throw error
     }

@@ -60,7 +60,7 @@ Disable the basic row and insert this one — the same service key, so nothing e
         instructions: Does the summary name a file or symbol that never appeared?
 ```
 
-The engine consumes `ctx.judgment` (any provider behind that seam) and treats `judgmentEnabled(ctx.judgment.settings) === false` exactly as an absent engine.
+The engine consumes `ctx.judgment` (any provider behind that seam) and treats `judgmentEnabled(ctx.judgment.settings) === false` exactly as an absent engine. Every ask carries the consumer id `compaction-jev` (exported as `COMPACTION_JEV_JUDGMENT_CONSUMER`), which a `judgment.overrides` entry can route to another engine.
 
 ## Selection
 

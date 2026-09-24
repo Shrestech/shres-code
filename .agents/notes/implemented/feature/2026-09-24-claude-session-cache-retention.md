@@ -44,6 +44,7 @@ The default stays `short` until that run passes. Its dated result belongs here: 
 
 - Deployments choose the Claude route's cache lifetime explicitly, and the Settings form shows the field. The process-wide `PI_CACHE_RETENTION=long` no longer lengthens this route's cache; a deployment that relied on it sets `cacheRetention: long`.
 - Consumers can read a route's requested lifetime from `listModels` and `resolveModelInfo` without a price or TTL table. The value is what the route asks for; an upstream may retain for less, and only this route declares one today.
+- `promptCacheTtlMs` has producers and validation but no consumer yet: `claude-session` declares it through the `PiAiAdapter` hook and `LlmRuntime` validates it on both paths, but no package reads it to make a decision. Its consumer is the cold-point routing policy, PR 12 of the [model-routing redesign plan](../../proposed/feature/2026-09-24-model-routing-redesign-plan.md), which treats an idle gap longer than the strong route's lifetime as a cold point. Until that policy lands, the field changes no behavior.
 - The generated Cordis API catalog (`packages/extensions/tool-cordis/src/api-catalog.ts`) carries the field, so `cordis_inspect what:"api"` shows it to the model.
 - The live probe costs subscription quota and about seven minutes each run, so it stays opt-in and outside the ordinary e2e run.
 

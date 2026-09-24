@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
 import { credentialRef } from '@shres-code/shres-code-credentials'
-import { JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import type { ResolvedCredential } from '@shres-code/shres-code-credentials'
+import { JudgmentEngineRegistry, JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
   JudgmentChoiceQuestion,
@@ -17,11 +18,30 @@ import TypesafeJudgmentEngine, {
   DEFAULT_TIMEOUT_MS,
   resolveConfig,
   retryWait,
+  TYPESAFE_ENGINE_DESCRIPTOR,
+  TYPESAFE_ENGINE_ID,
 } from '../src/index.ts'
 import type { TypesafeJudgmentConfig } from '../src/index.ts'
 import { MemoryCredentials } from './credentials-memory.ts'
 import { closeMockServers, mockServer } from './mock-server.ts'
 import type { Behavior, MockServer } from './mock-server.ts'
+
+
+/** A context with a bare engine registry, the one service a provider injects. */
+function engineContext(): Context {
+  const ctx = new Context()
+  ctx.provide('judgmentEngines', new JudgmentEngineRegistry((error: unknown) => {
+    throw error
+  }))
+  return ctx
+}
+
+/** The engine this provider registered on `ctx`. */
+function engine(ctx: Context): TypesafeJudgmentEngine {
+  const entry = ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)
+  if (entry === undefined) throw new Error('the engine is not registered')
+  return entry.engine as TypesafeJudgmentEngine
+}
 
 const API_KEY_REF = 'TYPESAFE_API_KEY'
 const ANSWERED_MODEL = 'jev-latest-2026-05-01'
@@ -67,6 +87,46 @@ class StubRedactor extends Service {
   }
 }
 
+/** A promise with its settle functions, for steps a test holds open. */
+interface Deferred<T> {
+  promise: Promise<T>
+  resolve(value: T): void
+  reject(error: Error): void
+}
+
+/** Create one {@link Deferred}. */
+function deferred<T>(): Deferred<T> {
+  const settle: { resolve?: (value: T) => void; reject?: (error: Error) => void } = {}
+  const promise = new Promise<T>((resolve, reject) => {
+    settle.resolve = resolve
+    settle.reject = reject
+  })
+  return {
+    promise,
+    resolve: (value) => {
+      settle.resolve!(value)
+    },
+    reject: (error) => {
+      settle.reject!(error)
+    },
+  }
+}
+
+/** Deployment egress hook that answers from a deferred the test settles. */
+class HangingRedactor extends Service {
+  static calls = 0
+
+  constructor(ctx: Context, private readonly pending: Deferred<string>) {
+    super(ctx, 'judgmentRedactor')
+    HangingRedactor.calls = 0
+  }
+
+  redactState(_state: string): Promise<string> {
+    HangingRedactor.calls += 1
+    return this.pending.promise
+  }
+}
+
 interface HarnessOptions {
   config?: Partial<TypesafeJudgmentConfig>
   seed?: Record<string, string>
@@ -81,7 +141,7 @@ async function harness(
 ): Promise<{ ctx: Context; server: MockServer }> {
   redactions.count = 0
   const server = await mockServer(script)
-  const ctx = new Context()
+  const ctx = engineContext()
   contexts.push(ctx)
   if (options.credentials !== false) {
     await ctx.plugin(MemoryCredentials, options.seed ?? { [API_KEY_REF]: 'key-one' })
@@ -89,13 +149,6 @@ async function harness(
   if (options.redactor === true) await ctx.plugin(StubRedactor)
   await ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, endpoint: server.url, ...options.config })
   return { ctx, server }
-}
-
-/** Dispose one context now and drop it from the afterEach sweep. */
-async function disposeContext(ctx: Context): Promise<void> {
-  const index = contexts.indexOf(ctx)
-  if (index >= 0) contexts.splice(index, 1)
-  await ctx.fiber.dispose()
 }
 
 /** The failure one ask rejected with, asserted to be a judgment failure. */
@@ -251,7 +304,7 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.8 } }) },
     ])
 
-    await ctx.judgment.ask({
+    await engine(ctx).ask({
       state: 'payments are failing',
       questions: [{ ...BINARY, criteria: { yes: 'act now', no: 'wait' } }],
     })
@@ -279,7 +332,7 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'state', questions: [BINARY] })
 
     expect(wireQuestions(server).urgent).toEqual({
       type: 'noul',
@@ -292,7 +345,7 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [{ ...BINARY, criteria: {} }] })
+    await engine(ctx).ask({ state: 'state', questions: [{ ...BINARY, criteria: {} }] })
 
     expect(wireQuestions(server).urgent).not.toHaveProperty('criteria')
   })
@@ -302,7 +355,7 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [{ ...BINARY, criteria: { no: 'wait' } }] })
+    await engine(ctx).ask({ state: 'state', questions: [{ ...BINARY, criteria: { no: 'wait' } }] })
 
     expect(wireQuestions(server).urgent?.criteria).toEqual({ false: 'wait' })
   })
@@ -318,7 +371,7 @@ describe('request mapping', () => {
       },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [CHOICE] })
+    await engine(ctx).ask({ state: 'state', questions: [CHOICE] })
 
     expect(wireQuestions(server).severity).toEqual({
       type: 'choice',
@@ -344,7 +397,7 @@ describe('request mapping', () => {
       },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [SCORE] })
+    await engine(ctx).ask({ state: 'state', questions: [SCORE] })
 
     expect(wireQuestions(server).difficulty).toEqual({
       type: 'score',
@@ -361,9 +414,9 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answered },
     ])
 
-    await ctx.judgment.ask({ state: 'state', questions: [BINARY], tier: 'fast' })
-    await ctx.judgment.ask({ state: 'state', questions: [BINARY], tier: 'accurate' })
-    await ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'state', questions: [BINARY], tier: 'fast' })
+    await engine(ctx).ask({ state: 'state', questions: [BINARY], tier: 'accurate' })
+    await engine(ctx).ask({ state: 'state', questions: [BINARY] })
 
     expect(server.requests.map(request => (request.body as { model: string }).model))
       .toEqual(['jev-preview', 'jev-latest', 'jev-latest'])
@@ -374,7 +427,7 @@ describe('request mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ], { config: { models: { fast: 'fast-id', accurate: 'accurate-id' } } })
 
-    await ctx.judgment.ask({ state: 'state', questions: [BINARY], tier: 'fast' })
+    await engine(ctx).ask({ state: 'state', questions: [BINARY], tier: 'fast' })
 
     expect(wireBody(server).model).toBe('fast-id')
   })
@@ -386,7 +439,7 @@ describe('response mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.83 } }) },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [BINARY] })
 
     expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.83 }])
   })
@@ -402,7 +455,7 @@ describe('response mapping', () => {
       },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [CHOICE] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [CHOICE] })
 
     expect(result.answers).toEqual([{
       kind: 'choice',
@@ -430,7 +483,7 @@ describe('response mapping', () => {
       },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [SCORE] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [SCORE] })
 
     expect(result.answers).toEqual([{
       kind: 'score',
@@ -453,7 +506,7 @@ describe('response mapping', () => {
       },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [CHOICE, BINARY] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [CHOICE, BINARY] })
 
     expect(Object.keys(wireQuestions(server))).toEqual(['severity', 'urgent'])
     expect(result.answers.map(answer => answer.id)).toEqual(['severity', 'urgent'])
@@ -468,7 +521,7 @@ describe('response mapping', () => {
       },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    const result = await engine(ctx).ask({ state: 'state', questions: [BINARY] })
 
     expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.2 }])
   })
@@ -478,7 +531,7 @@ describe('response mapping', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    const result = await ctx.judgment.ask({ state: 'state', questions: [BINARY], tier: 'accurate' })
+    const result = await engine(ctx).ask({ state: 'state', questions: [BINARY], tier: 'accurate' })
 
     expect(result.engine).toBe('typesafe')
     expect(result.model).toBe(ANSWERED_MODEL)
@@ -499,7 +552,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('with type "choice" instead of "noul"')
@@ -510,7 +563,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { noul: 0.5 } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('with type "no type" instead of "noul"')
@@ -521,7 +574,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({}) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('has no answer for question "urgent"')
@@ -530,7 +583,7 @@ describe('response validation', () => {
   it('rejects a body that is not JSON', async () => {
     const { ctx } = await harness([{ kind: 'malformed', status: 200, body: 'not json at all' }])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('body is not JSON')
@@ -539,7 +592,7 @@ describe('response validation', () => {
   it('rejects a JSON body that is not an object', async () => {
     const { ctx } = await harness([{ kind: 'json', status: 200, body: '[1, 2]' }])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('body is not a JSON object')
@@ -551,8 +604,8 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: JSON.stringify({ model: 7, answers: {} }) },
     ])
 
-    const empty = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
-    const numeric = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const empty = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
+    const numeric = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(empty.code).toBe('INVALID_ANSWER')
     expect(empty.message).toContain('has no model id')
@@ -566,8 +619,8 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: JSON.stringify({ model: ANSWERED_MODEL, answers: [] }) },
     ])
 
-    const absent = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
-    const array = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const absent = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
+    const array = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(absent.message).toContain('has no answers object')
     expect(array.message).toContain('has no answers object')
@@ -584,7 +637,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('with option "critical", which it was not asked')
@@ -599,7 +652,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('with no option')
@@ -610,7 +663,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 'high' } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('non-finite noul')
@@ -625,7 +678,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('non-finite noul')
@@ -636,7 +689,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({ severity: { type: 'choice', choice: 'low', confidence: 1 } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('no probabilities object')
@@ -653,7 +706,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('has no probability for option "high"')
@@ -670,7 +723,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('non-finite probability for "low"')
@@ -687,7 +740,7 @@ describe('response validation', () => {
       },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [SCORE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [SCORE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('non-finite confidence')
@@ -698,7 +751,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({ difficulty: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [SCORE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [SCORE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('instead of "score"')
@@ -709,7 +762,7 @@ describe('response validation', () => {
       { kind: 'json', status: 200, body: answerBody({ severity: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [CHOICE] }))
 
     expect(failure.code).toBe('INVALID_ANSWER')
     expect(failure.message).toContain('instead of "choice"')
@@ -722,7 +775,7 @@ describe('provider failures', () => {
       { kind: 'json', status, body: JSON.stringify({ error: { message: `refused ${status}` } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain(`HTTP ${status}`)
@@ -738,7 +791,7 @@ describe('provider failures', () => {
       { kind: 'json', status: 500, body: JSON.stringify({ message: 'backend is down' }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.message).toContain('HTTP 500')
     expect(failure.message).toContain('backend is down')
@@ -747,7 +800,7 @@ describe('provider failures', () => {
   it('reports the status when the error body is not JSON', async () => {
     const { ctx } = await harness([{ kind: 'malformed', status: 502, body: '<html>bad gateway</html>' }])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('HTTP 502')
@@ -757,7 +810,7 @@ describe('provider failures', () => {
   it('reports the status when the error body is JSON that is not an object', async () => {
     const { ctx } = await harness([{ kind: 'json', status: 500, body: 'null' }])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('HTTP 500')
@@ -768,7 +821,7 @@ describe('provider failures', () => {
       { kind: 'json', status: 422, body: JSON.stringify({ error: { code: 'validation_failed' } }) },
     ])
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('HTTP 422')
@@ -782,7 +835,7 @@ describe('credentials', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ], { credentials: false })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'secret state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'secret state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNCONFIGURED')
     expect(failure.message).toContain('mount the credentials seam (ctx.credentials)')
@@ -794,7 +847,7 @@ describe('credentials', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ], { seed: {} })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNCONFIGURED')
     expect(failure.message).toContain(`store ${API_KEY_REF} through the credentials service`)
@@ -806,7 +859,7 @@ describe('credentials', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ], { seed: { [API_KEY_REF]: '' } })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNCONFIGURED')
     expect(server.requests).toEqual([])
@@ -818,9 +871,9 @@ describe('credentials', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    await ctx.judgment.ask({ state: 'first', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'first', questions: [BINARY] })
     await ctx.credentials.set(credentialRef(API_KEY_REF), 'key-two')
-    await ctx.judgment.ask({ state: 'second', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'second', questions: [BINARY] })
 
     expect(server.requests.map(request => request.headers.authorization))
       .toEqual(['Bearer key-one', 'Bearer key-two'])
@@ -833,7 +886,7 @@ describe('state redaction', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ])
 
-    await ctx.judgment.ask({ state: 'the secret is in the state', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'the secret is in the state', questions: [BINARY] })
 
     expect(wireBody(server).state).toBe('the secret is in the state')
     expect(redactions.count).toBe(0)
@@ -845,12 +898,12 @@ describe('state redaction', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
     ], { redactor: true })
 
-    await ctx.judgment.ask({ state: 'the secret is in the state', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'the secret is in the state', questions: [BINARY] })
 
     expect(wireBody(server).state).toBe('the [redacted] is in the state')
     expect(redactions.count).toBe(1)
 
-    await ctx.judgment.ask({ state: 'another secret', questions: [BINARY] })
+    await engine(ctx).ask({ state: 'another secret', questions: [BINARY] })
 
     expect(wireBody(server, 1).state).toBe('another [redacted]')
     expect(redactions.count).toBe(2)
@@ -861,7 +914,7 @@ describe('deadline and cancellation', () => {
   it('fails UNAVAILABLE naming timeoutMs when the request outlives the deadline', async () => {
     const { ctx } = await harness([{ kind: 'stall' }], { config: { timeoutMs: 50 } })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('within timeoutMs 50')
@@ -870,7 +923,7 @@ describe('deadline and cancellation', () => {
   it('fails UNAVAILABLE naming timeoutMs when the body outlives the deadline', async () => {
     const { ctx } = await harness([{ kind: 'partial', status: 200, head: '{"model":"' }], { config: { timeoutMs: 50 } })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('within timeoutMs 50')
@@ -879,32 +932,99 @@ describe('deadline and cancellation', () => {
   it('fails UNAVAILABLE naming timeoutMs when an error body outlives the deadline', async () => {
     const { ctx } = await harness([{ kind: 'partial', status: 500, head: '{"error":' }], { config: { timeoutMs: 50 } })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('within timeoutMs 50')
   })
 
-  it('fails ABORTED when the caller aborted before the ask', async () => {
-    const { ctx } = await harness([{ kind: 'stall' }])
+  it('fails ABORTED when the caller aborted before the ask, consulting neither credentials nor redactor', async () => {
+    const { ctx, server } = await harness([{ kind: 'stall' }], { redactor: true })
+    const resolve = vi.spyOn(ctx.credentials, 'resolve')
     const controller = new AbortController()
     controller.abort()
 
-    const failure = await askFailure(() => ctx.judgment.ask({
+    const failure = await askFailure(() => engine(ctx).ask({
       state: 'state',
       questions: [BINARY],
       signal: controller.signal,
     }))
 
     expect(failure.code).toBe('ABORTED')
-    expect(failure.message).toContain('cancelled by the caller')
+    expect(failure.message).toBe('TypeSafe judgment ask was cancelled by the caller')
+    expect(resolve).not.toHaveBeenCalled()
+    expect(redactions.count).toBe(0)
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it('fails ABORTED at once when the caller aborts during a credential lookup that never settles', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }], { redactor: true })
+    const lookup = deferred<ResolvedCredential | undefined>()
+    const resolve = vi.spyOn(ctx.credentials, 'resolve').mockImplementation(() => lookup.promise)
+    const controller = new AbortController()
+
+    const pending = askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal }))
+    await vi.waitFor(() => {
+      expect(resolve).toHaveBeenCalledTimes(1)
+    })
+    controller.abort()
+    const failure = await pending
+
+    expect(failure.code).toBe('ABORTED')
+    expect(redactions.count).toBe(0)
+    expect(server.requests).toHaveLength(0)
+    // The abandoned lookup settling later, even by failing, reaches no caller.
+    lookup.reject(new Error('credential store went away'))
+    await new Promise(resolveTick => setTimeout(resolveTick, 0))
+  })
+
+  it('fails ABORTED at once when the caller aborts during a redaction that never settles', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }])
+    const redaction = deferred<string>()
+    await ctx.plugin(HangingRedactor, redaction)
+    const controller = new AbortController()
+
+    const pending = askFailure(() => engine(ctx).ask({ state: 'a secret', questions: [BINARY], signal: controller.signal }))
+    await vi.waitFor(() => {
+      expect(HangingRedactor.calls).toBe(1)
+    })
+    controller.abort()
+    const failure = await pending
+
+    expect(failure.code).toBe('ABORTED')
+    expect(server.requests).toHaveLength(0)
+    redaction.reject(new Error('redactor crashed'))
+    await new Promise(resolveTick => setTimeout(resolveTick, 0))
+  })
+
+  it('completes an ask whose slow credential lookup and redaction settle while the caller waits', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }])
+    const lookup = deferred<ResolvedCredential | undefined>()
+    const redaction = deferred<string>()
+    vi.spyOn(ctx.credentials, 'resolve').mockImplementation(() => lookup.promise)
+    await ctx.plugin(HangingRedactor, redaction)
+    const controller = new AbortController()
+
+    const pending = engine(ctx).ask({ state: 'a secret', questions: [BINARY], signal: controller.signal })
+    setTimeout(() => {
+      lookup.resolve({ value: 'slow-key', source: 'memory' })
+    }, 20)
+    await vi.waitFor(() => {
+      expect(HangingRedactor.calls).toBe(1)
+    })
+    redaction.resolve('a [redacted]')
+    const result = await pending
+
+    expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.5 }])
+    expect(server.requests[0]?.headers.authorization).toBe('Bearer slow-key')
+    expect(wireBody(server)['state']).toBe('a [redacted]')
   })
 
   it('fails ABORTED when the caller aborts while the request is outstanding', async () => {
     const { ctx } = await harness([{ kind: 'stall' }])
     const controller = new AbortController()
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY], signal: controller.signal })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal })
     setTimeout(() => { controller.abort() }, 20)
 
     const failure = await askFailure(() => pending)
@@ -916,7 +1036,7 @@ describe('deadline and cancellation', () => {
     const { ctx } = await harness([{ kind: 'partial', status: 200, head: '{"model":"' }])
     const controller = new AbortController()
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY], signal: controller.signal })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal })
     setTimeout(() => { controller.abort() }, 20)
 
     const failure = await askFailure(() => pending)
@@ -928,7 +1048,7 @@ describe('deadline and cancellation', () => {
     const { ctx } = await harness([{ kind: 'partial', status: 500, head: '{"error":' }])
     const controller = new AbortController()
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY], signal: controller.signal })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal })
     setTimeout(() => { controller.abort() }, 20)
 
     const failure = await askFailure(() => pending)
@@ -979,7 +1099,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.7 } }) },
     ])
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY] })
     await drainRefusal(server)
 
     // The refusal is in and the retry is armed on the faked timer: nothing is sent
@@ -1002,7 +1122,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.55 } }) },
     ])
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY] })
     await drainRefusal(server)
     expect(server.requests).toHaveLength(1)
 
@@ -1019,7 +1139,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 429, body: JSON.stringify({ error: { message: 'still busy' } }) },
     ])
 
-    const failure = await askFailure(() => settleRetry(ctx.judgment.ask({ state: 'state', questions: [BINARY] })))
+    const failure = await askFailure(() => settleRetry(engine(ctx).ask({ state: 'state', questions: [BINARY] })))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('HTTP 429')
@@ -1033,7 +1153,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
     ], { config: { retry: { maxRetries: 0 } } })
 
-    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain('slow down')
@@ -1046,7 +1166,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
     ], { config: { retry: { statuses: [503] } } })
 
-    const failure = await askFailure(() => unnamed.ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+    const failure = await askFailure(() => engine(unnamed.ctx).ask({ state: 'state', questions: [BINARY] }))
 
     expect(failure.message).toContain('HTTP 429')
     expect(unnamed.server.requests).toHaveLength(1)
@@ -1058,7 +1178,7 @@ describe('bounded retry', () => {
       { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.6 } }) },
     ], { config: { retry: { statuses: [503] } } })
 
-    const pending = named.ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    const pending = engine(named.ctx).ask({ state: 'state', questions: [BINARY] })
     await drainRefusal(named.server)
     expect(named.server.requests).toHaveLength(1)
 
@@ -1074,7 +1194,7 @@ describe('bounded retry', () => {
     ])
     const controller = new AbortController()
 
-    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY], signal: controller.signal })
+    const pending = engine(ctx).ask({ state: 'state', questions: [BINARY], signal: controller.signal })
     await drainRefusal(server)
     expect(server.requests).toHaveLength(1)
 
@@ -1140,17 +1260,24 @@ describe('retryWait', () => {
     await expect(waiting).resolves.toBeUndefined()
   })
 })
-describe('service registration', () => {
-  it('registers as ctx.judgment and withdraws the service when its fiber disposes', async () => {
-    const { ctx } = await harness([
-      { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) },
+describe('engine registration', () => {
+  it('registers as a ready remote engine and withdraws when its own fiber disposes', async () => {
+    const ctx = engineContext()
+    contexts.push(ctx)
+    const provider = await ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, endpoint: 'http://127.0.0.1:9' })
+
+    const entry = ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)
+    expect(entry?.engine).toBeInstanceOf(TypesafeJudgmentEngine)
+    expect(entry?.descriptor).toBe(TYPESAFE_ENGINE_DESCRIPTOR)
+    expect(entry?.status()).toEqual({ state: 'ready' })
+    expect(ctx.judgmentEngines.list()).toEqual([
+      { id: 'typesafe', label: 'Jev (TypeSafe)', egress: 'remote', calibration: 'calibrated', supportsFitting: false, terms: 'https://typesafe.ai/legal/terms' },
     ])
-
-    expect(ctx.judgment).toBeInstanceOf(TypesafeJudgmentEngine)
-    expect(ctx.get('judgment')).toBeInstanceOf(TypesafeJudgmentEngine)
-
-    await disposeContext(ctx)
-
     expect(ctx.get('judgment')).toBeUndefined()
+
+    await provider.dispose()
+
+    expect(ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)).toBeUndefined()
+    expect(ctx.judgmentEngines.list()).toEqual([])
   })
 })

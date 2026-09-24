@@ -58,13 +58,20 @@ test('shared routing tier composes both providers and preserves route-off absenc
     }, arm)
 
     const router = entries.get('model-router')
+    const dispatch = entries.get('judgment-dispatch')
     if (arm === 'route-off') {
       assert.equal(router, undefined)
+      assert.equal(dispatch, undefined)
       assert.ok(warnings.some(warning => warning.includes('model-router')), warnings.join('\n'))
       continue
     }
 
     assert.equal(router?.name, '@shres-code/shres-code-model-router')
+    // The dispatcher selects the one engine the arm composes.
+    const engine = arm === 'route-on' ? 'typesafe' : 'shield'
+    assert.equal(dispatch?.name, '@shres-code/shres-code-judgment-dispatch', arm)
+    assert.deepEqual(dispatch?.config, { defaultEngine: engine }, arm)
+    assert.equal(entries.get(`judgment-${engine}`)?.name, `@shres-code/shres-code-judgment-${engine}`, arm)
     assert.deepEqual(router?.config?.candidates, [{
       id: 'flash',
       provider: 'ollama-cloud',

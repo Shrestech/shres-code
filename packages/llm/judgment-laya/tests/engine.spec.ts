@@ -1,9 +1,11 @@
+import { existsSync } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
-import { LayaJudgmentEngine } from '../src/index.ts'
+import { LAYA_ENGINE_DESCRIPTOR, LAYA_ENGINE_ID, LayaJudgmentEngine, layaEngineStatus } from '../src/index.ts'
 import { alive, cleanup, fakeInstallation, MODEL_ID, REPO, REVISION, tempRuntime, until, writeBehavior } from './helpers.ts'
 import type { FakeInstallation } from './helpers.ts'
 
@@ -32,10 +34,11 @@ afterEach(async () => {
   await cleanup(root)
 })
 
-/** Mount the subprocess runtime and the provider over the fake installation. */
+/** Mount the subprocess runtime, the dispatcher selecting `laya`, and the provider over the fake installation. */
 async function mount(): Promise<{ ctx: Context; engine: LayaJudgmentEngine }> {
   ctx = new Context()
   await ctx.plugin(LocalSubprocessRuntime)
+  await ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
   await ctx.plugin(LayaJudgmentEngine, {
     model: { repo: REPO, revision: REVISION, manifestSha256: fake.manifestSha256 },
     checkpointContext: 1024,
@@ -48,8 +51,8 @@ async function mount(): Promise<{ ctx: Context; engine: LayaJudgmentEngine }> {
     installTimeoutMs: 10_000,
     restart: { maxRestarts: 2, windowMs: 60_000, backoffMs: 20, maxBackoffMs: 40 },
   })
-  const engine = ctx.get('judgment')
-  if (!(engine instanceof LayaJudgmentEngine)) throw new Error('ctx.judgment is not the Laya provider')
+  const engine = ctx.judgmentEngines.get(LAYA_ENGINE_ID)?.engine
+  if (!(engine instanceof LayaJudgmentEngine)) throw new Error('the laya engine is not registered')
   return { ctx, engine }
 }
 
@@ -69,11 +72,30 @@ class StubRedactor extends Service {
   }
 }
 
+describe('layaEngineStatus', () => {
+  it('reports a stopped gateway as unavailable with its detail and passes every other state through', () => {
+    expect(layaEngineStatus({ state: 'stopped', detail: 'stopped for install' })).toEqual({ state: 'unavailable', detail: 'stopped for install' })
+    expect(layaEngineStatus({ state: 'ready' })).toEqual({ state: 'ready' })
+    expect(layaEngineStatus({ state: 'not-installed', detail: 'run /laya install' })).toEqual({ state: 'not-installed', detail: 'run /laya install' })
+    expect(layaEngineStatus({ state: 'unsupported-host', detail: 'needs Apple silicon' })).toEqual({ state: 'unsupported-host', detail: 'needs Apple silicon' })
+  })
+})
+
 describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
   it('reports not-installed, installs on request, then serves ctx.judgment', async () => {
-    const { engine } = await mount()
+    const { ctx: mounted, engine } = await mount()
+    const entry = mounted.judgmentEngines.get(LAYA_ENGINE_ID)
+    expect(entry?.descriptor).toBe(LAYA_ENGINE_DESCRIPTOR)
+    expect(LAYA_ENGINE_DESCRIPTOR).toEqual({
+      id: 'laya', label: 'Laya (local MLX)', egress: 'none', calibration: 'calibrated', supportsFitting: true, host: 'darwin-arm64',
+    })
     await until(() => engine.status().state === 'not-installed')
     expect(engine.status().detail).toBe('Laya is not installed; run /laya install')
+    expect(entry?.status()).toEqual({ state: 'not-installed', detail: 'Laya is not installed; run /laya install' })
+    await expect(mounted.judgment.ask({ state: 's', questions: [] })).rejects.toMatchObject({
+      code: 'UNAVAILABLE',
+      message: 'judgment engine "laya" is not-installed: Laya is not installed; run /laya install',
+    })
     await expect(engine.ask({ state: 's', questions: [] })).rejects.toMatchObject({ code: 'UNAVAILABLE' })
 
     const first = engine.install()
@@ -87,6 +109,34 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     expect(answered).toMatchObject({ engine: 'shield', model: MODEL_ID, answers: [] })
     const fitted = await engine.fitting.ask({ states: ['hello'], questions: [] })
     expect(fitted.kind).toBe('answered')
+    const dispatched = await mounted.judgment.ask({ state: 'hello', questions: [] })
+    expect(dispatched).toMatchObject({ engineId: 'laya', engine: 'shield', model: MODEL_ID })
+    const dispatchedFit = await mounted.judgment.fitting!.ask({ states: ['hello'], questions: [] })
+    expect(dispatchedFit.kind === 'answered' ? dispatchedFit.result.engineId : undefined).toBe('laya')
+  })
+
+  it('reports the gateway stopped for an install as unavailable in the registry and announces each change', async () => {
+    await writeFile(join(runtimeDir, 'uv-sync-sleep'), '2')
+    const { ctx: mounted, engine } = await mount()
+    const entry = mounted.judgmentEngines.get(LAYA_ENGINE_ID)!
+    await until(() => engine.status().state === 'not-installed')
+    const announced: string[] = []
+    mounted.judgmentEngines.subscribe(() => {
+      announced.push(entry.status().state)
+    })
+
+    const install = engine.install()
+    await until(() => engine.status().state === 'stopped')
+    expect(entry.status()).toEqual({ state: 'unavailable', detail: 'stopped for install' })
+    await expect(mounted.judgment.ask({ state: 's', questions: [] })).rejects.toMatchObject({
+      code: 'UNAVAILABLE',
+      message: 'judgment engine "laya" is unavailable: stopped for install',
+    })
+
+    await install
+    await until(() => engine.status().state === 'ready')
+    expect(announced[0]).toBe('unavailable')
+    expect(announced.at(-1)).toBe('ready')
   })
 
   it('reports a failed install step and stays not-installed', async () => {
@@ -99,7 +149,7 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     expect(engine.status().detail).toBe('Laya is not installed; run /laya install')
   })
 
-  it('withdraws ctx.judgment and stops the gateway process when its fiber disposes', async () => {
+  it('withdraws the engine and stops the gateway process when its fiber disposes', async () => {
     const { ctx: mounted, engine } = await mount()
     await engine.install()
     await until(() => engine.status().state === 'ready')
@@ -110,7 +160,7 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     await mounted.fiber.dispose()
     ctx = undefined
 
-    expect(mounted.get('judgment')).toBeUndefined()
+    expect(mounted.get('judgmentEngines')).toBeUndefined()
     expect(pids.length).toBeGreaterThan(0)
     expect(pids.every(pid => !alive(pid))).toBe(true)
     expect(events).toEqual([])
@@ -138,7 +188,7 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     const { ctx: mounted, engine } = await mount()
     await until(() => engine.status().state === 'not-installed')
     const install = engine.install().catch((error: unknown) => error)
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await until(() => existsSync(join(runtimeDir, 'uv-sync-started')))
 
     await mounted.fiber.dispose()
     ctx = undefined

@@ -80,7 +80,7 @@ One check runs per session at a time. A result committed while an earlier check 
 
 #### What the model sees
 
-Nothing this package writes. It registers no prompt section, tool, message, or injected notice, and no conversation model receives the state: the ask goes to the judgment engine configured at `ctx.judgment` ([its own Model Experience](../../llm/judgment-typesafe/README.md)), and the decision it produces is log-only. A checked call's conversation is unchanged by the check.
+Nothing this package writes. It registers no prompt section, tool, message, or injected notice, and no conversation model receives the state: the ask goes to the judgment engine `ctx.judgment` selects for the consumer id `judgment-guardrails` (exported as `GUARDRAILS_JUDGMENT_CONSUMER`; for example, [TypeSafe's Model Experience](../../llm/judgment-typesafe/README.md)), and the decision it produces is log-only. A checked call's conversation is unchanged by the check.
 
 #### Token effect
 

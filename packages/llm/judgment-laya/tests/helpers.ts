@@ -185,7 +185,9 @@ export interface FakeInstallation {
  * Build a fake installation under `root`. The fake `uv venv` copies an
  * interpreter script into the venv; that script answers `install` by creating
  * the destination directory and otherwise runs the fake gateway. `uv sync`
- * exits with `UV_SYNC_EXIT` from the behavior directory's `uv-sync-exit` file.
+ * first creates `uv-sync-started` in the behavior directory, then sleeps for
+ * the seconds in `uv-sync-sleep` and exits with the code in `uv-sync-exit`
+ * when those files exist.
  */
 export async function fakeInstallation(root: string): Promise<FakeInstallation> {
   const { createHash } = await import('node:crypto')
@@ -210,7 +212,7 @@ export async function fakeInstallation(root: string): Promise<FakeInstallation> 
     '#!/bin/sh',
     'case "$1" in',
     `  venv) mkdir -p "$5/bin" && cp "${pythonTemplate}" "$5/bin/python" && chmod 755 "$5/bin/python" ;;`,
-    '  sync) if [ -f uv-sync-sleep ]; then sleep "$(cat uv-sync-sleep)"; fi; if [ -f uv-sync-exit ]; then echo "uv sync: resolution failed" >&2; exit "$(cat uv-sync-exit)"; fi ;;',
+    '  sync) : > uv-sync-started; if [ -f uv-sync-sleep ]; then sleep "$(cat uv-sync-sleep)"; fi; if [ -f uv-sync-exit ]; then echo "uv sync: resolution failed" >&2; exit "$(cat uv-sync-exit)"; fi ;;',
     'esac',
     '',
   ].join('\n'))

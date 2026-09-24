@@ -4,16 +4,22 @@ Service Definition for the typed-judgment capability seam: typed questions in, p
 
 ## Service API
 
-One provider registers per context as `ctx.judgment` by subclassing the default export. Consumers reach it as `ctx.judgment.ask(input)`.
+One service registers per context as `ctx.judgment`. In a deployment that service is [judgment-dispatch](../judgment-dispatch/README.md), which routes each ask to one engine registered in `ctx.judgmentEngines` (see [Engines](#engines)); a test can mount a single-engine subclass of the default export directly. Consumers reach it as `ctx.judgment.ask(input)`.
 
 ```ts
-import type { JudgmentQuestion, JudgmentAnswer } from '@shres-code/shres-code-judgment'
+import type {
+  JudgmentAnswer,
+  JudgmentConsumerId,
+  JudgmentEngineId,
+  JudgmentQuestion,
+} from '@shres-code/shres-code-judgment'
 
 interface JudgmentInput {
   state: string
   questions: readonly JudgmentQuestion[]
   tier?: 'fast' | 'accurate'
   signal?: AbortSignal
+  consumer?: JudgmentConsumerId
 }
 
 interface JudgmentResult {
@@ -21,12 +27,13 @@ interface JudgmentResult {
   engine: string
   model: string
   latencyMs: number
+  engineId?: JudgmentEngineId
 }
 ```
 
-Answers come back in the order the questions were asked, each carrying its question's `id`. An omitted `tier` resolves to `accurate`: the cheap tier is an explicit optimization, so silence must not weaken a decision. `engine` names the provider that served the ask and `model` the exact model that answered — a provider serving tier aliases reports the model id the alias resolved to, which is what makes an answer reproducible from a log.
+Answers come back in the order the questions were asked, each carrying its question's `id`. An omitted `tier` resolves to `accurate`: the cheap tier is an explicit optimization, so silence must not weaken a decision. `engine` names the provider that served the ask and `model` the exact model that answered — a provider serving tier aliases reports the model id the alias resolved to, which is what makes an answer reproducible from a log. `consumer` names the asking consumer (`judgmentConsumerId(value)` brands it) so a dispatcher can apply a per-consumer engine override, and `engineId` is the registry id of the engine a dispatcher routed the ask to.
 
-Every failure is one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` (no usable credential, thrown before any request), `UNAVAILABLE` (the engine could not be reached or refused the request), `INPUT_TOO_LARGE` (the complete serialized input exceeds a provider limit before transport), `INVALID_ANSWER` (the response did not match the question kind or was malformed), and `ABORTED` (the ask was cancelled through `input.signal`).
+Every failure is one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` (no usable credential, thrown before any request, or a selected engine no provider registered), `UNAVAILABLE` (the engine could not be reached, refused the request, or is not `ready`), `INPUT_TOO_LARGE` (the complete serialized input exceeds a provider limit before transport), `INVALID_ANSWER` (the response did not match the question kind or was malformed), and `ABORTED` (the ask was cancelled through `input.signal`).
 
 ## Atomic fitting
 
@@ -36,15 +43,41 @@ An answered result reports the selected index and exact redacted state, state an
 
 The capability is optional. Consumers that require atomic state selection check `ctx.judgment.fitting` and handle `unfit` explicitly; a provider that only implements `ask()` leaves input sizing to the consumer. Both methods share the same questions, tier, cancellation, answer ordering, and provider failure classes.
 
+## Engines
+
+`ctx.judgmentEngines` is a `JudgmentEngineRegistry` that [judgment-dispatch](../judgment-dispatch/README.md) provides. An engine provider injects `judgmentEngines` and registers one engine from its constructor with `registerJudgmentEngine(ctx, entry)`; the registration is released with the provider's fiber, and the returned function announces a status change to the registry's subscribers. An engine honours `input.signal` at every await: `throwIfJudgmentAborted(signal, message)` is the check before each step, and `abortableJudgmentStep(operation, signal, message)` races same-process work that cannot be cancelled, such as a credential lookup or the redaction hook, so the ask fails `ABORTED` at once.
+
+```ts
+import type {
+  JudgmentEngine,
+  JudgmentEngineDescriptor,
+  JudgmentEngineStatus,
+} from '@shres-code/shres-code-judgment'
+
+interface JudgmentEngineEntry {
+  engine: JudgmentEngine
+  descriptor: JudgmentEngineDescriptor // id, label, egress, calibration, supportsFitting, host?, terms?
+  status(): JudgmentEngineStatus // ready | starting | unavailable | unconfigured | not-installed | unsupported-host
+}
+```
+
+`judgmentEngineId(value)` brands a registry id. The registry rejects a descriptor whose `id` differs from the registered id, a `supportsFitting` flag that disagrees with the engine's `fitting`, and a second registration of one id. The shipped registry ids are `typesafe` ([judgment-typesafe](../judgment-typesafe/README.md), remote), `shield` ([judgment-shield](../judgment-shield/README.md), a deployment-run local gateway), and `laya` ([judgment-laya](../judgment-laya/README.md), a supervised laya-mlx gateway on Apple silicon).
+
+A consumer that names itself on its asks calls `declareJudgmentConsumer(ctx, id)` once; the id is declared in `ctx.judgmentEngines` while both the consumer and the registry are mounted, and the dispatcher accepts a `judgment.overrides` key only for a declared id. The registry reports declarations through `hasConsumer(id)` and `consumers()`, and notifies its subscribers when an id becomes declared or stops being declared.
+
 ## Settings
 
-Mounting an engine installs the Definition-owned `judgment` settings namespace with the composition default `{ enabled: true }`; the toggle exists only where an engine does, so the section appears and disappears with it. A configuration surface writes it through the settings seam like any other section — the schema is `{ enabled: boolean }`.
+The service mounted as `ctx.judgment` installs the Definition-owned `judgment` settings namespace, so the section appears and disappears with it. Under `judgment-dispatch` its composition layer is `{ enabled: true, engine: <defaultEngine> }`; a single-engine subclass mounted directly installs `{ enabled: true }`. A configuration surface writes it through the settings seam like any other section.
 
 ```ts
 interface JudgmentSettings {
   enabled: boolean
+  engine?: string
+  overrides?: Readonly<Record<string, string>> | null
 }
 ```
+
+`engine` selects the engine for every ask and `overrides` selects one per consumer id. An empty engine id, or an id key written without a value, fails the write by field name; the dispatcher additionally rejects an engine no provider registered.
 
 Consumers read the section live and treat `enabled: false` exactly as an absent engine:
 
@@ -60,7 +93,7 @@ function judgmentAvailability(ctx: Context): 'available' | 'engine-absent' {
 
 `ctx.judgment.settings` is the live source thunk — the resolved user layer while a settings service is attached, the composition default otherwise — and `judgmentEnabled(source)` reads `enabled` from it. Nothing is cached and nothing re-registers on a change, so a committed edit reaches the next decision.
 
-The engine itself never consults the toggle: an ask answers whenever the engine is mounted. Turning judgment off is the consumers' documented off-position, which is what keeps the switch from introducing a third behavior mode next to the consumers' existing engine-absent and engine-erroring paths.
+No engine consults the toggle: an ask answers whenever the service is mounted. Turning judgment off is the consumers' documented off-position, which is what keeps the switch from introducing a third behavior mode next to the consumers' existing engine-absent and engine-erroring paths.
 
 ## Question vocabulary
 
@@ -90,9 +123,12 @@ interface JudgmentRedactor {
 
 ## Providers
 
-A provider is one package per engine, mounted as `ctx.judgment` in composition:
+A provider is one package per engine, registered in `ctx.judgmentEngines`; a composition mounts the dispatcher and names the default engine:
 
 ```yaml
+- name: '@shres-code/shres-code-judgment-dispatch'
+  config:
+    defaultEngine: typesafe
 - name: '@shres-code/shres-code-judgment-typesafe'
   config:
     apiKeyRef: TYPESAFE_API_KEY
@@ -146,9 +182,10 @@ Fitting measures alternatives within one independent judgment operation. It does
 
 ## Known Limitations and Deferred Work
 
-- **The toggle gates consumers, not the engine** — `ctx.judgment.ask` answers while the engine is mounted regardless of `judgment.enabled`; a consumer reads the toggle itself and takes its own engine-absent path. A deployment that wants the engine physically out of the composition withdraws the plugin instead.
+- **The toggle gates consumers, not the engine** — `ctx.judgment.ask` answers while the service is mounted regardless of `judgment.enabled`; a consumer reads the toggle itself and takes its own engine-absent path. A deployment that wants the engine physically out of the composition withdraws the plugin instead.
 - **Consumer decisions are out of scope** — the seam reports probabilities and confidence and applies no threshold, margin, or fallback. A consumer that acts on an answer owns the band it treats as safe, and thresholds do not transfer between question kinds.
 - **State is text** — `JudgmentInput.state` is a string, so a consumer with structured state serializes it itself. Sending the engine a JSON object or an array of text values directly is deferred until a consumer needs it.
+- **Engine status is provider-reported** — the `typesafe` and `shield` engines always report `ready` and surface a missing credential or unreachable endpoint per ask; `laya` reports its supervised gateway's lifecycle through `status()`.
 - **Fitting is provider-optional** — `JudgmentEngine.fitting` is absent when a provider cannot measure and judge atomically. Consumers that need ordered candidate selection must handle an absent capability and the explicit `unfit` capacity result.
 - **The redaction hook covers state only** — question instructions, criteria, options, and levels are consumer-authored and pass through unchanged, and nothing here caps their size. A deployment that must bound egress caps the state it builds.
 - **No session event** — an ask is a model request a consumer made, not a session-log record: nothing in this package emits, replays, or persists. A consumer that must reconstruct why it asked logs its own decision.

@@ -82,7 +82,7 @@ import type {} from '@shres-code/shres-code-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.
-import { SettingsConflictError, settingsNamespace } from '@shres-code/shres-code-settings'
+import { SettingsConflictError, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@shres-code/shres-code-settings'
 import { credentialRef } from '@shres-code/shres-code-credentials'
 // Value edge: the rename impl narrows the title service's validation failure; the import also resolves `ctx.get('sessionTitle')`.
@@ -2101,7 +2101,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * the namespace's new redacted view. A namespace outside the configuration
    * boundary is refused before the seam is touched; every seam refusal —
    * unknown or invalid namespace, read-only provider, schema validation,
-   * storage — becomes one `settings-rejected` carrying the seam's own message.
+   * owner validation, storage — becomes one `settings-rejected` carrying the
+   * seam's own message, plus the field path an owner's `SettingsFieldError` names.
    */
   async function settingsWrite(
     request: RpcRequest<unknown>,
@@ -2125,7 +2126,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return err(request, {
         code: 'settings-rejected',
         message: error instanceof Error ? error.message : String(error),
-        details: { ns },
+        details: error instanceof SettingsFieldError ? { ns, path: [...error.path] } : { ns },
       })
     }
     let branded: SettingsNamespace

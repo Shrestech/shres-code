@@ -80,6 +80,28 @@ describe('the judgment settings namespace', () => {
     expect(judgmentEnabled(ctx.judgment.settings)).toBe(true)
   })
 
+  it('rejects an engine id that is empty or written without a value, naming the field', async () => {
+    const { ctx } = await boot()
+
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: '' }))
+      .rejects.toThrow('judgment: engine must name an engine id')
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: null }))
+      .rejects.toMatchObject({ path: ['engine'], message: 'judgment: engine must name an engine id' })
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': null } }))
+      .rejects.toMatchObject({ path: ['overrides', 'model-router'], message: 'judgment: overrides.model-router must name an engine id' })
+    await expect(ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { '': 'laya' } }))
+      .rejects.toMatchObject({ path: ['overrides', ''], message: 'judgment: overrides keys must name a consumer id' })
+    expect(ctx.judgment.settings()).toEqual({ enabled: true })
+  })
+
+  it('accepts a valueless overrides key as no overrides', async () => {
+    const { ctx } = await boot()
+
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'laya', overrides: null })
+
+    expect(ctx.judgment.settings()).toEqual({ enabled: true, engine: 'laya', overrides: null })
+  })
+
   it('falls back to the composition default when the settings service detaches', async () => {
     const { ctx, settings } = await boot()
     await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { enabled: false })

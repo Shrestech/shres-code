@@ -102,6 +102,21 @@ describe('trajectoryRoutingStreak', () => {
       sticky: { active: false, stepsElapsed: 0 },
     }, ['selection']))).toBeUndefined()
   })
+
+  it('marks the entry of a streak logged before step counting, from its turnsElapsed', () => {
+    /** A durable sticky record written before the router counted streaks in steps. */
+    const legacy = (turnsElapsed: number): TrajectoryRoutingDecision['sticky'] => ({
+      active: true, routeErrorLimit: 2, turnsElapsed, enteredTurn: 4,
+    }) as unknown as TrajectoryRoutingDecision['sticky']
+
+    expect(trajectoryRoutingStreak(decision({ sticky: legacy(0) }))).toEqual({ kind: 'entered', turn: 4 })
+    expect(trajectoryRoutingStreak(decision({ sticky: legacy(2) }))).toBeUndefined()
+    // A step-counted record ignores any turnsElapsed it also carries.
+    expect(trajectoryRoutingStreak(decision({
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 3, turnsElapsed: 0, enteredTurn: 4 } as unknown as TrajectoryRoutingDecision['sticky'],
+    }))).toBeUndefined()
+    expect(trajectoryRoutingRow(decision({ sticky: legacy(0) })).streak).toEqual({ kind: 'entered', turn: 4 })
+  })
 })
 
 describe('trajectoryRoutingRow', () => {

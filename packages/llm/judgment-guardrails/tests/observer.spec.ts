@@ -10,16 +10,16 @@
  * this package has no threshold, so every case asserts the class it recorded.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
+import { JUDGMENT_SETTINGS_NAMESPACE, JudgmentEngineRegistry, JudgmentError } from '@shres-code/shres-code-judgment'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { SettingsProvider } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as Guardrails from '../src/index.ts'
-import { INJECTION_QUESTION_ID, SEVERITY_QUESTION_ID, guardStateHash } from '../src/index.ts'
+import { GUARDRAILS_JUDGMENT_CONSUMER, INJECTION_QUESTION_ID, SEVERITY_QUESTION_ID, guardStateHash } from '../src/index.ts'
 import type { GuardrailsConfig } from '../src/index.ts'
 import {
   FakeJudgment,
@@ -147,6 +147,7 @@ describe('the guardrails observer', () => {
     expect(booted.judgment?.asks).toHaveLength(1)
     const ask = booted.judgment?.asks[0]
     expect(ask?.tier).toBe('fast')
+    expect(ask?.consumer).toBe('judgment-guardrails')
     expect(ask?.questions).toEqual([
       {
         kind: 'binary',
@@ -346,6 +347,25 @@ describe('the guardrails observer', () => {
 
     await expect(booted.ctx.settings.replace(Guardrails.GUARDRAILS_SETTINGS_NAMESPACE, { injectionInstructions: '' }))
       .rejects.toThrow(/injectionInstructions must be a non-empty string/)
+  })
+})
+
+describe('the judgment consumer declaration', () => {
+  it('declares judgment-guardrails in the engine registry while the registry is provided', async () => {
+    const booted = await boot({ enabled: true })
+    const engines = new JudgmentEngineRegistry(() => {})
+    const provider = await booted.ctx.plugin({
+      name: 'judgment-engine-registry',
+      apply: (inner: Context) => {
+        inner.provide('judgmentEngines', engines)
+      },
+    })
+
+    await vi.waitFor(() => {
+      expect(engines.consumers()).toEqual([GUARDRAILS_JUDGMENT_CONSUMER])
+    })
+    await provider.dispose()
+    expect(engines.hasConsumer('judgment-guardrails')).toBe(false)
   })
 })
 

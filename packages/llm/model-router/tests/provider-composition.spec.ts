@@ -18,6 +18,8 @@ import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
 import * as LlmRetryPlugin from '@shres-code/shres-code-llm-retry'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
+import { judgmentEngineId } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
 import ShieldJudgmentEngine from '@shres-code/shres-code-judgment-shield'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
@@ -286,6 +288,9 @@ async function loadSpine(endpoint: string, provider: ProviderKind, retry?: Retry
     `- name: '${CREDENTIALS_SPECIFIER}'`,
     '  config:',
     '    TYPESAFE_API_KEY: loader-key',
+    "- name: '@shres-code/shres-code-judgment-dispatch'",
+    '  config:',
+    `    defaultEngine: ${provider}`,
     `- name: '${judgmentSpecifier}'`,
     '  config:',
     ...provider === 'typesafe' ? ['    apiKeyRef: TYPESAFE_API_KEY'] : [
@@ -327,6 +332,7 @@ async function loadSpine(endpoint: string, provider: ProviderKind, retry?: Retry
     ['@shres-code/shres-code-agent-loop', AgentLoop],
     ['@shres-code/shres-code-llm-deepseek', DeepSeekPlugin],
     [CREDENTIALS_SPECIFIER, MemoryCredentials],
+    ['@shres-code/shres-code-judgment-dispatch', JudgmentDispatch],
     [judgmentSpecifier, provider === 'typesafe' ? TypesafeJudgmentEngine : ShieldJudgmentEngine],
     [ROUTER_SPECIFIER, ModelRoutingController],
     [RETRY_SPECIFIER, LlmRetryPlugin],
@@ -399,7 +405,9 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
     const judgmentURL = await judgmentServer.start()
     const loaded = await loadSpine(judgmentURL, provider)
 
-    expect(loaded.get('judgment')).toBeInstanceOf(provider === 'typesafe' ? TypesafeJudgmentEngine : ShieldJudgmentEngine)
+    expect(loaded.get('judgment')).toBeInstanceOf(JudgmentDispatch)
+    expect(loaded.judgmentEngines.get(judgmentEngineId(provider))?.engine)
+      .toBeInstanceOf(provider === 'typesafe' ? TypesafeJudgmentEngine : ShieldJudgmentEngine)
     const keepCurrentAgent = createAgent(loaded, 'provider-keep-current')
     await turn(keepCurrentAgent, 'Keep the manual route for this uncertain turn.')
     const keepCurrentDecision = eventsOfType(keepCurrentAgent.session.events, 'model-routing/decision')[0]

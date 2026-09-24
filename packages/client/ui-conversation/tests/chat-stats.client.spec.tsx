@@ -11,7 +11,9 @@ import { EMPTY_CONVERSATION_VIEWS } from '@shres-code/shres-code-client-runtime/
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
-import { StatsLine, contextOccupancy, deriveStats, formatDuration, formatTokens, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
+import {
+  StatsLine, billedInputTokens, cacheHitPercent, contextOccupancy, deriveStats, formatDuration, formatTokens, type StatsLineProps,
+} from '../src/client/chat/StatsLine.tsx'
 import { en } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -164,6 +166,19 @@ describe('formatters', () => {
   it('formats durations under and over a minute', () => {
     expect(formatDuration(45_230)).toBe('45.2s')
     expect(formatDuration(162_000)).toBe('2m42s')
+  })
+})
+
+describe('cache accounting', () => {
+  it('classifies a call whose write arrived without a read count as unreported input', () => {
+    // The projection token-meter folds for { inputTokens: 100, outputTokens: 5, cacheWriteTokens: 10 }.
+    const unreported = { uncachedInputTokens: 0, unreportedInputTokens: 110, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 }
+    expect(cacheHitPercent(unreported)).toBeNull()
+    expect(billedInputTokens(unreported)).toBe(110)
+    // A reported call beside it keeps its own hit share; the unreported one never dilutes it.
+    const mixed = { ...unreported, uncachedInputTokens: 20, cacheReadTokens: 60, cacheWriteTokens: 20 }
+    expect(cacheHitPercent(mixed)).toBe('60')
+    expect(billedInputTokens(mixed)).toBe(210)
   })
 })
 

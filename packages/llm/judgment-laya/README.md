@@ -1,6 +1,6 @@
 # @shres-code/shres-code-judgment-laya
 
-Local provider for the typed-judgment seam (`ctx.judgment`). The package supervises one loopback [`shres-laya-gateway`](../../../python/laya-gateway/README.md) process that runs a pinned [Laya](https://github.com/NandhaKishorM/laya) checkpoint through [laya-mlx](https://github.com/mizorewww/laya-mlx) on Apple silicon, and answers every ask over the Shield judgment wire through [`createShieldWireEngine`](../judgment-shield/README.md#wire-client). Judgment state never leaves the machine.
+Local engine for the typed-judgment seam, registered in `ctx.judgmentEngines` as `laya` for [judgment-dispatch](../judgment-dispatch/README.md) to route asks to. The package supervises one loopback [`shres-laya-gateway`](../../../python/laya-gateway/README.md) process that runs a pinned [Laya](https://github.com/NandhaKishorM/laya) checkpoint through [laya-mlx](https://github.com/mizorewww/laya-mlx) on Apple silicon, and answers every ask over the Shield judgment wire through [`createShieldWireEngine`](../judgment-shield/README.md#wire-client). Judgment state never leaves the machine.
 
 Installation is explicit: `/laya install` (or `install()`) creates a uv-managed virtual environment, syncs the gateway's hash-locked dependencies, downloads the pinned checkpoint, verifies every file's SHA-256 against the checked-in manifest, and writes an install marker. Every uv command runs with `UV_CACHE_DIR=<runtimeDir>/uv-cache`, `UV_PYTHON_INSTALL_DIR=<runtimeDir>/python`, and `UV_PYTHON_PREFERENCE=only-managed`: the virtual environment uses a uv-managed CPython installed inside `runtimeDir`, never a system or globally installed Python, and uv's global cache is not used. Deleting `runtimeDir` removes everything an install added, and `uv python uninstall` elsewhere cannot break it. The first install downloads that interpreter, about 20–40 MB (CPython 3.11 occupies about 75 MB on disk). The install honours the user's own uv policy: when the environment or a `uv.toml` forbids managed interpreters (`UV_PYTHON_DOWNLOADS=never`, `UV_NO_MANAGED_PYTHON=1`), `uv venv` fails and `/laya install` reports uv's error; the install never falls back to a system Python. Startup never downloads; the gateway runs with `HF_HUB_OFFLINE=1`. Until the gateway is ready, every ask fails `UNAVAILABLE`, so a consumer such as the model router keeps its manual route.
 
@@ -29,14 +29,17 @@ Every field is validated at load; unknown keys fail by name. Relative paths, a r
 | `maxResponseBytes` | `4194304` | Response body cap; at most 64 MiB. |
 | `restart.maxRestarts` / `windowMs` / `backoffMs` / `maxBackoffMs` | `5` / `600000` / `1000` / `30000` | Crash restarts allowed per sliding window, with exponential backoff between them. |
 
-The router's own judgment deadline, when it has one, should exceed `requestTimeoutMs` so a slow ask is classified by this provider.
+`requestTimeoutMs` is this provider's backstop: it bounds every ask from a consumer that sets no deadline of its own, the health check, and the startup smoke ask, which is the first inference after the checkpoint loads. The model router's `judgmentDeadlineMs` (default `1500`) sits below this default, so the router cuts a slow routing ask and its decision records `engineFailure.code: 'DEADLINE'`. A timeout here reports `UNAVAILABLE`, the code this provider also uses for a gateway that is not ready or has exited, so it is the less specific classification of a slow ask. Keep `requestTimeoutMs` above the router's deadline.
 
 ## Composition
 
-Mount the provider in place of `@shres-code/shres-code-judgment-typesafe`; one judgment provider serves a context. The subprocess service must be composed, and `/laya` registers when the command service is.
+Mount the provider beside the dispatcher and select it with `defaultEngine: laya`, or with `judgment.engine: laya` in settings when another engine is the composition default. The subprocess service must be composed, and `/laya` registers when the command service is.
 
 ```yaml
 - name: '@shres-code/shres-code-subprocess-local'
+- name: '@shres-code/shres-code-judgment-dispatch'
+  config:
+    defaultEngine: laya
 - name: '@shres-code/shres-code-judgment-laya'
   config:
     model:
@@ -63,6 +66,7 @@ Disposal clears status listeners, cancels a running install step, fails in-fligh
 | Surface | Contract |
 |---|---|
 | `status()` / `onStatus(listener)` | Current and published `starting`, `ready`, `unavailable`, `not-installed`, `unsupported-host`, or `stopped`, with a detail naming the next action. Listener exceptions are logged. |
+| Registry entry `laya` | Descriptor `egress: 'none'`, `calibration: 'calibrated'`, fitting, `host: 'darwin-arm64'`. Its status is the gateway status, except that `stopped` reports `unavailable` with the same detail; every gateway status change is announced to the registry's subscribers. The dispatcher answers an ask only while the status is `ready`. |
 | `lastExit()` | The last exit's recorded facts. |
 | `install(signal?)` | Stops the gateway, installs, and starts it again whether or not the install succeeded. Concurrent calls share one install. |
 | `restart()` | Stops the gateway, resets the restart budget, and launches. |
@@ -88,6 +92,6 @@ The ask is independent of the conversation model request and neither reads nor e
 
 - **Apple silicon only** — laya-mlx runs on darwin-arm64. Other hosts report `unsupported-host` and never spawn; they use a remote engine or a separately run Shield-wire gateway. A supervised CPU or CUDA gateway is deferred.
 - **Routing accuracy is unmeasured** — the pinned checkpoint is a development baseline for routing; the owning plan's offline replay decides operating points. Confidence from the `choice:11+` temperature bucket is clamped upstream and uncalibrated.
-- **One engine per context** — this package provides `ctx.judgment` directly. Selecting between Laya, TypeSafe, and other engines at runtime needs the planned engine registry and settings section.
+- **Host is checked when a selection is written** — the dispatcher rejects a settings write that selects `laya` on another host; a composition whose `defaultEngine` is `laya` on another host reports `unsupported-host` for every ask.
 - **Gateway project location** — the default `gatewayProject` is the repository copy; a published install must set it, because npm packages do not ship `python/`.
 - **Install needs the network once** — `/laya install` downloads Python packages and about 850 MB of weights. After a verified install, launches run offline.
