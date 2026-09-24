@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Reply with exactly: ROUTED_OK"
+    },
+    {
+      "op": "prompt",
+      "text": "Reply again with exactly: ROUTED_OK"
+    },
+    {
+      "op": "prompt",
+      "text": "Reply once more with exactly: ROUTED_OK"
+    }
+  ]
+}

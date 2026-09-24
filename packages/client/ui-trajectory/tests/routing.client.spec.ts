@@ -104,6 +104,28 @@ describe('trajectoryRoutingStreak', () => {
 })
 
 describe('trajectoryRoutingRow', () => {
+  it('shows an in-turn fallback as a visible streak exit, not a quiet marker', () => {
+    const fallback = decision({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      failure: { code: 'AUTH', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      failedChunkSeq: 9,
+      sticky: {
+        active: false,
+        turnsElapsed: 0,
+        brokenBy: 'route-failed',
+        entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    } as Partial<TrajectoryRoutingDecision>, ['selection', 'route'])
+
+    expect(trajectoryRoutingRow(fallback)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      streak: { kind: 'exited', reason: 'route-failed' },
+      quiet: false,
+    })
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',

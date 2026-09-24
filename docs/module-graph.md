@@ -18,14 +18,17 @@ flowchart TD
     pkg_untrusted_frame["untrusted-frame"]
   end
   subgraph group_llm["packages/llm"]
+    pkg_claude_credential["claude-credential"]
     pkg_codex_credential["codex-credential"]
     pkg_cursor_credential["cursor-credential"]
     pkg_grok_credential["grok-credential"]
     pkg_judgment["judgment"]
     pkg_judgment_guardrails["judgment-guardrails"]
+    pkg_judgment_laya["judgment-laya"]
     pkg_judgment_shield["judgment-shield"]
     pkg_judgment_typesafe["judgment-typesafe"]
     pkg_llm["llm"]
+    pkg_llm_claude_session["llm-claude-session"]
     pkg_llm_cli_bridge["llm-cli-bridge"]
     pkg_llm_codex_session["llm-codex-session"]
     pkg_llm_cursor_session["llm-cursor-session"]
@@ -350,6 +353,7 @@ flowchart TD
   end
   subgraph group_team["packages/team"]
     pkg_agent_team["agent-team"]
+    pkg_progress_signals["progress-signals"]
     pkg_worker_escalation["worker-escalation"]
   end
   subgraph group_terminal["packages/terminal"]
@@ -486,6 +490,8 @@ flowchart TD
   pkg_settings_file --> pkg_home_paths
   pkg_settings_file --> pkg_invariants
   pkg_settings_file --> pkg_settings
+  pkg_claude_credential --> pkg_invariants
+  pkg_claude_credential --> pkg_llm
   pkg_codex_credential --> pkg_invariants
   pkg_codex_credential --> pkg_llm
   pkg_cursor_credential --> pkg_invariants
@@ -542,6 +548,11 @@ flowchart TD
   pkg_judgment_guardrails --> pkg_judgment
   pkg_judgment_guardrails --> pkg_session
   pkg_judgment_guardrails --> pkg_settings
+  pkg_llm_claude_session --> pkg_claude_credential
+  pkg_llm_claude_session --> pkg_invariants
+  pkg_llm_claude_session --> pkg_llm
+  pkg_llm_claude_session --> pkg_llm_pi_ai
+  pkg_llm_claude_session --> pkg_settings
   pkg_llm_cli_bridge --> pkg_credentials
   pkg_llm_cli_bridge --> pkg_invariants
   pkg_llm_cli_bridge --> pkg_launch_environment
@@ -779,6 +790,12 @@ flowchart TD
   pkg_workspace --> pkg_session_persistence
   pkg_workspace --> pkg_storage
   pkg_workspace --> pkg_storage_domain
+  pkg_judgment_laya --> pkg_commands
+  pkg_judgment_laya --> pkg_invariants
+  pkg_judgment_laya --> pkg_judgment
+  pkg_judgment_laya --> pkg_judgment_shield
+  pkg_judgment_laya --> pkg_subprocess
+  pkg_judgment_laya --> pkg_timeout
   pkg_model_router --> pkg_agent
   pkg_model_router --> pkg_commands
   pkg_model_router --> pkg_invariants
@@ -891,6 +908,11 @@ flowchart TD
   pkg_pwsh_local --> pkg_shell
   pkg_pwsh_local --> pkg_subprocess
   pkg_pwsh_local --> pkg_timeout
+  pkg_progress_signals --> pkg_invariants
+  pkg_progress_signals --> pkg_jspace
+  pkg_progress_signals --> pkg_sandbox
+  pkg_progress_signals --> pkg_session
+  pkg_progress_signals --> pkg_step_budget
   pkg_terminal_bash --> pkg_agent
   pkg_terminal_bash --> pkg_invariants
   pkg_terminal_bash --> pkg_sandbox
@@ -1446,7 +1468,7 @@ flowchart TD
   pkg_worker_escalation --> pkg_invariants
   pkg_worker_escalation --> pkg_jspace
   pkg_worker_escalation --> pkg_judgment
-  pkg_worker_escalation --> pkg_sandbox
+  pkg_worker_escalation --> pkg_progress_signals
   pkg_worker_escalation --> pkg_session
   pkg_worker_escalation --> pkg_settings
   pkg_worker_escalation --> pkg_user_questions
@@ -1857,6 +1879,7 @@ flowchart TD
 | [`attachment-local`](../packages/attachment/attachment-local) | `attachment` | [`attachment`](../packages/attachment/attachment), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants) |
 | [`credentials-local`](../packages/credentials/credentials-local) | `credentials` | [`atomic-write`](../packages/util/atomic-write), [`credentials`](../packages/credentials/credentials), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment) |
 | [`settings-file`](../packages/settings/settings-file) | `settings` | [`atomic-write`](../packages/util/atomic-write), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings) |
+| [`claude-credential`](../packages/llm/claude-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`codex-credential`](../packages/llm/codex-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`cursor-credential`](../packages/llm/cursor-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`grok-credential`](../packages/llm/grok-credential) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
@@ -1871,6 +1894,7 @@ flowchart TD
 | [`lsp`](../packages/lsp/lsp) | `lsp` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`speech`](../packages/speech/speech) | `speech` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
 | [`judgment-guardrails`](../packages/llm/judgment-guardrails) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`session`](../packages/core/session), [`settings`](../packages/settings/settings) |
+| [`llm-claude-session`](../packages/llm/llm-claude-session) | `llm` | [`claude-credential`](../packages/llm/claude-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cli-bridge`](../packages/llm/llm-cli-bridge) | `llm` | [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`llm-codex-session`](../packages/llm/llm-codex-session) | `llm` | [`codex-credential`](../packages/llm/codex-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cursor-session`](../packages/llm/llm-cursor-session) | `llm` | [`cursor-credential`](../packages/llm/cursor-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings) |
@@ -1925,6 +1949,7 @@ flowchart TD
 | [`wiki-embed-onnx`](../packages/wiki/wiki-embed-onnx) | `wiki` | [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`wiki`](../packages/wiki/wiki) |
 | [`workflow`](../packages/workflow/workflow) | `workflow` | [`agent`](../packages/core/agent), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`workspace`](../packages/workspace/workspace) | `workspace` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`storage`](../packages/storage/storage), [`storage-domain`](../packages/storage/storage-domain) |
+| [`judgment-laya`](../packages/llm/judgment-laya) | `llm` | [`commands`](../packages/interaction/commands), [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`judgment-shield`](../packages/llm/judgment-shield), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`model-router`](../packages/llm/model-router) | `llm` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`settings`](../packages/settings/settings) |
 | [`agent-default-model`](../packages/core/agent-default-model) | `core` | [`agent`](../packages/core/agent), [`commands`](../packages/interaction/commands), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings) |
 | [`tools`](../packages/core/tools) | `core` | [`agent`](../packages/core/agent), [`code-runtime`](../packages/code-runtime/code-runtime), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`user-approval`](../packages/interaction/user-approval) |
@@ -1948,6 +1973,7 @@ flowchart TD
 | [`session-title-llm`](../packages/session/session-title-llm) | `session` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`timeout`](../packages/util/timeout) |
 | [`bash-local`](../packages/shell/bash-local) | `shell` | [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings), [`shell`](../packages/shell/shell), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`pwsh-local`](../packages/shell/pwsh-local) | `shell` | [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings), [`shell`](../packages/shell/shell), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+| [`progress-signals`](../packages/team/progress-signals) | `team` | [`invariants`](../packages/runtime-diagnostics/invariants), [`jspace`](../packages/jspace/jspace), [`sandbox`](../packages/sandbox/sandbox), [`session`](../packages/core/session), [`step-budget`](../packages/guard/step-budget) |
 | [`terminal-bash`](../packages/terminal/terminal-bash) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`session`](../packages/core/session), [`subprocess`](../packages/subprocess/subprocess), [`terminal`](../packages/terminal/terminal) |
 | [`wiki-filesystem`](../packages/wiki/wiki-filesystem) | `wiki` | [`atomic-write`](../packages/util/atomic-write), [`fs`](../packages/fs/fs), [`invariants`](../packages/runtime-diagnostics/invariants), [`wiki`](../packages/wiki/wiki) |
 | [`token-meter`](../packages/llm/token-meter) | `llm` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection) |
@@ -2032,7 +2058,7 @@ flowchart TD
 | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | `examples` | [`agent`](../packages/core/agent), [`agent-instructions`](../packages/context/agent-instructions), [`agent-loop`](../packages/core/agent-loop), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs-local`](../packages/jobs/jobs-local), [`llm`](../packages/llm/llm), [`llm-retry`](../packages/llm/llm-retry), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`shell-env`](../packages/shell/shell-env), [`skill`](../packages/skill/skill), [`skill-filesystem`](../packages/skill/skill-filesystem), [`system-prompt`](../packages/core/system-prompt), [`tool-bash`](../packages/shell/tool-bash), [`tool-goal`](../packages/goal/tool-goal), [`tool-jobs`](../packages/jobs/tool-jobs), [`tool-skill`](../packages/skill/tool-skill), [`tools`](../packages/core/tools) |
 | [`sdk-client`](../packages/sdk/client) | `sdk` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`sdk-protocol`](../packages/sdk/protocol), [`session`](../packages/core/session) |
 | [`sdk-jsonrpc-server`](../packages/sdk/server) | `sdk` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`sdk-protocol`](../packages/sdk/protocol), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent) |
-| [`worker-escalation`](../packages/team/worker-escalation) | `team` | [`agent`](../packages/core/agent), [`agent-team`](../packages/team/agent-team), [`invariants`](../packages/runtime-diagnostics/invariants), [`jspace`](../packages/jspace/jspace), [`judgment`](../packages/llm/judgment), [`sandbox`](../packages/sandbox/sandbox), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`user-questions`](../packages/interaction/user-questions) |
+| [`worker-escalation`](../packages/team/worker-escalation) | `team` | [`agent`](../packages/core/agent), [`agent-team`](../packages/team/agent-team), [`invariants`](../packages/runtime-diagnostics/invariants), [`jspace`](../packages/jspace/jspace), [`judgment`](../packages/llm/judgment), [`progress-signals`](../packages/team/progress-signals), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`user-questions`](../packages/interaction/user-questions) |
 | [`subagent-shres-sdk`](../packages/subagent/subagent-shres-sdk) | `subagent` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`sdk-client`](../packages/sdk/client), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess) |
 | [`client-ui-settings`](../packages/client/ui-settings) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-runtime`](../packages/client/runtime), [`client-schema-form`](../packages/client/schema-form), [`client-ui-slots`](../packages/client/ui-slots), [`invariants`](../packages/runtime-diagnostics/invariants), [`settings`](../packages/settings/settings) |
 | [`client-ui-settings-jspace`](../packages/client/ui-settings-jspace) | `client` | [`api-remotes`](../packages/api/remotes), [`client-runtime`](../packages/client/runtime), [`client-ui-slots`](../packages/client/ui-slots), [`client-web-react`](../packages/client/web-react), [`invariants`](../packages/runtime-diagnostics/invariants) |

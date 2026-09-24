@@ -24,9 +24,6 @@
       "path": "../../core/session"
     },
     {
-      "path": "../../guard/step-budget"
-    },
-    {
       "path": "../../interaction/user-questions"
     },
     {
@@ -39,13 +36,13 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../sandbox/sandbox"
-    },
-    {
       "path": "../../settings/settings"
     },
     {
       "path": "../agent-team"
+    },
+    {
+      "path": "../progress-signals"
     }
   ]
 }

@@ -50,6 +50,7 @@ export type TrajectoryKey =
   | 'routing.reason.escalated'
   | 'routing.reason.manualDeviation'
   | 'routing.reason.routeErrors'
+  | 'routing.reason.routeFailed'
   | 'routing.reason.modeOff'
   | 'routing.reason.judgmentError'
   | 'routing.confidence'
@@ -107,6 +108,7 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.escalated': 'escalated to the stronger model',
   'routing.reason.manualDeviation': 'model switched manually',
   'routing.reason.routeErrors': 'route failures',
+  'routing.reason.routeFailed': 'route failed, retried on the manual model',
   'routing.reason.modeOff': 'routing off',
   'routing.reason.judgmentError': 'judgment failed',
   'routing.confidence': 'confidence {value}',
@@ -146,6 +148,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
   'route-errors': 'routing.reason.routeErrors',
+  'route-failed': 'routing.reason.routeFailed',
   'mode-off': 'routing.reason.modeOff',
   'judgment-error': 'routing.reason.judgmentError',
 }
@@ -160,4 +163,5 @@ export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> 
   'manual-deviation': 'routing.reason.manualDeviation',
   'mode-off': 'routing.reason.modeOff',
   'route-errors': 'routing.reason.routeErrors',
+  'route-failed': 'routing.reason.routeFailed',
 }

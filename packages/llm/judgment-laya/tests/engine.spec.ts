@@ -1,0 +1,186 @@
+import { readFile, stat, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Context, Service } from '@shres-code/cordis'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import { LayaJudgmentEngine } from '../src/index.ts'
+import { alive, cleanup, fakeInstallation, MODEL_ID, REPO, REVISION, tempRuntime, until, writeBehavior } from './helpers.ts'
+import type { FakeInstallation } from './helpers.ts'
+
+// laya-mlx is Apple-silicon only; the fake gateway is not, so the host check
+// is pinned for these process-level tests.
+vi.mock('../src/installation.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/installation.ts')>(),
+  currentHost: () => ({ platform: 'darwin', arch: 'arm64' }),
+}))
+
+let root: string
+let runtimeDir: string
+let fake: FakeInstallation
+let ctx: Context | undefined
+
+beforeEach(async () => {
+  root = await tempRuntime()
+  runtimeDir = join(root, 'runtime')
+  fake = await fakeInstallation(root)
+  await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256 })
+})
+
+afterEach(async () => {
+  await ctx?.fiber.dispose()
+  ctx = undefined
+  await cleanup(root)
+})
+
+/** Mount the subprocess runtime and the provider over the fake installation. */
+async function mount(): Promise<{ ctx: Context; engine: LayaJudgmentEngine }> {
+  ctx = new Context()
+  await ctx.plugin(LocalSubprocessRuntime)
+  await ctx.plugin(LayaJudgmentEngine, {
+    model: { repo: REPO, revision: REVISION, manifestSha256: fake.manifestSha256 },
+    checkpointContext: 1024,
+    runtimeDir,
+    gatewayProject: fake.gatewayProject,
+    uvPath: fake.uvPath,
+    startupTimeoutMs: 10_000,
+    requestTimeoutMs: 5_000,
+    shutdownGraceMs: 500,
+    installTimeoutMs: 10_000,
+    restart: { maxRestarts: 2, windowMs: 60_000, backoffMs: 20, maxBackoffMs: 40 },
+  })
+  const engine = ctx.get('judgment')
+  if (!(engine instanceof LayaJudgmentEngine)) throw new Error('ctx.judgment is not the Laya provider')
+  return { ctx, engine }
+}
+
+const PROCESS_TIMEOUT_MS = 30_000
+
+/** Deployment redactor stub counting its consultations. */
+class StubRedactor extends Service {
+  static calls = 0
+
+  constructor(ctx: Context) {
+    super(ctx, 'judgmentRedactor')
+  }
+
+  redactState(state: string): string {
+    StubRedactor.calls += 1
+    return state.replaceAll('secret', '[redacted]')
+  }
+}
+
+describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
+  it('reports not-installed, installs on request, then serves ctx.judgment', async () => {
+    const { engine } = await mount()
+    await until(() => engine.status().state === 'not-installed')
+    expect(engine.status().detail).toBe('Laya is not installed; run /laya install')
+    await expect(engine.ask({ state: 's', questions: [] })).rejects.toMatchObject({ code: 'UNAVAILABLE' })
+
+    const first = engine.install()
+    expect(engine.install()).toBe(first)
+    const result = await first
+    expect(result.modelDir).toBe(engine.config.modelDir)
+    expect((await stat(engine.config.markerPath)).isFile()).toBe(true)
+    await until(() => engine.status().state === 'ready')
+
+    const answered = await engine.ask({ state: 'hello', questions: [] })
+    expect(answered).toMatchObject({ engine: 'shield', model: MODEL_ID, answers: [] })
+    const fitted = await engine.fitting.ask({ states: ['hello'], questions: [] })
+    expect(fitted.kind).toBe('answered')
+  })
+
+  it('reports a failed install step and stays not-installed', async () => {
+    await writeFile(join(runtimeDir, 'uv-sync-exit'), '7')
+    const { engine } = await mount()
+    await until(() => engine.status().state === 'not-installed')
+
+    await expect(engine.install()).rejects.toThrow('uv sync failed (exit 7): uv sync: resolution failed')
+    await until(() => engine.status().state === 'not-installed')
+    expect(engine.status().detail).toBe('Laya is not installed; run /laya install')
+  })
+
+  it('withdraws ctx.judgment and stops the gateway process when its fiber disposes', async () => {
+    const { ctx: mounted, engine } = await mount()
+    await engine.install()
+    await until(() => engine.status().state === 'ready')
+    const events: string[] = []
+    engine.onStatus(status => events.push(status.state))
+    const pids = await gatewayPids()
+
+    await mounted.fiber.dispose()
+    ctx = undefined
+
+    expect(mounted.get('judgment')).toBeUndefined()
+    expect(pids.length).toBeGreaterThan(0)
+    expect(pids.every(pid => !alive(pid))).toBe(true)
+    expect(events).toEqual([])
+    expect(engine.status()).toEqual({ state: 'stopped', detail: 'disposed' })
+  })
+
+  it('consults the deployment redactor once before the state leaves the process', async () => {
+    const requests = join(root, 'requests.jsonl')
+    await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256, recordRequestsTo: requests })
+    const { ctx: mounted, engine } = await mount()
+    await mounted.plugin(StubRedactor)
+    await engine.install()
+    await until(() => engine.status().state === 'ready')
+    StubRedactor.calls = 0
+
+    await engine.ask({ state: 'a secret plan', questions: [] })
+
+    const last = (await readFile(requests, 'utf8')).trim().split('\n').at(-1) ?? '{}'
+    expect((JSON.parse(last) as { body: { state: string } }).body.state).toBe('a [redacted] plan')
+    expect(StubRedactor.calls).toBe(1)
+  })
+
+  it('cancels a running install when disposed and waits for it to settle', async () => {
+    await writeFile(join(runtimeDir, 'uv-sync-sleep'), '30')
+    const { ctx: mounted, engine } = await mount()
+    await until(() => engine.status().state === 'not-installed')
+    const install = engine.install().catch((error: unknown) => error)
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    await mounted.fiber.dispose()
+    ctx = undefined
+
+    expect(await install).toMatchObject({ message: 'uv sync was cancelled' })
+    expect(engine.status()).toEqual({ state: 'stopped', detail: 'disposed' })
+  })
+
+  it('restart() relaunches a gateway whose restart budget is exhausted', async () => {
+    await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256, exitBeforeReady: 1 })
+    const { engine } = await mount()
+    await engine.install().catch(() => undefined)
+    await until(() => /exhausted/.test(engine.status().detail ?? ''), 20_000)
+    expect(engine.lastExit()).toMatchObject({ exitCode: 1 })
+
+    await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256 })
+    await engine.restart()
+    await until(() => engine.status().state === 'ready')
+  })
+})
+
+/** Process ids of running fake gateways started from this test's runtime. */
+async function gatewayPids(): Promise<number[]> {
+  const { execFile } = await import('node:child_process')
+  const output = await new Promise<string>((resolve) => {
+    execFile('pgrep', ['-f', 'fake-gateway.mjs'], (_error, stdout) => {
+      resolve(stdout)
+    })
+  })
+  const candidates = output.split('\n').map(Number).filter(pid => pid > 0)
+  const owned: number[] = []
+  for (const pid of candidates) {
+    try {
+      const cwd = await new Promise<string>((resolve) => {
+        execFile('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], (_error, stdout) => {
+          resolve(stdout)
+        })
+      })
+      if (cwd.includes(runtimeDir)) owned.push(pid)
+    } catch {
+      // A process that exited between pgrep and lsof is not owned.
+    }
+  }
+  return owned
+}

@@ -18,6 +18,9 @@ export type ModelRoutingInitialMode = 'off' | 'on'
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** What a failed downgraded request means for its step. */
+export type ModelRoutingInTurnFallback = 'manual' | 'off'
+
 /** The state window one judgment call reads. */
 export interface ModelRoutingStateConfig {
   /** Prior user messages of the conversation to include before the current turn's. Defaults to 2. */
@@ -42,9 +45,9 @@ export interface ModelRoutingHardHintConfig {
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
   scoreThreshold: number
-  /** Effort the selected downgraded route runs at above the threshold. */
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
 }
 
@@ -80,17 +83,26 @@ export interface ModelRouterConfig {
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
   /**
-   * Consecutive candidate failures that require a manual-model turn. Recorded
-   * on each held decision; settings changes affect subsequent decisions.
-   * Defaults to 2.
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
    */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
-   * Optional effort lift for a selected route on a hard turn. Omitted — or
-   * written as a valueless key, which the schema resolves to null — means not
-   * configured; the group is never implied by a default.
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
+  /**
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
    */
   difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
   /**
@@ -139,6 +151,8 @@ export interface ResolvedModelRouterConfig {
   readonly maxRouteErrors: number
   /** Policy for a failed judgment call. */
   readonly onUnavailable: ModelRoutingUnavailablePolicy
+  /** Policy for a failed downgraded request. */
+  readonly inTurnFallback: ModelRoutingInTurnFallback
   /** Effort lift for a hard turn, when configured. */
   readonly difficultyToEffort?: { readonly scoreThreshold: number; readonly reasoningEffort: string }
   /** Advisory-hint threshold, when configured. */
@@ -193,6 +207,7 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'escalateBack',
   'maxRouteErrors',
   'onUnavailable',
+  'inTurnFallback',
   'difficultyToEffort',
   'hardHint',
   'state',
@@ -232,12 +247,15 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   // Read through an unknown-typed view: the discriminated literals are the
   // schema's to enforce for a composition entry, but programmatic construction
   // bypasses it, so they are re-judged here as raw values a type cannot vouch for.
-  const raw = config as { initialMode?: unknown; onUnavailable?: unknown; tier?: unknown }
+  const raw = config as { initialMode?: unknown; onUnavailable?: unknown; inTurnFallback?: unknown; tier?: unknown }
   if (raw.initialMode !== 'off' && raw.initialMode !== 'on') {
     throw new Error('ModelRouterConfig.initialMode must be "off" or "on"')
   }
   if (raw.onUnavailable !== undefined && raw.onUnavailable !== 'fallback' && raw.onUnavailable !== 'error') {
     throw new Error('ModelRouterConfig.onUnavailable must be "fallback" or "error"')
+  }
+  if (raw.inTurnFallback !== undefined && raw.inTurnFallback !== 'manual' && raw.inTurnFallback !== 'off') {
+    throw new Error('ModelRouterConfig.inTurnFallback must be "manual" or "off"')
   }
   if (raw.tier !== undefined && raw.tier !== 'fast' && raw.tier !== 'accurate') {
     throw new Error('ModelRouterConfig.tier must be "fast" or "accurate"')
@@ -301,6 +319,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     throw new Error('ModelRouterConfig.maxRouteErrors must be a positive integer')
   }
   const onUnavailable = config.onUnavailable ?? 'fallback'
+  const inTurnFallback = config.inTurnFallback ?? 'manual'
   const tier = config.tier ?? 'fast'
   const contextTurns = config.state?.contextTurns ?? DEFAULT_STATE_CONTEXT_TURNS
   if (!Number.isInteger(contextTurns) || contextTurns < 0) {
@@ -344,6 +363,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     escalateBackScoreThreshold: scoreThreshold,
     maxRouteErrors,
     onUnavailable,
+    inTurnFallback,
     ...difficultyToEffort === undefined
       ? {}
       : {

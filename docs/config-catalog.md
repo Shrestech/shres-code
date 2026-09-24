@@ -1237,6 +1237,77 @@ Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
 Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
 
+<a id="shres-codeshres-code-judgment-laya"></a>
+
+## `@shres-code/shres-code-judgment-laya`
+
+Requires: `subprocess`
+
+```ts config-catalog
+/** Configuration for the supervised local Laya judgment gateway. */
+export interface LayaJudgmentConfig {
+  /** The pinned checkpoint and its manifest digest. */
+  model: LayaJudgmentModel
+  /** Token window of the pinned checkpoint; the gateway must report the same limit. */
+  checkpointContext: 512 | 1024
+  /** Inference precision passed to laya-mlx. */
+  dtype?: 'float16' | 'float32'
+  /** Absolute directory holding the virtual environment, its uv-managed Python, the uv package cache, and the install marker. */
+  runtimeDir?: string
+  /** Absolute Hugging Face home holding downloaded checkpoints. */
+  hfHome?: string
+  /** Absolute path of the `python/laya-gateway` project. */
+  gatewayProject?: string
+  /** `uv` executable: an absolute path or a name on PATH. */
+  uvPath?: string
+  /** Version of the uv-managed CPython the virtual environment uses, `major.minor`. */
+  python?: string
+  /** Questions per gateway inference batch. */
+  batchSize?: number
+  /** Deadline for the first readiness line, health check, and smoke ask, in milliseconds. */
+  startupTimeoutMs?: number
+  /** Deadline for one judgment request, in milliseconds. */
+  requestTimeoutMs?: number
+  /** SIGTERM-to-SIGKILL grace when stopping the gateway, in milliseconds. */
+  shutdownGraceMs?: number
+  /** Deadline for each install step, in milliseconds. */
+  installTimeoutMs?: number
+  /** Maximum serialized UTF-8 request body, enforced by both the provider and the gateway. */
+  maxRequestBytes?: number
+  /** Maximum response body accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Crash-restart budget. */
+  restart?: LayaRestartPolicy
+}
+
+/** The pinned checkpoint the local gateway serves. */
+export interface LayaJudgmentModel {
+  /** Hugging Face repository, `owner/name`. */
+  repo: string
+  /** 40-character commit sha of the pinned revision. */
+  revision: string
+  /**
+   * SHA-256 of the exact bytes of the gateway project's
+   * `manifests/<revision>.json`, which pins every checkpoint file's digest.
+   */
+  manifestSha256: string
+}
+
+/** Crash-restart budget for the supervised gateway. */
+export interface LayaRestartPolicy {
+  /** Restarts allowed inside one {@link windowMs}; one more leaves the gateway unavailable. */
+  maxRestarts?: number
+  /** Sliding window over which restarts are counted, in milliseconds. */
+  windowMs?: number
+  /** First restart delay; each consecutive failure doubles it. */
+  backoffMs?: number
+  /** Largest restart delay. */
+  maxBackoffMs?: number
+}
+```
+
+Source: [`packages/llm/judgment-laya/src/types.ts:33`](../packages/llm/judgment-laya/src/types.ts)
+
 <a id="shres-codeshres-code-judgment-shield"></a>
 
 ## `@shres-code/shres-code-judgment-shield`
@@ -1418,7 +1489,7 @@ export interface ClaudeSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:106`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -2323,17 +2394,26 @@ export interface ModelRouterConfig {
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
   /**
-   * Consecutive candidate failures that require a manual-model turn. Recorded
-   * on each held decision; settings changes affect subsequent decisions.
-   * Defaults to 2.
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
    */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
-   * Optional effort lift for a selected route on a hard turn. Omitted — or
-   * written as a valueless key, which the schema resolves to null — means not
-   * configured; the group is never implied by a default.
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
+  /**
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
    */
   difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
   /**
@@ -2378,11 +2458,14 @@ export interface ModelRoutingEscalateBackConfig {
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** What a failed downgraded request means for its step. */
+export type ModelRoutingInTurnFallback = 'manual' | 'off'
+
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
   scoreThreshold: number
-  /** Effort the selected downgraded route runs at above the threshold. */
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
 }
 
@@ -2403,7 +2486,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:52`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:55`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 
@@ -4882,7 +4965,7 @@ export interface EscalationTurnFailureStreakConfig {
 
 Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
-Source: [`packages/team/worker-escalation/src/config.ts:160`](../packages/team/worker-escalation/src/config.ts)
+Source: [`packages/team/worker-escalation/src/config.ts:153`](../packages/team/worker-escalation/src/config.ts)
 
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
@@ -5048,6 +5131,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
 - `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-progress-signals` ([`packages/team/progress-signals/src/index.ts`](../packages/team/progress-signals/src/index.ts))
 - `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
 - `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))

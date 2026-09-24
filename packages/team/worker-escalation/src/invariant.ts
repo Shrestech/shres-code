@@ -7,12 +7,12 @@
 /* jscpd:ignore-start */
 import type { Context } from '@shres-code/cordis'
 import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import { triggerSatisfiedAt } from '@shres-code/shres-code-progress-signals'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 // Type-only edges: resolve `ctx.settings` and `ctx.jspace`.
 import type {} from '@shres-code/shres-code-settings'
 import type {} from '@shres-code/shres-code-jspace'
 import { WORKER_ESCALATION_SETTINGS_NAMESPACE } from './config.ts'
-import { triggerSatisfiedAt } from './fold.ts'
 
 const PACKAGE_NAME = '@shres-code/shres-code-worker-escalation'
 
