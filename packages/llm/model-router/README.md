@@ -23,7 +23,11 @@ Every field is validated at plugin load (and again for a settings write), and un
 | `escalateBack.scoreThreshold` | `3` | Difficulty at or above which a held streak returns to the manual model (`escalated`). A score between the entry ceiling and this threshold holds a streak but does not enter one. With the default rubric, `3` is “hard”. |
 | `reentryCooldownTurns` | `2` | Turns after the turn whose `escalated`, `current-preferred`, or `route-failed` decision ended a streak that keep the manual model without a judgment call, logged as `reentry-cooldown`. `0` disables the cooldown. |
 | `maxRouteErrors` | `2` | Consecutive candidate failures that require a manual-model recovery turn: terminal failures of a held route, or `route-failed` decisions for one candidate across streaks. Each held decision records its effective limit. |
-| `onUnavailable` | `fallback` | `fallback` keeps the manual route and logs the class; `error` logs the `error` outcome instead. |
+| `onUnavailable` | `fallback` | `fallback` keeps the manual route and logs the class; `error` logs the `error` outcome instead. A held streak within its hold tolerance keeps its candidate under either policy. |
+| `judgmentDeadlineMs` | `1500` | Milliseconds one judgment call may take. The call runs under the turn's signal combined with this deadline; expiry records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer arriving later is not used. A positive integer of at most `30000`. |
+| `judgmentFailures.holdTolerance` | `2` | Consecutive failed judgment calls a held streak survives, keeping its candidate with `judgment-failure-held`; the next failure ends it. `0` ends a held streak at the first failure. |
+| `judgmentFailures.breakerThreshold` | `3` | Consecutive failed judgment calls that open the breaker. Only an answered call resets the count, so after the breaker closes one more failure opens it again. |
+| `judgmentFailures.breakerOpenTurns` | `5` | Turns after the latest failure during which an open breaker keeps the manual route with `breaker-open` and no judgment call. `0` disables the breaker. |
 | `inTurnFallback` | `manual` | `manual` retries a failed downgraded request's step on the manual route after every other recovery listener declined, logging `route-failed`; `off` leaves the failure terminal. |
 | `difficultyToEffort` | — | `{ scoreThreshold, reasoningEffort }`: a candidate entering a streak on a step at or above the threshold runs at this effort. Entry requires a score below `difficulty.entryScoreCeiling`, so a threshold at or above the ceiling never lifts. The streak keeps its entry effort; a later effort change is a candidate change. |
 | `hardHint.scoreThreshold` | — | While the manual route stands, a difficulty score at or above this adds the `consider-stronger` hint to the decision. |
@@ -72,7 +76,7 @@ Every fallback resolves to the manual route with a logged reason:
 |---|---|
 | No judgment engine composed | `engine-absent` |
 | Engine composed, deployment turned it off | `engine-disabled` |
-| Engine unreachable, refused, or timed out | `engine-unavailable` |
+| Engine unreachable, refused, or past `judgmentDeadlineMs` | `engine-unavailable` |
 | Engine answered with an unusable body | `invalid-answer` |
 | No candidates configured | `no-candidates` |
 | Generation runtime unavailable for capability checks | `model-unavailable` |
@@ -88,8 +92,11 @@ Every fallback resolves to the manual route with a logged reason:
 | Downgraded request failed and no other recovery listener retried it | `route-failed` |
 | A held streak reached `hold.maxSteps` | `hold-cap` |
 | A quality exit ended a streak within the last `reentryCooldownTurns` turns | `reentry-cooldown` |
+| Consecutive failed judgment calls opened the breaker | `breaker-open` |
 
 Cancellation propagates without appending or pinning a decision, including when a judgment resolves after its request was cancelled. A later retry judges the request again.
+
+A failed judgment call — `engine-unavailable`, `invalid-answer`, or `judgment-error` — records the engine's error code, or `DEADLINE`, in `engineFailure` when one is known. While a streak holds, the first `judgmentFailures.holdTolerance` consecutive failures keep its candidate as a `downgraded` / `judgment-failure-held` decision instead of ending it. The fold counts consecutive failed calls and the turn of the latest; an answered call clears the count. Once the count reaches `judgmentFailures.breakerThreshold`, consults within `judgmentFailures.breakerOpenTurns` turns of the latest failure record `breaker-open` without a judgment call. `state-too-large` and `judgment-input-too-large` describe the input rather than the engine, so they neither count nor hold a streak.
 
 The `route-failed` fallback runs in the `agent/request-error` waterfall. The router calls `next()` first, so a downstream recovery listener such as llm-retry keeps transient retries of the candidate in any listener order. Only when nothing downstream retries, the failure is not a cancellation, and the failed request is the step this router downgraded does it log `route-failed`, re-pin the step to the manual route recorded as the streak's entry base, and return `retry`. The step's retry then runs on the manual model without another judgment, and the turn completes there. A failure of that manual retry is terminal. [The subsystem page](../../../docs/subsystems/model-router.md#in-turn-fallback) owns the full condition.
 
@@ -163,4 +170,5 @@ The judgment call is an independent request that neither reads nor extends the c
 - **Step-scoped judgment** — the initial request and every later new step in a downgraded turn receive a fresh route and difficulty judgment over the latest bounded surface, with full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. Compaction can change the raw candidate-input key and force a fresh judgment within the same step; the redacted fitted state's `stateHash` is not compared for this purpose.
 - **Token accounting** — `state.maxChars` bounds serialized characters, not judgment tokens. A fitting provider measures complete alternatives with its own pinned tokenizer and may reject all of them, which triggers `judgment-input-too-large` and manual fallback without inference. A provider without fitting receives the first bounded state and owns its input-size behavior. Candidate context windows are compared conservatively because the LLM service has no shared exact tokenizer; shorter candidate windows remain excluded even when a particular request might fit.
 - **The manual-model guard is a substring match** — the invariant companion rejects a routed `request/header` whose system prompt contains the manual model id anywhere, so a prompt that quotes that id for another reason, such as workspace instructions naming it, is rejected too. The check runs only where the invariant registry is composed; the shipped bundles do not compose it.
+- **The deadline bounds the answer, not the wait** — the judgment call receives a signal that aborts at `judgmentDeadlineMs`, and an answer arriving after it is discarded as `DEADLINE`. An engine that ignores its signal still holds the consult until it settles; the shipped engines pass the signal to their requests.
 - **Capability metadata** — successful route preparation proves acceptance by the registered adapter, not remote model availability or task quality. Image content is represented by markers in the text judgment; its visual difficulty is not assessed.

@@ -10,7 +10,9 @@
 import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 import type {
   ModelRoutingBreakReason,
+  ModelRoutingDecision,
   ModelRoutingEntryBaseView,
+  ModelRoutingReason,
   ModelRoutingSelection,
   ModelRoutingStickyView,
 } from './types.ts'
@@ -42,7 +44,25 @@ export interface ModelRoutingStickyState {
   readonly recoveryTurn?: number
   /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
   readonly cooldownTurn?: number
+  /**
+   * Consecutive failed judgment calls since the last answered one, and the turn
+   * of the latest; absent when none is counted.
+   */
+  readonly judgmentFailures?: ModelRoutingJudgmentFailures
 }
+
+/** Consecutive failed judgment calls as the fold counts them. */
+export interface ModelRoutingJudgmentFailures {
+  /** Failed judgment calls since the last answered one. */
+  readonly count: number
+  /** Turn of the latest failed judgment call. */
+  readonly turn: number
+}
+
+/** Decision reasons that record a judgment call that failed. */
+const FAILED_JUDGMENT_REASONS: ReadonlySet<ModelRoutingReason> = new Set([
+  'engine-unavailable', 'invalid-answer', 'judgment-error', 'judgment-failure-held',
+])
 
 /**
  * Streak ends that start the re-entry cooldown: the exits that say the
@@ -99,6 +119,11 @@ export interface ModelRoutingStickyFoldState {
   readonly candidateFailures?: { readonly candidate: ModelRoutingSelection; readonly count: number }
   /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
   readonly cooldownTurn?: number
+  /**
+   * Consecutive failed judgment calls since the last answered one, and the turn
+   * of the latest; absent when none is counted.
+   */
+  readonly judgmentFailures?: ModelRoutingJudgmentFailures
 }
 
 /**
@@ -402,33 +427,60 @@ export function advanceStickyFoldState(
     case 'model-routing/decision': {
       const sticky = event.data.sticky
       validateStickyView(sticky)
-      if (sticky.active) {
-        const candidate = event.data.selection ?? state.candidate
-        const entering = !state.active
-        const restarted = entering || !sameSelection(state.candidate, candidate)
-        const entryBase = entering ? sticky.entryBase ?? state.lastHeader : state.entryBase
-        const enteredStep = sticky.enteredStep ?? (restarted ? undefined : state.enteredStep)
-        const { brokenBy: _previousBreak, cooldownTurn: _cooldown, enteredStep: _previousStep, ...withoutBreak } = state
-        return {
-          ...withoutBreak,
-          active: true,
-          enteredTurn: sticky.enteredTurn ?? state.enteredTurn ?? state.currentTurn,
-          ...enteredStep === undefined ? {} : { enteredStep },
-          stepsElapsed: restarted ? 0 : state.stepsElapsed,
-          ...candidate === undefined ? {} : { candidate },
-          ...entryBase === undefined ? {} : { entryBase },
-          routeErrorLimit: sticky.routeErrorLimit,
-          routeFailures: restarted ? 0 : state.routeFailures,
-        }
-      }
-      const ended = endStreak(state, sticky)
-      return state.active && sticky.brokenBy !== undefined && COOLDOWN_BREAKS.has(sticky.brokenBy)
-        ? { ...ended, cooldownTurn: state.currentTurn }
-        : ended
+      return applyDecision(countJudgment(state, event.data), event.data)
     }
     default:
       return state
   }
+}
+
+/**
+ * Count a failed judgment call, or clear the count after an answered one.
+ * Decisions that made no judgment call leave the count alone.
+ * @param state - the accumulator before the decision.
+ * @param decision - the logged decision.
+ * @returns the accumulator with the judgment-failure count applied.
+ */
+function countJudgment(state: ModelRoutingStickyFoldState, decision: ModelRoutingDecision): ModelRoutingStickyFoldState {
+  if (FAILED_JUDGMENT_REASONS.has(decision.reason)) {
+    return { ...state, judgmentFailures: { count: (state.judgmentFailures?.count ?? 0) + 1, turn: state.currentTurn } }
+  }
+  if (decision.route === undefined || state.judgmentFailures === undefined) return state
+  const { judgmentFailures: _failures, ...answered } = state
+  return answered
+}
+
+/**
+ * Apply one decision's sticky transition.
+ * @param state - the accumulator before the decision's transition.
+ * @param decision - the logged decision.
+ * @returns the accumulator after the decision.
+ */
+function applyDecision(state: ModelRoutingStickyFoldState, decision: ModelRoutingDecision): ModelRoutingStickyFoldState {
+  const sticky = decision.sticky
+  if (sticky.active) {
+    const candidate = decision.selection ?? state.candidate
+    const entering = !state.active
+    const restarted = entering || !sameSelection(state.candidate, candidate)
+    const entryBase = entering ? sticky.entryBase ?? state.lastHeader : state.entryBase
+    const enteredStep = sticky.enteredStep ?? (restarted ? undefined : state.enteredStep)
+    const { brokenBy: _previousBreak, cooldownTurn: _cooldown, enteredStep: _previousStep, ...withoutBreak } = state
+    return {
+      ...withoutBreak,
+      active: true,
+      enteredTurn: sticky.enteredTurn ?? state.enteredTurn ?? state.currentTurn,
+      ...enteredStep === undefined ? {} : { enteredStep },
+      stepsElapsed: restarted ? 0 : state.stepsElapsed,
+      ...candidate === undefined ? {} : { candidate },
+      ...entryBase === undefined ? {} : { entryBase },
+      routeErrorLimit: sticky.routeErrorLimit,
+      routeFailures: restarted ? 0 : state.routeFailures,
+    }
+  }
+  const ended = endStreak(state, sticky)
+  return state.active && sticky.brokenBy !== undefined && COOLDOWN_BREAKS.has(sticky.brokenBy)
+    ? { ...ended, cooldownTurn: state.currentTurn }
+    : ended
 }
 
 /**
@@ -472,6 +524,7 @@ export function readStickyFoldState(state: ModelRoutingStickyFoldState): ModelRo
     ...state.needsStrongTurn === true ? { needsStrongTurn: true } : {},
     ...state.recoveryTurn === undefined ? {} : { recoveryTurn: state.recoveryTurn },
     ...state.cooldownTurn === undefined ? {} : { cooldownTurn: state.cooldownTurn },
+    ...state.judgmentFailures === undefined ? {} : { judgmentFailures: state.judgmentFailures },
   }
 }
 

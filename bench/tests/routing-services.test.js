@@ -79,6 +79,8 @@ test('shared routing tier composes both providers and preserves route-off absenc
     assert.deepEqual(router?.config?.escalateBack, { scoreThreshold: 3 })
     assert.equal(router?.config?.maxRouteErrors, 2)
     assert.equal(router?.config?.onUnavailable, 'fallback')
+    assert.equal(router?.config?.judgmentDeadlineMs, 1500)
+    assert.deepEqual(router?.config?.judgmentFailures, { holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 })
     assert.match(router?.config?.routeInstructions, /routine, bounded task/)
     assert.match(router?.config?.routeInstructions, /uncertain, ambiguous/)
     assert.equal(warnings.length, 0, arm)

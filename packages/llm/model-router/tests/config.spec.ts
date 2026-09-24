@@ -14,6 +14,10 @@ import {
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
   DEFAULT_HOLD_MAX_STEPS,
   DEFAULT_HOLD_MIN_STEPS,
+  DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS,
+  DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
+  DEFAULT_JUDGMENT_DEADLINE_MS,
+  DEFAULT_JUDGMENT_HOLD_TOLERANCE,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -301,6 +305,25 @@ describe('resolveConfig bounds', () => {
     expect(resolveConfig(valid({ reentryCooldownTurns: 0 })).reentryCooldownTurns).toBe(0)
   })
 
+  it('requires a positive integer judgment deadline of at most 30 seconds', () => {
+    for (const judgmentDeadlineMs of [0, -1, 1.5, 30_001]) {
+      expect(() => resolveConfig(valid({ judgmentDeadlineMs })))
+        .toThrow('ModelRouterConfig.judgmentDeadlineMs must be a positive integer no greater than 30000')
+    }
+    expect(resolveConfig(valid({ judgmentDeadlineMs: 30_000 })).judgmentDeadlineMs).toBe(30_000)
+  })
+
+  it('requires integer judgment-failure bounds', () => {
+    expect(() => resolveConfig(valid({ judgmentFailures: { holdTolerance: -1 } })))
+      .toThrow('ModelRouterConfig.judgmentFailures.holdTolerance must be a non-negative integer')
+    expect(() => resolveConfig(valid({ judgmentFailures: { breakerThreshold: 0 } })))
+      .toThrow('ModelRouterConfig.judgmentFailures.breakerThreshold must be a positive integer')
+    expect(() => resolveConfig(valid({ judgmentFailures: { breakerOpenTurns: 0.5 } })))
+      .toThrow('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
+    expect(resolveConfig(valid({ judgmentFailures: { holdTolerance: 0, breakerOpenTurns: 0 } })).judgmentFailures)
+      .toEqual({ holdTolerance: 0, breakerThreshold: 3, breakerOpenTurns: 0 })
+  })
+
   it('rejects the removed turn-counted horizon key by name', () => {
     expect(() => resolveConfig(raw({ minTurnsDowngraded: 5 })))
       .toThrow('ModelRouterConfig: unknown key "minTurnsDowngraded"')
@@ -368,6 +391,8 @@ describe('the composition schema', () => {
     expect(resolved.hold).toEqual({ minSteps: 0, maxSteps: 40 })
     expect(normalized.difficulty).toEqual({ entryScoreCeiling: 2 })
     expect(normalized.reentryCooldownTurns).toBe(2)
+    expect(normalized.judgmentDeadlineMs).toBe(1500)
+    expect(normalized.judgmentFailures).toEqual({ holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 })
     expect('difficultyInstructions' in resolved).toBe(false)
     expect(resolved.difficultyToEffort).toBeUndefined()
     expect(resolved.hardHintScoreThreshold).toBeUndefined()
@@ -425,6 +450,14 @@ describe('resolveConfig defaults and detachment', () => {
     expect(resolved.entryScoreCeiling).toBe(2)
     expect(resolved.reentryCooldownTurns).toBe(DEFAULT_REENTRY_COOLDOWN_TURNS)
     expect(resolved.reentryCooldownTurns).toBe(2)
+    expect(resolved.judgmentDeadlineMs).toBe(DEFAULT_JUDGMENT_DEADLINE_MS)
+    expect(resolved.judgmentDeadlineMs).toBe(1500)
+    expect(resolved.judgmentFailures).toEqual({
+      holdTolerance: DEFAULT_JUDGMENT_HOLD_TOLERANCE,
+      breakerThreshold: DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
+      breakerOpenTurns: DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS,
+    })
+    expect(resolved.judgmentFailures).toEqual({ holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 })
     expect(resolved.escalateBackScoreThreshold).toBe(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD)
     expect(resolved.escalateBackScoreThreshold).toBe(3)
     expect(resolved.maxRouteErrors).toBe(DEFAULT_MAX_ROUTE_ERRORS)
@@ -460,6 +493,7 @@ describe('resolveConfig defaults and detachment', () => {
     expect(Object.isFrozen(resolved.difficultyLevels)).toBe(true)
     expect(Object.isFrozen(resolved.state)).toBe(true)
     expect(Object.isFrozen(resolved.hold)).toBe(true)
+    expect(Object.isFrozen(resolved.judgmentFailures)).toBe(true)
     expect(Object.isFrozen(resolved.difficultyToEffort)).toBe(true)
     // resolveConfig's own default levels are detached from the shared constant.
     expect(resolveConfig(valid()).difficultyLevels).not.toBe(DEFAULT_DIFFICULTY_LEVELS)

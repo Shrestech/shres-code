@@ -150,6 +150,29 @@ describe('trajectoryRoutingRow', () => {
     expect(en[ROUTING_REASON_KEYS['reentry-cooldown']]).toBe('cooling down after a streak exit')
   })
 
+  it('shows a judgment failure a streak survived as a held downgrade and an open breaker as the quiet marker', () => {
+    const held = decision({
+      reason: 'judgment-failure-held',
+      engineFailure: { code: 'DEADLINE' },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 3, enteredTurn: 1, enteredStep: 1 },
+    }, ['route'])
+    expect(trajectoryRoutingRow(held, decision())).toEqual({
+      outcome: 'downgraded',
+      reason: 'judgment-failure-held',
+      selection: {
+        candidateId: 'flash',
+        provider: 'deepseek-official',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+      quiet: false,
+    })
+    const open = decision({ outcome: 'kept-strong', reason: 'breaker-open', sticky: { active: false, stepsElapsed: 0 } }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(open)).toEqual({ outcome: 'kept-strong', reason: 'breaker-open', quiet: true })
+    expect(en[ROUTING_REASON_KEYS['judgment-failure-held']]).toBe('judgment failed, streak held')
+    expect(en[ROUTING_REASON_KEYS['breaker-open']]).toBe('judgment paused after repeated failures')
+  })
+
   it('carries the route, confidence, and entering streak of a downgrade', () => {
     expect(trajectoryRoutingRow(decision())).toEqual({
       outcome: 'downgraded',

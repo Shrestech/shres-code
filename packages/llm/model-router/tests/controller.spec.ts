@@ -218,6 +218,8 @@ interface Bench {
   resolve(turn?: number, base?: ModelSelection, signal?: AbortSignal, step?: number): Promise<ModelSelection | undefined>
   decisions(): ModelRoutingDecision[]
   decision(index?: number): ModelRoutingDecision
+  /** Whether the latest ask's signal has aborted. */
+  asksSignalAborted(): boolean
 }
 
 interface BenchOptions {
@@ -279,6 +281,7 @@ async function bench(options: BenchOptions = {}): Promise<Bench> {
         content: { messages: session.deriveMessages(), system: '', tools: [] },
       }),
     decisions,
+    asksSignalAborted: () => (ctx.judgment as ScriptedJudgment).asks.at(-1)?.signal?.aborted === true,
     decision: (index = 0) => {
       const found = decisions()[index]
       if (found === undefined) throw new Error(`no routing decision at index ${String(index)}`)
@@ -363,7 +366,11 @@ describe('mode', () => {
       }]),
       tier: 'fast',
     })
-    expect(b.engine.asks[0]?.signal).toBe(b.signal)
+    // The ask runs under the turn's signal combined with the judgment deadline.
+    const askSignal = b.engine.asks[0]?.signal
+    expect(askSignal).toBeInstanceOf(AbortSignal)
+    expect(askSignal).not.toBe(b.signal)
+    expect(askSignal?.aborted).toBe(false)
     const questions = b.engine.asks[0]?.questions ?? []
     expect(questions).toHaveLength(2)
     const route = questions[0]
@@ -979,8 +986,8 @@ describe('engine availability', () => {
       sticky: { active: false, stepsElapsed: 0 },
     })
 
-    // With a held streak the error outcome keeps the streak facts it saw.
-    const held = await bench({ config: { ...CONFIG, onUnavailable: 'error' } })
+    // With a held streak and no hold tolerance the error outcome ends the streak.
+    const held = await bench({ config: { ...CONFIG, onUnavailable: 'error', judgmentFailures: { holdTolerance: 0 } } })
     user(held.session, 'a small change')
     await held.resolve(1)
     openTurn(held.session, 2)
@@ -991,6 +998,188 @@ describe('engine availability', () => {
       reason: 'judgment-error',
       sticky: { active: false, stepsElapsed: 0 },
     })
+  })
+})
+
+describe('judgment failures', () => {
+  /** An ask that settles only when its signal aborts, as a real engine's fetch does. */
+  function hangs(input: JudgmentInput): Promise<JudgmentResult> {
+    return new Promise((_resolve, reject) => {
+      input.signal?.addEventListener('abort', () => {
+        reject(new JudgmentError('ABORTED', 'the judgment was cancelled'))
+      }, { once: true })
+    })
+  }
+
+  /** Enter a streak at turn 1, then open `turn` with one step started. */
+  async function heldInto(config: ModelRouterConfig, turn = 2): Promise<Bench> {
+    const b = await bench({ config })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    closeTurn(b.session, 1)
+    openTurn(b.session, turn)
+    startStep(b.session, turn)
+    return b
+  }
+
+  /** Close `turn` and open the next one with a started step. */
+  function nextTurn(b: Bench, turn: number): void {
+    closeTurn(b.session, turn - 1)
+    openTurn(b.session, turn)
+    startStep(b.session, turn)
+  }
+
+  it('deadline expiry records engine-unavailable DEADLINE and keeps the turn', async () => {
+    const b = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 20 } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.askOverride = hangs
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'engine-unavailable',
+      engineFailure: { code: 'DEADLINE' },
+      sticky: { active: false },
+    })
+    expect(b.asksSignalAborted()).toBe(true)
+
+    // An answer that arrives after the deadline, from an engine that ignored
+    // the signal, is not used.
+    const late = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    late.engine.askOverride = () => new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ answers: [PASSING, EASY], engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 40 })
+      }, 40)
+    })
+    expect(await late.resolve(1)).toBeUndefined()
+    expect(late.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' } })
+    expect(late.decision()).not.toHaveProperty('route')
+  })
+
+  it('records the engine code of a classified failure and none for an unclassified one', async () => {
+    const classified = await bench()
+    classified.engine.failure = new JudgmentError('UNAVAILABLE', 'the classifier could not be reached')
+    expect(await classified.resolve(1)).toBeUndefined()
+    expect(classified.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' } })
+
+    const plain = await bench()
+    plain.engine.failure = new Error('socket hang up')
+    expect(await plain.resolve(1)).toBeUndefined()
+    expect(plain.decision()).toMatchObject({ reason: 'engine-unavailable' })
+    expect(plain.decision()).not.toHaveProperty('engineFailure')
+  })
+
+  it('turn abort during the ask still propagates', async () => {
+    const b = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 30_000 } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.askOverride = hangs
+    const turn = new AbortController()
+    const pending = b.resolve(1, STRONG, turn.signal)
+    turn.abort(new Error('the user cancelled the turn'))
+    await expect(pending).rejects.toThrow('the user cancelled the turn')
+    expect(b.decisions()).toHaveLength(0)
+  })
+
+  it('held streak survives holdTolerance failures', async () => {
+    const config: ModelRouterConfig = { ...CONFIG, hold: { minSteps: 1 } }
+    const b = await heldInto(config)
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'the classifier could not be reached')
+    expect(await b.resolve(2)).toEqual(CHEAP)
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'downgraded',
+      reason: 'judgment-failure-held',
+      selection: { candidateId: 'cheap' },
+      engineFailure: { code: 'UNAVAILABLE' },
+      sticky: { active: true, stepsElapsed: 1, enteredTurn: 1, entryBase: STRONG },
+    })
+    // A missing answer is a failure too; it records no engine code.
+    b.engine.failure = undefined
+    b.engine.choice = undefined
+    nextTurn(b, 3)
+    expect(await b.resolve(3)).toEqual(CHEAP)
+    expect(b.decision(2)).toMatchObject({ reason: 'judgment-failure-held' })
+    expect(b.decision(2)).not.toHaveProperty('engineFailure')
+    expect(stickyState(b.session.events)).toMatchObject({ active: true, judgmentFailures: { count: 2, turn: 3 } })
+
+    // The third consecutive failure ends the streak.
+    nextTurn(b, 4)
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decision(3)).toMatchObject({ outcome: 'kept-strong', reason: 'invalid-answer', sticky: { active: false } })
+
+    // An answered call clears the count, so a later streak survives a failure again.
+    const answered = await heldInto(config)
+    answered.engine.failure = new Error('socket hang up')
+    expect(await answered.resolve(2)).toEqual(CHEAP)
+    answered.engine.failure = undefined
+    nextTurn(answered, 3)
+    expect(await answered.resolve(3)).toEqual(CHEAP)
+    expect(answered.decision(2)).toMatchObject({ reason: 'gate-passed' })
+    expect(stickyState(answered.session.events)).not.toHaveProperty('judgmentFailures')
+    answered.engine.failure = new Error('socket hang up')
+    nextTurn(answered, 4)
+    expect(await answered.resolve(4)).toEqual(CHEAP)
+    expect(answered.decision(3)).toMatchObject({ reason: 'judgment-failure-held' })
+
+    // Under the error policy a held failure within tolerance still holds.
+    const strict = await heldInto({ ...config, onUnavailable: 'error' })
+    strict.engine.failure = new Error('socket hang up')
+    expect(await strict.resolve(2)).toEqual(CHEAP)
+    expect(strict.decision(1)).toMatchObject({ outcome: 'downgraded', reason: 'judgment-failure-held' })
+  })
+
+  it('breaker opens after breakerThreshold and closes after breakerOpenTurns', async () => {
+    const b = await bench({
+      config: { ...CONFIG, judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 2 } },
+    })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'the classifier could not be reached')
+    expect(await b.resolve(1)).toBeUndefined()
+    nextTurn(b, 2)
+    expect(await b.resolve(2)).toBeUndefined()
+    const asked = b.engine.asks.length
+    expect(asked).toBe(2)
+
+    for (const turn of [3, 4]) {
+      nextTurn(b, turn)
+      expect(await b.resolve(turn)).toBeUndefined()
+      expect(b.decisions().at(-1)).toMatchObject({ outcome: 'kept-strong', reason: 'breaker-open' })
+      expect(b.decisions().at(-1)).not.toHaveProperty('engineFailure')
+    }
+    expect(b.engine.asks).toHaveLength(asked)
+
+    // After the window one call is tried; its failure opens the breaker again.
+    nextTurn(b, 5)
+    expect(await b.resolve(5)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(asked + 1)
+    nextTurn(b, 6)
+    expect(await b.resolve(6)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open' })
+
+    // An answered call closes it.
+    b.engine.failure = undefined
+    nextTurn(b, 8)
+    expect(await b.resolve(8)).toEqual(CHEAP)
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // breakerOpenTurns 0 disables the breaker.
+    const off = await bench({ config: { ...CONFIG, judgmentFailures: { breakerThreshold: 1, breakerOpenTurns: 0 } } })
+    off.engine.failure = new Error('socket hang up')
+    expect(await off.resolve(1)).toBeUndefined()
+    openTurn(off.session, 2)
+    expect(await off.resolve(2)).toBeUndefined()
+    expect(off.engine.asks).toHaveLength(2)
+    expect(off.decision(1)).toMatchObject({ reason: 'engine-unavailable' })
+  })
+
+  it('keeps state-too-large and judgment-input-too-large as immediate strong exits of a held streak', async () => {
+    const b = await heldInto({ ...CONFIG, hold: { minSteps: 1 } })
+    b.engine.failure = new JudgmentError('INPUT_TOO_LARGE', 'complete serialized request exceeds the body limit')
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({ outcome: 'kept-strong', reason: 'judgment-input-too-large', sticky: { active: false } })
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
   })
 })
 
@@ -1548,7 +1737,9 @@ describe('route-error recovery', () => {
   })
 
   it('does not count a later manual failure after an unavailable judgment broke the hold', async () => {
-    const b = await bench({ config: { ...CONFIG, maxRouteErrors: 1, onUnavailable: 'error' } })
+    const b = await bench({
+      config: { ...CONFIG, maxRouteErrors: 1, onUnavailable: 'error', judgmentFailures: { holdTolerance: 0 } },
+    })
     openTurn(b.session, 1)
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toEqual(CHEAP)

@@ -34,6 +34,8 @@ export type TrajectoryKey =
   | 'routing.reason.engineAbsent'
   | 'routing.reason.engineDisabled'
   | 'routing.reason.engineUnavailable'
+  | 'routing.reason.judgmentFailureHeld'
+  | 'routing.reason.breakerOpen'
   | 'routing.reason.invalidAnswer'
   | 'routing.reason.noCandidates'
   | 'routing.reason.modelUnavailable'
@@ -94,6 +96,8 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.engineAbsent': 'engine absent',
   'routing.reason.engineDisabled': 'engine disabled',
   'routing.reason.engineUnavailable': 'engine unavailable',
+  'routing.reason.judgmentFailureHeld': 'judgment failed, streak held',
+  'routing.reason.breakerOpen': 'judgment paused after repeated failures',
   'routing.reason.invalidAnswer': 'invalid answer',
   'routing.reason.noCandidates': 'no candidates configured',
   'routing.reason.modelUnavailable': 'model capabilities unavailable',
@@ -136,6 +140,8 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'engine-absent': 'routing.reason.engineAbsent',
   'engine-disabled': 'routing.reason.engineDisabled',
   'engine-unavailable': 'routing.reason.engineUnavailable',
+  'judgment-failure-held': 'routing.reason.judgmentFailureHeld',
+  'breaker-open': 'routing.reason.breakerOpen',
   'invalid-answer': 'routing.reason.invalidAnswer',
   'no-candidates': 'routing.reason.noCandidates',
   'model-unavailable': 'routing.reason.modelUnavailable',

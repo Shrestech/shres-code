@@ -724,6 +724,40 @@ describe('stickyState hold cap and re-entry cooldown', () => {
   })
 })
 
+describe('stickyState judgment failures', () => {
+  it('counts failed judgment calls with the turn of the latest and clears them on an answered call', () => {
+    const session = scripted('judgment-failures')
+    open(session, 1)
+    session.append('model-routing/decision', decision(
+      { active: false, stepsElapsed: 0 },
+      { reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' } },
+    ))
+    close(session, 1)
+    open(session, 2)
+    for (const reason of ['invalid-answer', 'judgment-error'] as const) {
+      session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0 }, { reason }))
+    }
+    expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, judgmentFailures: { count: 3, turn: 2 } })
+
+    // Decisions that made no judgment call leave the count alone.
+    for (const reason of ['breaker-open', 'reentry-cooldown', 'judgment-input-too-large'] as const) {
+      session.append('model-routing/decision', decision({ active: false, stepsElapsed: 0 }, { reason }))
+    }
+    expect(stickyState(session.events).judgmentFailures).toEqual({ count: 3, turn: 2 })
+
+    // A held failure counts while the streak holds.
+    session.append('model-routing/decision', decision({ active: true, stepsElapsed: 0, enteredTurn: 2 }, {
+      route: { choice: 'cheap', confidence: 0.9, probabilities: { cheap: 0.9 } },
+    }))
+    expect(stickyState(session.events)).not.toHaveProperty('judgmentFailures')
+    session.append('model-routing/decision', decision(
+      { active: true, stepsElapsed: 0, enteredTurn: 2 },
+      { reason: 'judgment-failure-held' },
+    ))
+    expect(stickyState(session.events)).toMatchObject({ active: true, judgmentFailures: { count: 1, turn: 2 } })
+  })
+})
+
 describe('stickyState purity', () => {
   it('reproduces an earlier state from the same log prefix', () => {
     const session = scripted('sticky-purity')

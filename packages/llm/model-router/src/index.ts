@@ -41,7 +41,7 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
-import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import { JudgmentError, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
@@ -61,6 +61,10 @@ import {
   DEFAULT_ENTRY_SCORE_CEILING,
   DEFAULT_HOLD_MAX_STEPS,
   DEFAULT_HOLD_MIN_STEPS,
+  DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS,
+  DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
+  DEFAULT_JUDGMENT_DEADLINE_MS,
+  DEFAULT_JUDGMENT_HOLD_TOLERANCE,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -68,6 +72,7 @@ import {
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   DEFAULT_DIFFICULTY_LEVELS,
   KEEP_CURRENT_OPTION_ID,
+  MAX_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
 import type { ModelRouterConfig, ResolvedModelRouterConfig } from './config.ts'
@@ -86,6 +91,7 @@ import type { ModelRoutingStickyFoldState, ModelRoutingStickyState } from './fol
 import type {
   ModelRoutingCandidate,
   ModelRoutingDecision,
+  ModelRoutingEngineFailure,
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
   ModelRoutingProjection,
@@ -103,16 +109,21 @@ export {
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
   DEFAULT_HOLD_MAX_STEPS,
   DEFAULT_HOLD_MIN_STEPS,
+  DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS,
+  DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
+  DEFAULT_JUDGMENT_DEADLINE_MS,
+  DEFAULT_JUDGMENT_HOLD_TOLERANCE,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   KEEP_CURRENT_OPTION_ID,
+  MAX_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
-export type { ModelRoutingStickyState } from './folds.ts'
+export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
 /** Settings namespace carrying the deployment's routing configuration. */
 export const MODEL_ROUTER_SETTINGS_NAMESPACE = settingsNamespace('model-router')
@@ -380,6 +391,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }),
     maxRouteErrors: z.number().step(1).min(1).default(DEFAULT_MAX_ROUTE_ERRORS),
     onUnavailable: z.union(['fallback', 'error']).default('fallback'),
+    judgmentDeadlineMs: z.number().step(1).min(1).max(MAX_JUDGMENT_DEADLINE_MS).default(DEFAULT_JUDGMENT_DEADLINE_MS),
+    judgmentFailures: z.object({
+      holdTolerance: z.number().step(1).min(0).default(DEFAULT_JUDGMENT_HOLD_TOLERANCE),
+      breakerThreshold: z.number().step(1).min(1).default(DEFAULT_JUDGMENT_BREAKER_THRESHOLD),
+      breakerOpenTurns: z.number().step(1).min(0).default(DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS),
+    }),
     inTurnFallback: z.union(['manual', 'off']).default('manual'),
     // Both optional field groups are unions with `z.const(null)`: schemastery
     // materializes an absent bare object as `{}` (probe-verified), which would
@@ -503,8 +520,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // The accumulator counts held steps and records the re-entry cooldown turn.
-        stateVersion: 7,
+        // The accumulator counts held steps and failed judgment calls, and records the re-entry cooldown turn.
+        stateVersion: 8,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -962,6 +979,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
     }
+    // The breaker is half-open once its window passes: only an answered call
+    // clears the count, so the next failure opens it again.
+    const failures = sticky.judgmentFailures
+    if (failures !== undefined && config.judgmentFailures.breakerOpenTurns > 0
+      && failures.count >= config.judgmentFailures.breakerThreshold
+      && turn - failures.turn <= config.judgmentFailures.breakerOpenTurns) {
+      return keep('breaker-open')
+    }
     const engine = this.ctx.get('judgment')
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
@@ -990,16 +1015,61 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ...difficultyInstructions === undefined ? [] : [difficultyQuestion(config, difficultyInstructions)],
     ]
     facts.judgmentQuestions = questions
+    /**
+     * One failed judgment call. A held streak keeps its candidate while the
+     * consecutive failures before this one are below the hold tolerance.
+     */
+    const judgmentFailed = (
+      reason: 'engine-unavailable' | 'invalid-answer',
+      appliesPolicy: boolean,
+      code?: ModelRoutingEngineFailure['code'],
+    ): ModelRoutingDecision => {
+      const engineFailure = code === undefined ? {} : { engineFailure: { code } }
+      if (held !== undefined && (sticky.judgmentFailures?.count ?? 0) < config.judgmentFailures.holdTolerance) {
+        return {
+          outcome: 'downgraded',
+          reason: 'judgment-failure-held',
+          stateHash: observed.hash,
+          stateSeqs: observed.seqs,
+          selection: held,
+          ...facts,
+          ...engineFailure,
+          sticky: {
+            active: true,
+            routeErrorLimit: config.maxRouteErrors,
+            stepsElapsed: sticky.stepsElapsed,
+            ...heldEntry(sticky),
+            entryBase: entryBaseOf(sticky, base),
+          },
+        }
+      }
+      if (appliesPolicy && config.onUnavailable === 'error') {
+        return {
+          outcome: 'error',
+          reason: 'judgment-error',
+          stateHash: observed.hash,
+          stateSeqs: observed.seqs,
+          ...facts,
+          ...engineFailure,
+          sticky: { active: false, stepsElapsed: 0 },
+        }
+      }
+      return { ...keep(reason), ...engineFailure }
+    }
+    // The deadline aborts the call alone: the turn's own signal still cancels
+    // the turn, and an answer arriving after the deadline is not used.
+    const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
+    const askSignal = AbortSignal.any([signal, deadline])
     let result: JudgmentResult
     try {
       if (engine.fitting === undefined) {
-        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal })
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal })
       } else {
         const fitted = await engine.fitting.ask({
           states: state.alternatives.map(candidate => candidate.text),
           questions,
           tier: config.tier,
-          signal,
+          signal: askSignal,
         })
         signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
@@ -1022,26 +1092,24 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
     } catch (error: unknown) {
       signal.throwIfAborted()
+      if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
       const code = (error as { code?: unknown } | null)?.code
       if (code === 'ABORTED') throw error
       if (code === 'INPUT_TOO_LARGE') return keep('judgment-input-too-large')
-      if (config.onUnavailable === 'error') {
-        return {
-          outcome: 'error',
-          reason: 'judgment-error',
-          stateHash: observed.hash,
-          stateSeqs: observed.seqs,
-          ...facts,
-          sticky: { active: false, stepsElapsed: 0 },
-        }
-      }
-      return keep(code === 'INVALID_ANSWER' ? 'invalid-answer' : 'engine-unavailable')
+      return judgmentFailed(
+        code === 'INVALID_ANSWER' ? 'invalid-answer' : 'engine-unavailable',
+        true,
+        error instanceof JudgmentError ? error.code : undefined,
+      )
     }
+    if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
     const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const score = result.answers.find((answer): answer is JudgmentScoreAnswer =>
       answer.kind === 'score' && answer.id === DIFFICULTY_QUESTION_ID)
-    if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) return keep('invalid-answer')
+    if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) {
+      return judgmentFailed('invalid-answer', false)
+    }
     const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
     const difficulty = score === undefined ? undefined : { score: score.score, confidence: score.confidence }
     const answered = {

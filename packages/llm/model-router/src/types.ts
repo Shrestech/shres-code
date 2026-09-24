@@ -9,7 +9,9 @@
  */
 
 import type { HostedTool, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
-import type { JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits } from '@shres-code/shres-code-judgment'
+import type {
+  JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
+} from '@shres-code/shres-code-judgment'
 
 /**
  * One allowlisted downgrade candidate as configuration states it: plain
@@ -150,8 +152,12 @@ export type ModelRoutingReason =
   | 'engine-absent'
   /** A judgment engine is composed and the deployment turned it off. */
   | 'engine-disabled'
-  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  /** The engine could not be reached, refused the ask, or did not answer within `judgmentDeadlineMs`. */
   | 'engine-unavailable'
+  /** A held streak kept its candidate through a failed judgment call within `judgmentFailures.holdTolerance`. */
+  | 'judgment-failure-held'
+  /** Consecutive failed judgment calls opened the breaker, so no judgment runs. */
+  | 'breaker-open'
   /** The engine answered with a body this provider could not use. */
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
@@ -339,6 +345,14 @@ export interface ModelRoutingDecision {
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
   failedChunkSeq?: number
+  /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
+  engineFailure?: ModelRoutingEngineFailure
+}
+
+/** A failed judgment call as a decision records it. */
+export interface ModelRoutingEngineFailure {
+  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  code: JudgmentErrorCode | 'DEADLINE'
 }
 
 /** The downgraded request whose failure a `route-failed` decision records. */

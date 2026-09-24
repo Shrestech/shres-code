@@ -2337,6 +2337,14 @@ export interface ModelRouterConfig {
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
    * every other recovery listener declined; `off` leaves the failure terminal.
@@ -2422,6 +2430,28 @@ export interface ModelRoutingEscalateBackConfig {
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
 
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
 /** What a failed downgraded request means for its step. */
 export type ModelRoutingInTurnFallback = 'manual' | 'off'
 
@@ -2450,7 +2480,7 @@ export interface ModelRoutingStateConfig {
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:85`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:107`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

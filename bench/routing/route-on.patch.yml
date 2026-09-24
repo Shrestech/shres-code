@@ -50,5 +50,7 @@
         escalateBack: {"scoreThreshold":4}
         maxRouteErrors: 2
         onUnavailable: "fallback"
+        judgmentDeadlineMs: 1500
+        judgmentFailures: {"holdTolerance":2,"breakerThreshold":3,"breakerOpenTurns":5}
         routeInstructions: "Which route should handle this turn? Choose the cheapest route that is still a safe fit, or the strong route when the turn is ambiguous or its work is not yet known."
         difficultyInstructions: "How hard is this turn for the model handling it? Score it on the levels below."

@@ -67,6 +67,28 @@ export interface ModelRoutingDifficultyConfig {
   entryScoreCeiling?: number
 }
 
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
 /** The advisory-hint operating point. */
 export interface ModelRoutingHardHintConfig {
   /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
@@ -126,6 +148,14 @@ export interface ModelRouterConfig {
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
   /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
@@ -190,6 +220,14 @@ export interface ResolvedModelRouterConfig {
   readonly maxRouteErrors: number
   /** Policy for a failed judgment call. */
   readonly onUnavailable: ModelRoutingUnavailablePolicy
+  /** Deadline of one judgment call, in milliseconds. */
+  readonly judgmentDeadlineMs: number
+  /** Hold tolerance and breaker for failed judgment calls. */
+  readonly judgmentFailures: {
+    readonly holdTolerance: number
+    readonly breakerThreshold: number
+    readonly breakerOpenTurns: number
+  }
   /** Policy for a failed downgraded request. */
   readonly inTurnFallback: ModelRoutingInTurnFallback
   /** Effort lift for a hard turn, when configured. */
@@ -238,6 +276,24 @@ export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
 export const DEFAULT_MAX_ROUTE_ERRORS = 2
 
 /**
+ * Default judgment deadline, in milliseconds: above the slowest judgment call a
+ * live session recorded (924 ms) and far above a local Laya call (about 14 ms).
+ */
+export const DEFAULT_JUDGMENT_DEADLINE_MS = 1500
+
+/** Largest accepted judgment deadline, in milliseconds. */
+export const MAX_JUDGMENT_DEADLINE_MS = 30_000
+
+/** Default number of consecutive failed judgment calls a held streak survives. */
+export const DEFAULT_JUDGMENT_HOLD_TOLERANCE = 2
+
+/** Default number of consecutive failed judgment calls that open the breaker. */
+export const DEFAULT_JUDGMENT_BREAKER_THRESHOLD = 3
+
+/** Default number of turns an open breaker keeps the manual route. */
+export const DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS = 5
+
+/**
  * Default difficulty levels. Scores are zero-based indexes into this ordered
  * list, so the fourth level (`hard`) is score 3. A deployment replaces the
  * descriptions with its own rubric; the count fixes the valid score range.
@@ -265,6 +321,8 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'escalateBack',
   'maxRouteErrors',
   'onUnavailable',
+  'judgmentDeadlineMs',
+  'judgmentFailures',
   'inTurnFallback',
   'difficultyToEffort',
   'hardHint',
@@ -392,6 +450,22 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   if (!Number.isInteger(maxRouteErrors) || maxRouteErrors < 1) {
     throw new Error('ModelRouterConfig.maxRouteErrors must be a positive integer')
   }
+  const judgmentDeadlineMs = config.judgmentDeadlineMs ?? DEFAULT_JUDGMENT_DEADLINE_MS
+  if (!Number.isInteger(judgmentDeadlineMs) || judgmentDeadlineMs < 1 || judgmentDeadlineMs > MAX_JUDGMENT_DEADLINE_MS) {
+    throw new Error(`ModelRouterConfig.judgmentDeadlineMs must be a positive integer no greater than ${MAX_JUDGMENT_DEADLINE_MS}`)
+  }
+  const holdTolerance = config.judgmentFailures?.holdTolerance ?? DEFAULT_JUDGMENT_HOLD_TOLERANCE
+  if (!Number.isInteger(holdTolerance) || holdTolerance < 0) {
+    throw new Error('ModelRouterConfig.judgmentFailures.holdTolerance must be a non-negative integer')
+  }
+  const breakerThreshold = config.judgmentFailures?.breakerThreshold ?? DEFAULT_JUDGMENT_BREAKER_THRESHOLD
+  if (!Number.isInteger(breakerThreshold) || breakerThreshold < 1) {
+    throw new Error('ModelRouterConfig.judgmentFailures.breakerThreshold must be a positive integer')
+  }
+  const breakerOpenTurns = config.judgmentFailures?.breakerOpenTurns ?? DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS
+  if (!Number.isInteger(breakerOpenTurns) || breakerOpenTurns < 0) {
+    throw new Error('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
+  }
   const onUnavailable = config.onUnavailable ?? 'fallback'
   const inTurnFallback = config.inTurnFallback ?? 'manual'
   const tier = config.tier ?? 'fast'
@@ -439,6 +513,8 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     escalateBackScoreThreshold: scoreThreshold,
     maxRouteErrors,
     onUnavailable,
+    judgmentDeadlineMs,
+    judgmentFailures: Object.freeze({ holdTolerance, breakerThreshold, breakerOpenTurns }),
     inTurnFallback,
     ...difficultyToEffort === undefined
       ? {}

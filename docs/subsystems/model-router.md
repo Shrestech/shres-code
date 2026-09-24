@@ -123,8 +123,12 @@ type ModelRoutingReason =
   | 'engine-absent'
   /** A judgment engine is composed and the deployment turned it off. */
   | 'engine-disabled'
-  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  /** The engine could not be reached, refused the ask, or did not answer within `judgmentDeadlineMs`. */
   | 'engine-unavailable'
+  /** A held streak kept its candidate through a failed judgment call within `judgmentFailures.holdTolerance`. */
+  | 'judgment-failure-held'
+  /** Consecutive failed judgment calls opened the breaker, so no judgment runs. */
+  | 'breaker-open'
   /** The engine answered with a body this provider could not use. */
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
@@ -228,6 +232,8 @@ interface ModelRoutingDecision {
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
   failedChunkSeq?: number
+  /** Why the judgment call failed, when it failed with a known code or missed its deadline. */
+  engineFailure?: ModelRoutingEngineFailure
 }
 ```
 
@@ -243,7 +249,19 @@ interface ModelRoutingFailure {
 }
 ```
 
+```ts type-equiv
+/** A failed judgment call as a decision records it. */
+interface ModelRoutingEngineFailure {
+  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  code: JudgmentErrorCode | 'DEADLINE'
+}
+```
+
 One decision is logged per fresh judged request step as `model-routing/decision`, log-only and append-only: it is written after the consult resolved the step, so the `request/header` that follows it carries the route it selected and the consumed route is reconstructable from the log. `stateHash` and `stateSeqs` record the state the judgment read, so a rerun over the same state is recognizable; neither gates a decision. `selection` is present for a downgraded outcome only, `route`/`difficulty`/`engine`/`model`/`latencyMs` record what the engine answered and how long it took, and `hint` is advisory — it appears while the manual route stands and never changes it. A `route-failed` decision records the failed request in `failure` and the failed attempt's last chunk in `failedChunkSeq`; it is written after that attempt and before the retried request's header.
+
+## Failed judgment calls
+
+Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure`, and an unclassified error records none. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest, and clears the count on a decision that carries a route answer. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
 
 ## In-turn fallback
 
@@ -349,6 +367,21 @@ interface ModelRoutingStickyState {
   readonly recoveryTurn?: number
   /** Turn of the last streak a quality exit ended; the re-entry cooldown counts from it. */
   readonly cooldownTurn?: number
+  /**
+   * Consecutive failed judgment calls since the last answered one, and the turn
+   * of the latest; absent when none is counted.
+   */
+  readonly judgmentFailures?: ModelRoutingJudgmentFailures
+}
+```
+
+```ts type-equiv
+/** Consecutive failed judgment calls as the fold counts them. */
+interface ModelRoutingJudgmentFailures {
+  /** Failed judgment calls since the last answered one. */
+  readonly count: number
+  /** Turn of the latest failed judgment call. */
+  readonly turn: number
 }
 ```
 
@@ -405,6 +438,30 @@ interface ModelRoutingDifficultyConfig {
 ```
 
 ```ts type-equiv
+/** How failed judgment calls affect a held streak and later consults. */
+interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+```
+
+```ts type-equiv
 /** Composition config of the model router; also the `model-router` settings section. */
 interface ModelRouterConfig {
   /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
@@ -450,6 +507,14 @@ interface ModelRouterConfig {
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
   /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
@@ -580,5 +645,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:351`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:362`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

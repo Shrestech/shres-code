@@ -34,11 +34,13 @@ The router's config in `route-on` is frozen here: `tier: "fast"`,
 `downgradeThreshold: 0.8`, `downgradeMargin: 0.1`,
 `hold: { minSteps: 20, maxSteps: 40 }`, `difficulty: { entryScoreCeiling: 2 }`,
 `reentryCooldownTurns: 2`, `escalateBack: { scoreThreshold: 4 }`,
-`maxRouteErrors: 2`, `onUnavailable: "fallback"`, and exactly one
-candidate (the weak route). Amendment: the step-counted `hold`, the entry
-ceiling, and the re-entry cooldown replace the turn-counted
+`maxRouteErrors: 2`, `onUnavailable: "fallback"`, `judgmentDeadlineMs: 1500`,
+`judgmentFailures: { holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 }`,
+and exactly one candidate (the weak route). Amendment: the step-counted
+`hold`, the entry ceiling, and the re-entry cooldown replace the turn-counted
 `minTurnsDowngraded: 5` this arm was first frozen with, which the router no
-longer accepts. The judgment engine is the TypeSafe provider on its
+longer accepts, and the judgment deadline and failure handling are pinned at
+their defaults. The judgment engine is the TypeSafe provider on its
 `fast` tier (`jev-preview`, measured at 273 ms against 685 ms for
 `accurate` on a 1.7k-token state), the tier both consumers use here.
 
