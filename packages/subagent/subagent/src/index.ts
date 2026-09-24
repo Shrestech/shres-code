@@ -36,6 +36,7 @@ import z from '@shres-code/schemastery'
 import { scopeTarget } from '@shres-code/shres-code-scope'
 import type { Scoped } from '@shres-code/shres-code-scope'
 import { assertObjectJsonSchema } from '@shres-code/shres-code-tools'
+import { InvariantError } from '@shres-code/shres-code-invariants'
 import type { ContentBlock, MessageId } from '@shres-code/shres-code-llm'
 import type { Agent, AgentOptions } from '@shres-code/shres-code-agent'
 import type { SessionId } from '@shres-code/shres-code-session'
@@ -193,7 +194,8 @@ declare module '@shres-code/cordis' {
      * The waterfall settles before any child resource exists, so a listener
      * that records its choice appends to `request.parent.session` before
      * returning and that record precedes the child's creation. A throwing
-     * listener is logged and the child keeps its inherited route; a route that
+     * listener is logged and the child keeps its inherited route, except that
+     * an `InvariantError` raised during the dispatch propagates; a route that
      * does not resolve to a registered model rejects the delegation.
      * Scope-filtered dispatch keys the carrier by `request.parent`, so a
      * listener registered on the parent's context answers only its delegations.
@@ -565,8 +567,10 @@ export class SubagentRuntime extends Service {
    * routes, when no listener answers, or when the answer equals the inherited
    * route. A throwing listener is logged and the child keeps its inherited
    * route: routing is an optional cost policy, and a broken policy must not
-   * fail the delegation it would only have made cheaper. A cancelled
-   * `input.signal` rejects instead. A listener route is merged over the
+   * fail the delegation it would only have made cheaper. An `InvariantError`
+   * raised during the dispatch is not contained: a violated invariant means
+   * the durable log is about to become inconsistent, so it rejects the
+   * delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the
    * inherited route and resolved against its registered model before return,
    * so an unregistered route rejects before any child exists; agent creation
    * itself does not validate a route.
@@ -576,6 +580,7 @@ export class SubagentRuntime extends Service {
    * @throws {SubagentError} `NO_PROVIDER` for an unregistered subagent provider,
    *   or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not
    *   resolve to a registered model.
+   * @throws {InvariantError} when a registered invariant fails during the dispatch.
    */
   async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined> {
     const provider = this.expectProvider(name)
@@ -599,6 +604,9 @@ export class SubagentRuntime extends Service {
         () => Promise.resolve(undefined),
       )
     } catch (error: unknown) {
+      // A violated invariant means the durable log is about to become
+      // inconsistent, which must fail loudly rather than fall back.
+      if (error instanceof InvariantError) throw error
       input.signal.throwIfAborted()
       this.ctx.logger.warn(
         `subagent/child-route listener failed for a "${input.kind}" child on "${name}"; `

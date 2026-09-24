@@ -13,7 +13,7 @@ import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
 import { LlmError } from '@shres-code/shres-code-llm'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
-import InvariantRegistry from '@shres-code/shres-code-invariants'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
 import * as ScopeInvariant from '@shres-code/shres-code-scope/invariant'
 import SubagentRuntime, { effectiveChildRoute, SubagentError } from '../src/index.ts'
 import type { SubagentChildRouteInput, SubagentChildRouteRequest } from '../src/index.ts'
@@ -197,6 +197,25 @@ describe('subagent/child-route', () => {
     routeTo(ctx, CHEAP)
 
     expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual(CHEAP)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('an invariant failure raised during the dispatch propagates instead of falling back', async () => {
+    const { ctx, parent } = await setup()
+    await ctx.plugin(InvariantRegistry)
+    const registration = ctx.invariants.register('@test/child-route-invariant', (inner, fail) => {
+      inner.on('internal/dispatch', (_mode, eventName) => {
+        if (eventName === 'subagent/child-route') fail('child-route dispatch breaks the test invariant')
+      }, { global: true })
+    })
+    // The returned disposer carries Cordis setup thenability: installation finishes asynchronously.
+    await (registration as unknown as PromiseLike<void>)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    routeTo(ctx, CHEAP)
+
+    const rejected = ctx.subagents.resolveChildRoute('spawn', input(parent))
+    await expect(rejected).rejects.toBeInstanceOf(InvariantError)
+    await expect(rejected).rejects.toThrow('child-route dispatch breaks the test invariant')
     expect(warn).not.toHaveBeenCalled()
   })
 

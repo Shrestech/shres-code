@@ -32,6 +32,7 @@ Four constraints bound the extension point:
 **Failure behavior.**
 
 - A throwing listener is contained: the method logs a warning naming the consumer kind and provider, and the child keeps its inherited route. Routing is an optional cost policy, so a broken policy must not fail the delegation it would only have made cheaper.
+- An `InvariantError` raised during the dispatch is not contained. The waterfall's catch cannot tell a listener's exception from a failure raised by a registered invariant's dispatch hook, so the method checks for the invariants package's `InvariantError` and rethrows it: a violated invariant means the durable log is about to become inconsistent, and the repository requires that to fail loudly. `@shres-code/shres-code-invariants` was already a required peer dependency of this package.
 - A cancelled delegation rejects with its cancellation reason instead of falling back, so cancellation is never reported as a policy failure.
 - A route that names no provider or model, or that `ctx.llm.resolveModelInfo()` cannot resolve, rejects with `SubagentError` code `INVALID_CHILD_ROUTE` before any child exists. Agent creation itself does not validate a route: an unregistered route would otherwise fail only at the child's first model request, after the child was published and counted.
 
@@ -45,8 +46,8 @@ The waterfall is a subagent-capability extension point, not an agent-loop change
 
 - `packages/subagent/subagent/tests/child-route.spec.ts` covers explicit override, fork exclusion, the out-of-process skip, byte-identical no-listener behavior, a routed spawned child whose request header carries the routed model, partial-route merging, the inherited-answer no-op, HMR disposal, parent-scoped dispatch, contained listener failure with its log line, cancellation, and every `INVALID_CHILD_ROUTE` path.
 - `packages/subagent/tool-subagent/tests/child-route.loader.spec.ts` boots a test-only `cordis.yml` through the real Loader against the mock model server. A test plugin routes children to `deepseek-v4-flash`, and the parent turn's `subagent` call makes wire requests in the order parent `deepseek-v4-pro`, child `deepseek-v4-flash`, parent `deepseek-v4-pro`. The listener observed only the parent as a live agent. Without the plugin, all three requests use the parent model.
-- With the invariant registry and the scope invariant mounted, a routed dispatch is accepted and logs no warning.
-- Negative controls: removing the fork exclusion, the explicit-route rule, the listener containment, route validation, or the `tool-subagent` wiring each fails its named test, and dispatching with a carrier keyed to no parent fails the scope-invariant test.
+- With the invariant registry and the scope invariant mounted, a routed dispatch is accepted and logs no warning. A test invariant that fails on every `subagent/child-route` dispatch makes `resolveChildRoute` reject with that `InvariantError` and log nothing.
+- Negative controls: removing the fork exclusion, the explicit-route rule, the listener containment, route validation, the `InvariantError` rethrow, or the `tool-subagent` wiring each fails its named test, and dispatching with a carrier keyed to no parent fails the scope-invariant test.
 
 No shipped composition registers a listener, so no model-visible output changes and no keyless snapshot applies. The Loader test is the real-composition evidence.
 
@@ -62,4 +63,4 @@ No shipped composition registers a listener, so no model-visible output changes 
 
 ## Consequences
 
-With no listener, every delegation is byte-identical to its previous behavior. The two consumers now await one extra resolution step before starting a child, which dispatches nothing when no listener is registered. A deployment can route fresh `subagent` and `workflow` children without touching either consumer, while fork children and bound seats keep their routes by construction. A listener that returns an unregistered route breaks delegations loudly at their first use rather than silently falling back. The containment cannot distinguish a listener's exception from one raised by a dispatch hook, so an invariant violation during this dispatch is logged in the same warning and the child keeps its inherited route instead of the error propagating.
+With no listener, every delegation is byte-identical to its previous behavior. The two consumers now await one extra resolution step before starting a child, which dispatches nothing when no listener is registered. A deployment can route fresh `subagent` and `workflow` children without touching either consumer, while fork children and bound seats keep their routes by construction. A listener that returns an unregistered route breaks delegations loudly at their first use rather than silently falling back. An invariant violated during the dispatch fails the delegation with its `InvariantError` instead of being logged as a routing-policy failure.

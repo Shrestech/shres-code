@@ -492,7 +492,7 @@ Provider `start()` fulfills with a published run. The service mints a unique `ru
 
 A delegation consumer may let a deployment choose a cheaper route for a fresh child. Before starting the child, the consumer calls `ctx.subagents.resolveChildRoute(provider, input)` once and passes the returned options as the start request's `agentOptions`, and derives any reported route from those same options with `effectiveChildRoute`. `tool-subagent` (kind `subagent`, with its tool name as `agentType`) and the worker-thread workflow engine (kind `workflow`) are the consuming callers; Team rosters and other direct `start()` callers never consult it.
 
-The resolver dispatches the `subagent/child-route` waterfall at most once, keyed by the delegating parent's scope, and only when the requested options name neither a provider nor a model, the provider sets `runsRequestedModel`, and the provider does not seed the child with parent history. A fork child keeps its parent's warm cached prefix and is never routed, and team seats always name their route. A listener route is merged over the inherited route and resolved with `ctx.llm.resolveModelInfo()` before return, so an unregistered route rejects with `INVALID_CHILD_ROUTE` before any child exists; agent creation itself does not validate a route. A throwing listener is logged and the child keeps its inherited route, because routing is an optional cost policy that must not fail the delegation, while a cancelled delegation rejects with its reason.
+The resolver dispatches the `subagent/child-route` waterfall at most once, keyed by the delegating parent's scope, and only when the requested options name neither a provider nor a model, the provider sets `runsRequestedModel`, and the provider does not seed the child with parent history. A fork child keeps its parent's warm cached prefix and is never routed, and team seats always name their route. A listener route is merged over the inherited route and resolved with `ctx.llm.resolveModelInfo()` before return, so an unregistered route rejects with `INVALID_CHILD_ROUTE` before any child exists; agent creation itself does not validate a route. A throwing listener is logged and the child keeps its inherited route, because routing is an optional cost policy that must not fail the delegation. An `InvariantError` raised during the dispatch propagates instead, because a violated invariant means the durable log is about to become inconsistent, and a cancelled delegation rejects with its reason.
 
 The waterfall settles before any child resource exists, so a listener that records its choice appends to the parent session before returning. That record precedes the child's creation in the parent log, which is the ordering a routing policy needs to keep every routed request reconstructable.
 
@@ -761,8 +761,10 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
  * routes, when no listener answers, or when the answer equals the inherited
  * route. A throwing listener is logged and the child keeps its inherited
  * route: routing is an optional cost policy, and a broken policy must not
- * fail the delegation it would only have made cheaper. A cancelled
- * `input.signal` rejects instead. A listener route is merged over the
+ * fail the delegation it would only have made cheaper. An `InvariantError`
+ * raised during the dispatch is not contained: a violated invariant means
+ * the durable log is about to become inconsistent, so it rejects the
+ * delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the
  * inherited route and resolved against its registered model before return,
  * so an unregistered route rejects before any child exists; agent creation
  * itself does not validate a route.
@@ -772,13 +774,14 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
  * @throws {SubagentError} `NO_PROVIDER` for an unregistered subagent provider,
  *   or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not
  *   resolve to a registered model.
+ * @throws {InvariantError} when a registered invariant fails during the dispatch.
  */
 async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>
 ```
 
 Types: [Agent](core.md) · [AgentOptions](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:272`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:274`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
@@ -790,7 +793,7 @@ Source: [`packages/subagent/subagent/src/index.ts:272`](../../packages/subagent/
 
 Choose the provider/model route of one fresh child before its delegation consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this at most once per child, and only when the request names neither a provider nor a model, the subagent provider runs requested routes, and the provider does not seed the child with parent history: a fork child keeps its parent's warm cached prefix and is never routed. Team seats always name their route, so no seat reaches a listener. The returned route is merged over `request.inherited`; `undefined` keeps it.
 
-The waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child's creation. A throwing listener is logged and the child keeps its inherited route; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent's context answers only its delegations.
+The waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child's creation. A throwing listener is logged and the child keeps its inherited route, except that an `InvariantError` raised during the dispatch propagates; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent's context answers only its delegations.
 
 ```ts cordis-catalog
 /**
@@ -806,7 +809,8 @@ The waterfall settles before any child resource exists, so a listener that recor
  * The waterfall settles before any child resource exists, so a listener
  * that records its choice appends to `request.parent.session` before
  * returning and that record precedes the child's creation. A throwing
- * listener is logged and the child keeps its inherited route; a route that
+ * listener is logged and the child keeps its inherited route, except that
+ * an `InvariantError` raised during the dispatch propagates; a route that
  * does not resolve to a registered model rejects the delegation.
  * Scope-filtered dispatch keys the carrier by `request.parent`, so a
  * listener registered on the parent's context answers only its delegations.
@@ -818,7 +822,7 @@ The waterfall settles before any child resource exists, so a listener that recor
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:203`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:205`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 
@@ -840,7 +844,7 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:182`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:183`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -857,7 +861,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:156`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:157`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -874,7 +878,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:162`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:163`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -898,5 +902,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:173`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:174`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->
