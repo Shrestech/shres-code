@@ -454,6 +454,11 @@ interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
+  /**
+   * Provider-executed tools this model's route serves inside the conversation;
+   * absent declares none, so the local tool catalog applies unchanged.
+   */
+  hostedTools?: readonly HostedTool[]
 }
 ```
 
@@ -642,6 +647,14 @@ interface LlmDiscoveredModel {
    * route's catalog or `defaultInput` fallback rather than a claim.
    */
   input?: readonly ModelModality[]
+  /**
+   * The endpoint declares audio input (speech-to-text) for this model.
+   * Display metadata only: the chat conversation never constructs audio
+   * parts, so this is not a chat modality and lives outside {@link input}.
+   */
+  audioInput?: boolean
+  /** The endpoint declares audio output (text-to-speech) for this model. */
+  audioOutput?: boolean
 }
 ```
 

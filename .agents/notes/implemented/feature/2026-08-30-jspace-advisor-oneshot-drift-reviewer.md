@@ -18,6 +18,16 @@ Both channels now run fresh one-shot reviewer children on one explicit route. Pa
 - **Coalescing is log-derived**: one review in flight, and `suppressReview` blocks new reviews until the user speaks after the latest advice — an ignored redirect never re-fires.
 - **Config splits the route from the capability provider**: `provider`/`model` name the reviewer's LLM route (passed as `agentOptions` on both channels — the skeleton's proactive child silently inherited the parent's model), `subagentProvider` (default `spawn`) names the `ctx.subagents` provider.
 
+## Alternatives considered
+
+**Repair the continuable proactive channel.** Rejected: design review proved it dead three ways — triggers never classify mid-turn, the captured append reenters the session's publication window, and the notice is attributable to any continuable child.
+
+**Anchor the digest on the card Goal.** Rejected: the card Goal is agent-authored and provably placeholder-grade (`always-open` and bare `/j-space on` open Goal "J-Space is on"), so the user-message stream is the goal anchor.
+
+**Keep the `userTurnOpen` trigger gate.** Rejected: it kept triggers from classifying mid-turn.
+
+**Let the reviewer inherit the parent's model.** Rejected: the skeleton's proactive child silently inherited it; `provider`/`model` now name the reviewer's LLM route explicitly.
+
 ## Consequences
 
 - The invariant companion no longer re-derives Config thresholds: every `jspace/advisor` event carries `triggerSeq`, and the companion checks the pointed-at event against a config-free per-family predicate plus strictly increasing drift-check pointers. This retires the original note's deferral reason for cadence triggers.

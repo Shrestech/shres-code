@@ -178,26 +178,9 @@ pi-ai installs several provider SDKs and lazy-loads the one selected by the cata
 
 ## Hosted tools
 
-A route declares the provider-executed tools its models serve with a `hostedTools` dict on the
-profile - `{ webSearch?: boolean, xSearch?: boolean }` at the route level, the same dict on a
-`models` entry or `modelOverrides` value to flip one model - and resolution materializes the
-effective per-model set, failing loud when a switch is not a boolean or names a tool the model's
-dialect does not serve (`x_search` exists only on `openai-responses`). The adapter derives the
-splice from the declaration per request: the dialect module for the model's wire protocol
-contributes the raw tool entries and the local function-tool names to drop while their hosted
-counterpart is enabled (hosted wins on name collision), and promotes hosted names that surface
-as pi-ai tool calls to `server-tool-call` content blocks so the loop never dispatches them. The
-splice rides pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names
-mirror the Grok Build CLI's sampler (`web_search`, `x_search`); the `openai-completions`
-dialect serves z.ai's hosted `web_search` (`search-prime` engine, accepted on request, folded
-into the answer silently with no surfaced artifact — verified live both streaming and not); a
-dialect without a module serves no hosted tools, so absent declarations leave the local tool
-catalog unchanged.
+A route declares the provider-executed tools its models serve with a `hostedTools` dict on the profile - `{ webSearch?: boolean, xSearch?: boolean }` at the route level, the same dict on a `models` entry or `modelOverrides` value to flip one model - and resolution materializes the effective per-model set, failing loud when a switch is not a boolean or names a tool the model's dialect does not serve (`x_search` exists only on `openai-responses`). The adapter derives the splice from the declaration per request: the dialect module for the model's wire protocol contributes the raw tool entries and the local function-tool names to drop while their hosted counterpart is enabled (hosted wins on name collision), and promotes hosted names that surface as pi-ai tool calls to `server-tool-call` content blocks so the loop never dispatches them. The splice rides pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names mirror the Grok Build CLI's sampler (`web_search`, `x_search`); the `openai-completions` dialect serves z.ai's hosted `web_search` (`search-prime` engine, accepted on request, folded into the answer silently with no surfaced artifact — verified live both streaming and not); a dialect without a module serves no hosted tools, so absent declarations leave the local tool catalog unchanged.
 
-`webSearchCallToServerToolCall` projects a `web_search_call` output item into the bounded
-server-tool-call block; the pinned pi-ai dependency drops that item before the harness sees it, so
-the converter is the tested seam a future pi-ai surface or raw-wire read feeds. X search surfaces
-as a custom tool call through pi-ai and is promoted to the block live.
+`webSearchCallToServerToolCall` projects a `web_search_call` output item into the bounded server-tool-call block; the pinned pi-ai dependency drops that item before the harness sees it, so the converter is the tested seam a future pi-ai surface or raw-wire read feeds. X search surfaces as a custom tool call through pi-ai and is promoted to the block live.
 ## Model Experience
 
 ### Provider request through pi-ai
