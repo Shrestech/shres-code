@@ -41,7 +41,13 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
-import { JudgmentError, judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import {
+  declareJudgmentConsumer,
+  JudgmentError,
+  judgmentConsumerId,
+  judgmentEnabled,
+  judgmentQuestionId,
+} from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
@@ -131,6 +137,12 @@ export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './fo
 
 /** Settings namespace carrying the deployment's routing configuration. */
 export const MODEL_ROUTER_SETTINGS_NAMESPACE = settingsNamespace('model-router')
+
+/**
+ * The consumer id every judgment ask of this router carries, so a
+ * `judgment.overrides` entry for `model-router` routes its asks.
+ */
+export const MODEL_ROUTER_JUDGMENT_CONSUMER = judgmentConsumerId('model-router')
 
 /** The route question's id, echoed by the answer this service reads. */
 export const ROUTE_QUESTION_ID = judgmentQuestionId('model-route')
@@ -562,6 +574,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         stateVersion: 9,
       })
     })
+    declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
@@ -883,6 +896,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const from = routeFromFor(config, base)
     let reason: 'manual-deviation' | 'base-unlisted' | 'unknown-candidate' | 'candidate-ineligible' | undefined
     let candidateEligibility: ModelRoutingDecision['candidateEligibility']
+    let eligibilityMs: number | undefined
     if (entryBase !== undefined && (entryBase.provider !== base.provider || entryBase.model !== base.model)) {
       reason = 'manual-deviation'
     } else if (from === undefined) {
@@ -899,9 +913,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           ...identity,
           ...selection.reasoningEffort === undefined ? {} : { reasoningEffort: selection.reasoningEffort },
         }
+        const eligibilityStarted = Date.now()
         candidateEligibility = await assessModelRoutingCandidates(
           llm, request.config, request.content.messages, [heldCandidate], undefined, signal,
         )
+        eligibilityMs = Date.now() - eligibilityStarted
       }
       if (candidateEligibility?.eligibleCandidates.length !== 1) reason = 'candidate-ineligible'
     }
@@ -920,6 +936,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         omittedSeqs: state.omittedSeqs,
       },
       ...candidateEligibility === undefined ? {} : { candidateEligibility },
+      ...eligibilityMs === undefined ? {} : { eligibilityMs },
       ...from === undefined ? {} : { objective: from.objective },
       sticky: { active: false, stepsElapsed: 0, brokenBy: reason },
     }
@@ -980,7 +997,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     let observed = state
     const facts: Pick<ModelRoutingDecision,
       'candidateEligibility' | 'judgmentQuestions' | 'stateProjection' | 'judgmentInput'
-      | 'judgmentRejection' | 'engine' | 'model'> = {}
+      | 'judgmentRejection' | 'engine' | 'model' | 'engineId' | 'latencyMs' | 'judgeUsage'
+      | 'eligibilityMs' | 'inputChars'> = {}
     /** One fallback: the manual route stands, with the class that kept it. */
     const keep = (reason: ModelRoutingReason): ModelRoutingDecision => ({
       outcome: 'kept-strong',
@@ -1051,9 +1069,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
     const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
+    const eligibilityStarted = Date.now()
     const eligibility = await assessModelRoutingCandidates(
       llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
     )
+    facts.eligibilityMs = Date.now() - eligibilityStarted
     facts.candidateEligibility = eligibility
     const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
     if (eligibility.eligibleCandidates.length === 0
@@ -1122,22 +1142,25 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // the turn, and an answer arriving after the deadline is not used.
     const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
     const askSignal = AbortSignal.any([signal, deadline])
+    const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
+    const fitting = engine.fittingFor(consumer)
+    const selectedEngine = engine.selectedEngine(consumer)
+    const states = fitting === undefined ? [state.text] : state.alternatives.map(candidate => candidate.text)
+    facts.inputChars = states.reduce((total, text) => total + text.length, 0)
+    const askStarted = Date.now()
     let result: JudgmentResult
     try {
-      if (engine.fitting === undefined) {
-        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal })
+      if (fitting === undefined) {
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer })
       } else {
-        const fitted = await engine.fitting.ask({
-          states: state.alternatives.map(candidate => candidate.text),
-          questions,
-          tier: config.tier,
-          signal: askSignal,
-        })
+        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer })
         signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
           facts.judgmentRejection = { limits: fitted.limits, reason: fitted.reason }
           facts.engine = fitted.engine
           facts.model = fitted.model
+          if (fitted.engineId !== undefined) facts.engineId = fitted.engineId
+          facts.latencyMs = Date.now() - askStarted
           return keep('judgment-input-too-large')
         }
         // Providers validate the selected index against the exact outbound candidates.
@@ -1154,16 +1177,26 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
     } catch (error: unknown) {
       signal.throwIfAborted()
-      if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
-      const code = (error as { code?: unknown } | null)?.code
-      if (code === 'ABORTED') throw error
+      // A failed call still ran: record where it went and how long it took.
+      facts.latencyMs = Date.now() - askStarted
+      const failedEngine = error instanceof JudgmentError ? error.engineId ?? selectedEngine : selectedEngine
+      if (failedEngine !== undefined) facts.engineId = failedEngine
+      // A coded failure is classified by its code, whenever it arrives; only a
+      // cancellation or an uncoded failure after the deadline is the deadline.
+      const code = error instanceof JudgmentError ? error.code : undefined
       if (code === 'INPUT_TOO_LARGE') return keep('judgment-input-too-large')
-      return judgmentFailed(
-        code === 'INVALID_ANSWER' ? 'invalid-answer' : 'engine-unavailable',
-        true,
-        error instanceof JudgmentError ? error.code : undefined,
-      )
+      if (code === 'INVALID_ANSWER') return judgmentFailed('invalid-answer', true, code)
+      if (code === 'UNAVAILABLE' || code === 'UNCONFIGURED') return judgmentFailed('engine-unavailable', true, code)
+      if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
+      if (code === 'ABORTED') throw error
+      return judgmentFailed('engine-unavailable', true)
     }
+    // A late answer was billed but is not used.
+    facts.engine = result.engine
+    facts.model = result.model
+    facts.latencyMs = result.latencyMs
+    if (result.engineId !== undefined) facts.engineId = result.engineId
+    if (result.usage !== undefined) facts.judgeUsage = result.usage
     if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
     const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
@@ -1178,9 +1211,6 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ...facts,
       route: routeAnswer,
       ...difficulty === undefined ? {} : { difficulty },
-      engine: result.engine,
-      model: result.model,
-      latencyMs: result.latencyMs,
     }
     // Entry and exit use different thresholds: a score in between holds a
     // streak but does not enter one.

@@ -23,10 +23,13 @@ import { Context } from '@shres-code/cordis'
 import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
-import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
+import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError, judgmentEngineId } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import type {
   JudgmentAnswer,
   JudgmentChoiceAnswer,
+  JudgmentConsumerId,
+  JudgmentEngineId,
   JudgmentInput,
   JudgmentFittingEngine,
   JudgmentTokenLimits,
@@ -58,6 +61,7 @@ import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import ModelRoutingController, {
   DIFFICULTY_QUESTION_ID,
   KEEP_CURRENT_OPTION_ID,
+  MODEL_ROUTER_JUDGMENT_CONSUMER,
   MODEL_ROUTER_SETTINGS_NAMESPACE,
   ROUTE_QUESTION_ID,
   stateHash,
@@ -122,6 +126,21 @@ class ScriptedJudgment extends JudgmentService {
   failure: Error | undefined
   /** Optional deferred response used by cancellation tests. */
   askOverride: ((input: JudgmentInput) => Promise<JudgmentResult>) | undefined
+  /** Fields a dispatcher and a metered engine add to every answer. */
+  stamp: Pick<JudgmentResult, 'engineId' | 'usage'> = {}
+  /** Registry id this service reports as selected, as a dispatcher does. */
+  selected: JudgmentEngineId | undefined
+  /** Fitting reported only for the router's consumer id. */
+  fittingForConsumer: JudgmentFittingEngine | undefined
+
+  override selectedEngine(): JudgmentEngineId | undefined {
+    return this.selected
+  }
+
+  override fittingFor(consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined {
+    if (this.fittingForConsumer !== undefined && consumer === MODEL_ROUTER_JUDGMENT_CONSUMER) return this.fittingForConsumer
+    return this.fitting
+  }
 
   override ask(input: JudgmentInput): Promise<JudgmentResult> {
     this.asks.push(input)
@@ -136,7 +155,7 @@ class ScriptedJudgment extends JudgmentService {
     if (this.score !== undefined && input.questions.some(question => question.kind === 'score')) {
       answers.push(this.score)
     }
-    return Promise.resolve({ answers, engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 3 })
+    return Promise.resolve({ answers, engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 3, ...this.stamp })
   }
 }
 
@@ -1087,6 +1106,110 @@ describe('judgment failures', () => {
     expect(await late.resolve(1)).toBeUndefined()
     expect(late.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' } })
     expect(late.decision()).not.toHaveProperty('route')
+  })
+
+  it('classifies a late coded failure by its code, not as the deadline', async () => {
+    const lateReject = (error: JudgmentError) => (): Promise<JudgmentResult> => new Promise((_resolve, reject) => {
+      setTimeout(() => { reject(error) }, 40)
+    })
+    const tooLarge = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    tooLarge.engine.askOverride = lateReject(new JudgmentError('INPUT_TOO_LARGE', 'late body-limit rejection'))
+    expect(await tooLarge.resolve(1)).toBeUndefined()
+    expect(tooLarge.decision()).toMatchObject({ reason: 'judgment-input-too-large', latencyMs: expect.any(Number) as unknown })
+    expect(tooLarge.decision()).not.toHaveProperty('engineFailure')
+
+    const unavailable = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    unavailable.engine.askOverride = lateReject(new JudgmentError('UNAVAILABLE', 'late refusal'))
+    expect(await unavailable.resolve(1)).toBeUndefined()
+    expect(unavailable.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' } })
+
+    const invalid = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    invalid.engine.askOverride = lateReject(new JudgmentError('INVALID_ANSWER', 'late garbage'))
+    expect(await invalid.resolve(1)).toBeUndefined()
+    expect(invalid.decision()).toMatchObject({ reason: 'invalid-answer', engineFailure: { code: 'INVALID_ANSWER' } })
+
+    // An uncoded failure after the deadline is the deadline.
+    const uncoded = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    uncoded.engine.askOverride = () => new Promise((_resolve, reject) => {
+      setTimeout(() => { reject(new Error('socket closed')) }, 40)
+    })
+    expect(await uncoded.resolve(1)).toBeUndefined()
+    expect(uncoded.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' } })
+  })
+
+  it('records the routed engine and the router-measured latency of a failed call', async () => {
+    const stamped = await bench()
+    stamped.engine.failure = new JudgmentError('UNAVAILABLE', 'laya is restarting', { engineId: judgmentEngineId('laya') })
+    expect(await stamped.resolve(1)).toBeUndefined()
+    expect(stamped.decision()).toMatchObject({
+      reason: 'engine-unavailable',
+      engineId: 'laya',
+      latencyMs: expect.any(Number) as unknown,
+      engineFailure: { code: 'UNAVAILABLE' },
+    })
+    expect(stamped.decision()).not.toHaveProperty('engine')
+
+    // An unstamped failure is attributed to the engine selected before the ask.
+    const selected = await bench()
+    selected.engine.selected = judgmentEngineId('typesafe')
+    selected.engine.failure = new Error('socket hang up')
+    expect(await selected.resolve(1)).toBeUndefined()
+    expect(selected.decision()).toMatchObject({ engineId: 'typesafe', latencyMs: expect.any(Number) as unknown })
+
+    // A single-engine service selects nothing, so an unstamped failure names none.
+    const single = await bench()
+    single.engine.failure = new JudgmentError('UNAVAILABLE', 'down')
+    expect(await single.resolve(1)).toBeUndefined()
+    expect(single.decision()).not.toHaveProperty('engineId')
+  })
+
+  it('records the engine, usage, and timing facts of an answered call and names the router on every ask', async () => {
+    const b = await bench()
+    openTurn(b.session, 1)
+    const text = 'a small change'
+    user(b.session, text)
+    b.engine.stamp = { engineId: judgmentEngineId('laya'), usage: { inputTokens: 900, outputTokens: 5, cacheReadTokens: 0 } }
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    const decision = b.decision()
+    expect(b.engine.asks[0]?.consumer).toBe(MODEL_ROUTER_JUDGMENT_CONSUMER)
+    expect(decision).toMatchObject({
+      engine: 'scripted-judgment',
+      model: 'scripted-1',
+      latencyMs: 3,
+      engineId: 'laya',
+      judgeUsage: { inputTokens: 900, outputTokens: 5, cacheReadTokens: 0 },
+      eligibilityMs: expect.any(Number) as unknown,
+      inputChars: b.engine.asks[0]?.state.length,
+    })
+    expect(decision.inputChars).toBeGreaterThan(text.length)
+
+    // A late answer is not used, but its call is recorded.
+    const late = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    late.engine.askOverride = () => new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ answers: [PASSING, EASY], engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 40, engineId: judgmentEngineId('laya'), usage: { inputTokens: 1, outputTokens: 1 } })
+      }, 40)
+    })
+    expect(await late.resolve(1)).toBeUndefined()
+    expect(late.decision()).toMatchObject({
+      reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' },
+      engine: 'scripted-judgment', latencyMs: 40, engineId: 'laya', judgeUsage: { inputTokens: 1, outputTokens: 1 },
+    })
+    expect(late.decision()).not.toHaveProperty('route')
+  })
+
+  it('declares the router consumer id to the judgment registry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'none' })
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(false)
+    const fiber = await ctx.plugin(ModelRoutingController, CONFIG)
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(true)
+    await fiber.dispose()
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(false)
+    await ctx.fiber.dispose()
   })
 
   it('records the engine code of a classified failure and none for an unclassified one', async () => {
@@ -3249,5 +3372,30 @@ describe('atomic judgment input fitting', () => {
     delete b.engine.fitting
     expect(await b.resolve()).toEqual(CHEAP)
     expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('reads its fitting for its own consumer id and records the offered characters and the routed engine', async () => {
+    const b = await bench()
+    user(b.session, 'earlier task')
+    user(b.session, 'continue')
+    const offered: string[][] = []
+    // Only the router's consumer has fitting, as under an override to a fitting engine.
+    b.engine.fittingForConsumer = {
+      ask: async (input) => {
+        offered.push([...input.states])
+        expect(input.consumer).toBe(MODEL_ROUTER_JUDGMENT_CONSUMER)
+        return { kind: 'unfit', engine: 'laya', model: 'pinned', limits: FIT_LIMITS, reason: 'state', engineId: judgmentEngineId('laya') }
+      },
+    }
+    expect(b.engine.fitting).toBeUndefined()
+    expect(await b.resolve()).toBeUndefined()
+    expect(b.engine.asks).toEqual([])
+    expect(b.decision()).toMatchObject({
+      reason: 'judgment-input-too-large',
+      engineId: 'laya',
+      latencyMs: expect.any(Number) as unknown,
+      inputChars: offered[0]!.reduce((total, text) => total + text.length, 0),
+    })
+    expect(offered[0]).toHaveLength(2)
   })
 })

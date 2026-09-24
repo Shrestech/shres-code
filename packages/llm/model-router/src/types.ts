@@ -8,7 +8,7 @@
  * @module @shres-code/shres-code-model-router/types
  */
 
-import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId, TokenUsage } from '@shres-code/shres-code-llm'
 import type {
   JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
 } from '@shres-code/shres-code-judgment'
@@ -386,12 +386,39 @@ export interface ModelRoutingDecision {
   hint?: 'consider-stronger'
   /** Sticky-fold facts after this decision. */
   sticky: ModelRoutingStickyView
-  /** Engine that answered the judgment call, when one was made. */
+  /** Engine that answered the judgment call, as the provider named it, when one answered. */
   engine?: string
   /** Exact model that answered, when a judgment call was made. */
   model?: string
-  /** Duration of the judgment call in milliseconds, when one was made. */
+  /**
+   * Duration of the judgment call in milliseconds, when one was made: the
+   * engine's own figure for an answer, and the router's wall-clock measure from
+   * the ask to its failure for a failed call.
+   */
   latencyMs?: number
+  /**
+   * Registry id of the engine the judgment call was routed to, as the
+   * dispatcher stamped it on the answer or the failure; absent when a
+   * single-engine implementation served `ctx.judgment`.
+   */
+  engineId?: string
+  /**
+   * Token usage of the judgment call's own model request, exactly as the
+   * engine reported it, so {@link TokenUsage}'s presence contract holds; absent
+   * when the engine reported none.
+   */
+  judgeUsage?: TokenUsage
+  /**
+   * Duration of the candidate capability assessment in milliseconds, when this
+   * decision ran one: it sits on the request's critical path with the call.
+   */
+  eligibilityMs?: number
+  /**
+   * Characters of state the router handed to the engine for the judgment call:
+   * the one state of a plain ask, or every alternative a fitted ask offered.
+   * `judgmentInput.state` records the exact text a fitted answer used.
+   */
+  inputChars?: number
   /** The failed downgraded request a `route-failed` decision retries on the manual route. */
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
@@ -404,7 +431,11 @@ export interface ModelRoutingDecision {
 
 /** A failed judgment call as a decision records it. */
 export interface ModelRoutingEngineFailure {
-  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  /**
+   * The engine's error code, whenever the failure arrived, or `DEADLINE` when
+   * `judgmentDeadlineMs` expired first and the failure was a cancellation or
+   * carried no code, or an answer arrived after it.
+   */
   code: JudgmentErrorCode | 'DEADLINE'
 }
 

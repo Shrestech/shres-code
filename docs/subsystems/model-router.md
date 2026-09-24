@@ -239,12 +239,39 @@ interface ModelRoutingDecision {
   hint?: 'consider-stronger'
   /** Sticky-fold facts after this decision. */
   sticky: ModelRoutingStickyView
-  /** Engine that answered the judgment call, when one was made. */
+  /** Engine that answered the judgment call, as the provider named it, when one answered. */
   engine?: string
   /** Exact model that answered, when a judgment call was made. */
   model?: string
-  /** Duration of the judgment call in milliseconds, when one was made. */
+  /**
+   * Duration of the judgment call in milliseconds, when one was made: the
+   * engine's own figure for an answer, and the router's wall-clock measure from
+   * the ask to its failure for a failed call.
+   */
   latencyMs?: number
+  /**
+   * Registry id of the engine the judgment call was routed to, as the
+   * dispatcher stamped it on the answer or the failure; absent when a
+   * single-engine implementation served `ctx.judgment`.
+   */
+  engineId?: string
+  /**
+   * Token usage of the judgment call's own model request, exactly as the
+   * engine reported it, so {@link TokenUsage}'s presence contract holds; absent
+   * when the engine reported none.
+   */
+  judgeUsage?: TokenUsage
+  /**
+   * Duration of the candidate capability assessment in milliseconds, when this
+   * decision ran one: it sits on the request's critical path with the call.
+   */
+  eligibilityMs?: number
+  /**
+   * Characters of state the router handed to the engine for the judgment call:
+   * the one state of a plain ask, or every alternative a fitted ask offered.
+   * `judgmentInput.state` records the exact text a fitted answer used.
+   */
+  inputChars?: number
   /** The failed downgraded request a `route-failed` decision retries on the manual route. */
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
@@ -271,7 +298,11 @@ interface ModelRoutingFailure {
 ```ts type-equiv
 /** A failed judgment call as a decision records it. */
 interface ModelRoutingEngineFailure {
-  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  /**
+   * The engine's error code, whenever the failure arrived, or `DEADLINE` when
+   * `judgmentDeadlineMs` expired first and the failure was a cancellation or
+   * carried no code, or an answer arrived after it.
+   */
   code: JudgmentErrorCode | 'DEADLINE'
 }
 ```
@@ -280,7 +311,7 @@ One decision is logged per fresh judged request step as `model-routing/decision`
 
 ## Failed judgment calls
 
-Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure`, and an unclassified error records none. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest, and clears the count on a decision that carries a route answer. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
+Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest, and clears the count on a decision that carries a route answer. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
 
 ## In-turn fallback
 
@@ -698,5 +729,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:381`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:393`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->
