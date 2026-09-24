@@ -242,7 +242,7 @@ function validateAccounting(value, name) {
       }
     }
   }
-  nonNegative(a, ['calls', 'unreportedCalls', 'dollars', 'dollarsUpperBound', 'offPeakCalls', 'unpricedCalls', 'quotaCalls', 'quotaTokens', 'quotaUnpricedTokens'], name)
+  nonNegative(a, ['calls', 'unreportedCalls', 'dollars', 'dollarsUpperBound', 'apiEquivalentDollars', 'apiEquivalentDollarsUpperBound', 'localCalls', 'offPeakCalls', 'unpricedCalls', 'quotaCalls', 'quotaTokens', 'quotaUnpricedTokens'], name)
   const tokens = /** @type {Record<string, unknown>} */ (a.tokens)
   if (typeof tokens !== 'object' || tokens === null) throw new Error(`${name}.tokens must be a record`)
   nonNegative(tokens, ['uncachedInput', 'unreportedInput', 'output', 'cacheRead', 'cacheWrite'], `${name}.tokens`)
@@ -261,7 +261,7 @@ function validateAccounting(value, name) {
   numbers(a.ttftSamplesMs, `${name}.ttftSamplesMs`)
   const judge = /** @type {Record<string, unknown>} */ (a.judge)
   if (typeof judge !== 'object' || judge === null) throw new Error(`${name}.judge must be a record`)
-  nonNegative(judge, ['calls', 'latencyMs', 'criticalPathMs', 'vendorPlanCalls', 'pricedCalls', 'unpricedCalls', 'dollars', 'dollarsUpperBound'], `${name}.judge`)
+  nonNegative(judge, ['calls', 'latencyMs', 'criticalPathMs', 'vendorPlanCalls', 'localCalls', 'pricedCalls', 'unpricedCalls', 'dollars', 'dollarsUpperBound'], `${name}.judge`)
   numbers(judge.latencySamplesMs, `${name}.judge.latencySamplesMs`)
   const byKind = /** @type {Record<string, unknown>} */ (judge.callsByKind)
   if (typeof byKind !== 'object' || byKind === null) throw new Error(`${name}.judge.callsByKind must be a record`)

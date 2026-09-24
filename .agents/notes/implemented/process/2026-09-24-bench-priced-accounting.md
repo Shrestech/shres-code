@@ -28,7 +28,8 @@ The runtime is unchanged: no runtime package carries a price table or a dollar f
 - **A billed call is a `usage` chunk.** The stream protocol emits at most one per call, and a failed attempt that reported usage still bills. A step's `assistant/message` adds a call only when the step logged no usage chunk. The token fields of descendant accounting keep their message-only numerator.
 - **Cache counts are read by presence.** The bench restates the `TokenUsage` contract instead of importing `cacheCount`: a present count, including 0, is reported, and an absent one is not. A call without a reported cache-read count leaves the cache-hit share, and its dollars enter only an upper bound that prices its whole input at the uncached input rate.
 - **Unpriced is never $0.** A route missing from `bench/accounting.json`, a model the snapshot lacks, or a null input or output price makes the call unpriced, counted and named. A null cache price bills that class at the input rate. Writes bill at the 5-minute tier because logged usage carries no write TTL. Off-peak prices apply when the request time, the step's `step/start`, falls in a snapshot window in UTC.
-- **Subscription routes are quota, not dollars.** `subscriptionProviders` is an explicit list of route ids. Their calls count as input-equivalent quota tokens: each class weighted by its price relative to the model's input price.
+- **Subscription routes are quota, not dollars.** `subscriptionProviders` is an explicit list of route ids. Their calls count as input-equivalent quota tokens: each class weighted by its price relative to the model's input price. A separate `apiEquivalentDollars` figure, with its upper bound, prices them at API list rates so a subscription arm compares with an API arm, and it never enters spend or the cap.
+- **Local is $0, not unpriced.** `localProviders` routes and `localJudgeEngines` judges (the loopback Laya and Shield gateways) count as local calls at zero marginal cost. Both lists are explicit, and the loader refuses an id in two billing lists.
 - **Judgments and TTFT are measured, not recorded.** `model-routing/decision`, `child-decision`, and `shadow-decision` fold when a log carries them. Judge calls are counted by kind and engine, their latency is summed and sampled, and the critical path sums `latencyMs` plus `eligibilityMs` over awaited consults. Vendor-plan engines are counted, and an LLM judge's own usage is priced. TTFT per step is the first token-bearing chunk minus `step/start`.
 
 Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw tokens by class, cache-hit and unreported shares, judge totals, and TTFT and judge-latency p50/p90.
@@ -46,6 +47,10 @@ Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw
 **Price an unreported call at the cache-read rate, or at an estimated hit share.** Rejected: either invents a measurement the provider did not make. The upper bound is the only figure the log supports, and the exact figure excludes the call.
 
 **Price an unverified or unmapped model at $0, or at a neighbouring model's price.** Rejected: $0 makes an unpriced strong route look free, and a borrowed price is an unsourced guess. Unpriced calls are counted and named instead.
+
+**Count a subscription route's API-equivalent dollars as spend.** Rejected: a subscription call bills quota, not dollars, so the cap would stop a run for money it never spends. The list-price figure stays a separate comparison column.
+
+**Report local routes as unpriced, or infer them from a loopback base URL.** Rejected: unpriced means the price is unknown, while a local call's marginal price is known to be zero. The session log carries no base URL, so an explicit list is the only source.
 
 **Infer subscription routes from route ids, such as a `-session` suffix.** Rejected: a new route would change the dollar/quota split silently. The route list is explicit configuration, pinned by hash.
 
@@ -73,10 +78,10 @@ The figures are only as current as the snapshot: a price change needs a new date
 - chunk-versus-message call folding;
 - off-peak switching at a window boundary, and a window that spans midnight;
 - unpriced and unmapped models;
-- the quota/dollar split;
+- the quota/dollar split, API-equivalent dollars for subscription calls, and local routes and judges at $0;
 - judgment folding, including vendor plans, priced LLM judges, and the critical path;
 - TTFT over plain and packed chunk rows;
 - pooling and percentiles;
-- snapshot and config validation;
+- snapshot and config validation, including an id in two billing lists;
 - the budget projection;
 - through the fake harness: priced trial records, a `--max-dollars` stop with its manifest record and resume, and the unpriced warning.

@@ -5,6 +5,9 @@
     "cursor-session",
     "grok-session"
   ],
+  "localProviders": [
+    "ollama-local"
+  ],
   "priceProviders": {
     "anthropic": "anthropic",
     "claude-session": "anthropic",
@@ -22,5 +25,9 @@
   "judgeEnginePriceProviders": {},
   "vendorPlanJudgeEngines": [
     "typesafe"
+  ],
+  "localJudgeEngines": [
+    "laya",
+    "shield"
   ]
 }

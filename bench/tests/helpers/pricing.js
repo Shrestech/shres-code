@@ -49,9 +49,11 @@ export const FIXTURE_SNAPSHOT = {
 /** The accounting config the fixture snapshot is priced with. */
 export const FIXTURE_CONFIG = {
   subscriptionProviders: ['sub-route'],
+  localProviders: ['local-route'],
   priceProviders: { 'acme-route': 'acme', 'sub-route': 'subco' },
   judgeEnginePriceProviders: { 'llm-judge': 'judgeco' },
   vendorPlanJudgeEngines: ['typesafe'],
+  localJudgeEngines: ['laya'],
 }
 
 /**

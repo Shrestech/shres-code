@@ -13,7 +13,10 @@
  * which prices its whole input at the uncached input rate.
  *
  * Research only: the runtime has no price table. Dollars are API-equivalent
- * list prices from the snapshot, never billing truth.
+ * list prices from the snapshot, never billing truth. `dollars` is spend on
+ * API-billed routes; `apiEquivalentDollars` also prices subscription routes at
+ * list rates for cross-arm comparison; local routes and judges cost $0 and are
+ * counted apart, never as unpriced.
  *
  * @module bench/runner/accounting
  */
@@ -115,6 +118,9 @@ const WINDOW = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/
  * @property {Record<string, string>} judgeEnginePriceProviders - judgment engine → snapshot `provider` for pricing
  *   the judge's own usage.
  * @property {string[]} vendorPlanJudgeEngines - judgment engines billed by vendor plan; counted, never priced.
+ * @property {string[]} localProviders - route ids served on this machine at zero marginal cost; their calls count
+ *   as local, never as dollars, quota, or unpriced.
+ * @property {string[]} localJudgeEngines - judgment engines served on this machine; their calls count as local.
  */
 
 /**
@@ -133,6 +139,7 @@ const WINDOW = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/
  * @property {number[]} latencySamplesMs - each judgment call's latency.
  * @property {number} criticalPathMs - `latencyMs` plus `eligibilityMs` summed over awaited consults.
  * @property {number} vendorPlanCalls - calls by a `vendorPlanJudgeEngines` engine.
+ * @property {number} localCalls - calls by a `localJudgeEngines` engine, at $0.
  * @property {number} pricedCalls
  * @property {number} unpricedCalls - LLM judge calls carrying usage with no usable price.
  * @property {number} dollars - priced judge usage with a reported cache-read count.
@@ -150,6 +157,11 @@ const WINDOW = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/
  * @property {number | null} unreportedShare - unreported input over all prompt tokens; null when none.
  * @property {number} dollars - API-equivalent USD over priced, reported, non-subscription calls.
  * @property {number} dollarsUpperBound - `dollars` plus priced unreported non-subscription calls at the uncached input rate.
+ * @property {number} apiEquivalentDollars - `dollars` plus priced, reported subscription calls at API list rates:
+ *   the cross-arm comparison figure, never spend.
+ * @property {number} apiEquivalentDollarsUpperBound - `apiEquivalentDollars` plus every priced unreported call,
+ *   subscription routes included, at the uncached input rate.
+ * @property {number} localCalls - calls on `localProviders` routes, at $0.
  * @property {number} offPeakCalls - priced calls billed at an off-peak rate.
  * @property {number} unpricedCalls - non-subscription calls with no usable price.
  * @property {string[]} unpricedModels - distinct `route/model` pairs of unpriced calls, sorted.
@@ -439,6 +451,9 @@ export function emptyAccounting() {
     unreportedShare: null,
     dollars: 0,
     dollarsUpperBound: 0,
+    apiEquivalentDollars: 0,
+    apiEquivalentDollarsUpperBound: 0,
+    localCalls: 0,
     offPeakCalls: 0,
     unpricedCalls: 0,
     unpricedModels: [],
@@ -453,6 +468,7 @@ export function emptyAccounting() {
       latencySamplesMs: [],
       criticalPathMs: 0,
       vendorPlanCalls: 0,
+      localCalls: 0,
       pricedCalls: 0,
       unpricedCalls: 0,
       dollars: 0,
@@ -489,6 +505,8 @@ export function priceAccounting(sessions, context) {
   const { snapshot, config } = context
   const subscription = new Set(config.subscriptionProviders)
   const vendorPlan = new Set(config.vendorPlanJudgeEngines)
+  const local = new Set(config.localProviders)
+  const localJudges = new Set(config.localJudgeEngines)
   const accounting = emptyAccounting()
   const judge = accounting.judge
   /** @type {Set<string>} */
@@ -518,6 +536,10 @@ export function priceAccounting(sessions, context) {
       accounting.tokens.cacheWrite += usage.cacheWriteTokens ?? 0
       accounting.tokens.output += usage.outputTokens
 
+      if (call.provider !== null && local.has(call.provider)) {
+        accounting.localCalls += 1
+        continue
+      }
       const rates = call.provider === null ? null : ratesFor(config.priceProviders[call.provider], call.model, call.time)
       if (call.provider !== null && subscription.has(call.provider)) {
         accounting.quotaCalls += 1
@@ -525,6 +547,11 @@ export function priceAccounting(sessions, context) {
           accounting.quotaUnpricedTokens += usage.inputTokens + usage.outputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
         } else {
           accounting.quotaTokens += priceUsage(usage, rates).dollars * PRICE_UNIT_TOKENS / rates.input
+        }
+        if (rates !== null) {
+          const listPrice = priceUsage(usage, rates)
+          if (listPrice.reported) accounting.apiEquivalentDollars += listPrice.dollars
+          accounting.apiEquivalentDollarsUpperBound += listPrice.dollars
         }
         continue
       }
@@ -535,8 +562,12 @@ export function priceAccounting(sessions, context) {
       }
       if (rates.offPeak) accounting.offPeakCalls += 1
       const priced = priceUsage(usage, rates)
-      if (priced.reported) accounting.dollars += priced.dollars
+      if (priced.reported) {
+        accounting.dollars += priced.dollars
+        accounting.apiEquivalentDollars += priced.dollars
+      }
       accounting.dollarsUpperBound += priced.dollars
+      accounting.apiEquivalentDollarsUpperBound += priced.dollars
     }
 
     for (const judgment of session.judgments) {
@@ -549,6 +580,10 @@ export function priceAccounting(sessions, context) {
       if (judgment.latencyMs !== null) {
         judge.latencyMs += judgment.latencyMs
         judge.latencySamplesMs.push(judgment.latencyMs)
+      }
+      if (judgment.engine !== null && localJudges.has(judgment.engine)) {
+        judge.localCalls += 1
+        continue
       }
       if (judgment.engine !== null && vendorPlan.has(judgment.engine)) {
         judge.vendorPlanCalls += 1
@@ -582,14 +617,14 @@ export function priceAccounting(sessions, context) {
  */
 export function mergeAccounting(left, right) {
   const sum = emptyAccounting()
-  for (const field of /** @type {const} */ (['calls', 'unreportedCalls', 'dollars', 'dollarsUpperBound', 'offPeakCalls', 'unpricedCalls', 'quotaCalls', 'quotaTokens', 'quotaUnpricedTokens'])) {
+  for (const field of /** @type {const} */ (['calls', 'unreportedCalls', 'dollars', 'dollarsUpperBound', 'apiEquivalentDollars', 'apiEquivalentDollarsUpperBound', 'localCalls', 'offPeakCalls', 'unpricedCalls', 'quotaCalls', 'quotaTokens', 'quotaUnpricedTokens'])) {
     sum[field] = left[field] + right[field]
   }
   for (const field of /** @type {const} */ (['uncachedInput', 'unreportedInput', 'output', 'cacheRead', 'cacheWrite'])) {
     sum.tokens[field] = left.tokens[field] + right.tokens[field]
   }
   sum.unpricedModels = [...new Set([...left.unpricedModels, ...right.unpricedModels])].sort()
-  for (const field of /** @type {const} */ (['calls', 'latencyMs', 'criticalPathMs', 'vendorPlanCalls', 'pricedCalls', 'unpricedCalls', 'dollars', 'dollarsUpperBound'])) {
+  for (const field of /** @type {const} */ (['calls', 'latencyMs', 'criticalPathMs', 'vendorPlanCalls', 'localCalls', 'pricedCalls', 'unpricedCalls', 'dollars', 'dollarsUpperBound'])) {
     sum.judge[field] = left.judge[field] + right.judge[field]
   }
   for (const kind of /** @type {const} */ (['decision', 'child-decision', 'shadow-decision'])) {
@@ -754,13 +789,13 @@ export async function loadAccountingConfig(path) {
     throw new Error(`accounting config not found: ${path}`)
   })
   const raw = JSON.parse(text)
-  const keys = ['subscriptionProviders', 'priceProviders', 'judgeEnginePriceProviders', 'vendorPlanJudgeEngines']
+  const keys = ['subscriptionProviders', 'localProviders', 'priceProviders', 'judgeEnginePriceProviders', 'vendorPlanJudgeEngines', 'localJudgeEngines']
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error(`${path} must hold a JSON object`)
   for (const key of Object.keys(raw)) {
     if (!keys.includes(key)) throw new Error(`${path}: unknown key "${key}"`)
   }
   const nonEmpty = value => typeof value === 'string' && value.length > 0
-  for (const key of ['subscriptionProviders', 'vendorPlanJudgeEngines']) {
+  for (const key of ['subscriptionProviders', 'localProviders', 'vendorPlanJudgeEngines', 'localJudgeEngines']) {
     if (!Array.isArray(raw[key]) || !raw[key].every(nonEmpty)) throw new Error(`${path}: ${key} must be an array of non-empty strings`)
   }
   for (const key of ['priceProviders', 'judgeEnginePriceProviders']) {
@@ -769,6 +804,29 @@ export async function loadAccountingConfig(path) {
       throw new Error(`${path}: ${key} must map ids to non-empty strings`)
     }
   }
+  // A route or engine has one billing class, so an id listed twice is a contradiction, not a precedence rule.
+  const exclusive = (label, lists) => {
+    const seen = new Map()
+    for (const [name, ids] of lists) {
+      for (const id of ids) {
+        if (seen.has(id)) throw new Error(`${path}: ${label} "${id}" is in both ${seen.get(id)} and ${name}`)
+        seen.set(id, name)
+      }
+    }
+  }
+  exclusive('route', [
+    ['subscriptionProviders', raw.subscriptionProviders],
+    ['localProviders', raw.localProviders],
+  ])
+  exclusive('route', [
+    ['localProviders', raw.localProviders],
+    ['priceProviders', Object.keys(raw.priceProviders)],
+  ])
+  exclusive('judge engine', [
+    ['localJudgeEngines', raw.localJudgeEngines],
+    ['vendorPlanJudgeEngines', raw.vendorPlanJudgeEngines],
+    ['judgeEnginePriceProviders', Object.keys(raw.judgeEnginePriceProviders)],
+  ])
   return { config: /** @type {AccountingConfig} */ (raw), sha256: createHash('sha256').update(text).digest('hex') }
 }
 

@@ -255,6 +255,48 @@ describe('accounting.priceAccounting', () => {
     assert.equal(accounting.tokens.cacheRead, 1007)
   })
 
+  it('prices subscription calls at API list rates in a separate figure that spend never includes', async () => {
+    const context = await fixtureContext()
+    const accounting = priceAccounting([foldSessionAccounting(log([
+      ...pricedStep({ step: 1, time: utc(9), provider: 'sub-route', model: 'big', usage: { inputTokens: 1000, outputTokens: 100, cacheReadTokens: 1000 } }),
+      ...pricedStep({ step: 2, time: utc(9), provider: 'sub-route', model: 'big', usage: { inputTokens: 500, outputTokens: 0 } }),
+      ...pricedStep({ step: 3, time: utc(9), provider: 'acme-route', model: 'flat', usage: { inputTokens: 1000, outputTokens: 0, cacheReadTokens: 0 } }),
+    ]))], context)
+    const spend = 1000 * 2 / 1e6
+    const reportedListPrice = (1000 * 4 + 100 * 20 + 1000 * 0.4) / 1e6
+    const unreportedListPrice = 500 * 4 / 1e6
+    assertDollars(accounting.dollars, spend)
+    assertDollars(accounting.dollarsUpperBound, spend)
+    assertDollars(accounting.apiEquivalentDollars, spend + reportedListPrice)
+    assertDollars(accounting.apiEquivalentDollarsUpperBound, spend + reportedListPrice + unreportedListPrice)
+    // Quota stays the subscription routes' primary cost, and the cap counts spend only.
+    assert.equal(accounting.quotaCalls, 2)
+    assertDollars(trialSpend(accounting), spend)
+    assertDollars(/** @type {number} */ (exactCost(accounting)), spend)
+  })
+
+  it('counts local routes and local judges at $0, never as unpriced, quota, or spend', async () => {
+    const context = await fixtureContext()
+    const accounting = priceAccounting([foldSessionAccounting(log([
+      ...pricedStep({ step: 1, time: utc(9), provider: 'local-route', model: 'anything', usage: { inputTokens: 400, outputTokens: 10, cacheReadTokens: 100 } }),
+      event('model-routing/decision', utc(9), { engine: 'laya', model: 'laya-1', latencyMs: 30, usage: { inputTokens: 900, outputTokens: 5 } }),
+    ]))], context)
+    assert.equal(accounting.localCalls, 1)
+    assert.equal(accounting.unpricedCalls, 0)
+    assert.deepEqual(accounting.unpricedModels, [])
+    assert.equal(accounting.quotaCalls, 0)
+    assert.equal(accounting.dollars, 0)
+    assert.equal(accounting.apiEquivalentDollarsUpperBound, 0)
+    // Local calls still count as tokens and in the cache-hit share.
+    assert.equal(accounting.cacheHitShare, 100 / 500)
+    assert.equal(accounting.judge.calls, 1)
+    assert.equal(accounting.judge.localCalls, 1)
+    assert.equal(accounting.judge.unpricedCalls, 0)
+    assert.equal(accounting.judge.dollarsUpperBound, 0)
+    assert.equal(accounting.judge.criticalPathMs, 30)
+    assert.equal(exactCost(accounting), 0)
+  })
+
   it('folds judgment calls: counts, latency, critical path, vendor plans, and priced LLM judges', async () => {
     const context = await fixtureContext()
     const accounting = priceAccounting([foldSessionAccounting(log([
@@ -346,6 +388,8 @@ describe('accounting inputs', () => {
     // Every configured price provider names a provider the snapshot prices.
     const providers = new Set([...context.snapshot.entries.values()].map(entry => entry.provider))
     for (const provider of Object.values(context.config.priceProviders)) assert.ok(providers.has(provider), provider)
+    // Both loopback judgment gateways are local: Laya answers over the Shield wire.
+    assert.deepEqual([...context.config.localJudgeEngines].sort(), ['laya', 'shield'])
   })
 
   it('fails loud on a malformed snapshot or config', async () => {
@@ -366,6 +410,14 @@ describe('accounting inputs', () => {
       await assert.rejects(() => loadAccountingConfig(join(dir, 'typo.json')), /unknown key "subscriptionProvider"/)
       await writeFile(join(dir, 'missing.json'), JSON.stringify({ ...FIXTURE_CONFIG, vendorPlanJudgeEngines: undefined }))
       await assert.rejects(() => loadAccountingConfig(join(dir, 'missing.json')), /vendorPlanJudgeEngines must be an array/)
+      const contradiction = async (name, override, pattern) => {
+        await writeFile(join(dir, name), JSON.stringify({ ...FIXTURE_CONFIG, ...override }))
+        await assert.rejects(() => loadAccountingConfig(join(dir, name)), pattern)
+      }
+      await contradiction('both-routes.json', { localProviders: ['sub-route'] }, /route "sub-route" is in both subscriptionProviders and localProviders/)
+      await contradiction('priced-local.json', { localProviders: ['acme-route'] }, /route "acme-route" is in both localProviders and priceProviders/)
+      await contradiction('both-engines.json', { localJudgeEngines: ['typesafe'] }, /judge engine "typesafe" is in both localJudgeEngines and vendorPlanJudgeEngines/)
+      await contradiction('priced-engine.json', { localJudgeEngines: ['llm-judge'] }, /judge engine "llm-judge" is in both localJudgeEngines and judgeEnginePriceProviders/)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
