@@ -67,6 +67,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   goals: 'goal.md',
   grokCredential: 'grok-credential.md',
   codexCredential: 'codex-credential.md',
+  cursorCredential: 'cursor-credential.md',
   claudeCredential: 'claude-credential.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
@@ -260,6 +261,9 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ResolvedRetryPolicy: 'llm-streaming.md',
   Message: 'llm-streaming.md',
   MessageSource: 'llm-streaming.md',
+  CursorSessionManager: 'cursor-credential.md',
+  CursorSessionOptions: 'cursor-credential.md',
+  CursorSessionToken: 'cursor-credential.md',
   MessageFeedbackDeleteRequest: 'feedback.md',
   MessageFeedbackDeleteResult: 'feedback.md',
   MessageFeedbackDeleteValue: 'feedback.md',
@@ -583,6 +587,8 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'Promise',
   'Record',
   'Readonly',
+  'Request',
+  'Response',
   'Uint8Array',
 ])
 

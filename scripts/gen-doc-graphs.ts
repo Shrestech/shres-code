@@ -139,6 +139,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns one single-flight Codex session-credential manager per credential spec; the llm-codex-session adapter resolves its bearer token and account header through this service.',
   },
   {
+    key: 'cursorCredential',
+    pkg: 'cursor-credential',
+    title: 'Cursor subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-cursor-session'],
+    note: 'Owns one single-flight Cursor session-credential manager per credential spec; a cursor-session adapter resolves its bearer token through this service, and the CLI owns refresh because the issuer is not publicly resolvable.',
+  },
+  {
     key: 'claudeCredential',
     pkg: 'claude-credential',
     title: 'Claude subscription credential engine',

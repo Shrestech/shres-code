@@ -9,6 +9,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
 | [grok-credential.md](grok-credential.md) | the one Grok Build subscription credential: the single-flight session-credential engine shared by the grok-session adapter and future consumers |
 | [codex-credential.md](codex-credential.md) | the one Codex subscription credential: the single-flight ChatGPT-login session engine shared by the codex-session adapter and future consumers |
+| [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the single-flight Cursor-Agent-CLI session-credential engine every cursor route resolves its bearer token through |
 | [claude-credential.md](claude-credential.md) | the one Claude subscription credential: the single-flight OAuth session engine the claude-session adapter refreshes through console.anthropic.com |
 | [scope.md](scope.md) | scoped registration identity, dispatch carriers, and the owned `Scope` context |
 | [typert.md](typert.md) | Remote invocation descriptors, lookup/Context declarations, Typert registries, and the Host Gateway/Client API boundaries |
