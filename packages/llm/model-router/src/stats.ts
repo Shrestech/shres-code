@@ -42,7 +42,7 @@ import type { ZodType } from 'zod'
 import { KEEP_CURRENT_OPTION_ID } from './config.ts'
 import type {
   ModelRoutingColdCause,
-  ModelRoutingDecision,
+  ModelRoutingLoggedDecision,
   ModelRoutingObjective,
   ModelRoutingOutcome,
   ModelRoutingReason,
@@ -93,9 +93,11 @@ const COLD_CAUSES: readonly ModelRoutingColdCause[] = [
 /**
  * Reason groups: the route switched or held; the judge kept the strong route;
  * a precondition kept it without a usable judgment; or the engine or the
- * routed request failed.
+ * routed request failed. `engine-uncalibrated`, a selected engine refused
+ * because its calibration is only verbalized, is a precondition: the engine
+ * was not asked.
  */
-const REASON_GROUPS: Readonly<Record<ModelRoutingReason, ModelRoutingReasonGroup>> = {
+const REASON_GROUPS: Readonly<Record<ModelRoutingReason | 'engine-uncalibrated', ModelRoutingReasonGroup>> = {
   'gate-passed': 'switched',
   'sticky-hold': 'switched',
   'judgment-failure-held': 'switched',
@@ -107,6 +109,7 @@ const REASON_GROUPS: Readonly<Record<ModelRoutingReason, ModelRoutingReasonGroup
   'gate-failed': 'judge-no',
   'engine-absent': 'fail-closed',
   'engine-disabled': 'fail-closed',
+  'engine-uncalibrated': 'fail-closed',
   'no-candidates': 'fail-closed',
   'base-unlisted': 'fail-closed',
   'model-unavailable': 'fail-closed',
@@ -212,6 +215,12 @@ export interface ModelRoutingStatsState {
   openStreak: { steps: number; lastStep: string | null } | null
   confidence: { values: number[]; margins: number[]; max: number | null }
   latency: number[]
+  /** Whether a failed ask's latency is in {@link latency}. */
+  latencyIncludesFailed: boolean
+  /** Asks in {@link latency} whose latency includes the eligibility assessment. */
+  latencyWithEligibility: number
+  judge: ModelRoutingStatsSnapshot['judge']
+  thresholds: ModelRoutingStatsSnapshot['thresholds']
   /** Served models in first-appearance order. */
   models: ModelTally[]
   /** Configured candidates of the latest decision that recorded them, in configuration order. */
@@ -260,6 +269,7 @@ export function createStatsState(): ModelRoutingStatsState {
       routeFailed: 0,
       judgeFailed: 0,
       deadlineHits: 0,
+      warmUps: 0,
       turnsWithDecisions: 0,
     },
     lastDecisionTurn: null,
@@ -271,6 +281,10 @@ export function createStatsState(): ModelRoutingStatsState {
     openStreak: null,
     confidence: { values: [], margins: [], max: null },
     latency: LATENCY_BUCKETS_MS.map(() => 0),
+    latencyIncludesFailed: false,
+    latencyWithEligibility: 0,
+    judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
+    thresholds: [],
     models: [],
     pool: [],
     selected: [],
@@ -338,7 +352,7 @@ function applyDecision(
   state: ModelRoutingStatsState,
   seq: number,
   time: number,
-  data: ModelRoutingDecision,
+  data: ModelRoutingLoggedDecision,
 ): ModelRoutingStatsState {
   const turn = state.position?.turn ?? 0
   const step = state.position?.step ?? 0
@@ -350,10 +364,17 @@ function applyDecision(
   const selection = data.outcome === 'downgraded' && data.selection !== undefined
     ? { provider: data.selection.provider, model: data.selection.model }
     : null
-  const answeredBy = route === undefined ? undefined : data.engine
+  // The registry id names the engine on answers and failures alike; older
+  // decisions name only the engine that answered, as its provider reported it.
+  const engineName = data.engineId ?? data.engine
+  const warmUp = data.engineFailure?.engineState !== undefined
+  const failed = judgeFailed(data)
+  const asked = route !== undefined || failed
+  const answeredBy = route === undefined ? undefined : engineName
   const engines = answeredBy === undefined ? state.engines : countEngine(state.engines, answeredBy)
   const engineIndex = answeredBy === undefined ? null : engines.findIndex(engine => engine.name === answeredBy)
   const latencyMs = data.latencyMs
+  const timed = asked && latencyMs !== undefined
   const index = timelineIndex(state, turn, step)
   const mark: ModelRoutingTimelineMark | undefined = entry
     ? 'down'
@@ -367,8 +388,9 @@ function applyDecision(
       streaks: state.counts.streaks + (entry ? 1 : 0),
       keptStrong: state.counts.keptStrong + (data.outcome === 'kept-strong' ? 1 : 0),
       routeFailed: state.counts.routeFailed + (data.reason === 'route-failed' ? 1 : 0),
-      judgeFailed: state.counts.judgeFailed + (judgeFailed(data) ? 1 : 0),
+      judgeFailed: state.counts.judgeFailed + (failed ? 1 : 0),
       deadlineHits: state.counts.deadlineHits + (data.engineFailure?.code === 'DEADLINE' ? 1 : 0),
+      warmUps: state.counts.warmUps + (warmUp ? 1 : 0),
       turnsWithDecisions: state.counts.turnsWithDecisions + (state.lastDecisionTurn === turn ? 0 : 1),
     },
     lastDecisionTurn: turn,
@@ -381,7 +403,17 @@ function applyDecision(
       : state.streakLengths,
     openStreak: entry ? { steps: 0, lastStep: null } : exit ? null : state.openStreak,
     confidence: route === undefined ? state.confidence : addConsult(state.confidence, route),
-    latency: route === undefined || latencyMs === undefined ? state.latency : addLatency(state.latency, latencyMs),
+    latency: timed ? addLatency(state.latency, latencyMs + (data.eligibilityMs ?? 0)) : state.latency,
+    latencyIncludesFailed: state.latencyIncludesFailed || (timed && route === undefined),
+    latencyWithEligibility: state.latencyWithEligibility + (timed && data.eligibilityMs !== undefined ? 1 : 0),
+    judge: data.judgeUsage === undefined ? state.judge : {
+      calls: state.judge.calls + 1,
+      promptTokens: state.judge.promptTokens + promptTokens(data.judgeUsage),
+      outputTokens: state.judge.outputTokens + data.judgeUsage.outputTokens,
+    },
+    thresholds: route === undefined || data.thresholds === undefined
+      ? state.thresholds
+      : countThresholds(state.thresholds, data.thresholds),
     pool: data.candidateEligibility === undefined
       ? state.pool
       : data.candidateEligibility.candidates.map(candidate => ({ provider: candidate.provider, model: candidate.model })),
@@ -404,7 +436,7 @@ function applyDecision(
       latest: data.objective,
       mixed: state.objective !== null && (state.objective.mixed || state.objective.latest !== data.objective),
     },
-    egress: data.engine === undefined ? state.egress : countEgress(state.egress, data.engine, data),
+    egress: !asked || engineName === undefined ? state.egress : countEgress(state.egress, engineName, data),
     engines,
     marks: mark === undefined ? state.marks : retain([...state.marks, { i: index, kind: mark }], RETAINED_TIMELINE_EVENTS),
     decisions: retain([...state.decisions, {
@@ -424,7 +456,7 @@ function applyDecision(
       reason: data.reason,
       best,
       difficulty: data.difficulty?.score ?? null,
-      engine: data.engine ?? null,
+      engine: engineName ?? null,
       latencyMs: latencyMs ?? null,
     }], RETAINED_RECENT_DECISIONS),
   }
@@ -664,16 +696,40 @@ function addConsult(
   }
 }
 
-/** Count one answered consult's latency in its bucket; above the last bound counts in the last bucket. */
+/** Count one ask's latency in its bucket; above the last bound counts in the last bucket. */
 function addLatency(latency: readonly number[], latencyMs: number): number[] {
   const found = LATENCY_BUCKETS_MS.findIndex(bound => latencyMs <= bound)
   const bucket = found === -1 ? LATENCY_BUCKETS_MS.length - 1 : found
   return latency.map((count, at) => at === bucket ? count + 1 : count)
 }
 
-/** Whether a decision records a failed judgment call. */
-function judgeFailed(data: ModelRoutingDecision): boolean {
+/**
+ * Whether a decision records a failed judgment call. A warm-up, an engine
+ * still becoming ready, was not called and is not a failure.
+ */
+function judgeFailed(data: ModelRoutingLoggedDecision): boolean {
+  if (data.engineFailure?.engineState !== undefined) return false
   return data.engineFailure !== undefined || data.reason === 'engine-unavailable' || data.reason === 'invalid-answer'
+}
+
+/** Count one consult under the thresholds it recorded, keeping first-appearance order. */
+function countThresholds(
+  thresholds: ModelRoutingStatsSnapshot['thresholds'],
+  applied: NonNullable<ModelRoutingLoggedDecision['thresholds']>,
+): ModelRoutingStatsSnapshot['thresholds'] {
+  const calibratedBy = applied.calibratedBy ?? null
+  const same = (entry: ModelRoutingStatsSnapshot['thresholds'][number]) => entry.downgradeThreshold === applied.downgradeThreshold
+    && entry.downgradeMargin === applied.downgradeMargin && entry.source === applied.source && entry.calibratedBy === calibratedBy
+  if (!thresholds.some(same)) {
+    return [...thresholds, {
+      downgradeThreshold: applied.downgradeThreshold,
+      downgradeMargin: applied.downgradeMargin,
+      source: applied.source,
+      calibratedBy,
+      consults: 1,
+    }]
+  }
+  return thresholds.map(entry => same(entry) ? { ...entry, consults: entry.consults + 1 } : entry)
 }
 
 /** Count one answered decision for an engine name. */
@@ -684,16 +740,17 @@ function countEngine(engines: ModelRoutingStatsState['engines'], name: string): 
 }
 
 /**
- * Count one judge ask and its state characters: the recorded judgment input's
- * length, else the projection's character budget as an upper bound.
+ * Count one judge ask and its state characters: the recorded input size, else
+ * the recorded judgment input's length, else the projection's character budget
+ * as an upper bound.
  */
 function countEgress(
   egress: ModelRoutingStatsState['egress'],
   engine: string,
-  data: ModelRoutingDecision,
+  data: ModelRoutingLoggedDecision,
 ): ModelRoutingStatsState['egress'] {
-  const exact = data.judgmentInput !== undefined
-  const chars = data.judgmentInput?.state.length ?? data.stateProjection?.maxChars ?? 0
+  const exact = data.inputChars !== undefined || data.judgmentInput !== undefined
+  const chars = data.inputChars ?? data.judgmentInput?.state.length ?? data.stateProjection?.maxChars ?? 0
   const known = egress.find(entry => entry.engine === engine)
   if (known === undefined) return [...egress, { engine, asks: 1, chars, exact }]
   return egress.map(entry => entry === known
@@ -731,13 +788,13 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
   const lengths = streakLengthValues(state)
   const calls = state.models.reduce((sum, model) => sum + model.calls, 0)
   const reportedCalls = state.models.reduce((sum, model) => sum + model.reportedCalls, 0)
-  const answered = state.latency.reduce((sum, count) => sum + count, 0)
+  const timed = state.latency.reduce((sum, count) => sum + count, 0)
   return {
     counts: { ...state.counts },
     reasons: ranked(state.reasons).map(({ key, count }) => ({
       reason: key,
       // Every key is a logged `ModelRoutingReason`.
-      group: REASON_GROUPS[key as ModelRoutingReason],
+      group: REASON_GROUPS[key as ModelRoutingReason | 'engine-uncalibrated'],
       count,
     })),
     keptReasons: ranked(state.keptReasons).map(({ key, count }) => ({ reason: key, count })),
@@ -756,10 +813,13 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
       bucketsMs: [...LATENCY_BUCKETS_MS],
       counts: [...state.latency],
       failed: state.counts.judgeFailed,
-      p50: answered === 0 ? null : percentile(state.latency, answered, 0.5),
-      p95: answered === 0 ? null : percentile(state.latency, answered, 0.95),
-      includesFailed: false,
+      p50: timed === 0 ? null : percentile(state.latency, timed, 0.5),
+      p95: timed === 0 ? null : percentile(state.latency, timed, 0.95),
+      includesFailed: state.latencyIncludesFailed,
+      withEligibility: state.latencyWithEligibility,
     },
+    judge: { ...state.judge },
+    thresholds: state.thresholds.map(entry => ({ ...entry })),
     models,
     cold: COLD_CAUSES.map(cause => ({ cause, count: state.cold[cause].count, tokens: state.cold[cause].tokens })),
     coldTtl: { ms: COLD_TTL_FALLBACK_MS, fallback: true },
@@ -951,6 +1011,7 @@ export const modelRoutingStatsSchema = zod.object({
     routeFailed: zod.number(),
     judgeFailed: zod.number(),
     deadlineHits: zod.number(),
+    warmUps: zod.number(),
     turnsWithDecisions: zod.number(),
   }),
   reasons: zod.array(zod.object({
@@ -974,7 +1035,16 @@ export const modelRoutingStatsSchema = zod.object({
     p50: nullableNumber,
     p95: nullableNumber,
     includesFailed: zod.boolean(),
+    withEligibility: zod.number(),
   }),
+  judge: zod.object({ calls: zod.number(), promptTokens: zod.number(), outputTokens: zod.number() }),
+  thresholds: zod.array(zod.object({
+    downgradeThreshold: zod.number(),
+    downgradeMargin: zod.number(),
+    source: zod.enum(['operating-point', 'global']),
+    calibratedBy: zod.string().nullable(),
+    consults: zod.number(),
+  })),
   models: zod.array(zod.object({
     provider: zod.string(),
     model: zod.string(),

@@ -8,7 +8,7 @@
  * @module @shres-code/shres-code-model-router/types
  */
 
-import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { HostedTool, LlmThinkingMode, ModelModality, ReasoningEffortId, TokenUsage } from '@shres-code/shres-code-llm'
 import type {
   JudgmentErrorCode, JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits,
 } from '@shres-code/shres-code-judgment'
@@ -574,10 +574,18 @@ export interface ModelRoutingStatsSnapshot {
     keptStrong: number
     /** Decisions with reason `route-failed`. */
     routeFailed: number
-    /** Decisions with `engineFailure`, or reason `engine-unavailable` or `invalid-answer`. */
+    /**
+     * Decisions with `engineFailure`, or reason `engine-unavailable` or
+     * `invalid-answer`, except warm-ups.
+     */
     judgeFailed: number
     /** Decisions whose `engineFailure.code` is `DEADLINE`. */
     deadlineHits: number
+    /**
+     * Decisions whose selected engine was still becoming ready
+     * (`engineFailure.engineState`), so no judgment call was made.
+     */
+    warmUps: number
     /** Turns with at least one decision. */
     turnsWithDecisions: number
   }
@@ -601,20 +609,44 @@ export interface ModelRoutingStatsSnapshot {
     total: number
   }
   /**
-   * Judge latency histogram. Bucket `i` counts latencies at most
-   * `bucketsMs[i]` and above the previous bound; the last bound is 30 s.
-   * Percentiles are read from the histogram, within one bucket.
+   * Latency the judge added per ask: the call's duration, plus the candidate
+   * eligibility assessment when the decision recorded its duration. Answered
+   * asks count, and failed asks whose decision recorded a duration. Bucket
+   * `i` counts latencies at most `bucketsMs[i]` and above the previous
+   * bound; the last bound is 30 s. Percentiles are read from the histogram,
+   * within one bucket.
    */
   latency: {
     bucketsMs: number[]
     counts: number[]
-    /** Failed asks, shown apart from the histogram. */
+    /** Failed judgments (`counts.judgeFailed`). */
     failed: number
     p50: number | null
     p95: number | null
-    /** Whether the histogram includes failed asks (their latency is recorded from PR 8b). */
+    /** Whether a failed ask's latency is in the histogram. */
     includesFailed: boolean
+    /** Asks in the histogram whose latency includes the eligibility assessment. */
+    withEligibility: number
   }
+  /**
+   * Token usage the judge reported for its own model calls (`judgeUsage`):
+   * the calls that reported it, the prompt tokens they processed, and their
+   * output tokens.
+   */
+  judge: { calls: number; promptTokens: number; outputTokens: number }
+  /**
+   * Distinct gate thresholds answered consults recorded as applied, in
+   * first-appearance order, with their consult counts. A consult whose
+   * decision recorded none is not counted.
+   */
+  thresholds: {
+    downgradeThreshold: number
+    downgradeMargin: number
+    source: 'operating-point' | 'global'
+    /** Preregistration that set them, or null when they are uncalibrated. */
+    calibratedBy: string | null
+    consults: number
+  }[]
   /** Models that served calls, strong first, then pool order, then first appearance. */
   models: ModelRoutingStatsModel[]
   /** Cold prefills by cause, every cause present, fixed order. */
@@ -633,12 +665,18 @@ export interface ModelRoutingStatsSnapshot {
     objective: ModelRoutingObjective | 'mixed' | null
   }
   /**
-   * Judge asks and state characters per engine name. `chars` is exact when
-   * every ask recorded its input size; otherwise it is the upper bound
-   * `stateProjection.maxChars` summed, and `bound` is `at-most`.
+   * Judge asks and state characters per engine: the registry id when the
+   * decision recorded one (`engineId`, also on failed asks), else the name the
+   * answering provider reported. `chars` is exact when every ask recorded its
+   * input size (`inputChars`, or the exact judgment input); otherwise it sums
+   * the upper bound `stateProjection.maxChars` for the rest, and `bound` is
+   * `at-most`. A warm-up sent nothing and is not counted.
    */
   egress: { engine: string; asks: number; chars: number; bound: 'exact' | 'at-most' }[]
-  /** Engine names that answered, in first-appearance order, with their decision counts. */
+  /**
+   * Engines that answered, named as in `egress`, in first-appearance order,
+   * with their decision counts.
+   */
   engines: { name: string; decisions: number }[]
   /**
    * Step timeline for the model chart. `steps[i].model` indexes `models`;
@@ -669,6 +707,7 @@ export interface ModelRoutingStatsSnapshot {
     reason: string
     best: number | null
     difficulty: number | null
+    /** The engine, named as in `egress`, or null when the decision names none. */
     engine: string | null
     latencyMs: number | null
   }[]
@@ -708,11 +747,47 @@ export interface ModelRoutingDecisionDetail {
   turn: number
   /** Step the decision was logged in. */
   step: number
-  /** The logged decision, verbatim. */
-  decision: ModelRoutingDecision
+  /** The logged decision, verbatim, with the judgment-call facts it recorded. */
+  decision: ModelRoutingLoggedDecision
   /** Configuration in force now. */
   gate: ModelRoutingGateView
 }
+
+/** The gate thresholds one answered consult applied, as a decision records them. */
+export interface ModelRoutingRecordedThresholds {
+  /** Route-confidence floor applied. */
+  downgradeThreshold: number
+  /** Top-two margin floor applied. */
+  downgradeMargin: number
+  /** Whether they came from the engine's operating point or the global defaults. */
+  source: 'operating-point' | 'global'
+  /** Id of the preregistration whose replay set them; absent means uncalibrated. */
+  calibratedBy?: string
+}
+
+/**
+ * Judgment-call facts a decision may record beside the fields of
+ * {@link ModelRoutingDecision}. Every field is optional, and a log written by a
+ * router that did not record one lacks it: readers fall back to the fields
+ * {@link ModelRoutingDecision} carries.
+ */
+export interface ModelRoutingDecisionFacts {
+  /** Registry id of the engine the call was routed to, on an answer or a failure. */
+  engineId?: string
+  /** Token usage of the judge's own model call, as the engine reported it. */
+  judgeUsage?: TokenUsage
+  /** Duration of the candidate eligibility assessment, in milliseconds. */
+  eligibilityMs?: number
+  /** Characters of state handed to the engine: the one state, or every alternative a fitted ask offered. */
+  inputChars?: number
+  /** The gate thresholds applied to the route answer. */
+  thresholds?: ModelRoutingRecordedThresholds
+  /** A failed call; `engineState` marks an engine still becoming ready, which was not called. */
+  engineFailure?: ModelRoutingEngineFailure & { engineState?: 'starting' | 'not-installed' }
+}
+
+/** A logged decision with the judgment-call facts it may record. */
+export type ModelRoutingLoggedDecision = ModelRoutingDecision & ModelRoutingDecisionFacts
 
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {

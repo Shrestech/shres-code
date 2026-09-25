@@ -29,6 +29,7 @@ import type {
   ModelRoutingBreakReason,
   ModelRoutingCandidateEligibility,
   ModelRoutingDecision,
+  ModelRoutingLoggedDecision,
   ModelRoutingRouteAnswer,
   ModelRoutingSelection,
   ModelRoutingStatsSnapshot,
@@ -53,7 +54,7 @@ class Log {
     return this.add('step/start', { turn, step }, time)
   }
 
-  decide(time: number, fields: Partial<ModelRoutingDecision> = {}): SessionEvent {
+  decide(time: number, fields: Partial<ModelRoutingLoggedDecision> = {}): SessionEvent {
     return this.add('model-routing/decision', {
       outcome: 'kept-strong',
       reason: 'current-preferred',
@@ -291,6 +292,7 @@ describe('modelRoutingStats fold', () => {
       routeFailed: 0,
       judgeFailed: 0,
       deadlineHits: 0,
+      warmUps: 0,
       turnsWithDecisions: 22,
     })
     expect(stats.reasons).toEqual([
@@ -348,6 +350,7 @@ describe('modelRoutingStats fold', () => {
       routeFailed: 1,
       judgeFailed: 2,
       deadlineHits: 1,
+      warmUps: 0,
       turnsWithDecisions: 4,
     })
     expect(stats.reasons).toEqual([
@@ -638,5 +641,109 @@ describe('modelRoutingStats fold', () => {
     expect(positionBefore(log.events, 0)).toEqual({ turn: 0, step: 0 })
     expect(positionBefore(log.events, 2)).toEqual({ turn: 3, step: 4 })
     expect(positionBefore(log.events, 3)).toEqual({ turn: 3, step: 4 })
+  })
+})
+
+describe('decisions recording judgment-call facts', () => {
+  const usage = (inputTokens: number, outputTokens: number, cacheReadTokens?: number): TokenUsage => ({
+    inputTokens, outputTokens, ...cacheReadTokens === undefined ? {} : { cacheReadTokens },
+  })
+  const consult = (fields: Partial<ModelRoutingLoggedDecision>): Partial<ModelRoutingLoggedDecision> => ({
+    route: answer('keep-current', 0.9, { 'keep-current': 0.9, 'flash': 0.1 }),
+    ...fields,
+  })
+
+  it('names engines by registry id on answers and failures, and counts exact input sizes', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, consult({ engine: 'Jev (TypeSafe)', engineId: 'typesafe', inputChars: 3_000, latencyMs: 40 }))
+    log.decide(2, { reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' }, engineId: 'typesafe', inputChars: 2_000, latencyMs: 90 })
+    log.decide(3, consult({ engine: 'laya', ...projected(12_000), latencyMs: 20 }))
+    log.decide(4, { reason: 'judgment-error', engineFailure: { code: 'INVALID_ANSWER' } })
+    const stats = fold(log)
+
+    expect(stats.engines).toEqual([{ name: 'typesafe', decisions: 1 }, { name: 'laya', decisions: 1 }])
+    expect(stats.egress).toEqual([
+      { engine: 'typesafe', asks: 2, chars: 5_000, bound: 'exact' },
+      { engine: 'laya', asks: 1, chars: 12_000, bound: 'at-most' },
+    ])
+    expect(stats.recent.map(row => row.engine)).toEqual([null, 'laya', 'typesafe', 'typesafe'])
+    expect(stats.counts.judgeFailed).toBe(2)
+    // The failed ask's 90 ms lands in the histogram beside the answers.
+    expect(stats.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(3)
+    expect(stats.latency.includesFailed).toBe(true)
+    expect(stats.latency.withEligibility).toBe(0)
+  })
+
+  it('adds the eligibility assessment to an ask\'s latency', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, consult({ engine: 'laya', latencyMs: 30, eligibilityMs: 70 }))
+    log.decide(2, { reason: 'candidate-ineligible', eligibilityMs: 400 })
+    const stats = fold(log)
+    const bucket = LATENCY_BUCKETS_MS.indexOf(100)
+    expect(stats.latency.counts[bucket]).toBe(1)
+    expect(stats.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(1)
+    expect(stats.latency).toMatchObject({ includesFailed: false, withEligibility: 1, p50: 100 })
+  })
+
+  it('sums the judge\'s reported usage', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, consult({ engine: 'llm:x', judgeUsage: usage(1_000, 20, 500) }))
+    log.decide(2, consult({ engine: 'llm:x' }))
+    log.decide(3, { reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' }, judgeUsage: usage(300, 0) })
+    expect(fold(log).judge).toEqual({ calls: 2, promptTokens: 1_800, outputTokens: 20 })
+  })
+
+  it('counts consults under the distinct thresholds they recorded', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    const global = { downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'global' as const }
+    const point = { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'operating-point' as const, calibratedBy: 'prereg-3' }
+    log.decide(1, consult({ thresholds: global }))
+    log.decide(2, consult({ thresholds: point }))
+    log.decide(3, consult({ thresholds: global }))
+    log.decide(4, consult({ thresholds: { ...global, source: 'operating-point' } }))
+    log.decide(5, consult({ thresholds: { ...global, downgradeMargin: 0.2 } }))
+    log.decide(6, consult({ thresholds: { ...point, calibratedBy: 'prereg-4' } }))
+    log.decide(7, consult({ thresholds: { ...point, downgradeThreshold: 0.75 } }))
+    log.decide(8, consult({}))
+    log.decide(9, { reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' }, thresholds: global })
+    expect(fold(log).thresholds).toEqual([
+      { downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'global', calibratedBy: null, consults: 2 },
+      { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'operating-point', calibratedBy: 'prereg-3', consults: 1 },
+      { downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'operating-point', calibratedBy: null, consults: 1 },
+      { downgradeThreshold: 0.8, downgradeMargin: 0.2, source: 'global', calibratedBy: null, consults: 1 },
+      { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'operating-point', calibratedBy: 'prereg-4', consults: 1 },
+      { downgradeThreshold: 0.75, downgradeMargin: 0.05, source: 'operating-point', calibratedBy: 'prereg-3', consults: 1 },
+    ])
+  })
+
+  it('counts a warm-up apart: no failure, no egress, no latency', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, {
+      reason: 'engine-unavailable',
+      engineFailure: { code: 'UNAVAILABLE', engineState: 'starting' },
+      engineId: 'laya',
+      latencyMs: 1,
+    })
+    const stats = fold(log)
+    expect(stats.counts).toMatchObject({ judgeFailed: 0, warmUps: 1, deadlineHits: 0 })
+    expect(stats.egress).toEqual([])
+    expect(stats.latency.counts.every(count => count === 0)).toBe(true)
+    expect(stats.recent[0]?.engine).toBe('laya')
+  })
+
+  it('groups an engine refused as uncalibrated with the preconditions', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    // A reason routers gating per engine record; this build's reason union does not list it.
+    log.decide(1, { reason: 'engine-uncalibrated' as ModelRoutingDecision['reason'], engineId: 'laya' })
+    const stats = fold(log)
+    expect(stats.reasons).toEqual([{ reason: 'engine-uncalibrated', group: 'fail-closed', count: 1 }])
+    expect(stats.egress).toEqual([])
+    expect(modelRoutingStatsSchema.safeParse(stats).success).toBe(true)
   })
 })

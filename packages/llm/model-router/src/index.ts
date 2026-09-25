@@ -563,7 +563,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         init: createStatsState,
         apply: applyStatsEvent,
         view: viewStats,
-        stateVersion: 1,
+        // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency.
+        stateVersion: 2,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {

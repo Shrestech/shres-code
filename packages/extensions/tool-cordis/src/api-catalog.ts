@@ -4653,7 +4653,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingDecisionDetail',
-    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingDecision;\n    gate: ModelRoutingGateView;\n}',
+    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingLoggedDecision;\n    gate: ModelRoutingGateView;\n}',
+  },
+  {
+    name: 'ModelRoutingDecisionFacts',
+    declaration: 'export interface ModelRoutingDecisionFacts {\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    thresholds?: ModelRoutingRecordedThresholds;\n    engineFailure?: ModelRoutingEngineFailure & {\n        engineState?: \'starting\' | \'not-installed\';\n    };\n}',
   },
   {
     name: 'ModelRoutingDifficultyAnswer',
@@ -4688,6 +4692,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
   },
   {
+    name: 'ModelRoutingLoggedDecision',
+    declaration: 'export type ModelRoutingLoggedDecision = ModelRoutingDecision & ModelRoutingDecisionFacts;',
+  },
+  {
     name: 'ModelRoutingObjective',
     declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
   },
@@ -4698,6 +4706,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingReason',
     declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
+  },
+  {
+    name: 'ModelRoutingRecordedThresholds',
+    declaration: 'export interface ModelRoutingRecordedThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
   },
   {
     name: 'ModelRoutingRequest',
