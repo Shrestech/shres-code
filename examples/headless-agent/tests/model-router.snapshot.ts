@@ -41,6 +41,8 @@ interface Arm {
   readonly promptFixture: string
   /** Driver that owns an explicit create/dispose/resume lifecycle. */
   readonly resume?: boolean
+  /** Driver that selects the first turn's routed model on the live agent before the remaining prompts. */
+  readonly select?: boolean
 }
 
 /** One arm's harvested, normalized outputs. */
@@ -117,7 +119,9 @@ async function armPrompts(fixture: string): Promise<string[]> {
  */
 async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
   const prompts = await armPrompts(arm.promptFixture)
-  const driver = arm.resume === true ? join(testsDir, 'fixtures', 'model-router-resume-driver.ts') : binScript
+  const driver = arm.resume === true
+    ? join(testsDir, 'fixtures', 'model-router-resume-driver.ts')
+    : arm.select === true ? join(testsDir, 'fixtures', 'model-router-select-driver.ts') : binScript
   let runCwd = ''
   let rawSession: string | undefined
   const result = await runLoaderSmoke({
@@ -205,6 +209,29 @@ describe('headless model-routing snapshots', () => {
       expect(headers.length).toBeGreaterThan(0)
       expect(headers.every(event => (event['data'] as { header: { config: { model: string } } }).header.config.model === 'deepseek-v4-flash')).toBe(true)
       await expectArmFixtures('model-router-resume', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it.each([
+    ['model-router-idle', 'model-router-idle.cordis.snapshot.yml', 'candidate-equals-base'],
+    ['model-router-idle-unlisted', 'model-router-resume.cordis.snapshot.yml', 'base-unlisted'],
+  ] as const)('reports routing idle on the selected route after a manual deviation (%s)', async (fixture, config, reason) => {
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({ configPath: join(exampleDir, config), promptFixture: fixture, select: true }, server)
+      // Every turn runs flash: the routed first turn, then the explicit selection. No judgment reaches the model.
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-flash', 'deepseek-v4-flash',
+      ])
+      const decisions = parseJsonl(output.session).filter(event => event['type'] === 'model-routing/decision')
+      expect(decisions.map(event => event['data'])).toMatchObject([
+        { outcome: 'downgraded', sticky: { active: true, entryBase: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } } },
+        { outcome: 'kept-strong', reason: 'manual-deviation', sticky: { active: false, brokenBy: 'manual-deviation' } },
+        { outcome: 'kept-strong', reason, sticky: { active: false } },
+      ])
+      await expectArmFixtures(fixture, output)
     } finally {
       await server.close()
     }

@@ -139,7 +139,17 @@ export function RoutingChip({
           <span aria-hidden="true">⋯</span>
         </button>
       )}
-      {idle && <span className={css.idle}>{t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}</span>}
+      {idle && (
+        // The visible copy is short and truncates in a narrow composer; the full
+        // sentence stays in the tooltip and the accessible description.
+        <span
+          className={css.idle}
+          title={t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
+          aria-description={t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
+        >
+          {t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}
+        </span>
+      )}
       {strong !== undefined && (
         <button
           type="button"
@@ -198,7 +208,14 @@ export function RoutingChip({
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
       {failure !== null && (
-        <span className={css.error} role="status" title={failure.detail}>{FAILURE_LABEL[failure.action]}</span>
+        <span
+          className={css.error}
+          role="status"
+          title={`${FAILURE_LABEL[failure.action]}: ${failure.detail}`}
+          aria-description={failure.detail}
+        >
+          {FAILURE_LABEL[failure.action]}
+        </span>
       )}
     </span>
   )

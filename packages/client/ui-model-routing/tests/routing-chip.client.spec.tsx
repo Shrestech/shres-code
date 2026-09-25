@@ -203,6 +203,10 @@ describe('RoutingChip', () => {
     const { view } = setup({ routing: idle() })
 
     expect(idleWarning()).toBeTruthy()
+    // The short visible copy truncates; the full sentence is the tooltip and the accessible description.
+    expect(idleWarning().getAttribute('title')).toBe(en['idle.warning.title'])
+    expect(idleWarning().getAttribute('aria-description')).toBe(en['idle.warning.title'])
+    expect(en['idle.warning'].length).toBeLessThan(en['idle.warning.title'].length)
     expect(restoreChip()).toBeTruthy()
     // Neither the warning nor the restore control names a routed model.
     expect(view.container.textContent).not.toContain(CHEAP.model)
@@ -212,7 +216,10 @@ describe('RoutingChip', () => {
   it('reports the unlisted-base idle state with its own warning and the restore', () => {
     setup({ routing: idle({ last: { outcome: 'kept-strong', reason: 'base-unlisted' } }) })
 
-    expect(screen.getByText(en['idle.unlisted'])).toBeTruthy()
+    const warning = screen.getByText(en['idle.unlisted'])
+    expect(warning.getAttribute('title')).toBe(en['idle.unlisted.title'])
+    expect(warning.getAttribute('aria-description')).toBe(en['idle.unlisted.title'])
+    expect(en['idle.unlisted'].length).toBeLessThan(en['idle.unlisted.title'].length)
     expect(screen.queryByText(en['idle.warning'])).toBeNull()
     expect(restoreChip()).toBeTruthy()
   })
@@ -244,11 +251,14 @@ describe('RoutingChip', () => {
 
     fireEvent.click(restoreChip())
     const refused = await screen.findByText('failed to restore the strong model')
-    expect(refused.getAttribute('title')).toBe('session.selectModel failed: model-unavailable: this route does not serve chat turns')
+    expect(refused.getAttribute('title'))
+      .toBe('failed to restore the strong model: session.selectModel failed: model-unavailable: this route does not serve chat turns')
+    expect(refused.getAttribute('aria-description'))
+      .toBe('session.selectModel failed: model-unavailable: this route does not serve chat turns')
     expect(idleWarning()).toBeTruthy()
 
     fireEvent.click(restoreChip())
-    expect(await screen.findByTitle('network down')).toBeTruthy()
+    expect(await screen.findByTitle('failed to restore the strong model: network down')).toBeTruthy()
     expect(onChip()).toBeTruthy()
   })
 
@@ -284,14 +294,17 @@ describe('RoutingChip', () => {
     setup({ routing: OFF, setRouting })
 
     fireEvent.click(offChip())
-    expect((await screen.findByText('failed to switch model routing')).getAttribute('title')).toBe('gone (session-not-found)')
+    // The label may truncate, so the tooltip carries it with the detail, and the detail is the description.
+    const refused = await screen.findByText('failed to switch model routing')
+    expect(refused.getAttribute('title')).toBe('failed to switch model routing: gone (session-not-found)')
+    expect(refused.getAttribute('aria-description')).toBe('gone (session-not-found)')
     expect(offChip()).toBeTruthy()
 
     fireEvent.click(offChip())
-    expect(await screen.findByTitle('network down')).toBeTruthy()
+    expect(await screen.findByTitle('failed to switch model routing: network down')).toBeTruthy()
 
     fireEvent.click(offChip())
-    expect(await screen.findByTitle('socket closed')).toBeTruthy()
+    expect(await screen.findByTitle('failed to switch model routing: socket closed')).toBeTruthy()
   })
 
   it('disables under the locked owner prop', () => {
@@ -381,7 +394,8 @@ describe('RoutingChip remote-judge confirm', () => {
     fireEvent.click(offChip())
     fireEvent.click(screen.getByRole('button', { name: en['confirm.openSettings'] }))
     const failure = await screen.findByText('failed to open Settings › Model routing')
-    expect(failure.getAttribute('title')).toBe('Settings is not composed')
+    expect(failure.getAttribute('title')).toBe('failed to open Settings › Model routing: Settings is not composed')
+    expect(failure.getAttribute('aria-description')).toBe('Settings is not composed')
   })
 
   it('names the section instead of offering Open Settings while the registry is not read', () => {
