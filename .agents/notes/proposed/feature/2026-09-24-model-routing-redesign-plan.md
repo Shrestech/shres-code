@@ -847,7 +847,7 @@ The design is a **Definition-owned engine registry plus one dispatcher that prov
   - `installJudgmentSettings` moves to the dispatcher, because the section exists where the dispatch exists.
   - Per-consumer overrides (`overrides: { 'model-router': 'laya', 'worker-escalation': 'typesafe' }`) are owner decision D7. They add an optional `consumer` id to `JudgmentInput`. Add them in R1, because Laya's window cannot hold the worker-escalation digest (`DEFAULT_MAX_DIGEST_CHARS = 4000`).
 - **`model-router`** keeps its ownership. The new section displays it, and `operatingPoints` ties it to engine ids.
-- **Classifier card.** `packages/client/ui-settings-models/src/client/ClassifierCard.tsx` (the `judgment.enabled` toggle) moves into the new section, so the fact has one home. The Models section keeps only model selection and links to "Model routing".
+- **Classifier card.** The Models page's Classifier card (the `judgment.enabled` toggle) moves into the new section, so the fact has one home. The Models section keeps only model selection and links to "Model routing".
 
 #### R1.3 Validation and fail-loud behaviour
 

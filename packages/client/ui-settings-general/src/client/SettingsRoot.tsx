@@ -6,7 +6,7 @@ import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
   IconFolderOpen16, IconFollowsystemOutline16, IconPersonalizationOutline16,
   IconMicOutline16, IconCodeOutline16, IconThinkOutline16,
-  IconSearchOutline16, IconSettingsOutline16,
+  IconSearchOutline16, IconSettingsOutline16, IconBranchOutline16,
 } from '@shres-code/shres-code-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
@@ -22,6 +22,7 @@ function destination(id: string): Destination {
 
 function NavIcon({ id }: { id: string }) {
   if (id === 'models') return <IconDataOutline16 size={18} />
+  if (id === 'model-routing') return <IconBranchOutline16 size={18} />
   if (id === 'appearance') return <IconFollowsystemOutline16 size={18} />
   if (id === 'audio') return <IconMicOutline16 size={18} />
   if (id === 'jspace') return <IconThinkOutline16 size={18} />
@@ -151,7 +152,7 @@ export function SettingsRoot({
           </div>
           <div className={css.options}>
             {sectionId !== undefined && renderSlot('settings.section', {
-              close, ...(active?.id === 'appearance' ? { item: 'appearance' } : {}),
+              close, openSection, ...(active?.id === 'appearance' ? { item: 'appearance' } : {}),
             }, { only: sectionId })}
           </div>
           {activeDestination === 'settings' && <footer className={css.actions}>{renderSlot('settings.action', {})}</footer>}

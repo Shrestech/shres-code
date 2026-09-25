@@ -1723,6 +1723,9 @@ importers:
       '@shres-code/shres-code-client-ui-settings-jspace':
         specifier: workspace:^
         version: link:../../client/ui-settings-jspace
+      '@shres-code/shres-code-client-ui-settings-model-routing':
+        specifier: workspace:^
+        version: link:../../client/ui-settings-model-routing
       '@shres-code/shres-code-client-ui-settings-models':
         specifier: workspace:^
         version: link:../../client/ui-settings-models
@@ -3075,6 +3078,52 @@ importers:
         version: 19.2.8
 
   packages/client/ui-settings-jspace:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
+      '@shres-code/shres-code-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@shres-code/shres-code-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@shres-code/shres-code-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@shres-code/shres-code-client-web-react':
+        specifier: workspace:^
+        version: link:../web-react
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ~19.2.18
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+
+  packages/client/ui-settings-model-routing:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^

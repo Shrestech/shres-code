@@ -18,11 +18,11 @@ import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
 import { Button, IconPlusOutline16, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type { InjectFace } from '@shres-code/shres-code-client-ui-slots'
+import type { SettingsSectionOwnerProps } from '@shres-code/shres-code-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
-import { ClassifierCard } from './ClassifierCard.tsx'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -44,7 +44,7 @@ export interface ModelsSectionInjected {
  * Props delivered by the slot outlet: the inject face spread flat (the
  * renderer erases the share boundary at the render call).
  */
-export type ModelsSectionComponentProps = InjectFace<ModelsSectionInjected>
+export type ModelsSectionComponentProps = InjectFace<ModelsSectionInjected> & Pick<SettingsSectionOwnerProps, 'openSection'>
 
 /** Partial component face used to exercise the pre-injection render path. */
 export type ModelsSectionProps = Partial<ModelsSectionComponentProps>
@@ -180,9 +180,9 @@ export function providerCopy(template: string, target: ProviderIdentity): string
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, api, t } = props
+  const { controller, useSnapshot, api, t, openSection } = props
   if (controller === undefined || useSnapshot === undefined || api === undefined || t === undefined) return null
-  return <Loaded injected={{ controller, useSnapshot, api, t }} />
+  return <Loaded injected={{ controller, useSnapshot, api, t, ...openSection === undefined ? {} : { openSection } }} />
 }
 
 function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactNode {
@@ -302,14 +302,7 @@ function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactN
             {providerCopy(t('savedProvider'), savedIdentity)}
           </p>
         )}
-      <div className={styles['rowCard']}>
-        <ClassifierCard
-          state={state}
-          api={api}
-          reload={() => { void controller.load() }}
-          t={t}
-        />
-      </div>
+      {state.namespaces.has('judgment') ? <RoutingLink openSection={injected.openSection} t={t} /> : null}
       <ul className={styles['rows']}>
         {listed.map((row) => {
           const target = targetOf(row)
@@ -598,5 +591,25 @@ function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactN
         {deleteFailure === undefined ? null : <p className={styles['error']}>{deleteFailure}</p>}
       </Modal>
     </div>
+  )
+}
+
+/**
+ * The one-line pointer to Settings › Model routing, which owns the classifier
+ * switch and the judgment engine; plain text where the shell offers no navigation.
+ */
+function RoutingLink({ openSection, t }: { openSection: ((id: string) => void) | undefined; t: ModelsSectionComponentProps['t'] }): ReactNode {
+  return (
+    <p className={styles['advancedHint']}>
+      {t('routingLinkLead')}
+      {' '}
+      {openSection === undefined
+        ? t('routingLinkTarget')
+        : (
+          <button type="button" className={styles['linkButton']} onClick={() => { openSection('model-routing') }}>
+            {t('routingLinkTarget')}
+          </button>
+        )}
+    </p>
   )
 }

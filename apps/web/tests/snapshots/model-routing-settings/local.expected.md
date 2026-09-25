@@ -1,0 +1,26 @@
+- region "Model routing":
+  - text: Applies to all sessions
+  - paragraph: Configure how routing judges each turn. Each session turns routing on or off with the Auto chip in its chat input.
+  - region "Judgment engine":
+    - heading "Judgment engine" [level=3]
+    - paragraph: One judge for every session. Changing it takes effect at the next decision in every session with routing on.
+    - text: Engine
+    - combobox "Engine":
+      - option "Jev (TypeSafe) — remote"
+      - option "Shield (local gateway) — local" [selected]
+    - text: Unavailable Local
+    - code: fast shield-fast@1 · accurate shield-accurate@1
+    - text: Uncalibrated
+    - paragraph: "judgment-shield: the gateway at 127.0.0.1:9 is not accepting connections: connect ECONNREFUSED 127.0.0.1:9"
+    - paragraph: Nothing leaves this machine.
+  - region "Default for new sessions":
+    - heading "Default for new sessions" [level=3]
+    - paragraph: Sessions start with this mode; each session changes its own with the Auto chip in the chat input.
+    - radiogroup "Routing mode for new sessions":
+      - radio "Off" [checked]
+      - radio "On"
+  - region "Classifier":
+    - heading "Classifier" [level=3]
+    - paragraph: "Turns every judgment consumer off at once: routing, worker escalation, and compaction. Moved here from Models."
+    - switch "Turn the classifier off" [checked]
+    - text: Enabled

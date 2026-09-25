@@ -71,7 +71,7 @@ Disposal clears status listeners, cancels a running install step, fails in-fligh
 | `install(signal?)` | Stops the gateway, installs, and starts it again whether or not the install succeeded. Concurrent calls share one install. |
 | `restart()` | Stops the gateway, resets the restart budget, and launches. |
 | `/laya [status\|install\|restart]` | The same operations from the conversation UI; the command is not sent to the model. |
-| Remote `laya.status` / `laya.install` / `laya.restart` | The same operations for configuration surfaces. `status` returns `LayaGatewayView`: the state and detail, the pinned `modelId`, `checkpointContext`, `dtype`, whether an install is running, and the last exit's code, signal, and deadline flag while the gateway is not ready (never its stderr). `install` runs under the engine's lifetime, not the caller's connection; `restart` returns the view once the restart began. Status changes also announce `judgment/engines-updated`. |
+| Remote `laya.gatewayStatus` / `laya.installGateway` / `laya.restartGateway` | The same operations for configuration surfaces. `gatewayStatus` returns `LayaGatewayView`: the state and detail, the pinned `modelId`, `checkpointContext`, `dtype`, whether an install is running, and the last exit's code, signal, and deadline flag while the gateway is not ready (never its stderr). `installGateway` runs under the engine's lifetime, not the caller's connection; `restartGateway` returns the view once the restart began. Status changes also announce `judgment/engines-updated`. |
 
 ## Model Experience
 

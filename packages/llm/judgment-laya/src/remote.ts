@@ -1,6 +1,8 @@
 /**
  * The `laya` Remote: status, install, and restart of the supervised local
- * gateway for configuration surfaces — the same operations `/laya` runs.
+ * gateway for configuration surfaces — the same operations `/laya` runs. The
+ * endpoint names carry a `Gateway` suffix because the Client Remote namespace
+ * service reserves a plain `install`.
  */
 
 import type { Context } from '@shres-code/cordis'
@@ -39,8 +41,8 @@ export class LayaGatewayRemote extends TypertRemoteService {
    * Read the gateway state, pin, and last exit.
    * @returns a JSON view; status changes also announce `judgment/engines-updated`.
    */
-  @Remote('status')
-  status(): LayaGatewayView {
+  @Remote('gatewayStatus')
+  gatewayStatus(): LayaGatewayView {
     return this.control.view()
   }
 
@@ -51,8 +53,8 @@ export class LayaGatewayRemote extends TypertRemoteService {
    * @returns the verified checkpoint directory and digests.
    * @throws Error naming the failed step; the gateway restarts either way.
    */
-  @Remote('install')
-  async install(): Promise<LayaInstallResult> {
+  @Remote('installGateway')
+  async installGateway(): Promise<LayaInstallResult> {
     return this.control.install()
   }
 
@@ -60,8 +62,8 @@ export class LayaGatewayRemote extends TypertRemoteService {
    * Restart the gateway with a fresh restart budget.
    * @returns the view after the restart began.
    */
-  @Remote('restart')
-  async restart(): Promise<LayaGatewayView> {
+  @Remote('restartGateway')
+  async restartGateway(): Promise<LayaGatewayView> {
     await this.control.restart()
     return this.control.view()
   }

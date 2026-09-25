@@ -202,6 +202,9 @@
     - id: ui-settings-models
       name: '@shres-code/shres-code-client-ui-settings-models'
 
+    - id: ui-settings-model-routing
+      name: '@shres-code/shres-code-client-ui-settings-model-routing'
+
     - id: ui-settings-shield
       name: '@shres-code/shres-code-client-ui-settings-shield'
 

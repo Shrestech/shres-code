@@ -1,0 +1,29 @@
+# Settings › Model routing needs the judgment dispatcher, its engines, and the
+# model router in the tree; the shipped Web bundle composes none of them. The
+# engines are keyless and deterministic: TypeSafe names a credential reference
+# nothing stores, so it reports unconfigured, and Shield points at the discard
+# port, so it reports unavailable. The router starts off, so no turn consults.
+- insert:
+    - id: judgment-dispatch
+      name: '@shres-code/shres-code-judgment-dispatch'
+      config:
+        defaultEngine: typesafe
+    - id: judgment-typesafe
+      name: '@shres-code/shres-code-judgment-typesafe'
+      config:
+        apiKeyRef: SHRES_E2E_ABSENT_TYPESAFE_KEY
+    - id: judgment-shield
+      name: '@shres-code/shres-code-judgment-shield'
+      config:
+        endpoint: 'http://127.0.0.1:9'
+        models:
+          fast: shield-fast@1
+          accurate: shield-accurate@1
+    - id: model-router
+      name: '@shres-code/shres-code-model-router'
+      config:
+        initialMode: 'off'
+        downgradeThreshold: 0.8
+        downgradeMargin: 0.1
+        routeInstructions: Pick the cheapest route that can finish this turn.
+        difficultyInstructions: Rate how much reasoning this turn needs.
