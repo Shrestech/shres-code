@@ -717,6 +717,38 @@ describe('LlmRuntime', () => {
       .resolves.toEqual({ provider: 'route', id: 'unknown', name: 'unknown' })
   })
 
+  it('passes declared cache-count reporting through listing and exact resolution, and rejects an unknown value', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends ScriptedAdapter {
+      override listModels(): Promise<readonly LlmModelInfo[]> {
+        return Promise.resolve([
+          { provider: 'route', id: 'reported', name: 'Reported', cacheUsage: 'reported' },
+          { provider: 'route', id: 'silent', name: 'Silent' },
+        ])
+      }
+
+      override resolveModel(_provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({
+          provider: 'route', id: model, name: model,
+          ...model === 'silent' ? {} : { cacheUsage: model === 'bogus' ? 'sometimes' : 'unreported' },
+        } as unknown as LlmResolvedModelInfo)
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+
+    await expect(ctx.llm.listModels('route')).resolves.toEqual([
+      { provider: 'route', id: 'reported', name: 'Reported', cacheUsage: 'reported' },
+      { provider: 'route', id: 'silent', name: 'Silent' },
+    ])
+    await expect(ctx.llm.resolveModelInfo('route', 'unreported'))
+      .resolves.toEqual({ provider: 'route', id: 'unreported', name: 'unreported', cacheUsage: 'unreported' })
+    await expect(ctx.llm.resolveModelInfo('route', 'silent'))
+      .resolves.toEqual({ provider: 'route', id: 'silent', name: 'silent' })
+    await expect(ctx.llm.resolveModelInfo('route', 'bogus'))
+      .rejects.toMatchObject({ code: 'INVALID_MODEL_CACHE_USAGE' })
+  })
+
   it('preserves modality metadata through exact model resolution', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -1208,6 +1240,7 @@ describe('LlmRuntime', () => {
     [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: 1.5 }, 'fractional prompt-cache TTL'],
     [{ provider: 'route', id: 'm', name: 'M', promptCacheTtlMs: Number.NaN }, 'NaN prompt-cache TTL'],
     [{ provider: 'route', id: 'm', name: 'M', thinkingMode: 'interleaved' }, 'unknown thinking mode'],
+    [{ provider: 'route', id: 'm', name: 'M', cacheUsage: 'sometimes' }, 'unknown cache-count reporting'],
   ] as const)('rejects invalid model metadata (%s: %s)', async (metadata, _label) => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)

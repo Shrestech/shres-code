@@ -435,13 +435,16 @@ describe('provider profile lifecycle', () => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmPiAi, { providers: { openai: {} } })
     const models = await ctx.llm.listModels('openai')
+    // gpt-4.1 speaks the OpenAI Responses protocol, whose usage reports cache counts.
     expect(models.find(model => model.id === 'gpt-4.1')).toEqual({
       provider: 'openai', id: 'gpt-4.1', name: 'GPT-4.1',
       inputModalities: ['text', 'image'],
+      cacheUsage: 'reported',
     })
     expect(models.every(model => model.provider === 'openai')).toBe(true)
     const info = await ctx.llm.resolveModelInfo('openai', 'gpt-4.1')
     expect(typeof info.context?.contextWindow).toBe('number')
+    expect(info.cacheUsage).toBe('reported')
   })
 
   it('exposes pi-ai model thinking levels verbatim without inventing a provider default', async () => {

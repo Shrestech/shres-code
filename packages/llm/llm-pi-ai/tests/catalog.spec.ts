@@ -99,8 +99,9 @@ describe('hand-declared providers', () => {
     const server = await mockServer([])
     const ctx = await harness(gateway(`${server.url}/v1`))
 
+    // A chat-completions route that declares nothing reports no cache counts.
     expect(await ctx.llm.listModels('acme-gateway')).toEqual([
-      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text'] },
+      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text'], cacheUsage: 'unreported' },
     ])
     const info = await ctx.llm.resolveModelInfo('acme-gateway', 'acme-large')
     expect(info).toMatchObject({
@@ -109,7 +110,11 @@ describe('hand-declared providers', () => {
       name: 'Acme Large',
       context: { contextWindow: 65_536 },
       defaultMaxTokens: 4096,
+      cacheUsage: 'unreported',
     })
+    // A route's declaration wins over its protocol.
+    const declared = await harness(gateway(`${server.url}/v1`, { cacheUsage: 'reported' }))
+    expect((await declared.llm.resolveModelInfo('acme-gateway', 'acme-large')).cacheUsage).toBe('reported')
   })
 
   it('offers no reasoning control it could not honour', async () => {
