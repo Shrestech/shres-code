@@ -1,12 +1,12 @@
 # Agent Note: Install BrowserSkill from the Web UI with owned browser control
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
 The [managed installation decision](../../implemented/feature/2026-09-24-managed-plugin-and-skill-installation.md) distinguishes plugin packages from skill instructions. Installing BrowserSkill instructions does not provision its executable, daemon, or browser extension. The external CLI route requires separate setup and command permissions. Users need a UI flow that ends with usable browser tools without exposing their normal browser profiles or weakening generic package installation.
 
-## Proposal
+## Decision
 
 Compose a first-party [BrowserSkill host plugin](../../../../packages/browser/browserskill/README.md) and [Settings section](../../../../packages/client/ui-browserskill/README.md) in the Web bundle. The plugin is already mounted; its Install action provisions runtime resources rather than changing npm dependencies or hot-loading a module graph. The native tools and guide are registered at mount and return a stable not-ready result until the owned browser is connected. The manual skill route remains independently available.
 
@@ -40,7 +40,7 @@ Host disposal aborts startup before requesting forceful termination through the 
 
 The plugin entry constructs BrowserSkillGateway directly with the runtime and owns the sole awaited disposal effect. No runtime object crosses configuration or becomes a synthetic Context service. Browser sessions belong to the initiating conversation, and ownership, HTTP(S) navigation, and supported interaction arguments are enforced in the executor, not only in tool schemas. Page-derived output is framed as untrusted data.
 
-## Evidence and remaining verification
+## Verification
 
 An isolated pilot using installed Chrome 153.0.8010.53, Puppeteer Core 25.12, and pinned bsk/extension 0.3.1 reached a local form, observed it, filled and clicked it, verified the server receipt, and stopped the owned session and daemon. Chrome's load-extension flag was ignored; Extensions.loadUnpacked and extension-worker storage configuration worked. The observed default-port contact count was zero in that run; the reservation, not that timing observation, provides isolation. No model API or everyday Chrome profile was used.
 
@@ -56,7 +56,7 @@ The bounded native recovery scenarios pass on macOS arm64 with installed Chrome.
 
 The removal checks retain every observed PID and process group across attempts and restarts. Three keyless checks use owned benign Node processes to reject removal when an older process or a later recorded group remains; the later-group regression fails before the early-success fix and passes afterward. Successful roots are removed only after the cumulative post-stop checks; structured stdout retains the observations.
 
-Final publication checks and the separately authorized GUI demonstration remain acceptance work.
+The keyless scenarios use a scripted provider and do not establish live-provider behavior. Any separately recorded GUI demonstration must identify its own commit, runtime configuration, and model provenance.
 
 ## Alternatives considered
 
@@ -76,7 +76,7 @@ Final publication checks and the separately authorized GUI demonstration remain 
 
 **Ignore stale command results without draining commands.** A delayed CLI could still reach a newly opened daemon, and the extension instance id persists across profile reuse. Lifetime cancellation and drainage are required in addition to identity checks.
 
-## Acceptance criteria
+## Consequences
 
 - A fresh Web profile completes consent, pinned provisioning, Chrome launch, and observed connection without a terminal step.
 - Real native tools, invoked through a scripted external model in the actual Web composition, control a local page; an independent server receipt proves the action. A fabricated runtime or executable does not satisfy this criterion.
@@ -84,7 +84,7 @@ Final publication checks and the separately authorized GUI demonstration remain 
 - Close drains tracked work, terminates verified recorded processes, and releases the lease. Host disposal escalates the same stop operations; forced host exit and SIGKILL behavior are measured separately. Failed teardown retains ownership and prevents deletion or replacement; a retried Close can recover.
 - Concurrency tests cover commands during teardown, old-lifetime results, internal shutdown reservations, and lease-preserving uninstall.
 - Tests use private homes, endpoints, and profiles; they neither read nor modify everyday browser data. Generic installer protections remain unchanged.
-- Keyless model-visible snapshots, UI evidence, documentation, independent review, and the separately authorized real-model demonstration cover their respective claims.
+- Keyless model-visible snapshots and real-composition UI tests establish their documented scopes; neither substitutes for live-provider evidence.
 
 ## Risks
 

@@ -18,7 +18,7 @@ The launcher publishes immutable profile metadata and an explicit plugin-mutatio
 
 Installed skills live under the Harness home, outside ordinary project and user-authored skill directories. The [filesystem provider](../../../../packages/skill/skill-filesystem/README.md) assigns them the lowest default precedence and returns their content as untrusted. Staging outside the watched root prevents incomplete copies from becoming discoverable. Provenance and digests describe the copied content; they are not an endorsement. Publication and removal use the existing registry invalidation and durable skill-tool output paths.
 
-[BrowserSkill setup](../../../../docs/cookbook/browserskill.md) uses this skill mechanism with a separately provisioned `bsk` runtime. Its DeepSeek Harness package is not treated as a native Shres bundle. The manual setup path neither installs a browser extension nor connects a browser profile automatically. The separate [native UI provisioning proposal](../../proposed/feature/2026-09-25-ui-browserskill-installation.md) does not change these generic installer guarantees.
+[BrowserSkill setup](../../../../docs/cookbook/browserskill.md) uses this skill mechanism with a separately provisioned `bsk` runtime. Its DeepSeek Harness package is not treated as a native Shres bundle. The manual setup path neither installs a browser extension nor connects a browser profile automatically. The separate [native UI provisioning decision](2026-09-25-ui-browserskill-installation.md) does not change these generic installer guarantees.
 
 ## Alternatives considered
 
