@@ -147,7 +147,7 @@ describe('global destinations and settings', () => {
     expect(next.stepId).toBe('credentials')
   })
 
-  it('lets a section open another section, which lists with its own icon', () => {
+  it('gives a section only the close affordance, and lists Model routing with its own icon', () => {
     const { renderSlot } = mount({ rows: [
       { id: 'general', order: 0, label: 'Preferences' },
       { id: 'models', order: 10, label: 'Models & providers' },
@@ -156,8 +156,8 @@ describe('global destinations and settings', () => {
     openSettings()
     fireEvent.click(screen.getByRole('button', { name: 'Models & providers' }))
     const call = renderSlot.mock.calls.findLast(([key]) => key === 'settings.section')
-    const owner = call?.[1] as { openSection: (id: string) => void }
-    act(() => { owner.openSection('model-routing') })
+    expect(Object.keys(call?.[1] as object)).toEqual(['close'])
+    fireEvent.click(screen.getByRole('button', { name: 'Model routing' }))
     expect(screen.getByTestId('section-model-routing')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Model routing' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Model routing' }).querySelector('svg')).not.toBeNull()

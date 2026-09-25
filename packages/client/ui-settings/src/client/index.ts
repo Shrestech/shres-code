@@ -2,7 +2,7 @@
  * Settings domain base plugin, browser half. Provides `ctx.settingsScope`, the
  * settings-namespace Host transport every preference row binds its durable
  * section through, and owns the canonical slot-type contract for the settings
- * surface. It depends on no `ui-*` presentation package, so any feature that
+ * surface and the `ctx.settingsPages` face that opens a section. It depends on no `ui-*` presentation package, so any feature that
  * owns a preference can reach it: the settings SHELL — the `shell.navigation`
  * occupant, its navigation, and the chrome — lives in ui-settings-general,
  * because a shell dependency on ui-sidebar would close a reference cycle
@@ -15,6 +15,7 @@ export type {
   SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
   SettingsPluginsTabOwnerProps, SettingsSectionOwnerProps, SettingsTriggerOwnerProps,
 } from './contract/slots.ts'
+export type { ISettingsPages } from './contract/pages.ts'
 export { SettingsScopeController, SettingsScopeBinder } from './settings-scope.ts'
 
 /**

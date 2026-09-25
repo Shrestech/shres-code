@@ -26,6 +26,8 @@ async function bench(isLoopback = true) {
   // distinct inject key (the typert namespace the Audio card reads); the
   // double answers status so activation can resolve it.
   new TestRemote(ctx)
+  const settingsPages = { open: vi.fn((_sectionId: string) => Promise.resolve()) }
+  ctx.provide('settingsPages', settingsPages)
   ctx.provide('remote.speech', {
     status: () => Promise.resolve({
       ok: true as const,
@@ -39,7 +41,7 @@ async function bench(isLoopback = true) {
   // The apply path only captures the wire face; no call leaves this fake
   // until a section actually loads.
   ctx.provide('connection', { api: {}, isLoopback } as never)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, settingsPages }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -57,7 +59,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.speech'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.speech', 'settingsPages'])
   })
 
   it('registers the models nav entry for declarations before or after apply', async () => {
@@ -83,6 +85,18 @@ describe('ui-settings-models apply', () => {
     expect(resolveSlotLabel(sections.find(section => section.options.id === 'audio')!.options.label)).toBe('Voice & audio')
     const injected = (entry.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected)()
     expect(injected.t('nav')).toBe('Models & providers')
+    // The page's link reaches Settings through the settings-owned face, never the frame.
+    injected.openSettings('model-routing')
+    expect(before.settingsPages.open).toHaveBeenCalledWith('model-routing')
+    const audio = sections.find(section => section.options.id === 'audio')!
+    expect(audio.inject?.()).not.toHaveProperty('speech')
+    const withSpeech = await bench()
+    const speech = { status: vi.fn() }
+    Object.assign(withSpeech.ctx.remote, { speech })
+    declare(withSpeech.slots)
+    await withSpeech.ctx.plugin({ inject: [...inject], apply }).await()
+    const audioWithSpeech = withSpeech.slots.entries('settings.section').find(section => section.options.id === 'audio')!
+    expect(audioWithSpeech.inject?.()).toHaveProperty('speech', speech)
     expect(injected.t('deleteTitle')).toBe('Delete {provider}?')
     expect(typeof injected.controller.load).toBe('function')
     expect(injected.hooks.snapshot).toBeDefined()

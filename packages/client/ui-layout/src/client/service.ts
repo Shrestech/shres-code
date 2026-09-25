@@ -6,8 +6,8 @@
  * (its only consumer). What remains here is the contract other plugins'
  * apply worlds reach for panel transitions (sidebar toggle from ui-sidebar,
  * details open/close from ui-conversation) and the full-page destination
- * (a Settings section a plugin links to) — writes stay inside the store's
- * declared action set, delivered as the registration's bound actions.
+ * primitive — writes stay inside the store's declared action set, delivered
+ * as the registration's bound actions.
  */
 import type { BoundActions } from '@shres-code/shres-code-client-ui-slots'
 import type { createLayoutStore } from './stores.ts'
@@ -30,8 +30,11 @@ export interface ILayout {
   closeDetails(): void
   /**
    * Show a full-page destination above the workspace, keeping the mounted
-   * session and its draft, or return to the workspace.
-   * @param page - a destination id, such as a Settings section id (`model-routing`), or null for the workspace.
+   * session and its draft, or return to the workspace. The frame does not
+   * interpret the id: it is a full-page destination id owned by the
+   * destination's provider, which checks it before calling this (Settings
+   * sections open through `ctx.settingsPages.open`).
+   * @param page - the full-page destination id, or null for the workspace.
    */
   navigate(page: string | null): void
 }
@@ -68,7 +71,7 @@ export class LayoutController implements ILayout {
 
   /**
    * Show a full-page destination above the workspace, or return to it.
-   * @param page - a destination id, or null for the workspace.
+   * @param page - the full-page destination id, owned by the destination's provider, or null for the workspace.
    */
   navigate(page: string | null): void {
     this.#require().navigate(page)

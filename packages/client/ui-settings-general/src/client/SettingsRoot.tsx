@@ -152,7 +152,7 @@ export function SettingsRoot({
           </div>
           <div className={css.options}>
             {sectionId !== undefined && renderSlot('settings.section', {
-              close, openSection, ...(active?.id === 'appearance' ? { item: 'appearance' } : {}),
+              close, ...(active?.id === 'appearance' ? { item: 'appearance' } : {}),
             }, { only: sectionId })}
           </div>
           {activeDestination === 'settings' && <footer className={css.actions}>{renderSlot('settings.action', {})}</footer>}

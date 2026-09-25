@@ -146,6 +146,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   judgmentRedactor: 'interface-typed optional hook (JudgmentRedactor); the service class JudgmentService is declared in the same package — packages/llm/judgment/README.md owns the API',
   appShell: 'client-side interface-typed browser service — packages/client/web/README.md owns the API',
   settingsScope: 'client-side settings-namespace transport service — packages/client/ui-settings/README.md owns the API',
+  settingsPages: 'client-side face opening a Settings section — packages/client/ui-settings/README.md owns the API',
   chatFileMentions: 'client-side slot-contract accessor (ChatFileMentions) — packages/client/ui-conversation/README.md owns the API',
   commandUi: 'client-side interface-typed browser service — packages/client/ui-commands/README.md owns the API',
   conversation: 'client-side interface-typed browser service — packages/client/ui-conversation/README.md owns the API',

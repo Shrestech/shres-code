@@ -71,6 +71,19 @@ describe('web e2e: Settings › Model routing', () => {
     expect(tripwire.warnings).toEqual([])
   })
 
+  it('opens Model routing from the Models page link through the settings-owned pages face', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-model-routing-link'))
+    const dialog = page.getByRole('region', { name: 'Settings' })
+    await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+    await expect.poll(async () => page.locator(SECTION).count()).toBe(0)
+    const link = dialog.locator('p', { hasText: 'Routing and classifier:' }).getByRole('button', { name: 'Model routing', exact: true })
+    await link.click()
+    await page.locator(SECTION).waitFor({ timeout: 10_000 })
+    const nav = dialog.getByRole('navigation', { name: 'Settings' })
+    expect(await nav.getByRole('button', { name: 'Model routing', exact: true }).getAttribute('aria-current')).toBe('page')
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
   it('keeps the fixture inventory exact', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, ['local.expected.md', 'remote.expected.md'])
   })

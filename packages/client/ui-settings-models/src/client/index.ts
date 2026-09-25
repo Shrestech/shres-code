@@ -63,8 +63,9 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  * constrained; registration depends on each slot through `slots.inject()`.
  * `remote.speech` names the typert remote namespace the Audio page reads;
  * api-remotes contributes it wherever this plugin is composed.
+ * `settingsPages` opens the Model routing section from the Models page link.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.speech']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.speech', 'settingsPages']
 
 /**
  * Register the settings sections once the `settings.section` declaration is on
@@ -89,6 +90,8 @@ export function apply(ctx: ClientContext): void {
     hooks: { snapshot: controller.store },
     api: connection.api,
     t,
+    // An unknown section id rejects loudly: the link names a section that must be composed.
+    openSettings: (sectionId) => { void ctx.settingsPages.open(sectionId) },
   })
   const audioInjected = (): AudioSectionInjected => ({
     controller,
