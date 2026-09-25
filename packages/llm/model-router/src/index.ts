@@ -1134,7 +1134,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const registered = selectedEngine === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(selectedEngine)
     const point = config.operatingPoints.find(entry => entry.engine === selectedEngine)
     // A generative model's stated probabilities do not gate unless the
-    // deployment accepted them for this engine (owner decision 9).
+    // deployment accepted them for this engine.
     if (registered?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true) {
       return { ...keep('engine-uncalibrated'), engineId: selectedEngine as string }
     }
