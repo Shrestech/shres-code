@@ -375,8 +375,17 @@ describe('RoutingChip remote-judge confirm', () => {
     await screen.findByText(en['confirm.refused'])
   })
 
+  it('reports a rejected Open Settings on the chip', async () => {
+    const openRoutingSettings = vi.fn(() => Promise.reject(new Error('Settings is not composed')))
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}), openRoutingSettings })
+    fireEvent.click(offChip())
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.openSettings'] }))
+    const failure = await screen.findByText('failed to open Settings › Model routing')
+    expect(failure.getAttribute('title')).toBe('Settings is not composed')
+  })
+
   it('names the section instead of offering Open Settings while the registry is not read', () => {
-    setup({ routing: OFF, engine: { kind: 'loading' }, openRoutingSettings: vi.fn() })
+    setup({ routing: OFF, engine: { kind: 'loading' }, openRoutingSettings: vi.fn(() => Promise.resolve()) })
     fireEvent.click(offChip())
     expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain(en['confirm.settings'])
     expect(screen.queryByRole('button', { name: en['confirm.openSettings'] })).toBeNull()
@@ -388,7 +397,7 @@ describe('RoutingChip remote-judge confirm', () => {
     expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain(en['confirm.settings'])
     expect(screen.queryByRole('button', { name: en['confirm.openSettings'] })).toBeNull()
     cleanup()
-    const openRoutingSettings = vi.fn()
+    const openRoutingSettings = vi.fn(() => Promise.resolve())
     const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}), openRoutingSettings })
     fireEvent.click(offChip())
     const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })

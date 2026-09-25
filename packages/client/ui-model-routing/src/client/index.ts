@@ -46,6 +46,9 @@ const NS = 'modelRouting'
  */
 const MODEL_ROUTER_SETTINGS_NAMESPACE = 'model-router'
 
+/** The Settings section that configures the judge for every session. */
+const MODEL_ROUTING_SETTINGS_SECTION = 'model-routing'
+
 /**
  * The model-selection directory one session's selection surfaces share,
  * declared structurally rather than imported: ui-model-selection owns the
@@ -104,11 +107,11 @@ export interface RoutingChipInjected {
   loadGate: () => Promise<ModelRoutingGateView>
   /**
    * Open Settings › Model routing, where the judge is chosen for every
-   * session. The confirm offers it only while the engine registry has been
-   * read, which is when that page exists; otherwise, or without it, the
-   * confirm names the section as text.
+   * session; rejects when Settings cannot open it. The confirm offers it only
+   * while the engine registry has been read, which is when that page exists;
+   * otherwise, or without it, the confirm names the section as text.
    */
-  openRoutingSettings?: () => void
+  openRoutingSettings?: () => Promise<void>
   /**
    * Framework-bound sources. `routingEngine` is the judgment engine facts,
    * which decide whether turning routing on asks for confirmation first.
@@ -151,6 +154,17 @@ export function apply(ctx: ClientContext): void {
   const routable = (sessionId: SessionId): boolean =>
     ctx.sessions.subagentAddress(sessionId) === undefined
     && ctx.sessions.list.getSnapshot().byId[sessionId]?.origin !== 'subagent'
+  // ctx.settingsPages is read when a surface mounts and again on each click,
+  // not injected: the settings shell comes and goes (HMR) without re-applying
+  // this plugin. A face gone by the click, or an id no section registers,
+  // rejects, and the surface reports it.
+  const openRoutingSettings = async (): Promise<void> => {
+    const pages = ctx.get('settingsPages')
+    if (pages === undefined) throw new Error(`no Settings pages face to open "${MODEL_ROUTING_SETTINGS_SECTION}"`)
+    await pages.open(MODEL_ROUTING_SETTINGS_SECTION)
+  }
+  const settingsLink = (): { openRoutingSettings?: () => Promise<void> } =>
+    ctx.get('settingsPages') === undefined ? {} : { openRoutingSettings }
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-model-routing: dictionaries')
   // Registration-time text (the view's label in the Activity popover) reads
   // through the bound translate as a thunk, so it follows the active locale.
@@ -195,6 +209,7 @@ export function apply(ctx: ClientContext): void {
             available: routable(sessionId),
             loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
             loadGate,
+            ...settingsLink(),
             hooks: { routerSettings: routerScope, routingEngine },
           }),
         }, RoutingView))
@@ -225,6 +240,7 @@ export function apply(ctx: ClientContext): void {
         return null
       },
       loadGate,
+      ...settingsLink(),
       hooks: { routingEngine },
       restoreStrong: async (selection) => {
         // Optional service: a deployment composing no selection surface keeps the

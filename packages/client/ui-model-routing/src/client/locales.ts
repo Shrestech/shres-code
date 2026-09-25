@@ -39,6 +39,7 @@ export const en = {
   'status.settings.before': 'change it in',
   'status.settings.link': 'Settings › Model routing',
   'notice.settings': 'Open Settings › Model routing',
+  'settings.failed': 'Settings › Model routing could not open: {message}',
   'judge.loading': 'checking…',
   'judge.failed': 'not known ({message})',
   'judge.none.no-dispatcher': 'none composed on this host',

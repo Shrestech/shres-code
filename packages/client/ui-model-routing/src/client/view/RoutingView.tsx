@@ -51,9 +51,10 @@ export interface RoutingViewInjected {
    * Open Settings › Model routing, where the judge and the routing defaults
    * are configured for every session. The view links through it only while
    * the engine registry has been read, which is when that page exists;
-   * otherwise, or without it, the view names the section as text.
+   * otherwise, or without it, the view names the section as text. A
+   * rejection shows as an alert.
    */
-  openRoutingSettings?: () => void
+  openRoutingSettings?: () => Promise<void>
   /**
    * Framework-bound sources. `routerSettings` is the `model-router` settings
    * scope; its status is `loading` until the host answers whether it composes
@@ -89,6 +90,7 @@ export function RoutingView({
   const [gateLoad, setGateLoad] = useState<GateLoad>({ kind: 'loading' })
   const [gateAttempt, setGateAttempt] = useState(0)
   const [openSeq, setOpenSeq] = useState<number | null>(null)
+  const [settingsFailure, setSettingsFailure] = useState<string | null>(null)
 
   // gate() reports how the router gates each registered engine, so it is read
   // again when the engine facts change; the loaded gate stays shown meanwhile.
@@ -134,7 +136,12 @@ export function RoutingView({
 
   const judge = routingJudge(engineState)
   // A link only while the page exists: opening a section that is not registered rejects.
-  const openSettings = routingSettingsPage(engineState) ? openRoutingSettings : undefined
+  const openSettings = routingSettingsPage(engineState) && openRoutingSettings !== undefined
+    ? () => {
+      setSettingsFailure(null)
+      openRoutingSettings().catch((reason: unknown) => { setSettingsFailure(reason instanceof Error ? reason.message : String(reason)) })
+    }
+    : undefined
   // The floors the current judge is gated by now: its operating point, else the global defaults.
   const gate = gateLoad.kind === 'loaded'
     ? gateFor(gateLoad.gate, judge.kind === 'engine' ? String(judge.engine.id) : undefined)
@@ -172,6 +179,7 @@ export function RoutingView({
         {' · '}{t('status.settings.before')}{' '}
         <SettingsLink open={openSettings} label={t('status.settings.link')} />
       </p>
+      {settingsFailure !== null && <p className={css.notice} role="alert">{t('settings.failed', { message: settingsFailure })}</p>}
       {egress !== undefined && <p className={css.notice} role="status">{egress}</p>}
       {trouble !== undefined && (
         <p className={css.notice} role="status">

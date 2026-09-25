@@ -16,13 +16,14 @@ import css from './RoutingChip.module.css'
 export type RoutingChipProps =
   PropsRuntime<'conversation.input.modelRouting'> & InjectFace<RoutingChipInjected> & PropsLocale<'modelRouting'>
 
-/** The chip's two gestures; each carries its own failure label. */
-type ChipAction = 'mode' | 'restore'
+/** The chip's gestures; each carries its own failure label. */
+type ChipAction = 'mode' | 'restore' | 'settings'
 
 /** English failure labels, one per gesture (error-surface policy: not localized). */
 const FAILURE_LABEL: Record<ChipAction, string> = {
   mode: 'failed to switch model routing',
   restore: 'failed to restore the strong model',
+  settings: 'failed to open Settings › Model routing',
 }
 
 /**
@@ -168,7 +169,10 @@ export function RoutingChip({
                   variant="outline"
                   onClick={() => {
                     setConfirm(null)
-                    openSettings()
+                    run('settings', async () => {
+                      await openSettings()
+                      return null
+                    })
                   }}
                 >
                   {t('confirm.openSettings')}

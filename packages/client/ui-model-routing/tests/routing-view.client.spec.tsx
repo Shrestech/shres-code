@@ -8,7 +8,7 @@
  * Trajectory, and two sessions rendering independent views.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type {
@@ -45,7 +45,7 @@ interface Setup {
   inspect?: unknown
   onInspectDone?: () => void
   routerStatus?: 'loading' | 'ready' | 'unavailable'
-  openRoutingSettings?: () => void
+  openRoutingSettings?: () => Promise<void>
   engine?: RoutingEngineState
   openState?: 'cold' | 'loading' | 'open' | 'error'
 }
@@ -491,7 +491,7 @@ describe('RoutingView judge facts', () => {
   it('reports a judge the router refuses: never asked, no egress warning', async () => {
     const verbalizedRemote = { ...REMOTE, calibration: 'verbalized' as const }
     const snapshot = engines('typesafe', { engines: [LOCAL, verbalizedRemote] })
-    const openRoutingSettings = vi.fn()
+    const openRoutingSettings = vi.fn(() => Promise.resolve())
     const refused = { ...GATE, engines: [{ engine: 'typesafe', calibration: { kind: 'refused' as const } }] }
     setup({ engine: { kind: 'ready', snapshot }, openRoutingSettings, loadGate: () => Promise.resolve(refused) })
     await screen.findByText('The judge, Jev (TypeSafe), is not used for routing: it only verbalizes its confidence and no operating point accepts it, so it is never asked and every step keeps the strong model.')
@@ -511,10 +511,25 @@ describe('RoutingView judge facts', () => {
     expect(statusLine().textContent).not.toContain('Not used for routing')
   })
 
+  it('shows a rejected Settings open as an alert, and clears it on the next attempt', async () => {
+    const openRoutingSettings = vi.fn()
+      .mockRejectedValueOnce(new Error('no settings.section "model-routing" is registered'))
+      .mockRejectedValueOnce('plain')
+      .mockResolvedValue(undefined)
+    setup({ openRoutingSettings })
+    fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
+    expect((await screen.findByRole('alert')).textContent)
+      .toBe('Settings › Model routing could not open: no settings.section "model-routing" is registered')
+    fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
+    expect((await screen.findByText(/could not open: plain/)).getAttribute('role')).toBe('alert')
+    fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
+    await waitFor(() => { expect(screen.queryByRole('alert')).toBeNull() })
+  })
+
   it('names Settings › Model routing as text while that page does not exist or is not known to', () => {
     // The page registers only while the engine registry is served.
     for (const engine of [{ kind: 'no-dispatcher' }, { kind: 'loading' }, { kind: 'failed', message: 'down' }] as RoutingEngineState[]) {
-      setup({ engine, openRoutingSettings: vi.fn() })
+      setup({ engine, openRoutingSettings: vi.fn(() => Promise.resolve()) })
       expect(statusLine().textContent).toContain('change it in Settings › Model routing')
       expect(screen.queryByRole('button', { name: 'Settings › Model routing' })).toBeNull()
       cleanup()
@@ -530,7 +545,7 @@ describe('RoutingView judge facts', () => {
   })
 
   it('opens Settings › Model routing from the status line and the judge notices', () => {
-    const openRoutingSettings = vi.fn()
+    const openRoutingSettings = vi.fn(() => Promise.resolve())
     setup({ openRoutingSettings })
     fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
     expect(openRoutingSettings).toHaveBeenCalledTimes(1)

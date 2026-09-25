@@ -184,7 +184,7 @@ describe('ui-model-routing browser apply', () => {
     await expect(face(SID).loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })
     expect(b.routingRemote.gate).toHaveBeenCalledTimes(1)
     expect(face(SID).hooks.routerSettings.getSnapshot().status).toBe('ready')
-    // No client service opens a Settings section yet, so the view names it as text.
+    // Without the settings shell's face the view names the section as text.
     expect(face(SID).openRoutingSettings).toBeUndefined()
     // A host failure reaches the view as a rejection naming its message and code.
     b.routingRemote.decision.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'seq 9 is not a routing decision', details: {} } })
@@ -293,6 +293,28 @@ describe('ui-model-routing browser apply', () => {
     ) => RoutingChipInjected
 
     await expect(seat(SID).restoreStrong(STRONG)).resolves.toBe('model selection is unavailable')
+    await fiber.dispose()
+  })
+
+  it('opens Settings › Model routing through ctx.settingsPages, read at each click', async () => {
+    const b = await bench()
+    const open = vi.fn((_sectionId: string) => Promise.resolve())
+    const pages = b.ctx.plugin({ name: 'pages', apply: (inner: Context) => { inner.provide('settingsPages', { open }) } })
+    await pages.await()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const view = (b.slots.entries('conversation.view').find(entry => entry.options.id === 'routing')!.inject as unknown as (
+      id: SessionId) => RoutingViewInjected)(SID)
+    const chip = (b.slots.entries('conversation.input.modelRouting')[0]!.inject as unknown as (id: SessionId) => RoutingChipInjected)(SID)
+    await view.openRoutingSettings!()
+    await chip.openRoutingSettings!()
+    expect(open.mock.calls).toEqual([['model-routing'], ['model-routing']])
+    // An unknown id rejects, and the rejection reaches the surface.
+    open.mockRejectedValueOnce(new Error('settings: no section "model-routing" is registered'))
+    await expect(view.openRoutingSettings!()).rejects.toThrow('no section "model-routing"')
+    // The face left between the mount and the click.
+    await pages.dispose()
+    await expect(chip.openRoutingSettings!()).rejects.toThrow('no Settings pages face to open "model-routing"')
     await fiber.dispose()
   })
 })
