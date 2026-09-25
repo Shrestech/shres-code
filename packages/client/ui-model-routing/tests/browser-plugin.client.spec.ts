@@ -6,11 +6,14 @@
  * line, and submits the routing-idle restore through the session's
  * model-selection directory — the same path the composer picker uses — folding a
  * refusal or an absent selection surface into a failure line. The plugin also
- * lists the Routing view in the `conversation.view` slot, whose face reads the
- * `modelRouting` decision and gate Remotes for its own session. Teardown
- * empties the seat and the view list (HMR safety).
+ * lists the Routing view in the `conversation.view` slot while the
+ * `model-router` settings scope is loading or ready, unlists it when the scope
+ * reports the namespace unavailable, and lists it again when it returns; the
+ * view's face reads the `modelRouting` decision and gate Remotes for its own
+ * session. Teardown empties the seat and the view list (HMR safety).
  */
 import { Context } from '@shres-code/cordis'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import type { SessionId, SubagentAddress } from '@shres-code/shres-code-client-runtime/client'
@@ -26,7 +29,19 @@ const CHILD = 's-routing-child' as SessionId
 
 const STRONG = { provider: 'deepseek', model: 'deepseek-v4.1' }
 
-async function bench(options: { directories?: boolean } = {}) {
+type ScopeStatus = 'loading' | 'ready' | 'unavailable'
+
+/** A controllable `model-router` settings scope and the binder that serves it. */
+function routerScope(status: ScopeStatus) {
+  const store = createSnapshotStore<{ status: ScopeStatus }>({ status })
+  const bind = vi.fn((_spec: { namespace: string }) => ({
+    getSnapshot: () => store.getSnapshot(),
+    subscribe: (listener: () => void) => store.subscribe(listener),
+  }))
+  return { bind, set: (next: ScopeStatus) => { store.set({ status: next }) } }
+}
+
+async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const slots = ctx.get('slots') as SlotRegistry
@@ -47,6 +62,8 @@ async function bench(options: { directories?: boolean } = {}) {
   ctx.provide('remote', { commands: commandsRemote, modelRouting: routingRemote })
   ctx.provide('remote.commands', commandsRemote)
   ctx.provide('remote.modelRouting', routingRemote)
+  const scope = routerScope(options.scope ?? 'ready')
+  ctx.provide('settingsScope', { bind: scope.bind })
   ctx.provide('locale', new LocaleRuntime(ctx))
   ctx.provide('sessions', {
     subagentAddress: (id: SessionId): SubagentAddress | undefined =>
@@ -61,12 +78,12 @@ async function bench(options: { directories?: boolean } = {}) {
       },
     })
   }
-  return { ctx, slots, execute, select, routingRemote }
+  return { ctx, slots, execute, select, routingRemote, scope }
 }
 
 describe('ui-model-routing browser apply', () => {
   it('declares every service it binds', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale'])
+    expect(inject).toEqual(['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale', 'settingsScope'])
   })
 
   it('node-half apply is an intentional no-op', () => {
@@ -76,10 +93,10 @@ describe('ui-model-routing browser apply', () => {
   it('waits until conversation declares the routing seat', async () => {
     const ctx = new Context()
     await ctx.plugin(SlotRegistry).await()
-    const pending = { gate: () => new Promise(() => {}) }
-    ctx.provide('remote', { commands: {}, modelRouting: pending })
+    ctx.provide('remote', { commands: {}, modelRouting: {} })
     ctx.provide('remote.commands', {})
-    ctx.provide('remote.modelRouting', pending)
+    ctx.provide('remote.modelRouting', {})
+    ctx.provide('settingsScope', { bind: routerScope('ready').bind })
     ctx.provide('locale', new LocaleRuntime(ctx))
     ctx.provide('sessions', { subagentAddress: () => undefined })
     const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -130,7 +147,7 @@ describe('ui-model-routing browser apply', () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    await vi.waitFor(() => { expect(b.slots.entries('conversation.view')).toHaveLength(1) })
+    expect(b.scope.bind).toHaveBeenCalledWith({ namespace: 'model-router' })
     const entry = b.slots.entries('conversation.view')[0]!
     expect(entry.component).toBe(RoutingView)
     expect(entry.options.id).toBe('routing')
@@ -143,8 +160,8 @@ describe('ui-model-routing browser apply', () => {
     await expect(face(SID).loadDecision(1037)).resolves.toEqual({ seq: 1037 })
     expect(b.routingRemote.decision).toHaveBeenCalledWith(SID, 1037)
     await expect(face(SID).loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })
-    // One gate read decided the listing; the view's own read is the second.
-    expect(b.routingRemote.gate).toHaveBeenCalledTimes(2)
+    expect(b.routingRemote.gate).toHaveBeenCalledTimes(1)
+    expect(face(SID).hooks.routerSettings.getSnapshot().status).toBe('ready')
     // A host failure reaches the view as a rejection naming its message and code.
     b.routingRemote.decision.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'seq 9 is not a routing decision', details: {} } })
     await expect(face(SID).loadDecision(9)).rejects.toThrow('seq 9 is not a routing decision (internal)')
@@ -154,36 +171,38 @@ describe('ui-model-routing browser apply', () => {
     expect(b.slots.entries('conversation.input.modelRouting')).toHaveLength(0)
   })
 
-  it('leaves the Routing view unlisted on a host without the router or without an answer', async () => {
-    const refused = await bench()
-    refused.routingRemote.gate.mockResolvedValueOnce({ ok: false, error: { code: 'not-found', message: 'no such endpoint', details: {} } })
-    const first = refused.ctx.plugin({ inject: [...inject], apply })
-    await first.await()
-    await vi.waitFor(() => { expect(refused.routingRemote.gate).toHaveBeenCalledTimes(1) })
-    await Promise.resolve()
-    expect(refused.slots.entries('conversation.view')).toHaveLength(0)
-    await first.dispose()
+  it('lists the Routing view while the router scope is loading or ready, and not when it is unavailable', async () => {
+    const absent = await bench({ scope: 'unavailable' })
+    const unlisted = absent.ctx.plugin({ inject: [...inject], apply })
+    await unlisted.await()
+    expect(absent.slots.entries('conversation.view')).toHaveLength(0)
+    await unlisted.dispose()
 
-    const offline = await bench()
-    offline.routingRemote.gate.mockRejectedValueOnce(new Error('socket closed'))
-    const second = offline.ctx.plugin({ inject: [...inject], apply })
-    await second.await()
-    await vi.waitFor(() => { expect(offline.routingRemote.gate).toHaveBeenCalledTimes(1) })
-    await Promise.resolve()
-    expect(offline.slots.entries('conversation.view')).toHaveLength(0)
-    await second.dispose()
+    const unknown = await bench({ scope: 'loading' })
+    const optimistic = unknown.ctx.plugin({ inject: [...inject], apply })
+    await optimistic.await()
+    // Unknown is not absent: the row stays, so a persisted selection keeps its view.
+    expect(unknown.slots.entries('conversation.view')).toHaveLength(1)
+    await optimistic.dispose()
+    expect(unknown.slots.entries('conversation.view')).toHaveLength(0)
   })
 
-  it('does not list the view when the plugin unloads before the host answers', async () => {
-    const b = await bench()
-    let answer!: (value: unknown) => void
-    b.routingRemote.gate.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+  it('unlists the view when the router goes away and lists it again when it returns', async () => {
+    const b = await bench({ scope: 'loading' })
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
+    b.scope.set('ready')
+    expect(b.slots.entries('conversation.view')).toHaveLength(1)
+    b.scope.set('unavailable')
+    expect(b.slots.entries('conversation.view')).toHaveLength(0)
+    b.scope.set('unavailable')
+    expect(b.slots.entries('conversation.view')).toHaveLength(0)
+    b.scope.set('ready')
+    expect(b.slots.entries('conversation.view')).toHaveLength(1)
     await fiber.dispose()
-    answer({ ok: true, value: { downgradeThreshold: 0.8 } })
-    await Promise.resolve()
-    await Promise.resolve()
+    expect(b.slots.entries('conversation.view')).toHaveLength(0)
+    // A scope change after unload lists nothing.
+    b.scope.set('loading')
     expect(b.slots.entries('conversation.view')).toHaveLength(0)
   })
 

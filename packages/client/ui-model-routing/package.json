@@ -36,7 +36,8 @@
         "@shres-code/shres-code-client-locale",
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-client-ui-conversation",
-        "@shres-code/shres-code-model-router"
+        "@shres-code/shres-code-model-router",
+        "@shres-code/shres-code-client-ui-settings"
       ],
       "platform": "web"
     }
@@ -71,7 +72,8 @@
     "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^",
     "clsx": "^2.1.1",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "@shres-code/shres-code-client-ui-settings": "workspace:^"
   },
   "files": [
     "lib/index.js",

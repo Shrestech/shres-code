@@ -251,3 +251,35 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.skeletonHeading,
+.skeletonRow,
+.skeletonTile,
+.skeletonChart {
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-skeleton);
+}
+
+.skeletonHeading {
+  width: 160px;
+  height: 28px;
+}
+
+.skeletonRow {
+  width: min(520px, 100%);
+  height: 18px;
+}
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.skeletonTile {
+  height: 88px;
+}
+
+.skeletonChart {
+  height: 180px;
+}

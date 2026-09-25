@@ -18,6 +18,8 @@ import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: pulls the `modelRouting` SessionProjectionMap merge for useProjection.
 import type {} from '@shres-code/shres-code-model-router/client'
+// Type-only: pulls the settings plugin's Context merge (ctx.settingsScope).
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import { RoutingChip } from './RoutingChip.tsx'
 import { en, type RoutingKey } from './locales.ts'
 import { RoutingView, type RoutingViewInjected } from './view/RoutingView.tsx'
@@ -34,6 +36,12 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 
 /** Dictionary namespace owned by this plugin. */
 const NS = 'modelRouting'
+
+/**
+ * The settings namespace the model router installs while it is mounted; its
+ * scope status is the host-composition fact the Routing view is listed by.
+ */
+const MODEL_ROUTER_SETTINGS_NAMESPACE = 'model-router'
 
 /**
  * The model-selection directory one session's selection surfaces share,
@@ -99,8 +107,11 @@ function remoteValue<T>(result: { ok: true; value: T } | { ok: false; error: { c
   return result.value
 }
 
-/** Required services: the slot registry, session binding lookup, the commands and modelRouting Remotes, and the locale registry. */
-export const inject = ['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale']
+/**
+ * Required services: the slot registry, session binding lookup, the commands
+ * and modelRouting Remotes, the locale registry, and settings scopes.
+ */
+export const inject = ['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale', 'settingsScope']
 
 /**
  * Client plugin body: register the routing chip over the command channel and the
@@ -113,34 +124,44 @@ export function apply(ctx: ClientContext): void {
   // through the bound translate as a thunk, so it follows the active locale.
   const t = ctx.locale.bind(NS)
 
-  // The Routing view is listed only on a host that composes the model router.
-  // The client assembly mounts the modelRouting Remote whatever the host
-  // composes, but only a host that loaded the router claims its endpoints, so
-  // one gate read is the host's own answer. A refused or failed read leaves
-  // the view unlisted until the page reloads.
+  // The Routing view is listed while the host composes the model router. The
+  // router installs its settings namespace only while it is mounted, so the
+  // namespace's scope status is the host's composition fact: 'loading' is not
+  // yet known and keeps the entry listed, so a persisted Routing selection
+  // never falls back to Chat while the answer is on its way; 'unavailable'
+  // unlists it; a namespace that returns (a settings change, a host reload)
+  // lists it again. The shell resolves an unlisted selection to Chat at read
+  // time without writing the store, so the selection returns with the view.
+  const routerScope = ctx.settingsScope.bind<Record<string, unknown>>({
+    namespace: MODEL_ROUTER_SETTINGS_NAMESPACE,
+  })
   ctx.effect(() => {
-    let live = true
     let unlist: (() => void) | undefined
-    ctx.remote.modelRouting.gate().then((result) => {
-      if (!live || !result.ok) return
-      unlist = ctx.slots.inject('conversation.view', () => ctx.slots.register({
-        name: 'conversation.view',
-        id: 'routing',
-        order: 20,
-        locale: NS,
-        label: () => t('view.routing'),
-        inject: (sessionId: SessionId): RoutingViewInjected => ({
-          available: ctx.sessions.subagentAddress(sessionId) === undefined,
-          loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
-          loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
-        }),
-      }, RoutingView))
-    }, () => {
-      // A transport failure is not an answer from the host; nothing else is
-      // listening for it, and the view stays unlisted.
-    })
+    const sync = (): void => {
+      const listed = routerScope.getSnapshot().status !== 'unavailable'
+      if (listed && unlist === undefined) {
+        unlist = ctx.slots.inject('conversation.view', () => ctx.slots.register({
+          name: 'conversation.view',
+          id: 'routing',
+          order: 20,
+          locale: NS,
+          label: () => t('view.routing'),
+          inject: (sessionId: SessionId): RoutingViewInjected => ({
+            available: ctx.sessions.subagentAddress(sessionId) === undefined,
+            loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
+            loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
+            hooks: { routerSettings: routerScope },
+          }),
+        }, RoutingView))
+      } else if (!listed && unlist !== undefined) {
+        unlist()
+        unlist = undefined
+      }
+    }
+    sync()
+    const unsubscribe = routerScope.subscribe(sync)
     return () => {
-      live = false
+      unsubscribe()
       unlist?.()
     }
   }, 'ui-model-routing: routing view')

@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import type {
   ModelRoutingDecisionDetail, ModelRoutingGateView,
 } from '@shres-code/shres-code-model-router/client'
+import type { SettingsScope } from '@shres-code/shres-code-client-runtime/client'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type { ConvViewOwnerProps, ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting`/`modelRoutingStats` SessionProjectionMap merges for useProjection.
@@ -43,6 +44,14 @@ export interface RoutingViewInjected {
    * @returns the gate; rejects when the host cannot read it.
    */
   loadGate: () => Promise<ModelRoutingGateView>
+  /**
+   * Framework-bound sources. `routerSettings` is the `model-router` settings
+   * scope; its status is `loading` until the host answers whether it composes
+   * the router, which the view shows as a skeleton.
+   */
+  hooks: {
+    routerSettings: SettingsScope<Record<string, unknown>>
+  }
 }
 
 /** Full Routing view props: the view share, the conversation owner share, the injected face, and the locale seat. */
@@ -57,10 +66,12 @@ type GateLoad = { kind: 'loading' } | { kind: 'loaded'; gate: ModelRoutingGateVi
  * @returns the view, or a notice when routing is unavailable for this session.
  */
 export function RoutingView({
-  useProjection, available, loadDecision, loadGate, inspect, onInspectDone, reveal, canReveal, t,
+  useProjection, useSession, useRouterSettings, available, loadDecision, loadGate, inspect, onInspectDone, reveal, canReveal, t,
 }: RoutingViewProps) {
   const stats = useProjection('modelRoutingStats')
   const routing = useProjection('modelRouting')
+  const routerStatus = useRouterSettings(scope => scope.status)
+  const openState = useSession(snapshot => snapshot.openState)
   const [gateLoad, setGateLoad] = useState<GateLoad>({ kind: 'loading' })
   const [gateAttempt, setGateAttempt] = useState(0)
   const [openSeq, setOpenSeq] = useState<number | null>(null)
@@ -82,6 +93,24 @@ export function RoutingView({
     onInspectDone?.()
   }, [inspect, onInspectDone])
 
+  // Unknown is not absent: until the host answers whether it composes the
+  // router, and until this session's projections arrive with its tail page,
+  // the view holds a skeleton instead of claiming routing is unavailable.
+  const projected = routing !== undefined && stats !== undefined
+  const settled = openState === 'open' || openState === 'error'
+  if (routerStatus === 'loading' || (!projected && !settled)) {
+    return (
+      <div className={css.view} aria-busy="true">
+        <span className={css.visuallyHidden}>{t('view.loading')}</span>
+        <div className={css.skeletonHeading} aria-hidden="true" />
+        <div className={css.skeletonRow} aria-hidden="true" />
+        <div className={css.skeletonGrid} aria-hidden="true">
+          {[0, 1, 2, 3].map(index => <div key={index} className={css.skeletonTile} />)}
+        </div>
+        <div className={css.skeletonChart} aria-hidden="true" />
+      </div>
+    )
+  }
   if (!available || routing === undefined || stats === undefined) {
     return <div className={css.view}><p className={css.muted}>{t('view.unavailable')}</p></div>
   }

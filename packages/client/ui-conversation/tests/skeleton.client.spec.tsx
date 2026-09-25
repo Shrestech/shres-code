@@ -511,6 +511,27 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
+  it('shows Chat for an unlisted selected view without writing the store, and the view again when it returns', () => {
+    const viewTabs: ViewTab[] = [
+      { id: 'chat', label: 'Chat' },
+      { id: 'trajectory', label: 'Trajectory' },
+      { id: 'routing', label: 'Routing' },
+    ]
+    const b = mount(conversationSnapshot(), undefined, undefined, { viewTabs })
+    act(() => { b.chat.actions.setView('routing') })
+    expect(b.view.getByTestId('view-routing')).toBeTruthy()
+
+    // The view's owner unlisted it (its host capability went away).
+    viewTabs.pop()
+    b.rerender()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.chat.store.getSnapshot().view).toBe('routing')
+
+    viewTabs.push({ id: 'routing', label: 'Routing' })
+    b.rerender()
+    expect(b.view.getByTestId('view-routing')).toBeTruthy()
+  })
+
   it('keeps the Chat fallback selected by id when a view is inserted before it', async () => {
     const viewTabs: ViewTab[] = [
       { id: 'chat', label: 'Chat' },

@@ -42,6 +42,8 @@ interface Setup {
   canReveal?: RoutingViewProps['canReveal']
   inspect?: unknown
   onInspectDone?: () => void
+  routerStatus?: 'loading' | 'ready' | 'unavailable'
+  openState?: 'cold' | 'loading' | 'open' | 'error'
 }
 
 function props(options: Setup): RoutingViewProps {
@@ -50,8 +52,12 @@ function props(options: Setup): RoutingViewProps {
   })
   const useProjection = (key: string, selector?: (value: unknown) => unknown) =>
     bindSnapshotSelector(store)(s => (selector ?? (value => value))(s.values[key]))
+  const scope = { status: options.routerStatus ?? 'ready' }
+  const session = { openState: options.openState ?? 'open' }
   return {
     useProjection,
+    useRouterSettings: (selector: (value: typeof scope) => unknown) => selector(scope),
+    useSession: (selector: (value: typeof session) => unknown) => selector(session),
     available: options.available ?? true,
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
     loadDecision: options.loadDecision ?? ((seq: number) => Promise.resolve({ ...decisionDetail(), seq })),
@@ -70,14 +76,29 @@ function setup(options: Setup = {}) {
 const gateLoaded = () => screen.findByText(/switching requires 0\.80/)
 
 describe('RoutingView availability and states', () => {
-  it('renders a notice for a subagent session or a host without routing', () => {
+  it('holds a skeleton while the host has not answered whether it composes the router', () => {
+    setup({ routerStatus: 'loading' })
+    expect(screen.getByText(en['view.loading'])).toBeTruthy()
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy()
+    expect(screen.queryByText(en['view.unavailable'])).toBeNull()
+  })
+
+  it('holds a skeleton until the session\'s projections arrive with its tail page', () => {
+    for (const openState of ['cold', 'loading'] as const) {
+      setup({ routing: undefined, openState })
+      expect(screen.getByText(en['view.loading'])).toBeTruthy()
+      cleanup()
+    }
+  })
+
+  it('says routing is unavailable once the session settled without the projection, or for a subagent session', () => {
+    setup({ routing: undefined, openState: 'open' })
+    expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
+    cleanup()
+    setup({ stats: undefined, openState: 'error' })
+    expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
+    cleanup()
     setup({ available: false })
-    expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
-    cleanup()
-    setup({ routing: undefined })
-    expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
-    cleanup()
-    setup({ stats: undefined })
     expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
   })
 
