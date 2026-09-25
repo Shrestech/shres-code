@@ -109,15 +109,23 @@ export interface ModelRoutingOperatingPoint {
   readonly acceptVerbalized: boolean
 }
 
-/** The gate thresholds one answered consult applied, as a decision records them. */
+/**
+ * The thresholds in force when a consult judged a route answer, as the
+ * decision records them, so a later configuration change does not
+ * reinterpret the log.
+ */
 export interface ModelRoutingThresholds {
   /** Route-confidence floor applied. */
   downgradeThreshold: number
   /** Top-two margin floor applied. */
   downgradeMargin: number
-  /** Whether they came from the engine's operating point or the global defaults. */
+  /** Difficulty at or above which no streak is entered; present when the consult asked the difficulty question. */
+  entryScoreCeiling?: number
+  /** Difficulty at or above which a held streak escalates; present when the consult asked the difficulty question. */
+  escalateBackScoreThreshold?: number
+  /** Whether the confidence and margin floors came from the engine's operating point or the global defaults. */
   source: 'operating-point' | 'global'
-  /** Id of the preregistration whose replay set them; absent means uncalibrated. */
+  /** Id of the preregistration whose replay set the operating point; absent means uncalibrated. */
   calibratedBy?: string
 }
 
@@ -479,7 +487,7 @@ export interface ModelRoutingDecision {
   engineFailure?: ModelRoutingEngineFailure
   /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
   objective?: ModelRoutingObjective
-  /** The gate thresholds applied to the route answer, when a judgment call answered. */
+  /** The thresholds in force for the route and difficulty answers, when a judgment call answered. */
   thresholds?: ModelRoutingThresholds
 }
 

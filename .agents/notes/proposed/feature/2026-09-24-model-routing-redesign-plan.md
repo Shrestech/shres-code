@@ -866,7 +866,7 @@ The settings API needs a validator hook if `installSettingsSection` lacks one: a
 
 - Router decisions already record `engine`, `model`, and `latencyMs`. Add:
   - `engineId`, the registry id the dispatcher routed or would route the ask to, recorded on answered and failed calls and on `engine-uncalibrated` and `breaker-open`;
-  - `thresholds: {downgradeThreshold, downgradeMargin, source, calibratedBy?}`, the values applied, so a later settings change cannot reinterpret history;
+  - `thresholds: {downgradeThreshold, downgradeMargin, entryScoreCeiling?, escalateBackScoreThreshold?, source, calibratedBy?}`, the values in force, so a later settings change cannot reinterpret history;
   - `judgeUsage`, `eligibilityMs`, `inputChars`, and a failed call's wall-clock `latencyMs` ([engine-facts note](../../implemented/feature/2026-09-25-model-router-engine-facts.md)).
 - The worker-escalation `escalation/decision` event also records `selectedEngine`.
 - Settings changes are not session events. Decisions carry the engine that answered, which is what replay needs.

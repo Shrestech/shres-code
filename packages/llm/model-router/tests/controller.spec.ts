@@ -1570,10 +1570,16 @@ describe('judgment failures', () => {
     await pointed.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
     await registeredEngine(pointed.ctx, 'laya', { state: 'ready' }, 'calibrated', borderline)
     expect(await pointed.resolve(1)).toEqual(CHEAP)
-    expect(pointed.decision()).toMatchObject({
-      reason: 'gate-passed',
-      thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.1, source: 'operating-point', calibratedBy: 'prereg-2026-10-routing-v1' },
-    })
+    // Every threshold in force is recorded, in one fixed key order.
+    expect(Object.entries(pointed.decision().thresholds!)).toEqual([
+      ['downgradeThreshold', 0.7],
+      ['downgradeMargin', 0.1],
+      ['entryScoreCeiling', 2],
+      ['escalateBackScoreThreshold', 3],
+      ['source', 'operating-point'],
+      ['calibratedBy', 'prereg-2026-10-routing-v1'],
+    ])
+    expect(pointed.decision().reason).toBe('gate-passed')
 
     // Laya without a point uses the global defaults, uncalibrated, and is not fail-closed.
     const global = await bench({ engine: false })
@@ -1590,6 +1596,17 @@ describe('judgment failures', () => {
     const single = await bench({ config: { ...CONFIG, operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.99, downgradeMargin: 0.9 }] } })
     expect(await single.resolve(1)).toEqual(CHEAP)
     expect(single.decision()).toMatchObject({ thresholds: { source: 'global' } })
+
+    // Without the difficulty question no difficulty threshold is in force.
+    const { difficultyInstructions: _omitted, ...routeOnly } = CONFIG
+    const plain = await bench({ config: { ...routeOnly, hold: { minSteps: 0 } } })
+    expect(await plain.resolve(1)).toEqual(CHEAP)
+    expect(plain.decision().thresholds).toEqual({ downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'global' })
+
+    // The difficulty thresholds come from the configuration in force at the consult.
+    const tuned = await bench({ config: { ...CONFIG, difficulty: { entryScoreCeiling: 3 }, escalateBack: { scoreThreshold: 4 } } })
+    expect(await tuned.resolve(1)).toEqual(CHEAP)
+    expect(tuned.decision().thresholds).toMatchObject({ entryScoreCeiling: 3, escalateBackScoreThreshold: 4 })
   })
 
   it('reports an operating point for an unregistered engine once after the settle, and when it resolves', async () => {

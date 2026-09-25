@@ -1138,14 +1138,17 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (registered?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true) {
       return { ...keep('engine-uncalibrated'), engineId: selectedEngine as string }
     }
-    const thresholds: ModelRoutingThresholds = point === undefined
-      ? { downgradeThreshold: config.downgradeThreshold, downgradeMargin: config.downgradeMargin, source: 'global' }
-      : {
-        downgradeThreshold: point.downgradeThreshold,
-        downgradeMargin: point.downgradeMargin,
-        source: 'operating-point',
-        ...point.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
-      }
+    // Built in one fixed key order, so equal inputs log equal decisions.
+    const thresholds: ModelRoutingThresholds = {
+      downgradeThreshold: point?.downgradeThreshold ?? config.downgradeThreshold,
+      downgradeMargin: point?.downgradeMargin ?? config.downgradeMargin,
+      ...config.difficultyInstructions === undefined ? {} : {
+        entryScoreCeiling: config.entryScoreCeiling,
+        escalateBackScoreThreshold: config.escalateBackScoreThreshold,
+      },
+      source: point === undefined ? 'global' : 'operating-point',
+      ...point?.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
+    }
     const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
     const eligibilityStarted = Date.now()
