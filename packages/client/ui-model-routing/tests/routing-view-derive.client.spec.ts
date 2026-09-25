@@ -9,7 +9,7 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gatePath, judgeSegment, judgeTrouble,
+  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeSegment, judgeTrouble,
   latencyScopeNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
@@ -134,37 +134,43 @@ describe('routingKpis', () => {
 
 describe('gatePath', () => {
   it('passes every check for gate-passed', () => {
-    expect(gatePath('gate-passed').every(check => check.status === 'pass' && !check.first)).toBe(true)
+    expect(gatePath('gate-passed', true).every(check => check.status === 'pass' && !check.first)).toBe(true)
   })
 
   it('marks the first failing check and skips the rest', () => {
-    const path = gatePath('low-confidence')
+    const path = gatePath('low-confidence', true)
     expect(path.map(check => check.status)).toEqual(['pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'fail', 'skip', 'skip'])
     expect(path.filter(check => check.first).map(check => check.id)).toEqual(['confidence'])
-    expect(gatePath('base-unlisted')[1]).toEqual({ id: 'base-listed', status: 'fail', first: true })
+    expect(gatePath('base-unlisted', false)[1]).toEqual({ id: 'base-listed', status: 'fail', first: true })
   })
 
   it('stops at the router\'s own order: the pool first, the engine before eligibility', () => {
-    const statusOf = (reason: string) => Object.fromEntries(gatePath(reason).map(check => [check.id, check.status]))
+    const statusOf = (reason: string, assessed = false) =>
+      Object.fromEntries(gatePath(reason, assessed).map(check => [check.id, check.status]))
     expect(statusOf('no-candidates')).toMatchObject({ pool: 'fail', 'base-listed': 'skip' })
     expect(statusOf('state-too-large')).toMatchObject({ pool: 'fail', 'base-listed': 'skip' })
     for (const reason of ['engine-absent', 'engine-disabled', 'breaker-open', 'engine-uncalibrated']) {
       expect(statusOf(reason)).toMatchObject({ cooldown: 'pass', engine: 'fail', eligibility: 'skip', judge: 'skip' })
     }
     expect(statusOf('candidate-ineligible')).toMatchObject({ engine: 'pass', eligibility: 'fail' })
+    // Refused after the assessment: re-checked before asking, or the answering engine refused.
+    for (const reason of ['engine-absent', 'engine-disabled', 'breaker-open', 'engine-uncalibrated']) {
+      expect(statusOf(reason, true)).toMatchObject({ engine: 'pass', eligibility: 'pass', judge: 'fail', difficulty: 'skip' })
+    }
+    expect(statusOf('candidate-ineligible', true)).toMatchObject({ eligibility: 'fail' })
     expect(statusOf('engine-unavailable')).toMatchObject({ eligibility: 'pass', judge: 'fail' })
   })
 
   it('marks a held streak without a failing check', () => {
-    expect(gatePath('sticky-hold').at(-1)).toEqual({ id: 'hold', status: 'held', first: false })
-    const failedJudge = gatePath('judgment-failure-held')
+    expect(gatePath('sticky-hold', true).at(-1)).toEqual({ id: 'hold', status: 'held', first: false })
+    const failedJudge = gatePath('judgment-failure-held', true)
     expect(failedJudge.find(check => check.id === 'judge')).toEqual({ id: 'judge', status: 'held', first: false })
     expect(failedJudge.find(check => check.id === 'hold')).toEqual({ id: 'hold', status: 'held', first: false })
     expect(failedJudge.find(check => check.id === 'confidence')?.status).toBe('skip')
   })
 
   it('skips every check for a reason it does not know', () => {
-    expect(gatePath('a-future-reason').every(check => check.status === 'skip')).toBe(true)
+    expect(gatePath('a-future-reason', false).every(check => check.status === 'skip')).toBe(true)
   })
 })
 
@@ -203,7 +209,8 @@ describe('decision thresholds', () => {
   it('compares a decision that recorded none with the configuration now, uncalibrated', () => {
     const thresholds = decisionThresholds(decisionDetail())
     expect(thresholds).toEqual({
-      source: 'now', difficultySource: 'now', downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+      source: 'now', origin: 'global', difficultySource: 'now',
+      downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
     })
     expect(thresholdSourceLabel(thresholds, t)).toBe('Threshold now · uncalibrated')
     expect(thresholdValueLabel(thresholds, 0.8, t)).toBe('threshold now 0.80')
@@ -233,6 +240,32 @@ describe('decision thresholds', () => {
   })
 })
 
+describe('operating points', () => {
+  const POINTS = {
+    ...GATE,
+    operatingPoints: [
+      { engine: 'laya', downgradeThreshold: 0.6, downgradeMargin: 0.2, calibratedBy: 'prereg-1', acceptVerbalized: false },
+      { engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.15, acceptVerbalized: true },
+    ],
+  }
+
+  it('gates an engine by its operating point, else by the global floors', () => {
+    expect(gateFor(POINTS, 'laya')).toMatchObject({ downgradeThreshold: 0.6, downgradeMargin: 0.2, origin: 'operating-point', calibratedBy: 'prereg-1' })
+    expect(gateFor(POINTS, 'typesafe')).toMatchObject({ downgradeThreshold: 0.7, origin: 'operating-point' })
+    expect(gateFor(POINTS, 'typesafe').calibratedBy).toBeUndefined()
+    expect(gateFor(POINTS, 'other')).toMatchObject({ downgradeThreshold: 0.8, origin: 'global' })
+    expect(gateFor(POINTS, undefined).origin).toBe('global')
+  })
+
+  it('falls back to the operating point now of the engine a decision names', () => {
+    const calibrated = decisionThresholds({ ...decisionDetail({ engineId: 'laya' }), gate: POINTS })
+    expect(calibrated).toMatchObject({ source: 'now', origin: 'operating-point', calibratedBy: 'prereg-1', downgradeThreshold: 0.6 })
+    expect(thresholdSourceLabel(calibrated, t)).toBe('Threshold now · the engine\'s operating point · calibrated by prereg-1')
+    const uncalibrated = decisionThresholds({ ...decisionDetail({ engineId: 'typesafe' }), gate: POINTS })
+    expect(thresholdSourceLabel(uncalibrated, t)).toBe('Threshold now · the engine\'s operating point · uncalibrated')
+  })
+})
+
 describe('recorded facts in the statistics', () => {
   it('names warm-ups and judge tokens in the tiles', () => {
     const stats = {
@@ -242,7 +275,7 @@ describe('recorded facts in the statistics', () => {
       latency: { ...liveStats().latency, withEligibility: 22 },
     }
     const tiles = routingKpis(stats, GATE, () => 'remote', t)
-    expect(tiles.find(tile => tile.id === 'decisions')?.detail).toBe('22 judged · 0 failed · 3 while the judge was starting')
+    expect(tiles.find(tile => tile.id === 'decisions')?.detail).toBe('22 judged · 0 failed · 3 judge warming up')
     expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 1 s · deadline 1.5 s · 42k judge tokens')
   })
 

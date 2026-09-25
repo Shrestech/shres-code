@@ -308,13 +308,19 @@ export interface GateCheck {
 }
 
 /**
- * The ordered gate path of one decision, with its first failing check.
+ * The ordered gate path of one decision, with its first failing check. The
+ * router checks the engine before assessing candidates and again immediately
+ * before asking, and refuses an answering engine after the answer, so an
+ * engine refusal on a decision that recorded the assessment stopped at the
+ * judgment call rather than before eligibility.
  * @param reason - the decision's logged reason.
+ * @param assessed - whether the decision recorded a candidate eligibility assessment.
  * @returns one row per check in router order.
  */
-export function gatePath(reason: string): GateCheck[] {
+export function gatePath(reason: string, assessed: boolean): GateCheck[] {
   if (reason === 'gate-passed') return GATE_CHECKS.map(id => ({ id, status: 'pass', first: false }))
-  const stop = FAILING_CHECK[reason]
+  const listed = FAILING_CHECK[reason]
+  const stop = listed === 'engine' && assessed ? 'judge' : listed
   if (stop === undefined) return GATE_CHECKS.map(id => ({ id, status: 'skip', first: false }))
   const held = HELD_REASONS.has(reason)
   const index = GATE_CHECKS.indexOf(stop)
@@ -390,6 +396,33 @@ export function routeMargin(decision: ModelRoutingDecision): number | undefined 
   return (sorted[0] ?? 0) - (sorted[1] ?? 0)
 }
 
+/** The gate configuration now for one engine, with the calibration of its floors. */
+export type EngineGate = ModelRoutingGateView & {
+  /** The preregistration that set the floors, when the engine's operating point names one. */
+  calibratedBy?: string
+  /** Whether the floors are the engine's operating point or the global defaults. */
+  origin: 'operating-point' | 'global'
+}
+
+/**
+ * The gate configuration now for one engine: its operating point's floors
+ * replace the global ones when the configuration names that engine.
+ * @param gate - the configured gate.
+ * @param engineId - the engine's registry id, when known.
+ * @returns the gate the engine is judged by now.
+ */
+export function gateFor(gate: ModelRoutingGateView, engineId: string | undefined): EngineGate {
+  const point = engineId === undefined ? undefined : gate.operatingPoints.find(candidate => candidate.engine === engineId)
+  if (point === undefined) return { ...gate, origin: 'global' }
+  return {
+    ...gate,
+    downgradeThreshold: point.downgradeThreshold,
+    downgradeMargin: point.downgradeMargin,
+    origin: 'operating-point',
+    ...point.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
+  }
+}
+
 /**
  * The thresholds one drill-down compares a decision with, and where they come
  * from: `recorded` values are the ones in force when the decision was made;
@@ -406,9 +439,9 @@ export interface DecisionThresholds {
    * configuration now.
    */
   difficultySource: 'recorded' | 'now'
-  /** Where recorded floors came from: the engine's operating point or the global defaults. */
-  origin?: 'operating-point' | 'global'
-  /** The preregistration that set recorded floors; absent means they are uncalibrated. */
+  /** Where the floors came from: the engine's operating point or the global defaults. */
+  origin: 'operating-point' | 'global'
+  /** The preregistration that set the floors; absent means they are uncalibrated. */
   calibratedBy?: string
   /** Route-confidence floor. */
   downgradeThreshold: number
@@ -423,9 +456,10 @@ export interface DecisionThresholds {
 /**
  * Resolve the thresholds a drill-down compares one decision with: the
  * thresholds the decision recorded as applied, else the configuration in
- * force now, uncalibrated, from the `modelRouting.decision` read's gate. A
- * decision records the difficulty scores only when its consult asked the
- * difficulty question; otherwise they too come from the gate.
+ * force now from the `modelRouting.decision` read's gate, for the engine the
+ * decision names when it recorded one. A decision records the difficulty
+ * scores only when its consult asked the difficulty question; otherwise they
+ * too come from the gate.
  * @param detail - the decision detail.
  * @returns the thresholds and their sources.
  */
@@ -441,10 +475,13 @@ export function decisionThresholds(detail: ModelRoutingDecisionDetail): Decision
       escalateBackScoreThreshold: detail.gate.escalateBackScoreThreshold,
     }
   if (recorded === undefined) {
+    const now = gateFor(detail.gate, detail.decision.engineId)
     return {
       source: 'now',
-      downgradeThreshold: detail.gate.downgradeThreshold,
-      downgradeMargin: detail.gate.downgradeMargin,
+      origin: now.origin,
+      ...now.calibratedBy === undefined ? {} : { calibratedBy: now.calibratedBy },
+      downgradeThreshold: now.downgradeThreshold,
+      downgradeMargin: now.downgradeMargin,
       ...difficulty,
     }
   }
@@ -465,11 +502,12 @@ export function decisionThresholds(detail: ModelRoutingDecisionDetail): Decision
  * @returns the source pill text.
  */
 export function thresholdSourceLabel(thresholds: DecisionThresholds, t: RoutingTranslate): string {
-  if (thresholds.source === 'now') return t('drill.source.now')
+  if (thresholds.source === 'now' && thresholds.origin === 'global') return t('drill.source.now')
   const origin = t(thresholds.origin === 'operating-point' ? 'drill.source.origin.point' : 'drill.source.origin.global')
+  const when = t(thresholds.source === 'now' ? 'drill.source.when.now' : 'drill.source.when.recorded')
   return thresholds.calibratedBy === undefined
-    ? t('drill.source.recordedUncalibrated', { origin })
-    : t('drill.source.recorded', { origin, calibratedBy: thresholds.calibratedBy })
+    ? t('drill.source.uncalibrated', { when, origin })
+    : t('drill.source.calibrated', { when, origin, calibratedBy: thresholds.calibratedBy })
 }
 
 /**

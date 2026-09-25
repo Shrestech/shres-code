@@ -15,6 +15,7 @@ export const BUCKETS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10
 export const GATE: ModelRoutingGateView = {
   downgradeThreshold: 0.8,
   downgradeMargin: 0.1,
+  operatingPoints: [],
   judgmentDeadlineMs: 1500,
   entryScoreCeiling: 2,
   escalateBackScoreThreshold: 3,

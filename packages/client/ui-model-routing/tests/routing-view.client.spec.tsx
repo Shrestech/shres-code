@@ -354,7 +354,7 @@ describe('RoutingView decisions and drill-down', () => {
     setup({ loadDecision: () => Promise.resolve(warmUp) })
     fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 22.1' }))
     const drawer = await screen.findByRole('dialog')
-    await within(drawer).findByText('UNAVAILABLE · the judge was not installed, so it was not called')
+    await within(drawer).findByText('UNAVAILABLE · judge warming up (not installed), not called and not counted as a failure')
     expect(within(drawer).getByText('4000 characters')).toBeTruthy()
     expect(within(drawer).queryByText(en['drill.state.offered'])).toBeNull()
   })
@@ -507,6 +507,12 @@ describe('RoutingView judge facts', () => {
     expect(screen.getByText('The judge, Laya (local, MLX), is Not installed (run /laya install); steps keep the strong model until it is ready.')).toBeTruthy()
   })
 
+  it('draws the threshold line at the current judge\'s operating point, naming its calibration', async () => {
+    const points = { ...GATE, operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.6, downgradeMargin: 0.2, calibratedBy: 'prereg-1', acceptVerbalized: false }] }
+    setup({ loadGate: () => Promise.resolve(points) })
+    expect((await screen.findAllByText('threshold now 0.60 (calibrated by prereg-1)')).length).toBeGreaterThan(0)
+  })
+
   it('reports an engine refused as uncalibrated, and notes on the confidence and latency graphs', async () => {
     const recent = activeStats().recent
     const stats = {
@@ -522,9 +528,11 @@ describe('RoutingView judge facts', () => {
     expect(screen.getByText(en['g6.judgeOnly'])).toBeTruthy()
   })
 
-  it('shows the no-engine state when routing is on and no judge is composed', () => {
+  it('shows the no-engine state when routing is on and no judge is composed', async () => {
     setup({ engine: { kind: 'no-dispatcher' } })
     expect(screen.getByText(en['state.noEngine'])).toBeTruthy()
+    // Without a judge the global floors are the gate now.
+    await gateLoaded()
   })
 
   it('counts off-machine characters only for remote judges', async () => {

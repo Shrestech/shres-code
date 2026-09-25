@@ -23,7 +23,7 @@ import {
 } from './charts.tsx'
 import { DecisionDrawer } from './DecisionDrawer.tsx'
 import {
-  egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, judgeSegment, judgeTrouble, routingKpis, routingVerdict,
+  egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, judgeSegment, judgeTrouble, routingKpis, routingVerdict,
   routingViewState, strongRoute,
 } from './derive.ts'
 import { RecentDecisions } from './RecentDecisions.tsx'
@@ -122,8 +122,11 @@ export function RoutingView({
     return <div className={css.view}><p className={css.muted}>{t('view.unavailable')}</p></div>
   }
 
-  const gate = gateLoad.kind === 'loaded' ? gateLoad.gate : null
   const judge = routingJudge(engineState)
+  // The floors the current judge is gated by now: its operating point, else the global defaults.
+  const gate = gateLoad.kind === 'loaded'
+    ? gateFor(gateLoad.gate, judge.kind === 'engine' ? String(judge.engine.id) : undefined)
+    : null
   const state = routingViewState(stats, routing.active, judge)
   const verdict = routingVerdict(stats, gate, routing.active, t)
   const kpis = routingKpis(stats, gate, engineEgress(engineState), t)

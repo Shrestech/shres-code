@@ -97,7 +97,7 @@ function DecisionBody({ detail, showState, onShowState, t }: {
   const { decision, gate } = detail
   const thresholds = decisionThresholds(detail)
   const thresholdLabel = (value: number): string => thresholdValueLabel(thresholds, value, t)
-  const path = gatePath(decision.reason)
+  const path = gatePath(decision.reason, decision.candidateEligibility !== undefined)
   const first = path.find(check => check.first)
   const options = routeOptions(decision)
   const question = routeQuestion(decision)

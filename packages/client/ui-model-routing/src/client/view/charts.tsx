@@ -9,9 +9,9 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import type {
-  ModelRoutingGateView, ModelRoutingStatsModel, ModelRoutingStatsSnapshot,
+  ModelRoutingStatsModel, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
-import { latencyScopeNote, recordedThresholdsNote, type RoutingTranslate } from './derive.ts'
+import { latencyScopeNote, recordedThresholdsNote, type EngineGate, type RoutingTranslate } from './derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from './format.ts'
 import css from './charts.module.css'
 
@@ -168,8 +168,8 @@ function Mark({ label, onDetail, onActivate, children }: MarkProps) {
 interface GraphProps {
   /** The session's statistics. */
   stats: ModelRoutingStatsSnapshot
-  /** The configured gate, or null while it loads. */
-  gate: ModelRoutingGateView | null
+  /** The gate the current judge is gated by now, or null while it loads. */
+  gate: EngineGate | null
   /** The view's translate. */
   t: RoutingTranslate
 }
@@ -248,7 +248,7 @@ export function ModelTimeline({ stats, gate, t, onStep, onDecision }: GraphProps
                   y1={confidenceY(threshold)}
                   y2={confidenceY(threshold)}
                 />
-                <text className={css.thresholdText} x={TIMELINE_WIDTH - 8} y={confidenceY(threshold) - 3} textAnchor="end">{t('chart.threshold', { value: formatScore(threshold) })}</text>
+                <text className={css.thresholdText} x={TIMELINE_WIDTH - 8} y={confidenceY(threshold) - 3} textAnchor="end">{thresholdLabel(gate, threshold, t)}</text>
               </>
             )}
             {decisions.flatMap(entry => (entry.best === null ? [] : [{ ...entry, best: entry.best }])).map((entry) => {
@@ -332,7 +332,7 @@ export function ConfidenceChart({ stats, gate, t }: GraphProps) {
                 <rect className={css.switchZone} x={x(threshold)} y={10} width={x(1) - x(threshold)} height={90} />
                 <text className={css.thresholdText} x={x(threshold) + 4} y={20}>{t('g2.zone')}</text>
                 <line className={css.thresholdLine} x1={x(threshold)} x2={x(threshold)} y1={8} y2={100} />
-                <text className={css.thresholdText} x={x(threshold)} y={8} textAnchor="end">{t('chart.threshold', { value: formatScore(threshold) })}</text>
+                <text className={css.thresholdText} x={x(threshold)} y={8} textAnchor="end">{thresholdLabel(gate, threshold, t)}</text>
               </>
             )}
             <line className={css.gridLine} x1={x(0)} x2={x(1)} y1={100} y2={100} />
@@ -668,4 +668,17 @@ export function StreakExits({ stats, t }: GraphProps) {
       )}
     </section>
   )
+}
+
+/**
+ * The threshold line's label: the floor now, and whether a preregistration calibrated it.
+ * @param gate - the gate the line is drawn from.
+ * @param threshold - the floor.
+ * @param t - the view's translate.
+ * @returns the label.
+ */
+function thresholdLabel(gate: EngineGate | null, threshold: number, t: RoutingTranslate): string {
+  return gate?.calibratedBy === undefined
+    ? t('chart.threshold', { value: formatScore(threshold) })
+    : t('chart.threshold.calibrated', { value: formatScore(threshold), calibratedBy: gate.calibratedBy })
 }
