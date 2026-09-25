@@ -1219,7 +1219,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /**
    * Provide or return the session-local model selection the agent's
-   * model-selection hook applies, which prompt assembly snapshots. A selection
+   * model-selection hook applies, which prompt assembly snapshots. With
+   * `agentDefaultModel` composed the proxy delegates to it, first withdrawing a
+   * selection it provided itself before that service was mounted. A selection
    * this proxy provides is withdrawn when its fiber is disposed.
    *
    * Explicit selections are durable even when no subsequent request runs.
@@ -1229,7 +1231,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
     const owned = ctx.get('agentDefaultModel')
-    if (owned !== undefined) return owned.selectionFor(agent)
+    if (owned !== undefined) {
+      // agent-default-model mounted after this proxy provided a selection:
+      // withdraw ours so it becomes the agent's one provider.
+      selectionReleases.get(agent)?.()
+      return owned.selectionFor(agent)
+    }
     const installed = selections.get(agent)
     if (installed !== undefined) return installed
     const selection: WebModelSelectionRef = {
@@ -1251,6 +1258,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const release = ctx.effect(() => withdraw, 'apiProxy.selectionFor()')
     selectionReleases.set(agent, () => {
       selectionReleases.delete(agent)
+      selections.delete(agent)
       // The withdrawal is synchronous; the disposer's promise settles with it.
       void release()
     })

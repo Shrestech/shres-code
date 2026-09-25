@@ -161,6 +161,44 @@ describe('the Host API model selection', () => {
     await ctx.fiber.dispose()
   })
 
+  it('hands its selections to agentDefaultModel when that service is mounted after sessions exist', async () => {
+    const ctx = await composed()
+    // The model catalog `sessions.models` reads; it lists no providers.
+    ctx.provide('llm', { listProviders: () => [] } as never)
+    const routing = ctx.get('modelRouting') as unknown as RoutingDouble
+    // The proxy's own default differs from the request's resolved route, so a
+    // consult shows whether the proxy's selection is the one applied.
+    const proxy = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'proxy-provider', model: 'proxy-model' }), cwd: '/tmp' })
+    const created = await proxy.sessions.create(request({ sessionId: 'session-before-default' as SessionId }))
+    expect(created.result.ok).toBe(true)
+    const agent = ctx.agents.get('session-before-default' as SessionId)
+    if (agent === undefined) throw new Error('the session has no agent')
+    await requestFor(agent)
+    expect(routing.bases.at(-1)?.base).toEqual({ provider: 'proxy-provider', model: 'proxy-model' })
+
+    // agent-default-model is hot-mounted: the proxy now delegates, withdrawing
+    // its own selection first, so agentDefaultModel is the one provider.
+    const mounted = await ctx.plugin(AgentDefaultModel, { provider: 'mounted-provider', model: 'mounted-model' })
+    const models = await proxy.sessions.models(request({ sessionId: agent.id }))
+    expect(models.result).toMatchObject({ ok: true, value: { current: { provider: 'mounted-provider', model: 'mounted-model' } } })
+    expect(ctx.agentDefaultModel.selectionFor(agent)).toBe(ctx.agentDefaultModel.selectionFor(agent))
+    expect(() => { provideModelSelection(agent, { current: undefined, assembled: undefined }) })
+      .toThrow(`agent "${agent.id}" already has a model selection provider`)
+    const before = routing.bases.length
+    await requestFor(agent)
+    expect(routing.bases).toHaveLength(before + 1)
+    expect(routing.bases.at(-1)?.base).toEqual({ provider: 'mounted-provider', model: 'mounted-model' })
+
+    // It is unmounted again: its withdrawal empties the slot, and the proxy provides its own.
+    await mounted.dispose()
+    const back = await proxy.sessions.models(request({ sessionId: agent.id }))
+    expect(back.result).toMatchObject({ ok: true, value: { current: { provider: 'proxy-provider', model: 'proxy-model' } } })
+    await requestFor(agent)
+    expect(routing.bases).toHaveLength(before + 2)
+    expect(routing.bases.at(-1)?.base).toEqual({ provider: 'proxy-provider', model: 'proxy-model' })
+    await ctx.fiber.dispose()
+  })
+
   it('gives a Web session exactly one selection provider when the Host API delegates to agentDefaultModel', async () => {
     const ctx = await composed({ defaultModel: true })
     const created = await api(ctx).sessions.create(request({ sessionId: 'session-default' as SessionId }))
