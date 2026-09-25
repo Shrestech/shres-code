@@ -11,7 +11,7 @@ import clsx from 'clsx'
 import type {
   ModelRoutingStatsModel, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
-import { latencyScopeNote, recordedThresholdsNote, type EngineGate, type RoutingTranslate } from './derive.ts'
+import { latencyNote, recordedThresholdsNote, type EngineGate, type RoutingTranslate } from './derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from './format.ts'
 import css from './charts.module.css'
 
@@ -589,7 +589,7 @@ export function LatencyChart({ stats, gate, t }: GraphProps) {
     failed,
   })
   return (
-    <ChartCard title={t('g6.title')} subtitle={t('g6.subtitle')} table={table} detail={detail} note={latencyScopeNote(stats, t)} t={t}>
+    <ChartCard title={t('g6.title')} subtitle={t('g6.subtitle')} table={table} detail={detail} note={latencyNote(stats, t)} t={t}>
       {answered + failed === 0
         ? <p className={css.empty}>{t('g6.empty')}</p>
         : (

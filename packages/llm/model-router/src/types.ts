@@ -709,12 +709,12 @@ export interface ModelRoutingStatsSnapshot {
     total: number
   }
   /**
-   * Latency the judge added per ask: the call's duration, plus the candidate
-   * eligibility assessment when the decision recorded its duration. Answered
-   * asks count, and failed asks whose decision recorded a duration. Bucket
-   * `i` counts latencies at most `bucketsMs[i]` and above the previous
-   * bound; the last bound is 30 s. Percentiles are read from the histogram,
-   * within one bucket.
+   * Judge-call latency per ask (`latencyMs`), the duration
+   * `judgmentDeadlineMs` bounds. Answered asks count, and failed asks whose
+   * decision recorded a duration; a refusal before any request does not.
+   * Bucket `i` counts latencies at most `bucketsMs[i]` and above the
+   * previous bound; the last bound is 30 s. Percentiles are read from the
+   * histogram, within one bucket.
    */
   latency: {
     bucketsMs: number[]
@@ -725,8 +725,27 @@ export interface ModelRoutingStatsSnapshot {
     p95: number | null
     /** Whether a failed ask's latency is in the histogram. */
     includesFailed: boolean
-    /** Asks in the histogram whose latency includes the eligibility assessment. */
-    withEligibility: number
+  }
+  /**
+   * Candidate eligibility assessment before a consult (`eligibilityMs`), in
+   * the `latency.bucketsMs` buckets, over every decision that recorded it.
+   */
+  eligibility: {
+    counts: number[]
+    p50: number | null
+    p95: number | null
+  }
+  /**
+   * Time decisions added before their steps could start: each decision's
+   * judge-call and eligibility durations as recorded, summed, and averaged over
+   * the turns with decisions.
+   */
+  criticalPath: {
+    totalMs: number
+    /** `totalMs` over `counts.turnsWithDecisions`, or null without decisions. */
+    perTurnMs: number | null
+    /** Decisions with a timed judge call and no recorded eligibility duration, whose share excludes it. */
+    judgeOnly: number
   }
   /**
    * Token usage the judge reported for its own model calls (`judgeUsage`):
@@ -770,7 +789,9 @@ export interface ModelRoutingStatsSnapshot {
    * answering provider reported. `chars` is exact when every ask recorded its
    * input size (`inputChars`, or the exact judgment input); otherwise it sums
    * the upper bound `stateProjection.maxChars` for the rest, and `bound` is
-   * `at-most`. A warm-up sent nothing and is not counted.
+   * `at-most`. An ask that failed or whose fit was rejected is also `at-most`,
+   * since it cannot show whether the request left. A warm-up and an engine the
+   * dispatcher reports unconfigured send nothing and are not counted.
    */
   egress: { engine: string; asks: number; chars: number; bound: 'exact' | 'at-most' }[]
   /**

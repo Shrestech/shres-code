@@ -611,7 +611,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         apply: applyStatsEvent,
         view: viewStats,
         // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency.
-        stateVersion: 2,
+        stateVersion: 3,
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)

@@ -11,7 +11,7 @@ import { en } from '../src/client/locales.ts'
 import {
   decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeNotUsed, judgeRefused,
   judgeSegment, judgeTrouble,
-  latencyScopeNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
+  latencyNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
 } from '../src/client/view/derive.ts'
@@ -101,7 +101,7 @@ describe('routingKpis', () => {
       ['pool-steps', '0.0%', '0 of 93 steps · 0 streaks'],
       ['kept-strong', '22', 'top: current-preferred (15)'],
       ['route-failed', '0', 'recovered in-turn on the strong model'],
-      ['latency', '1000', 'P95 1 s · judge call only · deadline 1.5 s'],
+      ['latency', '1000', 'P95 1 s · deadline 1.5 s · 1 s per turn'],
       ['moved', '0', '0 moved − 0 return re-prefill · quota'],
       ['switch-cost', '235k', 'cold prefills after model changes (routed + manual)'],
       ['egress', '≤ 264k', '22 asks to a remote engine · at most'],
@@ -115,7 +115,7 @@ describe('routingKpis', () => {
     expect(tiles.find(tile => tile.id === 'switch-cost')?.value).toBe('200k')
     expect(tiles.find(tile => tile.id === 'moved')).toMatchObject({ value: '0', detail: '10 moved − 20 return re-prefill · no objective' })
     expect(tiles.find(tile => tile.id === 'egress')).toMatchObject({ value: '120k', detail: '40 asks to a remote engine' })
-    expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 50 ms')
+    expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 50 ms · 40 ms per turn with the assessment')
   })
 
   it('reports unknown egress before the registry reports it, and local-only egress after', () => {
@@ -290,11 +290,10 @@ describe('recorded facts in the statistics', () => {
       ...liveStats(),
       counts: { ...liveStats().counts, warmUps: 3 },
       judge: { calls: 22, promptTokens: 40_000, outputTokens: 2_000 },
-      latency: { ...liveStats().latency, withEligibility: 22 },
     }
     const tiles = routingKpis(stats, GATE, () => 'remote', t)
     expect(tiles.find(tile => tile.id === 'decisions')?.detail).toBe('22 judged · 0 failed · 3 judge warming up')
-    expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 1 s · deadline 1.5 s · 42k judge tokens')
+    expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 1 s · deadline 1.5 s · 1 s per turn · 42k judge tokens')
   })
 
   it('notes consults recorded at other floors than the threshold line draws', () => {
@@ -310,13 +309,15 @@ describe('recorded facts in the statistics', () => {
     )
   })
 
-  it('says what a latency covers', () => {
-    expect(latencyScopeNote(emptyStats(), t)).toBeUndefined()
-    expect(latencyScopeNote(liveStats(), t)).toBe('The judgment call only: this log does not record the eligibility assessment before it.')
-    const all = { ...liveStats(), latency: { ...liveStats().latency, withEligibility: 22 } }
-    expect(latencyScopeNote(all, t)).toBeUndefined()
-    const some = { ...liveStats(), latency: { ...liveStats().latency, withEligibility: 5 } }
-    expect(latencyScopeNote(some, t)).toBe('Includes the eligibility assessment on 5 of 22 asks; the rest are the judgment call only.')
+  it('states the eligibility assessment and the time per turn apart from the judge call', () => {
+    expect(latencyNote(emptyStats(), t)).toBeUndefined()
+    expect(latencyNote(liveStats(), t)).toBe(
+      'This log records no eligibility assessment time. Decisions added 1 s per turn before their steps could start.'
+      + ' 22 decisions recorded no assessment time, so that figure counts only their judge call.',
+    )
+    expect(latencyNote(activeStats(), t)).toBe(
+      'The eligibility assessment before each consult took P50 10 ms, P95 10 ms. Decisions added 40 ms per turn before their steps could start.',
+    )
   })
 
   it('reports an engine refused as uncalibrated only while routing is on', () => {

@@ -37,8 +37,10 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
     streakLengths: { median: null, max: null },
     confidence: { values: [], margins: [], max: null, total: 0 },
     latency: {
-      bucketsMs: BUCKETS, counts: BUCKETS.map(() => 0), failed: 0, p50: null, p95: null, includesFailed: false, withEligibility: 0,
+      bucketsMs: BUCKETS, counts: BUCKETS.map(() => 0), failed: 0, p50: null, p95: null, includesFailed: false,
     },
+    eligibility: { counts: BUCKETS.map(() => 0), p50: null, p95: null },
+    criticalPath: { totalMs: 0, perTurnMs: null, judgeOnly: 0 },
     judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
     thresholds: [],
     models: [],
@@ -98,7 +100,9 @@ export function liveStats(): ModelRoutingStatsSnapshot {
       max: 0.39,
       total: 21,
     },
-    latency: { bucketsMs: BUCKETS, counts, failed: 0, p50: 1000, p95: 1000, includesFailed: false, withEligibility: 0 },
+    latency: { bucketsMs: BUCKETS, counts, failed: 0, p50: 1000, p95: 1000, includesFailed: false },
+    eligibility: { counts: BUCKETS.map(() => 0), p50: null, p95: null },
+    criticalPath: { totalMs: 22_000, perTurnMs: 1_000, judgeOnly: 22 },
     judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
     thresholds: [],
     models: [
@@ -154,7 +158,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     exits: [{ brokenBy: 'gate-failed', count: 4 }, { brokenBy: 'hold-cap', count: 2 }],
     streakLengths: { median: 5, max: 12 },
     confidence: { values: [0.85, 0.85, 0.9, 0.2], margins: [0.3, 0.3, 0.4, 0.05], max: 0.9, total: 40 },
-    latency: { bucketsMs: BUCKETS, counts, failed: 20, p50: 20, p95: 50, includesFailed: true, withEligibility: 40 },
+    latency: { bucketsMs: BUCKETS, counts, failed: 20, p50: 20, p95: 50, includesFailed: true },
+    eligibility: { counts: BUCKETS.map(bound => bound === 10 ? 40 : 0), p50: 10, p95: 10 },
+    criticalPath: { totalMs: 1_600, perTurnMs: 40, judgeOnly: 0 },
     judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
     thresholds: [],
     models: [

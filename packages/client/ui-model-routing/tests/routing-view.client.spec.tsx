@@ -139,7 +139,7 @@ describe('RoutingView availability and states', () => {
     expect(screen.getByText('Routing kept the strong model on all 22 decisions.')).toBeTruthy()
     expect(screen.getByText(/Routing is Off for this session now/)).toBeTruthy()
     const tile = document.querySelector('[data-kpi="latency"]')!
-    expect(tile.textContent).toBe('Judge latency1000 ms P50P95 1 s · judge call only · deadline 1.5 s')
+    expect(tile.textContent).toBe('Judge latency1000 ms P50P95 1 s · deadline 1.5 s · 1 s per turn')
   })
 
   it('reports a gate that failed to load and retries it', async () => {
@@ -562,14 +562,13 @@ describe('RoutingView judge facts', () => {
       ...activeStats(),
       recent: [{ ...recent[0]!, reason: 'engine-uncalibrated' }, ...recent.slice(1)],
       thresholds: [{ downgradeThreshold: 0.7, downgradeMargin: 0.1, source: 'operating-point' as const, calibratedBy: null, consults: 4 }],
-      latency: { ...activeStats().latency, withEligibility: 0 },
     }
     // A judge the router asks, so the recorded refusal is what the notice reports.
     setup({ stats, routing: ON, engine: { kind: 'ready', snapshot: engines('typesafe') } })
     // The note compares with the gate, so it appears once the gate has loaded.
     await screen.findByText('The line is the threshold now. 4 consults recorded other thresholds at the time: confidence ≥ 0.70, margin ≥ 0.10.')
     expect(screen.getByText(en['state.engineUncalibrated'])).toBeTruthy()
-    expect(screen.getByText(en['g6.judgeOnly'])).toBeTruthy()
+    expect(screen.getByText(/Decisions added 40 ms per turn before their steps could start/)).toBeTruthy()
   })
 
   it('shows the no-engine state when routing is on and no judge is composed', async () => {

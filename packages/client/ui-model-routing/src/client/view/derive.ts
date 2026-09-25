@@ -157,8 +157,12 @@ export function routingKpis(
     .reduce((sum, row) => sum + row.tokens, 0)
   const latencyDetail = [
     latency.p95 === null ? undefined : t('kpi.latency.p95', { p95: formatMs(latency.p95) }),
-    latency.p50 === null || latency.withEligibility > 0 ? undefined : t('kpi.latency.judgeOnly'),
     gate === null ? undefined : t('kpi.latency.deadline', { deadline: formatMs(gate.judgmentDeadlineMs) }),
+    stats.criticalPath.perTurnMs === null
+      ? undefined
+      : t(stats.criticalPath.judgeOnly === 0 ? 'kpi.latency.perTurn' : 'kpi.latency.perTurn.partial', {
+        value: formatMs(Math.round(stats.criticalPath.perTurnMs)),
+      }),
     stats.judge.calls === 0 ? undefined : t('kpi.latency.tokens', { tokens: formatTokens(stats.judge.promptTokens + stats.judge.outputTokens) }),
   ].filter((part): part is string => part !== undefined)
   return [
@@ -670,16 +674,22 @@ export function recordedThresholdsNote(
 }
 
 /**
- * The G6 note on what an ask's latency covers: the judgment call alone when
- * no decision recorded its eligibility assessment, or which asks include it.
+ * The G6 note on the time around the judge call the histogram leaves out:
+ * the candidate eligibility assessment before it, and the time decisions
+ * added per turn, noting decisions that recorded no assessment time.
  * @param stats - the session's statistics.
  * @param t - the view's translate.
- * @returns the note, or undefined when every ask includes the assessment or none is timed.
+ * @returns the note, or undefined before any decision recorded a duration.
  */
-export function latencyScopeNote(stats: ModelRoutingStatsSnapshot, t: RoutingTranslate): string | undefined {
-  const timed = stats.latency.counts.reduce((sum, count) => sum + count, 0)
-  if (timed === 0 || stats.latency.withEligibility === timed) return undefined
-  return stats.latency.withEligibility === 0
-    ? t('g6.judgeOnly')
-    : t('g6.eligibilityPartial', { with: stats.latency.withEligibility, total: timed })
+export function latencyNote(stats: ModelRoutingStatsSnapshot, t: RoutingTranslate): string | undefined {
+  const { eligibility, criticalPath } = stats
+  if (criticalPath.totalMs === 0 || criticalPath.perTurnMs === null) return undefined
+  const parts = [
+    eligibility.p50 === null || eligibility.p95 === null
+      ? t('g6.eligibility.none')
+      : t('g6.eligibility', { p50: formatMs(eligibility.p50), p95: formatMs(eligibility.p95) }),
+    t('g6.perTurn', { value: formatMs(Math.round(criticalPath.perTurnMs)) }),
+    criticalPath.judgeOnly === 0 ? undefined : t('g6.perTurn.judgeOnly', { count: criticalPath.judgeOnly }),
+  ].filter((part): part is string => part !== undefined)
+  return parts.join(' ')
 }

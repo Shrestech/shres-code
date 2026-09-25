@@ -214,11 +214,16 @@ export interface ModelRoutingStatsState {
   /** Steps the open streak has counted, and the last step it counted. */
   openStreak: { steps: number; lastStep: string | null } | null
   confidence: { values: number[]; margins: number[]; max: number | null }
+  /** Judge-call latency counts in {@link LATENCY_BUCKETS_MS}. */
   latency: number[]
   /** Whether a failed ask's latency is in {@link latency}. */
   latencyIncludesFailed: boolean
-  /** Asks in {@link latency} whose latency includes the eligibility assessment. */
-  latencyWithEligibility: number
+  /** Candidate eligibility assessment durations in {@link LATENCY_BUCKETS_MS}. */
+  eligibility: number[]
+  /** Judge-call and eligibility time recorded on every decision, in milliseconds. */
+  criticalPathMs: number
+  /** Decisions whose judge call was timed and whose eligibility time was not recorded. */
+  criticalPathJudgeOnly: number
   judge: ModelRoutingStatsSnapshot['judge']
   thresholds: ModelRoutingStatsSnapshot['thresholds']
   /** Served models in first-appearance order. */
@@ -282,7 +287,9 @@ export function createStatsState(): ModelRoutingStatsState {
     confidence: { values: [], margins: [], max: null },
     latency: LATENCY_BUCKETS_MS.map(() => 0),
     latencyIncludesFailed: false,
-    latencyWithEligibility: 0,
+    eligibility: LATENCY_BUCKETS_MS.map(() => 0),
+    criticalPathMs: 0,
+    criticalPathJudgeOnly: 0,
     judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
     thresholds: [],
     models: [],
@@ -369,9 +376,8 @@ function applyDecision(
   const engineName = data.engineId ?? data.engine
   const warmUp = data.engineFailure?.engineState !== undefined
   const failed = judgeFailed(data)
-  // A recorded input size means the state was handed to an engine, including
-  // a call whose answer was then discarded because the answering engine was refused.
-  const asked = !warmUp && (route !== undefined || failed || data.inputChars !== undefined)
+  const sent = sentState(data, failed)
+  const asked = sent !== 'none'
   const answeredBy = route === undefined ? undefined : engineName
   const engines = answeredBy === undefined ? state.engines : countEngine(state.engines, answeredBy)
   const engineIndex = answeredBy === undefined ? null : engines.findIndex(engine => engine.name === answeredBy)
@@ -405,9 +411,11 @@ function applyDecision(
       : state.streakLengths,
     openStreak: entry ? { steps: 0, lastStep: null } : exit ? null : state.openStreak,
     confidence: route === undefined ? state.confidence : addConsult(state.confidence, route),
-    latency: timed ? addLatency(state.latency, latencyMs + (data.eligibilityMs ?? 0)) : state.latency,
+    latency: timed ? addLatency(state.latency, latencyMs) : state.latency,
     latencyIncludesFailed: state.latencyIncludesFailed || (timed && route === undefined),
-    latencyWithEligibility: state.latencyWithEligibility + (timed && data.eligibilityMs !== undefined ? 1 : 0),
+    eligibility: data.eligibilityMs === undefined ? state.eligibility : addLatency(state.eligibility, data.eligibilityMs),
+    criticalPathMs: state.criticalPathMs + (latencyMs ?? 0) + (data.eligibilityMs ?? 0),
+    criticalPathJudgeOnly: state.criticalPathJudgeOnly + (latencyMs !== undefined && data.eligibilityMs === undefined ? 1 : 0),
     judge: data.judgeUsage === undefined ? state.judge : {
       calls: state.judge.calls + 1,
       promptTokens: state.judge.promptTokens + promptTokens(data.judgeUsage),
@@ -438,7 +446,7 @@ function applyDecision(
       latest: data.objective,
       mixed: state.objective !== null && (state.objective.mixed || state.objective.latest !== data.objective),
     },
-    egress: !asked || engineName === undefined ? state.egress : countEgress(state.egress, engineName, data),
+    egress: !asked || engineName === undefined ? state.egress : countEgress(state.egress, engineName, data, sent),
     engines,
     marks: mark === undefined ? state.marks : retain([...state.marks, { i: index, kind: mark }], RETAINED_TIMELINE_EVENTS),
     decisions: retain([...state.decisions, {
@@ -714,6 +722,24 @@ function judgeFailed(data: ModelRoutingDecision): boolean {
   return data.engineFailure !== undefined || data.reason === 'engine-unavailable' || data.reason === 'invalid-answer'
 }
 
+/**
+ * How much of the recorded state a decision's judge call sent. An answer
+ * proves the state left, including one the router then discarded because it
+ * refused the answering engine. A warm-up and an engine the dispatcher
+ * reports unconfigured refuse before any request, so they send nothing.
+ * Another failure or a rejected fit cannot show whether the request left,
+ * so its characters are an upper bound.
+ * @param data - the decision.
+ * @param failed - whether it records a failed judgment.
+ * @returns `exact`, `at-most`, or `none`.
+ */
+function sentState(data: ModelRoutingDecision, failed: boolean): 'exact' | 'at-most' | 'none' {
+  if (data.engineFailure?.engineState !== undefined || data.engineFailure?.code === 'UNCONFIGURED') return 'none'
+  if (data.route !== undefined) return 'exact'
+  if (data.reason === 'engine-uncalibrated' && data.inputChars !== undefined) return 'exact'
+  return failed || data.inputChars !== undefined ? 'at-most' : 'none'
+}
+
 /** Count one consult under the thresholds it recorded, keeping first-appearance order. */
 function countThresholds(
   thresholds: ModelRoutingStatsSnapshot['thresholds'],
@@ -744,14 +770,16 @@ function countEngine(engines: ModelRoutingStatsState['engines'], name: string): 
 /**
  * Count one judge ask and its state characters: the recorded input size, else
  * the recorded judgment input's length, else the projection's character budget
- * as an upper bound.
+ * as an upper bound. The count is exact only for an ask whose state is known
+ * to have left and whose size was recorded.
  */
 function countEgress(
   egress: ModelRoutingStatsState['egress'],
   engine: string,
   data: ModelRoutingDecision,
+  sent: 'exact' | 'at-most',
 ): ModelRoutingStatsState['egress'] {
-  const exact = data.inputChars !== undefined || data.judgmentInput !== undefined
+  const exact = sent === 'exact' && (data.inputChars !== undefined || data.judgmentInput !== undefined)
   const chars = data.inputChars ?? data.judgmentInput?.state.length ?? data.stateProjection?.maxChars ?? 0
   const known = egress.find(entry => entry.engine === engine)
   if (known === undefined) return [...egress, { engine, asks: 1, chars, exact }]
@@ -791,6 +819,7 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
   const calls = state.models.reduce((sum, model) => sum + model.calls, 0)
   const reportedCalls = state.models.reduce((sum, model) => sum + model.reportedCalls, 0)
   const timed = state.latency.reduce((sum, count) => sum + count, 0)
+  const assessed = state.eligibility.reduce((sum, count) => sum + count, 0)
   return {
     counts: { ...state.counts },
     reasons: ranked(state.reasons).map(({ key, count }) => ({
@@ -818,7 +847,16 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
       p50: timed === 0 ? null : percentile(state.latency, timed, 0.5),
       p95: timed === 0 ? null : percentile(state.latency, timed, 0.95),
       includesFailed: state.latencyIncludesFailed,
-      withEligibility: state.latencyWithEligibility,
+    },
+    eligibility: {
+      counts: [...state.eligibility],
+      p50: assessed === 0 ? null : percentile(state.eligibility, assessed, 0.5),
+      p95: assessed === 0 ? null : percentile(state.eligibility, assessed, 0.95),
+    },
+    criticalPath: {
+      totalMs: state.criticalPathMs,
+      perTurnMs: state.counts.turnsWithDecisions === 0 ? null : state.criticalPathMs / state.counts.turnsWithDecisions,
+      judgeOnly: state.criticalPathJudgeOnly,
     },
     judge: { ...state.judge },
     thresholds: state.thresholds.map(entry => ({ ...entry })),
@@ -1037,7 +1075,16 @@ export const modelRoutingStatsSchema = zod.object({
     p50: nullableNumber,
     p95: nullableNumber,
     includesFailed: zod.boolean(),
-    withEligibility: zod.number(),
+  }),
+  eligibility: zod.object({
+    counts: zod.array(zod.number()),
+    p50: nullableNumber,
+    p95: nullableNumber,
+  }),
+  criticalPath: zod.object({
+    totalMs: zod.number(),
+    perTurnMs: nullableNumber,
+    judgeOnly: zod.number(),
   }),
   judge: zod.object({ calls: zod.number(), promptTokens: zod.number(), outputTokens: zod.number() }),
   thresholds: zod.array(zod.object({

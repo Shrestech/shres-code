@@ -662,8 +662,9 @@ describe('decisions recording judgment-call facts', () => {
     const stats = fold(log)
 
     expect(stats.engines).toEqual([{ name: 'typesafe', decisions: 1 }, { name: 'laya', decisions: 1 }])
+    // The failed ask cannot show whether its request left, so typesafe's total is an upper bound.
     expect(stats.egress).toEqual([
-      { engine: 'typesafe', asks: 2, chars: 5_000, bound: 'exact' },
+      { engine: 'typesafe', asks: 2, chars: 5_000, bound: 'at-most' },
       { engine: 'laya', asks: 1, chars: 12_000, bound: 'at-most' },
     ])
     expect(stats.recent.map(row => row.engine)).toEqual([null, 'laya', 'typesafe', 'typesafe'])
@@ -671,19 +672,50 @@ describe('decisions recording judgment-call facts', () => {
     // The failed ask's 90 ms lands in the histogram beside the answers.
     expect(stats.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(3)
     expect(stats.latency.includesFailed).toBe(true)
-    expect(stats.latency.withEligibility).toBe(0)
   })
 
-  it('adds the eligibility assessment to an ask\'s latency', () => {
+  it('counts nothing sent for an engine the dispatcher reports unconfigured', () => {
     const log = new Log()
     log.step(0, 1, 1)
-    log.decide(1, consult({ engine: 'laya', latencyMs: 30, eligibilityMs: 70 }))
+    // The review's probe: TypeSafe selected without a key.
+    log.decide(1, {
+      reason: 'engine-unavailable', engineFailure: { code: 'UNCONFIGURED' }, engineId: 'typesafe', inputChars: 12_000, latencyMs: 2,
+    })
+    const refused = fold(log)
+    expect(refused.egress).toEqual([])
+    expect(refused.counts.judgeFailed).toBe(1)
+    // A refusal before any request is not a judge call.
+    expect(refused.latency.counts.every(count => count === 0)).toBe(true)
+    expect(refused.criticalPath.totalMs).toBe(2)
+    log.decide(2, { reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' }, engineId: 'typesafe', inputChars: 12_000, latencyMs: 1_500 })
+    expect(fold(log).egress).toEqual([{ engine: 'typesafe', asks: 1, chars: 12_000, bound: 'at-most' }])
+  })
+
+  it('counts a rejected fit as an upper bound', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, { reason: 'judgment-input-too-large', engine: 'Laya', engineId: 'laya', inputChars: 30_000, latencyMs: 5 })
+    expect(fold(log).egress).toEqual([{ engine: 'laya', asks: 1, chars: 30_000, bound: 'at-most' }])
+  })
+
+  it('times the judge call alone and folds the eligibility assessment and the critical path apart', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    // The review's probe: a 1000 ms answer after an 800 ms assessment, against a 1500 ms deadline.
+    log.decide(1, consult({ engine: 'laya', latencyMs: 1_000, eligibilityMs: 800 }))
     log.decide(2, { reason: 'candidate-ineligible', eligibilityMs: 400 })
+    log.step(1, 2, 3)
+    log.decide(4, consult({ engine: 'laya', latencyMs: 30 }))
     const stats = fold(log)
-    const bucket = LATENCY_BUCKETS_MS.indexOf(100)
-    expect(stats.latency.counts[bucket]).toBe(1)
-    expect(stats.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(1)
-    expect(stats.latency).toMatchObject({ includesFailed: false, withEligibility: 1, p50: 100 })
+    expect(stats.latency.counts[LATENCY_BUCKETS_MS.indexOf(1_000)]).toBe(1)
+    expect(stats.latency.counts[LATENCY_BUCKETS_MS.indexOf(50)]).toBe(1)
+    expect(stats.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(2)
+    expect(stats.latency).toMatchObject({ includesFailed: false, p95: 1_000 })
+    expect(stats.eligibility.counts[LATENCY_BUCKETS_MS.indexOf(1_000)]).toBe(1)
+    expect(stats.eligibility.counts[LATENCY_BUCKETS_MS.indexOf(500)]).toBe(1)
+    expect(stats.eligibility).toMatchObject({ p50: 500, p95: 1_000 })
+    // Two turns with decisions share 2230 ms; the last decision recorded no assessment time.
+    expect(stats.criticalPath).toEqual({ totalMs: 2_230, perTurnMs: 1_115, judgeOnly: 1 })
   })
 
   it('sums the judge\'s reported usage', () => {
