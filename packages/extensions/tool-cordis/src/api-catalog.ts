@@ -4665,11 +4665,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingDecisionDetail',
-    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingLoggedDecision;\n    gate: ModelRoutingGateView;\n}',
-  },
-  {
-    name: 'ModelRoutingDecisionFacts',
-    declaration: 'export interface ModelRoutingDecisionFacts {\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    thresholds?: ModelRoutingRecordedThresholds;\n    engineFailure?: ModelRoutingEngineFailure & {\n        engineState?: \'starting\' | \'not-installed\';\n    };\n}',
+    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingDecision;\n    gate: ModelRoutingGateView;\n}',
   },
   {
     name: 'ModelRoutingDifficultyAnswer',
@@ -4689,7 +4685,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingGateView',
-    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
+    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    operatingPoints: ModelRoutingOperatingPoint[];\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
   },
   {
     name: 'ModelRoutingInactiveStickyView',
@@ -4702,10 +4698,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingInTurnFallback',
     declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
-  },
-  {
-    name: 'ModelRoutingLoggedDecision',
-    declaration: 'export type ModelRoutingLoggedDecision = ModelRoutingDecision & ModelRoutingDecisionFacts;',
   },
   {
     name: 'ModelRoutingObjective',
@@ -4722,10 +4714,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingReason',
     declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
-  },
-  {
-    name: 'ModelRoutingRecordedThresholds',
-    declaration: 'export interface ModelRoutingRecordedThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    entryScoreCeiling?: number;\n    escalateBackScoreThreshold?: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
   },
   {
     name: 'ModelRoutingRequest',

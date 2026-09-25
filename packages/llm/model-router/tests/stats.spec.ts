@@ -29,7 +29,6 @@ import type {
   ModelRoutingBreakReason,
   ModelRoutingCandidateEligibility,
   ModelRoutingDecision,
-  ModelRoutingLoggedDecision,
   ModelRoutingRouteAnswer,
   ModelRoutingSelection,
   ModelRoutingStatsSnapshot,
@@ -54,7 +53,7 @@ class Log {
     return this.add('step/start', { turn, step }, time)
   }
 
-  decide(time: number, fields: Partial<ModelRoutingLoggedDecision> = {}): SessionEvent {
+  decide(time: number, fields: Partial<ModelRoutingDecision> = {}): SessionEvent {
     return this.add('model-routing/decision', {
       outcome: 'kept-strong',
       reason: 'current-preferred',
@@ -648,7 +647,7 @@ describe('decisions recording judgment-call facts', () => {
   const usage = (inputTokens: number, outputTokens: number, cacheReadTokens?: number): TokenUsage => ({
     inputTokens, outputTokens, ...cacheReadTokens === undefined ? {} : { cacheReadTokens },
   })
-  const consult = (fields: Partial<ModelRoutingLoggedDecision>): Partial<ModelRoutingLoggedDecision> => ({
+  const consult = (fields: Partial<ModelRoutingDecision>): Partial<ModelRoutingDecision> => ({
     route: answer('keep-current', 0.9, { 'keep-current': 0.9, 'flash': 0.1 }),
     ...fields,
   })
@@ -739,11 +738,16 @@ describe('decisions recording judgment-call facts', () => {
   it('groups an engine refused as uncalibrated with the preconditions', () => {
     const log = new Log()
     log.step(0, 1, 1)
-    // A reason routers gating per engine record; this build's reason union does not list it.
-    log.decide(1, { reason: 'engine-uncalibrated' as ModelRoutingDecision['reason'], engineId: 'laya' })
+    log.decide(1, { reason: 'engine-uncalibrated', engineId: 'laya' })
     const stats = fold(log)
     expect(stats.reasons).toEqual([{ reason: 'engine-uncalibrated', group: 'fail-closed', count: 1 }])
     expect(stats.egress).toEqual([])
+    // An answering engine refused after its call: the state was sent and the call took time.
+    log.decide(2, { reason: 'engine-uncalibrated', engineId: 'laya', inputChars: 2_500, latencyMs: 40, engine: 'Laya' })
+    const answered = fold(log)
+    expect(answered.egress).toEqual([{ engine: 'laya', asks: 1, chars: 2_500, bound: 'exact' }])
+    expect(answered.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(1)
+    expect(answered.engines).toEqual([])
     expect(modelRoutingStatsSchema.safeParse(stats).success).toBe(true)
   })
 })

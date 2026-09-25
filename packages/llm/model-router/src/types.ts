@@ -814,15 +814,19 @@ export interface ModelRoutingStatsSnapshot {
 }
 
 /**
- * The router configuration a decision was gated by, as configured now:
- * decisions do not record it. Thresholds are uncalibrated until an engine
- * reports a calibration.
+ * The router's gate configuration in force now. A judged decision records the
+ * thresholds it applied; this is the configuration a view compares a decision
+ * with when it recorded none, and the one the next consult is gated by. Floors
+ * are uncalibrated unless an operating point names the preregistration that
+ * set them.
  */
 export interface ModelRoutingGateView {
-  /** Route-confidence floor. */
+  /** Route-confidence floor for an engine without an operating point. */
   downgradeThreshold: number
-  /** Top-two margin floor. */
+  /** Top-two margin floor for an engine without an operating point. */
   downgradeMargin: number
+  /** Per-engine floors, which replace the two above for the engine each names. */
+  operatingPoints: ModelRoutingOperatingPoint[]
   /** Deadline of one judgment call, in milliseconds. */
   judgmentDeadlineMs: number
   /** Difficulty at or above which a streak is not entered. */
@@ -847,51 +851,11 @@ export interface ModelRoutingDecisionDetail {
   turn: number
   /** Step the decision was logged in. */
   step: number
-  /** The logged decision, verbatim, with the judgment-call facts it recorded. */
-  decision: ModelRoutingLoggedDecision
+  /** The logged decision, verbatim. */
+  decision: ModelRoutingDecision
   /** Configuration in force now. */
   gate: ModelRoutingGateView
 }
-
-/** The gate thresholds one answered consult applied, as a decision records them. */
-export interface ModelRoutingRecordedThresholds {
-  /** Route-confidence floor applied. */
-  downgradeThreshold: number
-  /** Top-two margin floor applied. */
-  downgradeMargin: number
-  /** Difficulty at or above which no streak is entered; present when the consult asked the difficulty question. */
-  entryScoreCeiling?: number
-  /** Difficulty at or above which a held streak escalates; present when the consult asked the difficulty question. */
-  escalateBackScoreThreshold?: number
-  /** Whether the confidence and margin floors came from the engine's operating point or the global defaults. */
-  source: 'operating-point' | 'global'
-  /** Id of the preregistration whose replay set the operating point; absent means uncalibrated. */
-  calibratedBy?: string
-}
-
-/**
- * Judgment-call facts a decision may record beside the fields of
- * {@link ModelRoutingDecision}. Every field is optional, and a log written by a
- * router that did not record one lacks it: readers fall back to the fields
- * {@link ModelRoutingDecision} carries.
- */
-export interface ModelRoutingDecisionFacts {
-  /** Registry id of the engine the call was routed to, on an answer or a failure. */
-  engineId?: string
-  /** Token usage of the judge's own model call, as the engine reported it. */
-  judgeUsage?: TokenUsage
-  /** Duration of the candidate eligibility assessment, in milliseconds. */
-  eligibilityMs?: number
-  /** Characters of state handed to the engine: the one state, or every alternative a fitted ask offered. */
-  inputChars?: number
-  /** The gate thresholds applied to the route answer. */
-  thresholds?: ModelRoutingRecordedThresholds
-  /** A failed call; `engineState` marks an engine still becoming ready, which was not called. */
-  engineFailure?: ModelRoutingEngineFailure & { engineState?: 'starting' | 'not-installed' }
-}
-
-/** A logged decision with the judgment-call facts it may record. */
-export type ModelRoutingLoggedDecision = ModelRoutingDecision & ModelRoutingDecisionFacts
 
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {

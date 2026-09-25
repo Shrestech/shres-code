@@ -798,6 +798,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     return {
       downgradeThreshold: config.downgradeThreshold,
       downgradeMargin: config.downgradeMargin,
+      operatingPoints: config.operatingPoints.map(point => ({ ...point })),
       judgmentDeadlineMs: config.judgmentDeadlineMs,
       entryScoreCeiling: config.entryScoreCeiling,
       escalateBackScoreThreshold: config.escalateBackScoreThreshold,

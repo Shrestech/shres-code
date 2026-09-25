@@ -73,7 +73,7 @@ describe('modelRouting Remote reads', () => {
     ])
   })
 
-  it('gate reports the configured thresholds, deadline, difficulty band, and hold', async () => {
+  it('gate reports the configured thresholds, operating points, deadline, difficulty band, and hold', async () => {
     const { ctx } = await setup({
       ...CONFIG,
       judgmentDeadlineMs: 4_000,
@@ -82,10 +82,12 @@ describe('modelRouting Remote reads', () => {
       escalateBack: { scoreThreshold: 1.5 },
       hold: { minSteps: 2, maxSteps: 7 },
       state: { maxChars: 8_000 },
+      operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.6, downgradeMargin: 0.2, calibratedBy: 'prereg-1' }],
     })
     expect(ctx.modelRouting.gateView()).toEqual({
       downgradeThreshold: 0.8,
       downgradeMargin: 0.1,
+      operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.6, downgradeMargin: 0.2, calibratedBy: 'prereg-1', acceptVerbalized: false }],
       judgmentDeadlineMs: 4_000,
       entryScoreCeiling: 1,
       escalateBackScoreThreshold: 1.5,
@@ -100,6 +102,7 @@ describe('modelRouting Remote reads', () => {
     expect(ctx.modelRouting.gateView()).toEqual({
       downgradeThreshold: 0.8,
       downgradeMargin: 0.1,
+      operatingPoints: [],
       judgmentDeadlineMs: DEFAULT_JUDGMENT_DEADLINE_MS,
       entryScoreCeiling: DEFAULT_ENTRY_SCORE_CEILING,
       escalateBackScoreThreshold: DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,

@@ -42,7 +42,7 @@ import type { ZodType } from 'zod'
 import { KEEP_CURRENT_OPTION_ID } from './config.ts'
 import type {
   ModelRoutingColdCause,
-  ModelRoutingLoggedDecision,
+  ModelRoutingDecision,
   ModelRoutingObjective,
   ModelRoutingOutcome,
   ModelRoutingReason,
@@ -97,7 +97,7 @@ const COLD_CAUSES: readonly ModelRoutingColdCause[] = [
  * because its calibration is only verbalized, is a precondition: the engine
  * was not asked.
  */
-const REASON_GROUPS: Readonly<Record<ModelRoutingReason | 'engine-uncalibrated', ModelRoutingReasonGroup>> = {
+const REASON_GROUPS: Readonly<Record<ModelRoutingReason, ModelRoutingReasonGroup>> = {
   'gate-passed': 'switched',
   'sticky-hold': 'switched',
   'judgment-failure-held': 'switched',
@@ -352,7 +352,7 @@ function applyDecision(
   state: ModelRoutingStatsState,
   seq: number,
   time: number,
-  data: ModelRoutingLoggedDecision,
+  data: ModelRoutingDecision,
 ): ModelRoutingStatsState {
   const turn = state.position?.turn ?? 0
   const step = state.position?.step ?? 0
@@ -369,7 +369,9 @@ function applyDecision(
   const engineName = data.engineId ?? data.engine
   const warmUp = data.engineFailure?.engineState !== undefined
   const failed = judgeFailed(data)
-  const asked = route !== undefined || failed
+  // A recorded input size means the state was handed to an engine, including
+  // a call whose answer was then discarded because the answering engine was refused.
+  const asked = !warmUp && (route !== undefined || failed || data.inputChars !== undefined)
   const answeredBy = route === undefined ? undefined : engineName
   const engines = answeredBy === undefined ? state.engines : countEngine(state.engines, answeredBy)
   const engineIndex = answeredBy === undefined ? null : engines.findIndex(engine => engine.name === answeredBy)
@@ -707,7 +709,7 @@ function addLatency(latency: readonly number[], latencyMs: number): number[] {
  * Whether a decision records a failed judgment call. A warm-up, an engine
  * still becoming ready, was not called and is not a failure.
  */
-function judgeFailed(data: ModelRoutingLoggedDecision): boolean {
+function judgeFailed(data: ModelRoutingDecision): boolean {
   if (data.engineFailure?.engineState !== undefined) return false
   return data.engineFailure !== undefined || data.reason === 'engine-unavailable' || data.reason === 'invalid-answer'
 }
@@ -715,7 +717,7 @@ function judgeFailed(data: ModelRoutingLoggedDecision): boolean {
 /** Count one consult under the thresholds it recorded, keeping first-appearance order. */
 function countThresholds(
   thresholds: ModelRoutingStatsSnapshot['thresholds'],
-  applied: NonNullable<ModelRoutingLoggedDecision['thresholds']>,
+  applied: NonNullable<ModelRoutingDecision['thresholds']>,
 ): ModelRoutingStatsSnapshot['thresholds'] {
   const calibratedBy = applied.calibratedBy ?? null
   const same = (entry: ModelRoutingStatsSnapshot['thresholds'][number]) => entry.downgradeThreshold === applied.downgradeThreshold
@@ -747,7 +749,7 @@ function countEngine(engines: ModelRoutingStatsState['engines'], name: string): 
 function countEgress(
   egress: ModelRoutingStatsState['egress'],
   engine: string,
-  data: ModelRoutingLoggedDecision,
+  data: ModelRoutingDecision,
 ): ModelRoutingStatsState['egress'] {
   const exact = data.inputChars !== undefined || data.judgmentInput !== undefined
   const chars = data.inputChars ?? data.judgmentInput?.state.length ?? data.stateProjection?.maxChars ?? 0
@@ -794,7 +796,7 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
     reasons: ranked(state.reasons).map(({ key, count }) => ({
       reason: key,
       // Every key is a logged `ModelRoutingReason`.
-      group: REASON_GROUPS[key as ModelRoutingReason | 'engine-uncalibrated'],
+      group: REASON_GROUPS[key as ModelRoutingReason],
       count,
     })),
     keptReasons: ranked(state.keptReasons).map(({ key, count }) => ({ reason: key, count })),
