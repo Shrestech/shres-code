@@ -386,11 +386,9 @@ async function loadComposition(options: CompositionOptions): Promise<Context> {
   return context
 }
 
-/** Create one agent with the manual model selected for its session. */
+/** Create one root agent on the manual route; the registry installs its model-selection hook. */
 function createAgent(loaded: Context, id: string): Agent {
-  const agent = loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL })
-  loaded.agentDefaultModel.selectionFor(agent)
-  return agent
+  return loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL })
 }
 
 /** Drive one user turn to whole-agent idle. */

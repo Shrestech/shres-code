@@ -6,7 +6,7 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { installModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
+import { provideModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-commands'
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
@@ -123,9 +123,17 @@ export class AgentDefaultModelConfig extends Service {
 
   private source: () => AgentDefaultModelSettings
   private readonly selections = new WeakMap<Agent, LiveModelSelectionRef>()
+  /** This service's own context, whose fiber owns every provided selection. */
+  private readonly home: Context
+  /** Early withdrawal of each provided selection, run when its agent is disposed. */
+  private readonly releases = new WeakMap<Agent, () => void>()
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'agentDefaultModel')
+    this.home = ctx
+    // A disposed agent needs no selection: release its withdrawal effect now
+    // instead of holding it until this service unloads.
+    ctx.on('agent/disposed', ({ agent }) => { this.releases.get(agent)?.() }, { global: true })
     const entry: AgentDefaultModelSettings = { provider: config.provider, model: config.model }
     this.source = () => entry
     installSettingsSection(ctx, AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, AGENT_DEFAULT_MODEL_SETTINGS_SCHEMA, entry, {
@@ -185,7 +193,10 @@ export class AgentDefaultModelConfig extends Service {
   }
 
   /**
-   * Install or return the session-local model selection that prompt assembly snapshots.
+   * Provide or return the session-local model selection the agent's
+   * model-selection hook applies, which prompt assembly snapshots. The
+   * selection is withdrawn when this service's fiber is disposed, so a
+   * reloaded instance provides its own.
    *
    * Explicit selections are logged as `agent/model-selection` and survive
    * resume and fork. Without one, the session's manual route precedes the live
@@ -211,7 +222,15 @@ export class AgentDefaultModelConfig extends Service {
       },
       assembled: undefined,
     }
-    installModelSelection(agent.ctx, selectionRef)
+    const withdraw = provideModelSelection(agent, selectionRef)
+    // The selection belongs to this service's fiber: a reload withdraws it, and
+    // the replacement instance provides its own.
+    const release = this.home.effect(() => withdraw, 'agentDefaultModel.selectionFor()')
+    this.releases.set(agent, () => {
+      this.releases.delete(agent)
+      // The withdrawal is synchronous; the disposer's promise settles with it.
+      void release()
+    })
     this.selections.set(agent, selectionRef)
     return selectionRef
   }

@@ -1,16 +1,15 @@
 /**
  * Snapshot-only composition for the keyless model-routing fixtures: a scripted
  * judgment engine, registered in `ctx.judgmentEngines` as `snapshot` for the
- * composed `judgment-dispatch` to route asks to, plus the model-selection
- * wiring the headless example's spine leaves to its app runner.
+ * composed `judgment-dispatch` to route asks to, plus the scripted routing-mode
+ * and trailing-context steps some arms configure.
  *
  * The judgment engine is an external service to the router, so the fixture
  * answers every ask from one configured script: the route question names either
  * the `flash` candidate or the current model, and the difficulty question
- * returns a configured zero-based score. The selection wiring mirrors what the
- * product CLI runner installs in its agent setup — the spine's pre-created root
- * agent has no selection ref until one is installed, and the router is only
- * reachable from the `agent/request` waterfall that installation registers.
+ * returns a configured zero-based score. The fixture installs no model
+ * selection: the agent registry gives the spine's pre-created root agent its
+ * model-selection hook, which is how the router is reached.
  */
 
 import type { Context } from '@shres-code/cordis'
@@ -157,11 +156,12 @@ class SnapshotJudgment implements JudgmentEngine {
 /** Cordis plugin name. */
 export const name = 'model-router-snapshot-fixture'
 
-/** Required default-model service the selection wiring installs through. */
-export const inject = ['agentDefaultModel', 'settings']
+/** Required settings service the deployment-mode script writes through. */
+export const inject = ['settings']
 
 /**
- * Register the scripted engine and install the root agent's model selection.
+ * Register the scripted engine and drive the scripted routing modes. The agent
+ * registry installs the root agent's model-selection hook.
  * @param ctx - the fixture's context.
  */
 export function apply(ctx: Context, config: Config): void {
@@ -176,7 +176,6 @@ export function apply(ctx: Context, config: Config): void {
     if (deploymentMode !== undefined) {
       await ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: deploymentMode })
     }
-    ctx.get('agentDefaultModel')?.selectionFor(agent)
     const decision = await next()
     if (decision.kind === 'reject' || !config.trailingContext) return decision
     return {

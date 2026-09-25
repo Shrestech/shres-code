@@ -146,7 +146,8 @@ class SnapshotQuestions implements UserQuestionProvider {
 /** Structural Agent: the identity the shipped registry and the ask seam both accept. */
 function stubAgent(id: string, session: Session): Agent {
   const agentId = id as Agent['id']
-  return { id: agentId, session: { id: agentId, header: session.header } } as unknown as Agent
+  // A registered root agent needs a scoped context for its model-selection hook.
+  return { id: agentId, ctx: new Context(), session: { id: agentId, header: session.header } } as unknown as Agent
 }
 
 const snapshotsDir = join(dirname(fileURLToPath(import.meta.url)), 'snapshots', 'worker-escalation')

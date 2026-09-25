@@ -178,11 +178,9 @@ function laya(loaded: Context): LayaJudgmentEngine {
   return engine
 }
 
-/** Create one root agent on the manual route. */
+/** Create one root agent on the manual route; the registry installs its model-selection hook. */
 function createAgent(loaded: Context, id: string): Agent {
-  const agent = loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL })
-  loaded.agentDefaultModel.selectionFor(agent)
-  return agent
+  return loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL })
 }
 
 /** Run one slash command and return its settled text. */

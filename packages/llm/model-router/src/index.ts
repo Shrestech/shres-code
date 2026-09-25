@@ -16,14 +16,20 @@
  * step is judged — the difficulty question is then mandatory — so harder work
  * revealed by steering or tool results can return to the manual model.
  *
- * The consult sits inside `installModelSelection` (`packages/core/agent`): after
- * the manual selection rewrote the request, `resolveRequest` may replace it.
+ * The consult sits inside the model-selection hook (`installModelSelection`,
+ * `packages/core/agent`) that the agent registry installs on every root agent:
+ * after the manual selection rewrote the request, `resolveRequest` may replace
+ * it. The controller adopts root agents only; a delegated child, one whose
+ * session header records a delegation depth, is routed only by the policy
+ * that spawned it. A root agent without the hook cannot be routed, so the
+ * controller reports it at error level once and records no routing mode for it.
  * Same-step retries reuse their judgment while its input is unchanged and
  * recheck capabilities and manual authority. A manual-model decision remains
  * in force for the rest of the turn.
  *
- * Agent Note:
+ * Agent Notes:
  * - .agents/notes/implemented/bug-fix/2026-09-22-routing-choice-and-difficulty.md
+ * - .agents/notes/implemented/bug-fix/2026-09-25-router-selection-install-gap.md
  *
  * @module @shres-code/shres-code-model-router
  */
@@ -33,6 +39,7 @@ import type { Events } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
+import { modelSelectionInstalled } from '@shres-code/shres-code-agent'
 import type {
   Agent,
   ModelRoutingConsult,
@@ -486,6 +493,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private readonly pins = new WeakMap<Session, PinnedDecision>()
   private readonly pendingIntents = new WeakMap<Session, PendingMode>()
   private readonly liveAgents = new Set<Agent>()
+  /** Root agents this controller has not adopted because they carried no model-selection hook when announced. */
+  private readonly unreachable = new WeakSet<Agent>()
 
   /**
    * @param ctx - the context this service registers `ctx.modelRouting` on.
@@ -726,9 +735,35 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
   }
 
-  /** Adopt only agents whose resolved routing service is this controller. */
+  /**
+   * Adopt a root agent whose resolved routing service is this controller. A
+   * root agent without the model-selection hook is reported once and gets no
+   * routing mode, because no request of it can reach the consult.
+   */
   private attachAgent(agent: Agent): void {
-    if (!this.ownsAgent(agent)) return
+    if (!this.ownsAgent(agent) || delegatedChild(agent)) return
+    if (!modelSelectionInstalled(agent)) {
+      if (this.unreachable.has(agent)) return
+      this.unreachable.add(agent)
+      this.ctx.logger.error(
+        'model-router: agent "%s" has no model-selection hook, so routing cannot run for it; '
+          + 'the agent registry installs the hook for every root agent',
+        agent.id,
+      )
+      return
+    }
+    this.liveAgents.add(agent)
+    this.reconcileConfiguration(agent.session)
+  }
+
+  /**
+   * Adopt a root agent reported unreachable once it carries the hook, which a
+   * front end providing its selection later installs. Its routing mode is
+   * committed then, or at the next accepted pre-step while a turn is open.
+   */
+  private adoptIfReachable(agent: Agent): void {
+    if (!this.unreachable.has(agent) || !modelSelectionInstalled(agent)) return
+    this.unreachable.delete(agent)
     this.liveAgents.add(agent)
     this.reconcileConfiguration(agent.session)
   }
@@ -919,6 +954,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     request: ModelRoutingRequest,
   ): Promise<ModelSelection | undefined> {
     signal.throwIfAborted()
+    // A delegated child is routed only by the policy that spawned it, even
+    // when a front end gave it a model-selection hook.
+    if (delegatedChild(agent)) return undefined
+    // Only the hook calls the consult, so an agent reported unreachable has it now.
+    this.adoptIfReachable(agent)
     const session = agent.session
     const active = this.modeOf(session)
     const pinned = this.pins.get(session)
@@ -1533,6 +1573,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private runCommand(agent: Agent, rawInput: string): { kind: 'success'; text: string } {
     const args = rawInput.trim()
     const config = this.config()
+    this.adoptIfReachable(agent)
+    if (this.unreachable.has(agent)) {
+      return { kind: 'success', text: 'Routing can\'t run for this agent: it has no model-selection hook.' }
+    }
     if (args === '' || args === 'status') {
       const { active, pending } = this.get(agent)
       const sticky = stickyState(agent.session.events)
@@ -1658,6 +1702,17 @@ function hintFor(
   return threshold !== undefined && difficulty !== undefined && difficulty.score >= threshold
     ? { hint: 'consider-stronger' }
     : {}
+}
+
+/**
+ * Whether an agent is a delegated child: its session header records a
+ * delegation depth above zero. `parentSession` does not decide it, because a
+ * user fork of a root session sets it too.
+ * @param agent - the agent to classify.
+ * @returns `true` for a subagent or Team seat, `false` for a root agent.
+ */
+function delegatedChild(agent: Agent): boolean {
+  return (agent.session.header.delegationDepth ?? 0) > 0
 }
 
 /** The route question includes the manual model so the judgment can decline every downgrade. */
