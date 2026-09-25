@@ -30,7 +30,7 @@ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps, ConvViewOwnerProps,
 } from '../src/client/contract/slots.ts'
-import type { ViewTab } from '../src/client/contract/views.ts'
+import type { ChatStoreState, ViewTab } from '../src/client/contract/views.ts'
 
 /** Machine-backed wiring over a sink spy. */
 function fakeWiring() {
@@ -790,7 +790,8 @@ describe('cross-view inspect handoff', () => {
     expect(b.lastViewOwner('trajectory').inspect).toBeNull()
   })
 
-  it('keeps a persisted open Activity closed at mount without moving focus into it', () => {
+  it('moves no focus into Activity after a reload, while a user open still does', () => {
+    // A snapshot a build before the transient field wrote, with the popover open.
     localStorage.setItem(CHAT_KEY, JSON.stringify({
       selection: null, draft: '', view: null, inspect: null, activityOpen: true,
     }))
@@ -817,6 +818,84 @@ describe('cross-view inspect handoff', () => {
     fireEvent.pointerDown(document.body)
     expect(b.chat.store.getSnapshot().activityOpen).toBe(false)
     expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+  })
+})
+
+describe('Activity open state across a reload and a session switch', () => {
+  const CHAT_KEY = 'shres.conversation.chat'
+  type ChatInstance = ReturnType<ReturnType<typeof createChatStore>['create']>
+
+  /**
+   * The header alone, keyed by session as the runtime's session-scoped slots
+   * remount it, recording the chat store's open state each render reads.
+   */
+  function header(sessionId: SessionId, chat: ChatInstance, reads: boolean[] = []) {
+    const session = createSnapshotStore<ConversationSnapshot>(conversationSnapshot({ sessionId }))
+    const sessions = createSnapshotStore<SessionListState>({
+      ids: [sessionId], byId: { [sessionId]: row(sessionId) }, current: sessionId,
+      phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    })
+    const workspaces = createSnapshotStore<WorkspaceListState>(workspaceState([workspace('one')]))
+    const { wiring } = fakeWiring()
+    const selectChat = bindSnapshotSelector(chat)
+    const useStore = (<U,>(select: (state: ChatStoreState) => U): U => {
+      reads.push(chat.getSnapshot().activityOpen)
+      return selectChat(select)
+    }) as typeof selectChat
+    return (
+      <ConversationSessionHeader
+        key={sessionId}
+        sessionId={sessionId}
+        SessionProvider={({ children }) => children(sessionId)}
+        useSession={bindSnapshotSelector(session)}
+        useSessions={bindSnapshotSelector(sessions)}
+        useWorkspaces={bindSnapshotSelector(workspaces)}
+        useProjection={(() => undefined)}
+        useInput={bindSnapshotSelector(wiring.state)}
+        inputActions={wiring.actions}
+        useStore={useStore}
+        actions={chat.actions}
+        renderSlot={(() => null) as never}
+        views={{ list: () => [{ id: 'chat', label: 'Chat' }], subscribe: () => () => {}, version: () => 1 }}
+        open={vi.fn()}
+        t={t}
+      />
+    )
+  }
+
+  it('renders a reloaded session\'s header closed on its first render, with nothing closing it at mount', () => {
+    // What an open popover left in storage before the field was transient.
+    localStorage.setItem(`${CHAT_KEY}.s-reload`, JSON.stringify({
+      selection: null, draft: 'kept', view: null, inspect: null, activityOpen: true,
+    }))
+    const chat = createChatStore().create('s-reload')
+    const setActivityOpen = vi.spyOn(chat.actions, 'setActivityOpen')
+    const reads: boolean[] = []
+    const view = render(header(sid('s-reload'), chat, reads))
+    expect(reads[0]).toBe(false)
+    expect(reads.every(open => !open)).toBe(true)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('#shres-session-activity')?.hasAttribute('hidden')).toBe(true)
+    expect(setActivityOpen).not.toHaveBeenCalled()
+    // The rest of the stored snapshot is restored.
+    expect(chat.getSnapshot().draft).toBe('kept')
+  })
+
+  it('closes Activity on a session switch, so returning to the session shows it closed', () => {
+    const first = createChatStore().create('s-first')
+    const second = createChatStore().create('s-second')
+    const view = render(header(sid('s-first'), first))
+    fireEvent.click(view.getByRole('button', { name: 'Activity' }))
+    expect(first.getSnapshot().activityOpen).toBe(true)
+
+    view.rerender(header(sid('s-second'), second))
+    expect(first.getSnapshot().activityOpen).toBe(false)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
+
+    const reads: boolean[] = []
+    view.rerender(header(sid('s-first'), first, reads))
+    expect(reads[0]).toBe(false)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
   })
 })
 

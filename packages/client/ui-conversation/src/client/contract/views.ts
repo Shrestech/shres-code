@@ -65,10 +65,9 @@ export interface ChatStoreState {
    */
   inspect: InspectRequest | null
   /**
-   * Whether the session's Activity popover is open. `reveal` closes it.
-   * Persisted snapshots are read through `readActivityOpen`, so one without the
-   * field reads as closed, and the header closes it when it mounts, so a reload
-   * never reopens the popover.
+   * Whether the session's Activity popover is open. `reveal` closes it, and
+   * so does leaving the session. The field is transient in the persisted
+   * store, so a reload starts it closed.
    */
   activityOpen: boolean
 }
