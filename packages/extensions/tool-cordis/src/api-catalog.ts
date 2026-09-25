@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
-        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
+        description: 'Provide or return the session-local model selection the agent\'s model-selection hook applies, which prompt assembly snapshots.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
         parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
         returns: 'the shared mutable selection for this Agent.',
       },
@@ -292,7 +292,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'enter(agent: Agent, owner: Agent | undefined): () => void',
-        description: 'Insert an already-constructed agent without announcing it. This is the advanced ordered-lifecycle primitive used by the async agent factory: it first completes setup while the agent is unpublished, then assigns the returned detach closure into its pre-installed composite teardown before calling announce. Ordinary callers use register.',
+        description: 'Insert an already-constructed agent without announcing it. This is the advanced ordered-lifecycle primitive used by the async agent factory: it first completes setup while the agent is unpublished, then assigns the returned detach closure into its pre-installed composite teardown before calling announce. Ordinary callers use register. A root agent, one whose session header records no delegation depth, leaves with its model-selection hook installed (installModelSelection) unless setup already installed it, so every `agent/created` listener sees it.',
         parameters: [{ name: 'agent', description: 'the prepared, unpublished agent.' }, { name: 'owner', description: 'live agent whose scoped context created this agent, or undefined for a top-level runtime root. This is runtime ownership, not the resumed session\'s durable parent lineage.' }],
         returns: 'an idempotent closure that removes this exact entry and emits `agent/disposed` with listener failures contained. When called from a synchronous `agent/created` listener, removal and disposal wait until that creation dispatch unwinds.',
       },

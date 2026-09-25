@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, open, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Context } from '@shres-code/cordis'
-import { installModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
+import { provideModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-agent-presets/types'
 import { AttachmentError } from '@shres-code/shres-code-attachment'
@@ -1213,7 +1213,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /**
-   * Install or return the session-local model selection that prompt assembly snapshots.
+   * Provide or return the session-local model selection the agent's
+   * model-selection hook applies, which prompt assembly snapshots.
    *
    * Explicit selections are durable even when no subsequent request runs.
    * Otherwise the session's manual route precedes the live default, which a
@@ -1238,7 +1239,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
       assembled: undefined,
     }
-    installModelSelection(agent.ctx, selection)
+    provideModelSelection(agent, selection)
     selections.set(agent, selection)
     return selection
   }

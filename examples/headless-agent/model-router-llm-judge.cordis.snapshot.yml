@@ -68,7 +68,3 @@
               # The stub route is on this machine; a real DeepSeek route is remote.
               egress: local
               maxStateTokens: 16000
-          # Installs the agent's live model selection, as in every router snapshot;
-          # its scripted engine is registered but not selected.
-          - id: model-router-snapshot-fixture
-            name: './tests/fixtures/model-router-snapshot-fixture.ts'

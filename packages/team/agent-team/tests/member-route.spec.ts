@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@shres-code/cordis'
-import { installModelSelection, type Agent } from '@shres-code/shres-code-agent'
+import { provideModelSelection, type Agent } from '@shres-code/shres-code-agent'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
 import { createUserMessage } from '@shres-code/shres-code-llm'
@@ -175,7 +175,7 @@ describe('Agent Team roster model route', () => {
     const { ctx } = await boot(adapter)
     const lead = ctx.agentLoop.create(LEAD, LEAD_ROUTE)
     const selection = { current: { provider: 'mock', model: 'picked-model' }, assembled: undefined }
-    installModelSelection(lead.ctx, selection)
+    provideModelSelection(lead, selection)
     // Before the switched Lead's next request the roster reports its last known route.
     expect(row(ctx, lead, 'lead')).toMatchObject({ agentProvider: 'mock', model: 'lead-model' })
     lead.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))

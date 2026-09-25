@@ -4,6 +4,8 @@ import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import {
   agentEvents,
   installModelSelection,
+  modelSelectionInstalled,
+  provideModelSelection,
   selectionInForce,
   type Agent,
   type AgentRequestContent,
@@ -19,13 +21,72 @@ function requestContent(): AgentRequestContent {
   return { messages: [], system: '', tools: [] }
 }
 
+let agentCount = 0
+/** The smallest agent the hook reads: an id and a scoped context. */
+function hookAgent(ctx: Context): Agent {
+  agentCount += 1
+  return { id: `agent-${String(agentCount)}`, ctx } as unknown as Agent
+}
+
+describe('one model-selection hook per agent', () => {
+  it('installs once, rejects a second hook, and reinstalls after disposal', async () => {
+    const ctx = new Context()
+    const agent = hookAgent(ctx)
+    expect(modelSelectionInstalled(agent)).toBe(false)
+    const dispose = installModelSelection(agent)
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    expect(() => installModelSelection(agent)).toThrow(`agent "${agent.id}" already has a model selection hook`)
+    dispose()
+    dispose()
+    expect(modelSelectionInstalled(agent)).toBe(false)
+    const again = installModelSelection(agent)
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    again()
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts one selection provider, installing the hook when absent, and rejects a second', async () => {
+    const ctx = new Context()
+    const agent = hookAgent(ctx)
+    const first: ModelSelectionRef = { current: undefined, assembled: undefined }
+    provideModelSelection(agent, first)
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    provideModelSelection(agent, first)
+    expect(() => { provideModelSelection(agent, { current: undefined, assembled: undefined }) })
+      .toThrow(`agent "${agent.id}" already has a model selection provider`)
+
+    // A provider may arrive after the hook, which then applies it.
+    await ctx.plugin(SystemPrompt)
+    const later = hookAgent(ctx)
+    installModelSelection(later)
+    provideModelSelection(later, { current: { provider: 'alpha', model: 'a1' }, assembled: undefined })
+    expect(modelSelectionInstalled(later)).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('passes the resolved request through while no selection is provided', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    const agent = hookAgent(ctx)
+    installModelSelection(agent)
+    const seed: LlmCallConfig = { provider: 'seed', model: 'seed', temperature: 0.2 }
+    expect((await ctx.systemPrompt.assemble()).variables).toEqual({})
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal: new AbortController().signal },
+      () => Promise.resolve(seed),
+    )).resolves.toBe(seed)
+    await ctx.fiber.dispose()
+  })
+})
+
 describe('installModelSelection()', () => {
   it('snapshots prompt variables and request routing together, then disposes both listeners', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     const selection: ModelSelectionRef = { current: undefined, assembled: undefined }
-    const dispose = installModelSelection(ctx, selection)
-    const agent = {} as Agent
+    const agent = hookAgent(ctx)
+    const dispose = installModelSelection(agent)
+    provideModelSelection(agent, selection)
     const seed: LlmCallConfig = { provider: 'seed', model: 'seed', temperature: 0.2 }
     const signal = new AbortController().signal
 
@@ -62,6 +123,7 @@ describe('installModelSelection()', () => {
     )).resolves.toEqual({ provider: 'beta', model: 'b1', temperature: 0.2 })
 
     dispose()
+    expect(modelSelectionInstalled(agent)).toBe(false)
     expect((await ctx.systemPrompt.assemble()).variables).toEqual({})
     await expect(agentEvents(ctx, agent).waterfall(
       'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seed),
@@ -121,8 +183,8 @@ describe('installModelSelection() with a composed router', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     const selection: ModelSelectionRef = { current: { provider: 'alpha', model: 'a1' }, assembled: undefined }
-    installModelSelection(ctx, selection)
-    const agent = {} as Agent
+    const agent = hookAgent(ctx)
+    provideModelSelection(agent, selection)
     const signal = new AbortController().signal
     await ctx.plugin(StubRouting, () => undefined)
 
@@ -138,8 +200,8 @@ describe('installModelSelection() with a composed router', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     const selection: ModelSelectionRef = { current: { provider: 'alpha', model: 'a1' }, assembled: undefined }
-    installModelSelection(ctx, selection)
-    const agent = {} as Agent
+    const agent = hookAgent(ctx)
+    provideModelSelection(agent, selection)
     const signal = new AbortController().signal
     await ctx.plugin(StubRouting, () => ({
       provider: 'cheap',
@@ -172,12 +234,52 @@ describe('installModelSelection() with a composed router', () => {
     await ctx.fiber.dispose()
   })
 
+  it('uses the route the router reports beneath a routed header when no selection is provided', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    const agent = hookAgent(ctx)
+    installModelSelection(agent)
+    const signal = new AbortController().signal
+    await ctx.plugin(StubRouting, () => undefined)
+    const routed = ctx.get('modelRouting') as unknown as StubRouting
+    const seededFromCandidate: LlmCallConfig = { provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low'), temperature: 0.1 }
+
+    // A routed header seeds the request; the manual route beneath it is restored.
+    routed.sticky = { provider: 'alpha', model: 'a1' }
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toEqual({ provider: 'alpha', model: 'a1', temperature: 0.1 })
+    expect(routed.calls.at(-1)?.base).toEqual({ provider: 'alpha', model: 'a1' })
+
+    // A request already on the reported route is passed through untouched.
+    routed.sticky = { provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low') }
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 2, step: 1, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toBe(seededFromCandidate)
+
+    // Without a routed header the resolved route is the manual route.
+    routed.sticky = undefined
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 3, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toBe(seededFromCandidate)
+    expect(routed.calls.at(-1)?.base).toEqual({ provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low') })
+
+    // A provided selection is the manual route; the router's report does not replace it.
+    routed.sticky = { provider: 'alpha', model: 'a1' }
+    provideModelSelection(agent, { current: { provider: 'beta', model: 'b1' }, assembled: undefined })
+    await ctx.systemPrompt.assemble()
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 4, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toEqual({ provider: 'beta', model: 'b1', temperature: 0.1 })
+    await ctx.fiber.dispose()
+  })
+
   it('keeps the persisted route when no manual selection is assembled', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     const selection: ModelSelectionRef = { current: undefined, assembled: undefined }
-    installModelSelection(ctx, selection)
-    const agent = {} as Agent
+    const agent = hookAgent(ctx)
+    provideModelSelection(agent, selection)
     const signal = new AbortController().signal
     await ctx.plugin(StubRouting, base => ({ provider: 'cheap', model: base.model }))
 
@@ -193,8 +295,8 @@ describe('installModelSelection() with a composed router', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     const selection: ModelSelectionRef = { current: undefined, assembled: undefined }
-    installModelSelection(ctx, selection)
-    const agent = {} as Agent
+    const agent = hookAgent(ctx)
+    provideModelSelection(agent, selection)
     const signal = new AbortController().signal
     await ctx.plugin(StubRouting, base => ({ provider: 'cheap', model: base.model }))
 

@@ -91,6 +91,7 @@
     "@shres-code/cordis": "workspace:^",
     "@shres-code/cordis-plugin-include": "workspace:^",
     "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-sdk-jsonrpc-server": "workspace:^",
     "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
     "@shres-code/shres-code-subagent": "workspace:^",
     "@shres-code/shres-code-subagent-fork-in-process": "workspace:^",

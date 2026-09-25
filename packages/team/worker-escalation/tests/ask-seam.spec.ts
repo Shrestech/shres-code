@@ -141,7 +141,8 @@ async function settle(): Promise<void> {
 /** Structural Agent: the shape the shipped registry and seam both accept. */
 function stubAgent(id: string, session: Session): Agent {
   const agentId = id as Agent['id']
-  return { id: agentId, session: { id: agentId, header: session.header } } as unknown as Agent
+  // A registered root agent needs a scoped context for its model-selection hook.
+  return { id: agentId, ctx: new Context(), session: { id: agentId, header: session.header } } as unknown as Agent
 }
 
 /** One booted ladder plus the seams it reaches. */

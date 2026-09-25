@@ -166,6 +166,8 @@ interface AgentOptions {
 
 Dispatch requires `provider` and `model` after `agent/request`. When present, `maxTokens` must be a positive safe integer and caps every conversation-model request; omission allows the exact-model adapter default to materialize before the request header, or otherwise leaves provider behavior unchanged. An agent-scoped `deployment:persona` prompt section may shadow the global default persona.
 
+Every root agent, one whose session header records no `delegationDepth`, carries exactly one model-selection listener pair on its scoped `system-prompt/assemble` and `agent/request`. The agent registry installs it (`installModelSelection`) before it announces the agent, on create and on resume, so a composed `ctx.modelRouting` is consulted for every root agent whichever front end created it, including a user fork, which records `parentSession` with no delegation depth. A delegated child gets the listeners only when a front end provides its selection. Front ends own only the manual selection the listeners apply: they provide it once per agent with `provideModelSelection`, which the Host API and `agentDefaultModel.selectionFor` do, and a second, different provider for the same agent throws. Without a provided selection the manual route is the one the router reports beneath a routed header (`stickySelection`), else the request's resolved route, and the request is rewritten only when the two differ; with no router nothing is rewritten. `modelSelectionInstalled(agent)` reports whether an agent can be routed.
+
 The request waterfall exposes detached model content to listeners. A model-routing consult receives that content together with the config after downstream listeners and manual selection, so it can validate a candidate against the request it would replace without assembling or dispatching another request:
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
@@ -382,7 +384,8 @@ purposeSelections(): Partial<Record<ModelPurpose, ModelSelection>>
 selectionForPurpose(purpose: ModelPurpose): ModelSelection | undefined
 
 /**
- * Install or return the session-local model selection that prompt assembly snapshots.
+ * Provide or return the session-local model selection the agent's
+ * model-selection hook applies, which prompt assembly snapshots.
  *
  * Explicit selections are logged as `agent/model-selection` and survive
  * resume and fork. Without one, the session's manual route precedes the live
@@ -732,7 +735,10 @@ register(agent: Agent): () => void
  * advanced ordered-lifecycle primitive used by the async agent factory: it
  * first completes setup while the agent is unpublished, then assigns the
  * returned detach closure into its pre-installed composite teardown before
- * calling {@link announce}. Ordinary callers use {@link register}.
+ * calling {@link announce}. Ordinary callers use {@link register}. A root
+ * agent, one whose session header records no delegation depth, leaves with
+ * its model-selection hook installed ({@link installModelSelection}) unless
+ * setup already installed it, so every `agent/created` listener sees it.
  * @param agent - the prepared, unpublished agent.
  * @param owner - live agent whose scoped context created this agent, or
  *   undefined for a top-level runtime root. This is runtime ownership, not
@@ -785,7 +791,7 @@ list(): Agent[]
 roots(): Agent[]
 ```
 
-Source: [`packages/core/agent/src/index.ts:256`](../../packages/core/agent/src/index.ts)
+Source: [`packages/core/agent/src/index.ts:257`](../../packages/core/agent/src/index.ts)
 
 <a id="ctxfirstrunsetup--firstrunsetup"></a>
 

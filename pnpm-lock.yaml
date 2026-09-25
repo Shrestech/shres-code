@@ -7132,6 +7132,9 @@ importers:
       '@shres-code/shres-code-llm-retry':
         specifier: workspace:^
         version: link:../llm-retry
+      '@shres-code/shres-code-sdk-jsonrpc-server':
+        specifier: workspace:^
+        version: link:../../sdk/server
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session

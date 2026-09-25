@@ -14,6 +14,8 @@ The scoped-registration surface: `Agent.ctx` is the agent's scope context (`shre
 
 An explicit `agent/model-selection` event is authoritative as the manual selection ahead of the router's sticky base and every request header, including when its provider/model/effort is byte-identical to a routed header. The router may still replace the current request with an eligible candidate. The event survives resume and fork; when it is absent, `selectionInForce()` falls back to the router's manual base, the last routed header's base, or the caller's default.
 
+The registry installs one model-selection hook (`installModelSelection`) on every root agent, one whose session header records no `delegationDepth`, before it announces the agent, so a composed router is reached whichever front end created it. A front end provides the manual selection the hook applies with `provideModelSelection`, once per agent; a second, different provider throws. Without one, the manual route is the router's `stickySelection` beneath a routed header, else the request's resolved route. `modelSelectionInstalled(agent)` reports the hook.
+
 `AgentOptions` supplies the initial provider/model route and an optional positive `maxTokens` output cap. The concrete loop resolves any exact-model adapter default, records the effective cap in the request header, and applies it to each conversation-model request; an explicit Agent option wins, while omission leaves the adapter or provider route default in control.
 
 - `ctx.agents.register(agent: Agent): () => void` — record an **already-constructed** agent. Disposed with the calling fiber.

@@ -6,7 +6,7 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { installModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
+import { provideModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-commands'
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
@@ -185,7 +185,8 @@ export class AgentDefaultModelConfig extends Service {
   }
 
   /**
-   * Install or return the session-local model selection that prompt assembly snapshots.
+   * Provide or return the session-local model selection the agent's
+   * model-selection hook applies, which prompt assembly snapshots.
    *
    * Explicit selections are logged as `agent/model-selection` and survive
    * resume and fork. Without one, the session's manual route precedes the live
@@ -211,7 +212,7 @@ export class AgentDefaultModelConfig extends Service {
       },
       assembled: undefined,
     }
-    installModelSelection(agent.ctx, selectionRef)
+    provideModelSelection(agent, selectionRef)
     this.selections.set(agent, selectionRef)
     return selectionRef
   }
