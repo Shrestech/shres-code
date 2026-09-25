@@ -490,7 +490,7 @@ interface JudgmentSettings {
 
 ## Failure classes
 
-An engine reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request, and for a selected engine no provider registered; `UNAVAILABLE` for an engine that could not be reached, timed out, refused the request, or is not `ready`; `INPUT_TOO_LARGE` for serialized input over the engine's request limit; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. A dispatched failure also carries `engineId`, the registry id of the engine the ask was routed to. No threshold, margin, or fallback lives in the seam.
+An engine reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request, and for a selected engine no provider registered; `UNAVAILABLE` for an engine that could not be reached, timed out, refused the request, or is not `ready`; `INPUT_TOO_LARGE` for serialized input over the engine's request limit; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. A dispatched failure also carries `engineId`, the registry id of the engine the ask was routed to, and a dispatcher's own refusal before dispatch carries `refusedBeforeDispatch: true`: nothing left the process. No threshold, margin, or fallback lives in the seam.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -546,7 +546,7 @@ selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:265`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:280`](../../packages/llm/judgment/src/index.ts)
 
 <a id="ctxjudgmentengines--judgmentengineregistry"></a>
 

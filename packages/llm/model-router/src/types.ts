@@ -519,6 +519,15 @@ export interface ModelRoutingEngineFailure {
    * `judgmentFailures.holdTolerance` or the breaker.
    */
   engineState?: 'starting' | 'not-installed'
+  /**
+   * `true` when the dispatcher refused the call before handing it to any
+   * engine (`JudgmentError.refusedBeforeDispatch`), as it does for a selected
+   * engine that is not composed or not `ready`: nothing was sent. Unlike a
+   * warm-up, the fold counts it as a failed judgment toward
+   * `judgmentFailures.holdTolerance` and the breaker, so a persistent
+   * misconfiguration opens the breaker.
+   */
+  refusedBeforeDispatch?: true
 }
 
 /** The downgraded request whose failure a `route-failed` decision records. */

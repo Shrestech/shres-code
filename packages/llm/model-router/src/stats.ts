@@ -789,16 +789,18 @@ function judgeFailed(data: ModelRoutingDecision): boolean {
 /**
  * How much of the recorded state a decision's judge call sent. An answer
  * proves the state left, including one the router then discarded because it
- * refused the answering engine. A warm-up and an engine the dispatcher
- * reports unconfigured refuse before any request, so they send nothing.
- * Another failure or a rejected fit cannot show whether the request left,
- * so its characters are an upper bound.
+ * refused the answering engine. A warm-up, a call the dispatcher refused
+ * before dispatching it, and an engine that reports itself unconfigured
+ * fail before any request, so they send nothing. Another failure or a
+ * rejected fit cannot show whether the request left, so its characters are
+ * an upper bound.
  * @param data - the decision.
  * @param failed - whether it records a failed judgment.
  * @returns `exact`, `at-most`, or `none`.
  */
 function sentState(data: ModelRoutingDecision, failed: boolean): 'exact' | 'at-most' | 'none' {
-  if (data.engineFailure?.engineState !== undefined || data.engineFailure?.code === 'UNCONFIGURED') return 'none'
+  const failure = data.engineFailure
+  if (failure?.engineState !== undefined || failure?.refusedBeforeDispatch === true || failure?.code === 'UNCONFIGURED') return 'none'
   if (data.route !== undefined) return 'exact'
   if (data.reason === 'engine-uncalibrated' && data.inputChars !== undefined) return 'exact'
   return failed || data.inputChars !== undefined ? 'at-most' : 'none'

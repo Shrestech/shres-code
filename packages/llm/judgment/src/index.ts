@@ -156,6 +156,8 @@ export function judgmentConsumerId(value: string): JudgmentConsumerId {
 export interface JudgmentErrorOptions extends ErrorOptions {
   /** Registry id of the engine the failed ask was routed to; see {@link JudgmentError.engineId}. */
   engineId?: JudgmentEngineId
+  /** Set only by a dispatcher that refused the ask itself; see {@link JudgmentError.refusedBeforeDispatch}. */
+  refusedBeforeDispatch?: true
 }
 
 /**
@@ -173,12 +175,22 @@ export class JudgmentError extends Error {
    * without an emitted field so an unrouted failure has no `engineId` key.
    */
   declare readonly engineId?: JudgmentEngineId
+  /**
+   * `true` when a dispatcher refused the ask before handing it to any engine:
+   * the selected engine is not composed, is not `ready`, or has no fitting for
+   * a fitted ask. Nothing left the process, so a consumer that accounts for
+   * egress counts nothing sent. Only a dispatcher sets it; it re-creates an
+   * engine's own failure without it. Declared without an emitted field, like
+   * {@link engineId}.
+   */
+  declare readonly refusedBeforeDispatch?: true
 
   /**
    * Create one classified judgment failure.
    * @param code - stable failure class.
    * @param message - diagnostic naming the engine and what could not be done.
-   * @param options - optional original failure and the routed engine's registry id.
+   * @param options - optional original failure, the routed engine's registry
+   *   id, and a dispatcher's refusal before dispatch.
    */
   constructor(
     readonly code: JudgmentErrorCode,
@@ -187,6 +199,9 @@ export class JudgmentError extends Error {
   ) {
     super(message, options)
     if (options?.engineId !== undefined) Object.defineProperty(this, 'engineId', { value: options.engineId, enumerable: true })
+    if (options?.refusedBeforeDispatch === true) {
+      Object.defineProperty(this, 'refusedBeforeDispatch', { value: true, enumerable: true })
+    }
   }
 }
 

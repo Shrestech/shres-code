@@ -61,6 +61,9 @@ describe('JudgmentError', () => {
     const error = new JudgmentError('UNAVAILABLE', 'laya is starting', { engineId: judgmentEngineId('laya') })
     expect(error.engineId).toBe('laya')
     expect(error.cause).toBeUndefined()
+    expect(error).not.toHaveProperty('refusedBeforeDispatch')
+    const refused = new JudgmentError('UNAVAILABLE', 'laya is unconfigured', { engineId: judgmentEngineId('laya'), refusedBeforeDispatch: true })
+    expect(refused.refusedBeforeDispatch).toBe(true)
   })
 })
 

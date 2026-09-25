@@ -861,7 +861,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/configuration': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:905`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:914`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -876,7 +876,7 @@ Source: [`packages/llm/model-router/src/types.ts:905`](../packages/llm/model-rou
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:917`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:926`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -891,7 +891,7 @@ Source: [`packages/llm/model-router/src/types.ts:917`](../packages/llm/model-rou
 'model-routing/mode': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:911`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:920`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 
