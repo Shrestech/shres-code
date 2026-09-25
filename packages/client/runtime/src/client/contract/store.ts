@@ -80,16 +80,16 @@ function rafBatch(notify: () => void): () => void {
  * frame-level skew, same nature as the object layer's microtask batching.
  *
  * @param init - initial state.
- * @param opts - flush mode and opt-in persistence (localStorage, keyed by name).
+ * @param opts - flush mode and opt-in persistence (localStorage, keyed by name, leaving out `transient` top-level fields).
  * @returns the store.
  */
 export function createSnapshotStore<T>(
-  init: T, opts?: { flush?: 'raf' | 'sync'; persist?: { name: string } }): SnapshotStore<T> {
+  init: T, opts?: { flush?: 'raf' | 'sync'; persist?: { name: string; transient?: readonly string[] } }): SnapshotStore<T> {
   // Immer enters through produce() in update() below (identical semantics to
   // the immer middleware without its setState-signature mutator generics).
   const withSelector = subscribeWithSelector(() => init)
   const api: StoreApi<T> = createStore<T>()(withSelector)
-  if (opts?.persist) attachPersistence(api, opts.persist.name)
+  if (opts?.persist) attachPersistence(api, opts.persist.name, init, opts.persist.transient ?? [])
 
   let subscribe = (fn: () => void) => api.subscribe(fn)
   if (opts?.flush === 'raf') {
@@ -123,8 +123,10 @@ export function createSnapshotStore<T>(
  * draft becomes {0:'h',1:'e',...}) — not fixable via merge/deserialize options
  * because the corruption happens before serialization. Storage failures
  * (quota, private mode) only disable persistence, never break the store.
+ * `transient` top-level fields of an object state are left out of the
+ * written JSON and restored from `init`.
  */
-function attachPersistence<T>(api: StoreApi<T>, name: string): void {
+function attachPersistence<T>(api: StoreApi<T>, name: string, init: T, transient: readonly string[]): void {
   // Non-browser runs (node e2e booting the client tree) have no localStorage:
   // persistence silently disables — same contract as a storage failure, minus
   // the per-store console noise a ReferenceError would produce.
@@ -132,18 +134,39 @@ function attachPersistence<T>(api: StoreApi<T>, name: string): void {
   try {
     const raw = localStorage.getItem(name)
     if (raw !== null) {
-      api.setState(devFreeze(JSON.parse(raw) as T), true)
+      api.setState(devFreeze(withFields(JSON.parse(raw) as T, init, transient)), true)
     }
   } catch (error) {
     console.error(`snapshot store '${name}' rehydration failed:`, error)
   }
   api.subscribe((state) => {
     try {
-      localStorage.setItem(name, JSON.stringify(state))
+      localStorage.setItem(name, JSON.stringify(withoutFields(state, transient)))
     } catch (error) {
       console.error(`snapshot store '${name}' persistence failed:`, error)
     }
   })
+}
+
+/** A restored object state with its transient fields taken from `init`. */
+function withFields<T>(restored: T, init: T, fields: readonly string[]): T {
+  if (fields.length === 0 || !isRecord(restored) || !isRecord(init)) return restored
+  const next: Record<string, unknown> = { ...restored }
+  for (const field of fields) next[field] = init[field]
+  return next as T
+}
+
+/** An object state without its transient fields, for writing. */
+function withoutFields(state: unknown, fields: readonly string[]): unknown {
+  if (fields.length === 0 || !isRecord(state)) return state
+  const next: Record<string, unknown> = { ...state }
+  for (const field of fields) Reflect.deleteProperty(next, field)
+  return next
+}
+
+/** Whether a value is a plain JSON object (not an array or null). */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Deep-freeze wholesale-set state outside production: set() bypasses immer's freeze. */
@@ -214,7 +237,9 @@ export function defineStore<T, A extends ActionsDecl<T>>(
         : scopeKey === undefined ? decl.persist : `${decl.persist}.${scopeKey}`
       const store = createSnapshotStore<T>(
         decl.init(),
-        persistKey !== undefined ? { persist: { name: persistKey } } : undefined)
+        persistKey === undefined
+          ? undefined
+          : { persist: { name: persistKey, ...decl.transient === undefined ? {} : { transient: decl.transient } } })
       const actions = {} as Record<string, (...params: unknown[]) => void>
       for (const key of Object.keys(decl.actions)) {
         const mutate = decl.actions[key] as (draft: T, ...params: unknown[]) => void

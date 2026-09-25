@@ -2,7 +2,7 @@
 /** Persisted-snapshot read of the inspect request, and the reveal write through the chat store. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createReveal, readInspectRequest, TRAJECTORY_VIEW_ID } from '../src/client/inspect.ts'
-import { createChatStore, readActivityOpen } from '../src/client/stores.ts'
+import { createChatStore } from '../src/client/stores.ts'
 
 const KEY = 'shres.conversation.chat'
 
@@ -54,9 +54,17 @@ describe('readInspectRequest', () => {
     expect(readInspectRequest(snapshot.inspect)).toEqual({
       view: 'trajectory', target: { kind: 'call', callId: 'c9' },
     })
-    // A snapshot written before the Activity field reads as closed.
-    expect(readActivityOpen(snapshot.activityOpen)).toBe(false)
-    expect(readActivityOpen(true)).toBe(true)
+    // A snapshot written without the Activity field starts it closed.
+    expect(snapshot.activityOpen).toBe(false)
+  })
+
+  it('never writes the Activity popover\'s open state, so a reload starts it closed', () => {
+    const store = createChatStore().create('s2')
+    store.actions.setDraft('kept')
+    store.actions.setActivityOpen(true)
+    expect(JSON.parse(localStorage.getItem(`${KEY}.s2`)!)).not.toHaveProperty('activityOpen')
+    localStorage.setItem(`${KEY}.s3`, JSON.stringify({ selection: null, draft: 'kept', view: null, inspect: null, activityOpen: true }))
+    expect(createChatStore().create('s3').store.getSnapshot()).toMatchObject({ draft: 'kept', activityOpen: false })
   })
 })
 

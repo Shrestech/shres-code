@@ -15,17 +15,6 @@ type ChatActions = {
 }
 
 /**
- * Read the chat store's persisted `activityOpen` field. The store rehydrates
- * localStorage JSON without validation, and a snapshot written before the
- * field existed carries none, so only a stored `true` reads as open.
- * @param value - the store's `activityOpen` field as rehydrated.
- * @returns whether the Activity popover is open.
- */
-export function readActivityOpen(value: unknown): boolean {
-  return value === true
-}
-
-/**
  * Declares the per-session chat state and write surface.
  * @returns the store handle.
  */
@@ -36,6 +25,8 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
     // and the contract cannot drift.
     init: (): ChatStoreState => ({ selection: null, draft: '', view: null, inspect: null, activityOpen: false }),
     persist: 'shres.conversation.chat',
+    // The Activity popover opens by gesture in this page load only, so a reload never shows it open.
+    transient: ['activityOpen'],
     actions: {
       select: (d, target: SelectionTarget | null) => { d.selection = target },
       setDraft: (d, text: string) => { d.draft = text },
