@@ -74,6 +74,61 @@ export interface ModelRoutingCandidate {
   description: string
 }
 
+/**
+ * The gate thresholds one judgment engine is operated at, as configuration
+ * states them. Thresholds do not transfer between engines, so a point applies
+ * only to the engine it names.
+ */
+export interface ModelRoutingOperatingPointConfig {
+  /** Registry id of the engine this point applies to. */
+  engine: string
+  /** Route confidence at or above which a candidate may be selected. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. */
+  downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds; absence marks them uncalibrated. */
+  calibratedBy?: string
+  /**
+   * Allow gating on an engine whose descriptor declares `verbalized`
+   * calibration. Without it such an engine is refused as `engine-uncalibrated`.
+   */
+  acceptVerbalized?: boolean
+}
+
+/** One resolved operating point. */
+export interface ModelRoutingOperatingPoint {
+  /** Registry id of the engine this point applies to. */
+  readonly engine: string
+  /** Route-confidence floor. */
+  readonly downgradeThreshold: number
+  /** Top-two margin floor. */
+  readonly downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds, when one did. */
+  readonly calibratedBy?: string
+  /** Whether a `verbalized` engine may gate. */
+  readonly acceptVerbalized: boolean
+}
+
+/**
+ * The thresholds in force when a consult judged a route answer, as the
+ * decision records them, so a later configuration change does not
+ * reinterpret the log.
+ */
+export interface ModelRoutingThresholds {
+  /** Route-confidence floor applied. */
+  downgradeThreshold: number
+  /** Top-two margin floor applied. */
+  downgradeMargin: number
+  /** Difficulty at or above which no streak is entered; present when the consult asked the difficulty question. */
+  entryScoreCeiling?: number
+  /** Difficulty at or above which a held streak escalates; present when the consult asked the difficulty question. */
+  escalateBackScoreThreshold?: number
+  /** Whether the confidence and margin floors came from the engine's operating point or the global defaults. */
+  source: 'operating-point' | 'global'
+  /** Id of the preregistration whose replay set the operating point; absent means uncalibrated. */
+  calibratedBy?: string
+}
+
 /** One resolved strong route that routing may start from. */
 export interface ModelRoutingRouteFrom {
   /** Registered provider route of the strong model. */
@@ -222,6 +277,11 @@ export type ModelRoutingReason =
   | 'thin-margin'
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
+  /**
+   * The selected engine declares `verbalized` calibration and no operating
+   * point accepts it, so it is not asked and the manual route stands.
+   */
+  | 'engine-uncalibrated'
   /**
    * The manual route runs budget thinking with reasoning enabled, so every
    * other candidate is excluded and no judgment runs: returning to it after a
@@ -386,12 +446,39 @@ export interface ModelRoutingDecision {
   hint?: 'consider-stronger'
   /** Sticky-fold facts after this decision. */
   sticky: ModelRoutingStickyView
-  /** Engine that answered the judgment call, when one was made. */
+  /** Engine that answered the judgment call, as the provider named it, when one answered. */
   engine?: string
   /** Exact model that answered, when a judgment call was made. */
   model?: string
-  /** Duration of the judgment call in milliseconds, when one was made. */
+  /**
+   * Duration of the judgment call in milliseconds, when one was made: the
+   * engine's own figure for an answer, and the router's wall-clock measure from
+   * the ask to its failure for a failed call.
+   */
   latencyMs?: number
+  /**
+   * Registry id of the engine the judgment call was routed to, as the
+   * dispatcher stamped it on the answer or the failure; absent when a
+   * single-engine implementation served `ctx.judgment`.
+   */
+  engineId?: string
+  /**
+   * Token usage of the judgment call's own model request, exactly as the
+   * engine reported it, so {@link TokenUsage}'s presence contract holds; absent
+   * when the engine reported none.
+   */
+  judgeUsage?: TokenUsage
+  /**
+   * Duration of the candidate capability assessment in milliseconds, when this
+   * decision ran one: it sits on the request's critical path with the call.
+   */
+  eligibilityMs?: number
+  /**
+   * Characters of state the router handed to the engine for the judgment call:
+   * the one state of a plain ask, or every alternative a fitted ask offered.
+   * `judgmentInput.state` records the exact text a fitted answer used.
+   */
+  inputChars?: number
   /** The failed downgraded request a `route-failed` decision retries on the manual route. */
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
@@ -400,12 +487,25 @@ export interface ModelRoutingDecision {
   engineFailure?: ModelRoutingEngineFailure
   /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
   objective?: ModelRoutingObjective
+  /** The thresholds in force for the route and difficulty answers, when a judgment call answered. */
+  thresholds?: ModelRoutingThresholds
 }
 
 /** A failed judgment call as a decision records it. */
 export interface ModelRoutingEngineFailure {
-  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  /**
+   * The engine's error code, whenever the failure arrived, or `DEADLINE` when
+   * `judgmentDeadlineMs` expired first and the failure was a cancellation or
+   * carried no code, or an answer arrived after it.
+   */
   code: JudgmentErrorCode | 'DEADLINE'
+  /**
+   * The engine's registry state when it was becoming ready: before the call,
+   * which the router then did not make, or when the call's failure arrived.
+   * The fold does not count the decision as a failed judgment toward
+   * `judgmentFailures.holdTolerance` or the breaker.
+   */
+  engineState?: 'starting' | 'not-installed'
 }
 
 /** The downgraded request whose failure a `route-failed` decision records. */

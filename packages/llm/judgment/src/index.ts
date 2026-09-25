@@ -152,6 +152,12 @@ export function judgmentConsumerId(value: string): JudgmentConsumerId {
   return value as JudgmentConsumerId
 }
 
+/** Options of one {@link JudgmentError}. */
+export interface JudgmentErrorOptions extends ErrorOptions {
+  /** Registry id of the engine the failed ask was routed to; see {@link JudgmentError.engineId}. */
+  engineId?: JudgmentEngineId
+}
+
 /**
  * Classified failure of one judgment ask. Consumers branch on {@link code}
  * instead of matching provider text; a provider sets `cause` to whatever it
@@ -159,19 +165,28 @@ export function judgmentConsumerId(value: string): JudgmentConsumerId {
  */
 export class JudgmentError extends Error {
   override readonly name = 'JudgmentError'
+  /**
+   * Registry id of the engine the failed ask was routed to. A dispatcher sets
+   * it on every failure of a routed ask, as it sets
+   * {@link JudgmentResult.engineId} on every answer; absent when a
+   * single-engine implementation served `ctx.judgment` directly. Declared
+   * without an emitted field so an unrouted failure has no `engineId` key.
+   */
+  declare readonly engineId?: JudgmentEngineId
 
   /**
    * Create one classified judgment failure.
    * @param code - stable failure class.
    * @param message - diagnostic naming the engine and what could not be done.
-   * @param options - optional original failure.
+   * @param options - optional original failure and the routed engine's registry id.
    */
   constructor(
     readonly code: JudgmentErrorCode,
     message: string,
-    options?: ErrorOptions,
+    options?: JudgmentErrorOptions,
   ) {
     super(message, options)
+    if (options?.engineId !== undefined) Object.defineProperty(this, 'engineId', { value: options.engineId, enumerable: true })
   }
 }
 
@@ -269,6 +284,30 @@ export abstract class JudgmentService extends Service implements JudgmentEngine 
   constructor(ctx: Context, settings: JudgmentSettingsInstall = {}) {
     super(ctx, 'judgment')
     this.settings = installJudgmentSettings(this.ctx, settings)
+  }
+
+  /**
+   * The fitting capability that answers one consumer's fitted asks. A
+   * dispatcher answers with the engine it selects for `consumer`, so a consumer
+   * that names itself reads its fitting here rather than from {@link fitting},
+   * which follows the deployment-wide selection. A single-engine
+   * implementation answers every consumer with {@link fitting}.
+   * @param _consumer - the asking consumer; omission reads the deployment-wide selection.
+   * @returns the fitting capability, or `undefined` when the engine answering this consumer has none.
+   */
+  fittingFor(_consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined {
+    return this.fitting
+  }
+
+  /**
+   * The registry id of the engine that answers one consumer's asks, read
+   * before an ask so a consumer can attribute its own state to an engine. A
+   * single-engine implementation selects nothing and returns `undefined`.
+   * @param _consumer - the asking consumer; omission reads the deployment-wide selection.
+   * @returns the selected registry id, or `undefined` when this service does not select engines.
+   */
+  selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined {
+    return undefined
   }
 
   /**

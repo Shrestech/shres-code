@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
-import JudgmentService, { judgmentQuestionId, JudgmentError } from '../src/index.ts'
+import JudgmentService, { judgmentConsumerId, judgmentEngineId, judgmentQuestionId, JudgmentError } from '../src/index.ts'
 import type { JudgmentInput, JudgmentResult } from '../src/index.ts'
 
 /** Minimal engine proving the seam's registration form and answer contract. */
@@ -54,6 +54,13 @@ describe('JudgmentError', () => {
     expect(error.code).toBe('UNAVAILABLE')
     expect(error.message).toBe('the judgment engine could not be reached')
     expect(error.cause).toBe(cause)
+    expect(error).not.toHaveProperty('engineId')
+  })
+
+  it('carries the routed engine id when a dispatcher sets it', () => {
+    const error = new JudgmentError('UNAVAILABLE', 'laya is starting', { engineId: judgmentEngineId('laya') })
+    expect(error.engineId).toBe('laya')
+    expect(error.cause).toBeUndefined()
   })
 })
 
@@ -66,6 +73,18 @@ describe('the judgment seam through a provider', () => {
     const result = await ctx.judgment.ask({ state: 'payments are failing', questions: [BINARY], tier: 'fast' })
     expect(result).toEqual({ answers: [], engine: 'recording', model: 'recording-1', latencyMs: 0 })
     expect((ctx.judgment as RecordingJudgment).asks[0]?.questions[0]).toEqual(BINARY)
+  })
+
+  it('answers every consumer with its own fitting and selects no engine by default', async () => {
+    const ctx = new Context()
+    await ctx.plugin(RecordingJudgment)
+    const consumer = judgmentConsumerId('model-router')
+    expect(ctx.judgment.fittingFor(consumer)).toBeUndefined()
+    expect(ctx.judgment.selectedEngine(consumer)).toBeUndefined()
+    const fitting = { ask: () => Promise.reject(new Error('unused')) }
+    Object.defineProperty(ctx.judgment, 'fitting', { value: fitting })
+    expect(ctx.judgment.fittingFor(consumer)).toBe(fitting)
+    expect(ctx.judgment.fittingFor()).toBe(fitting)
   })
 
   it('exposes ctx.judgmentRedactor only while a deployment mounts one', async () => {

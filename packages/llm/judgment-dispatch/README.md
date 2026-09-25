@@ -27,9 +27,9 @@ Each ask resolves one engine id: the `judgment.overrides` entry for the ask's `c
 - A registered engine whose `status()` is not `ready` fails `UNAVAILABLE` with the state and its detail.
 - A ready engine answers, and the result carries `engineId`, the registry id of that engine.
 
-The engine's own failures reach the caller unchanged. Consumers treat every failure as their own engine-unavailable path, so an unavailable local engine never becomes a remote ask.
+Every failure of a routed ask carries `engineId`, as every answer does: the dispatcher's own `UNCONFIGURED` and `UNAVAILABLE`, and an engine's `JudgmentError`, which keeps its code, message, and cause. Anything else an engine throws breaks the provider contract and reaches the caller unchanged. Consumers treat every failure as their own engine-unavailable path, so an unavailable local engine never becomes a remote ask. `selectedEngine(consumer)` reads the id an ask for that consumer would be routed to.
 
-`ctx.judgment.fitting` is present while the deployment-wide engine exposes fitting, and it routes each fitted ask by its `consumer` the same way. A fitted ask routed to an engine without fitting fails `UNAVAILABLE`, and every fitted result carries `engineId`.
+`ctx.judgment.fittingFor(consumer)` is present while the engine selected for that consumer exposes fitting, and `ctx.judgment.fitting` is the same read for the deployment-wide selection. A consumer that names itself reads its fitting through `fittingFor`, so an override to a fitting engine fits even when the deployment-wide engine does not. Each fitted ask routes by its own `consumer` at ask time: one routed to an engine without fitting fails `UNAVAILABLE`, and every fitted result carries `engineId`.
 
 ## Settings
 

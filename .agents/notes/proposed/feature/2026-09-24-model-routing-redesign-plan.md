@@ -516,7 +516,7 @@ The owner edits one shared candidate pool and enables the strong routes routing 
 - `base-unlisted`: the manual route is not in `routeFrom`. No judgment runs, and a held streak whose route is removed ends with `brokenBy: 'base-unlisted'`.
 - `no-candidates`: the pool is empty.
 - `candidate-ineligible`: nothing remains after `equals-base` (§3.1) and the capability checks.
-- `engine-uncalibrated`: the selected engine has no operating point (PR 8b).
+- `engine-uncalibrated`: the selected engine declares `verbalized` calibration and no operating point accepts it (PR 8b). An engine calibrated by design without a point routes on the global thresholds, recorded as uncalibrated.
 
 A pool edit takes effect at the next decision, and a held candidate removed from the pool ends its streak with `unknown-candidate`. Every decision records `candidateEligibility` and the matched entry's `objective`, so an edit cannot reinterpret history.
 
@@ -667,7 +667,7 @@ candidates:                   # the one shared pool: id, provider, model, reason
   - { id: flash, provider: ollama-cloud, model: deepseek-v4.1-flash:cloud, description: "small, well-scoped edits in familiar code" }
 routeFrom:                    # required unless initialMode is off; an unlisted base is never routed
   - { provider: claude-session, model: claude-opus-5-5, objective: quota }
-operatingPoints:              # per registry engine id; absent engine => engine-uncalibrated (PR 8b)
+operatingPoints:              # per registry engine id; absent => global thresholds, uncalibrated; a verbalized engine needs acceptVerbalized (PR 8b)
   - { engine: laya, downgradeThreshold: <set from the §5.7 replay>, downgradeMargin: <set from the §5.7 replay>, calibratedBy: <preregistration id> }
 entry:
   policy: cold-points         # 'cold-points' | 'every-turn'
@@ -857,16 +857,17 @@ The design is a **Definition-owned engine registry plus one dispatcher that prov
 | A settings write selects an unregistered id | Write time: the section validator checks the live registry | The write is rejected with a named error; the UI lists only registered ids |
 | A settings write selects an engine whose descriptor `host` does not match (Laya on Linux) | Write time | Rejected: `engine "laya" requires darwin-arm64` |
 | The selected engine is registered but not ready | Each ask; status is pushed to the UI | `UNAVAILABLE` → `engine-unavailable`, subject to the §3.6 tolerance and breaker; the UI shows status and detail |
-| `operatingPoints` lacks the selected engine | Consult | `kept-strong` / `engine-uncalibrated`, no ask; the UI shows "not calibrated for routing" |
-| `operatingPoints[].engine` names an unregistered id | Dispatcher ready | Logged error; the router config reports invalid; decisions fall back as above |
+| The selected engine is `verbalized` and no operating point sets `acceptVerbalized` | Consult | `kept-strong` / `engine-uncalibrated`, no ask; the UI shows "not calibrated for routing". An engine calibrated by design without a point routes on the global thresholds, recorded as `thresholds.source: 'global'` with no `calibratedBy` |
+| `operatingPoints[].engine` names an unregistered id | After the Loader settles, and on each later settings or registry change | The router logs it at error level once, and at info level when it resolves; the point never applies, so decisions use the global thresholds, uncalibrated |
 
 The settings API needs a validator hook if `installSettingsSection` lacks one: add `validate?(value): string | undefined` to the `packages/settings` `installSettingsSection` options.
 
 #### R1.4 Logging
 
 - Router decisions already record `engine`, `model`, and `latencyMs`. Add:
-  - `selectedEngine: JudgmentEngineId`, recorded even when the ask failed or was skipped (`engine-uncalibrated`, `breaker-open`);
-  - `operatingPoint: {downgradeThreshold, downgradeMargin}`, the values applied, so a later settings change cannot reinterpret history.
+  - `engineId`, the registry id the dispatcher routed or would route the ask to, recorded on answered and failed calls and on `engine-uncalibrated` and `breaker-open`;
+  - `thresholds: {downgradeThreshold, downgradeMargin, entryScoreCeiling?, escalateBackScoreThreshold?, source, calibratedBy?}`, the values in force, so a later settings change cannot reinterpret history;
+  - `judgeUsage`, `eligibilityMs`, `inputChars`, and a failed call's wall-clock `latencyMs` ([engine-facts note](../../implemented/feature/2026-09-25-model-router-engine-facts.md)).
 - The worker-escalation `escalation/decision` event also records `selectedEngine`.
 - Settings changes are not session events. Decisions carry the engine that answered, which is what replay needs.
 
@@ -1060,7 +1061,7 @@ The design is **a new provider package that owns a supervised sidecar**. judgmen
 - never retry beyond its own documented policy.
 
 **Calibration caveats.**
-- Verbalized LLM probabilities are not calibrated, and thresholds from one engine do not transfer to another. That is why operating points are per engine (§R1.4), and an engine without one is `engine-uncalibrated`.
+- Verbalized LLM probabilities are not calibrated, and thresholds from one engine do not transfer to another. That is why operating points are per engine (§R1.4). A `verbalized` engine without an accepting point is `engine-uncalibrated`; an engine calibrated by design without one routes on the global thresholds, recorded as uncalibrated, and default-on waits for calibrated points (§5.8).
 - Policy: `verbalized` engines may be selected for shadow and bench runs only. The router refuses to decide downgrades on them unless an `operatingPoints[]` entry sets `acceptVerbalized: true` (owner decision D9).
 - An LLM judge's own tokens count against its route's quota or dollars, and the §5.1 accounting includes them.
 - An LLM judge on the *same* provider as the strong route competes for its quota and rate limits.
@@ -1204,7 +1205,7 @@ Every PR in this plan targets and merges into `feat/jev-judgment-foundation` (th
 | — | **#195 doc-gate cleanup** (commits `2b9bbfd58c`, `c8ef75b2fb`, `cee6f55279`): fix only the doc-gate failures #195 introduces relative to master, on #195 itself (D-11) | on the Jev branch | the files named by the branch-introduced failures | — | — | no doc-gate failure beyond master's baseline |
 | — | **#195 → master.** The consolidated Jev branch reaches master only through #195, a draft, once the owner has verified routing on it (D-60). The router ships in no default bundle; the demo home follows owner decision D1. | draft | | | | pre-push checks per the `shres-pre-push-checks` skill |
 | 8a | `judgment: engine registry and dispatcher` (R1 backend; D-39; #222) | merged as `d787c5fce8` | judgment, judgment-dispatch (new), judgment-typesafe, judgment-shield (`endpointPolicy`), judgment-laya (migrated into the registry), worker-escalation (`selectedEngine`), settings (`validate` hook), bench overlays, examples | 10a | `implemented/architecture/2026-09-24-judgment-engine-registry.md`; partially supersedes the 2026-09-20 shipped note's single-engine facts | registry disposal (HMR); dispatcher `UNCONFIGURED`/`UNAVAILABLE`; settings write rejection; Loader test switching engines |
-| 8b | `model-router: per-engine operating points` (D-39, D-48) | not merged | model-router (`operatingPoints` with `calibratedBy`, `engine-uncalibrated`, `selectedEngine` and `operatingPoint` on decisions) | 7, 8a | extends the 8a note | an engine without an operating point keeps strong as `engine-uncalibrated` |
+| 8b | `model-router: engine facts, consumer id, and failure accounting` (D-39, D-48; branch `feat/model-router-engine-facts`) | not merged | judgment (`fittingFor`, `selectedEngine`, `JudgmentError.engineId`), judgment-dispatch, model-router (consumer id; `engineId`, `judgeUsage`, `eligibilityMs`, `inputChars`, `thresholds` on decisions; failures per engine; warm-up not counted; `operatingPoints` with `calibratedBy` and `acceptVerbalized`), acp-snapshot normalizer, bench accounting, ui-trajectory | 7, 8a | `implemented/feature/2026-09-25-model-router-engine-facts.md` | a `verbalized` engine without an accepting point keeps strong as `engine-uncalibrated`; a calibrated engine without one routes on the global thresholds, uncalibrated; the `model-router-llm-judge` snapshot; the bench accounting test on real router output |
 | 9a | `ui-settings-model-routing: mode, engine selector, enabled toggle, engine status` (R1 UI; D-48) | not merged | client/ui-settings-model-routing (new), ui-settings-models (Classifier card removed), api Typert gateway (`judgmentEngines` host API) | 8a | same as PR 8a (UI section) | 9a specs in §R1.5; browser-plugin disposal; GIF |
 | 9b | `ui-settings-model-routing: pool editor, route from, read-only thresholds` (D-46, D-48) | not merged | client/ui-settings-model-routing, api Typert gateway (`modelRouting.poolStatus()`), model-router (the write-time unregistered-provider check, §3.3) | 7, 8a, 9a | same as PR 8a (UI section) | 9b specs in §R1.5; Loader pool-edit test; GIF |
 | 10a | `judgment-laya: supervised local MLX gateway` as a `ctx.judgment` provider (R2, R3; D-9; #213) | merged as `a583c1c692` | judgment-laya (new), `python/laya-gateway` (new), judgment-shield (wire client export), `THIRD_PARTY_NOTICES.md`, `scripts/gen-third-party-notices.ts` (notices check), `scripts/check-laya-upstream.ts` | — | `implemented/feature/2026-09-24-local-laya-judgment.md` (pins, fidelity-check result, install and offline policy, upstream-tracking policy) | supervisor specs in §R2.3; e2e `laya.e2e.ts`; notices check |

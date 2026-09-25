@@ -1071,6 +1071,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'fittingFor(_consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined',
+        description: 'The fitting capability that answers one consumer\'s fitted asks. A dispatcher answers with the engine it selects for `consumer`, so a consumer that names itself reads its fitting here rather than from fitting, which follows the deployment-wide selection. A single-engine implementation answers every consumer with fitting.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the fitting capability, or `undefined` when the engine answering this consumer has none.',
+      },
+      {
+        signature: 'selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined',
+        description: 'The registry id of the engine that answers one consumer\'s asks, read before an ask so a consumer can attribute its own state to an engine. A single-engine implementation selects nothing and returns `undefined`.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the selected registry id, or `undefined` when this service does not select engines.',
+      },
+      {
         signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
         description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id. An implementation must honour `input.signal` at every await, settling promptly with `ABORTED` once it aborts: a consumer\'s deadline bounds the answer it uses, but bounds its wait only when the engine aborts.',
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
@@ -4649,7 +4661,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingDecision',
-    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n}',
+    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n    thresholds?: ModelRoutingThresholds;\n}',
   },
   {
     name: 'ModelRoutingDecisionDetail',
@@ -4665,7 +4677,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingEngineFailure',
-    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n}',
+    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n}',
   },
   {
     name: 'ModelRoutingEntryBaseView',
@@ -4700,12 +4712,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
   },
   {
+    name: 'ModelRoutingOperatingPoint',
+    declaration: 'export interface ModelRoutingOperatingPoint {\n    readonly engine: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly calibratedBy?: string;\n    readonly acceptVerbalized: boolean;\n}',
+  },
+  {
     name: 'ModelRoutingOutcome',
     declaration: 'export type ModelRoutingOutcome = \'downgraded\' | \'kept-strong\' | \'skipped\' | \'error\';',
   },
   {
     name: 'ModelRoutingReason',
-    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
+    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
   },
   {
     name: 'ModelRoutingRecordedThresholds',
@@ -4730,6 +4746,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingStickyView',
     declaration: 'export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView;',
+  },
+  {
+    name: 'ModelRoutingThresholds',
+    declaration: 'export interface ModelRoutingThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    entryScoreCeiling?: number;\n    escalateBackScoreThreshold?: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
   },
   {
     name: 'ModelRoutingUnavailablePolicy',
@@ -4897,7 +4917,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',
