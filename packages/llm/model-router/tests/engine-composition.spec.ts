@@ -154,9 +154,10 @@ afterEach(async () => {
  * Boot the router, the dispatcher, and the given engines through the Loader.
  * @param engines - the engines to register, in order.
  * @param defaultEngine - the dispatcher's `defaultEngine`.
+ * @param routerLines - extra router config lines, indented under `config`.
  * @returns the booted composition.
  */
-async function boot(engines: readonly EngineSpec[], defaultEngine: string): Promise<Booted> {
+async function boot(engines: readonly EngineSpec[], defaultEngine: string, routerLines: readonly string[] = []): Promise<Booted> {
   root = await mkdtemp(join(tmpdir(), 'shres-model-router-engines-'))
   const plugins = engines.map(spec => ({ spec, ...enginePlugin(spec) }))
   const routes = new Routes()
@@ -186,6 +187,7 @@ async function boot(engines: readonly EngineSpec[], defaultEngine: string): Prom
     '    judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 5 }',
     '    routeInstructions: Pick the cheapest route that can finish this turn.',
     '    difficultyInstructions: Rate how hard this turn is.',
+    ...routerLines,
     '',
   ].join('\n'))
   const modules = new Map<string, unknown>([
@@ -274,8 +276,29 @@ describe('real Loader composition: router, judgment-dispatch, and registered eng
     expect(decisions()).toHaveLength(1)
     expect(decisions()[0]).toMatchObject({ outcome: 'kept-strong', reason: 'engine-uncalibrated', engineId: 'verb' })
     expect(decisions()[0]).not.toHaveProperty('route')
+    expect(decisions()[0]).not.toHaveProperty('thresholds')
     expect(engines['verb']!.asks).toHaveLength(0)
     expect(engines['cal']!.asks).toHaveLength(0)
+  })
+
+  it('records the thresholds of the engine that answers when the selection changes while candidates are assessed', { timeout: 30_000 }, async () => {
+    const { ctx, routes, consult, decisions, engines } = await boot([{ id: 'cal' }, { id: 'pt' }], 'cal', [
+      '    operatingPoints:',
+      '      - { engine: pt, downgradeThreshold: 0.9, downgradeMargin: 0.5, calibratedBy: prereg-pt }',
+    ])
+    routes.duringAssessment = () => ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: 'pt' })
+    expect(await consult(1)).toEqual(CHEAP)
+    expect(engines['pt']!.asks).toHaveLength(1)
+    expect(engines['cal']!.asks).toHaveLength(0)
+    expect(decisions()[0]).toMatchObject({ reason: 'gate-passed', engine: 'pt', engineId: 'pt' })
+    expect(decisions()[0]?.thresholds).toEqual({
+      downgradeThreshold: 0.9,
+      downgradeMargin: 0.5,
+      entryScoreCeiling: 2,
+      escalateBackScoreThreshold: 3,
+      source: 'operating-point',
+      calibratedBy: 'prereg-pt',
+    })
   })
 
   it('treats an engine that starts warming while candidates are assessed as warm-up, not failure', { timeout: 30_000 }, async () => {
