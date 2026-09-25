@@ -52,10 +52,12 @@ import {
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
+  JudgmentEngineId,
   JudgmentQuestion,
   JudgmentResult,
   JudgmentScoreAnswer,
   JudgmentScoreQuestion,
+  JudgmentService,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
@@ -96,7 +98,7 @@ import {
 import { buildRoutingStateCandidates } from './state.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
-import type { ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
+import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
 import type {
   ModelRoutingCandidate,
   ModelRoutingDecision,
@@ -160,6 +162,20 @@ declare module '@shres-code/cordis' {
   interface Context {
     modelRouting: ModelRoutingController
   }
+}
+
+/** The engine facts one judgment call is decided on, read with no await between them. */
+interface EngineSnapshot {
+  /** Registry id of the engine; absent when a single-engine service selects none. */
+  readonly engineId?: JudgmentEngineId
+  /** Whether the engine declares `verbalized` calibration and no operating point accepts it. */
+  readonly refused: boolean
+  /** The engine's registry state while it is becoming ready. */
+  readonly warming?: 'starting' | 'not-installed'
+  /** Counted failures that apply to this engine; undefined when none do. */
+  readonly failures: ModelRoutingJudgmentFailures | undefined
+  /** Thresholds in force for this engine. */
+  readonly thresholds: ModelRoutingThresholds
 }
 
 /** One assembled judgment state, with the surface seqs it came from. */
@@ -665,6 +681,46 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })
   }
 
+  /**
+   * The engine facts one judgment call is decided on, read with no await
+   * between them: the engine's registry calibration and status, its operating
+   * point, the thresholds in force, and the failures counted against it.
+   * @param engine - the judgment service.
+   * @param config - resolved configuration carrying the operating points and global thresholds.
+   * @param sticky - fold state carrying the counted failures.
+   * @param engineId - the engine to describe; omission reads the one selected for this router now.
+   * @returns the snapshot.
+   */
+  private engineSnapshot(
+    engine: JudgmentService,
+    config: ResolvedModelRouterConfig,
+    sticky: ModelRoutingStickyState,
+    engineId: JudgmentEngineId | undefined = engine.selectedEngine(MODEL_ROUTER_JUDGMENT_CONSUMER),
+  ): EngineSnapshot {
+    const entry = engineId === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(engineId)
+    const point = engineId === undefined ? undefined : config.operatingPoints.find(candidate => candidate.engine === engineId)
+    const state = entry?.status().state
+    return {
+      ...engineId === undefined ? {} : { engineId },
+      // A generative model's stated probabilities do not gate unless the
+      // deployment accepted them for this engine.
+      refused: entry?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true,
+      ...state === 'starting' || state === 'not-installed' ? { warming: state } : {},
+      failures: judgmentFailuresFor(sticky.judgmentFailures, engineId),
+      // Built in one fixed key order, so equal inputs log equal decisions.
+      thresholds: {
+        downgradeThreshold: point?.downgradeThreshold ?? config.downgradeThreshold,
+        downgradeMargin: point?.downgradeMargin ?? config.downgradeMargin,
+        ...config.difficultyInstructions === undefined ? {} : {
+          entryScoreCeiling: config.entryScoreCeiling,
+          escalateBackScoreThreshold: config.escalateBackScoreThreshold,
+        },
+        source: point === undefined ? 'global' : 'operating-point',
+        ...point?.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
+      },
+    }
+  }
+
   /** Adopt only agents whose resolved routing service is this controller. */
   private attachAgent(agent: Agent): void {
     if (!this.ownsAgent(agent)) return
@@ -1117,38 +1173,27 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
     }
-    const engine = this.ctx.get('judgment')
     const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
-    const selectedEngine = engine?.selectedEngine(consumer)
+    let engine = this.ctx.get('judgment')
     // Failures count per engine, so an engine switch starts from none. The
     // breaker is half-open once its window passes: only an answered call
     // clears the count, so the next failure opens it again.
-    const failures = judgmentFailuresFor(sticky.judgmentFailures, selectedEngine)
-    if (failures !== undefined && config.judgmentFailures.breakerOpenTurns > 0
+    const breakerOpen = (failures: ModelRoutingJudgmentFailures | undefined): boolean => failures !== undefined
+      && config.judgmentFailures.breakerOpenTurns > 0
       && failures.count >= config.judgmentFailures.breakerThreshold
-      && turn - failures.turn <= config.judgmentFailures.breakerOpenTurns) {
-      return { ...keep('breaker-open'), ...selectedEngine === undefined ? {} : { engineId: selectedEngine } }
+      && turn - failures.turn <= config.judgmentFailures.breakerOpenTurns
+    const withEngine = (decision: ModelRoutingDecision, snapshot: EngineSnapshot | undefined): ModelRoutingDecision =>
+      snapshot?.engineId === undefined ? decision : { ...decision, engineId: snapshot.engineId }
+    // A refusal needs no capability assessment, so the engine selected now is
+    // checked first; the call re-checks the engine it asks immediately before
+    // asking, because the selection can change during the assessment.
+    let snapshot = engine === undefined ? undefined : this.engineSnapshot(engine, config, sticky)
+    if (breakerOpen(snapshot === undefined ? sticky.judgmentFailures : snapshot.failures)) {
+      return withEngine(keep('breaker-open'), snapshot)
     }
-    if (engine === undefined) return keep('engine-absent')
+    if (engine === undefined || snapshot === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
-    const registered = selectedEngine === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(selectedEngine)
-    const point = config.operatingPoints.find(entry => entry.engine === selectedEngine)
-    // A generative model's stated probabilities do not gate unless the
-    // deployment accepted them for this engine.
-    if (registered?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true) {
-      return { ...keep('engine-uncalibrated'), engineId: selectedEngine as string }
-    }
-    // Built in one fixed key order, so equal inputs log equal decisions.
-    const thresholds: ModelRoutingThresholds = {
-      downgradeThreshold: point?.downgradeThreshold ?? config.downgradeThreshold,
-      downgradeMargin: point?.downgradeMargin ?? config.downgradeMargin,
-      ...config.difficultyInstructions === undefined ? {} : {
-        entryScoreCeiling: config.entryScoreCeiling,
-        escalateBackScoreThreshold: config.escalateBackScoreThreshold,
-      },
-      source: point === undefined ? 'global' : 'operating-point',
-      ...point?.calibratedBy === undefined ? {} : { calibratedBy: point.calibratedBy },
-    }
+    if (snapshot.refused) return withEngine(keep('engine-uncalibrated'), snapshot)
     const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
     const eligibilityStarted = Date.now()
@@ -1186,6 +1231,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const judgmentFailed = (
       reason: 'engine-unavailable' | 'invalid-answer',
       appliesPolicy: boolean,
+      failures: ModelRoutingJudgmentFailures | undefined,
       code?: ModelRoutingEngineFailure['code'],
       engineState?: ModelRoutingEngineFailure['engineState'],
     ): ModelRoutingDecision => {
@@ -1225,18 +1271,26 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
       return { ...keep(reason), ...engineFailure }
     }
+    // From here to the ask nothing awaits: the dispatcher reads its selection
+    // when the ask is called, so this snapshot names the engine that answers.
+    engine = this.ctx.get('judgment')
+    if (engine === undefined) return keep('engine-absent')
+    if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
+    snapshot = this.engineSnapshot(engine, config, sticky)
+    const asked = snapshot
+    const fitting = engine.fittingFor(consumer)
+    if (breakerOpen(asked.failures)) return withEngine(keep('breaker-open'), asked)
+    if (asked.refused) return withEngine(keep('engine-uncalibrated'), asked)
+    if (asked.engineId !== undefined) facts.engineId = asked.engineId
     // An engine that is still starting or not yet installed cannot answer: the
     // call is not made and the fold does not count it as a failure.
-    const engineState = registered?.status().state
-    if (selectedEngine !== undefined) facts.engineId = selectedEngine
-    if (engineState === 'starting' || engineState === 'not-installed') {
-      return judgmentFailed('engine-unavailable', true, 'UNAVAILABLE', engineState)
+    if (asked.warming !== undefined) {
+      return judgmentFailed('engine-unavailable', true, asked.failures, 'UNAVAILABLE', asked.warming)
     }
     // The deadline aborts the call alone: the turn's own signal still cancels
     // the turn, and an answer arriving after the deadline is not used.
     const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
     const askSignal = AbortSignal.any([signal, deadline])
-    const fitting = engine.fittingFor(consumer)
     const states = fitting === undefined ? [state.text] : state.alternatives.map(candidate => candidate.text)
     facts.inputChars = states.reduce((total, text) => total + text.length, 0)
     const askStarted = Date.now()
@@ -1271,31 +1325,44 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       signal.throwIfAborted()
       // A failed call still ran: record where it went and how long it took.
       facts.latencyMs = Date.now() - askStarted
-      const failedEngine = error instanceof JudgmentError ? error.engineId ?? selectedEngine : selectedEngine
-      if (failedEngine !== undefined) facts.engineId = failedEngine
+      // The failure is judged against the engine that produced it, with its
+      // status as it reads now: an engine that began restarting is warming up.
+      const stamped = error instanceof JudgmentError ? error.engineId : undefined
+      const failed = this.engineSnapshot(engine, config, sticky, stamped ?? asked.engineId)
+      if (failed.engineId !== undefined) facts.engineId = failed.engineId
       // A coded failure is classified by its code, whenever it arrives; only a
       // cancellation or an uncoded failure after the deadline is the deadline.
       const code = error instanceof JudgmentError ? error.code : undefined
       if (code === 'INPUT_TOO_LARGE') return keep('judgment-input-too-large')
-      if (code === 'INVALID_ANSWER') return judgmentFailed('invalid-answer', true, code)
-      if (code === 'UNAVAILABLE' || code === 'UNCONFIGURED') return judgmentFailed('engine-unavailable', true, code)
-      if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
+      if (code === 'INVALID_ANSWER') return judgmentFailed('invalid-answer', true, failed.failures, code)
+      if (code === 'UNAVAILABLE' || code === 'UNCONFIGURED') {
+        return judgmentFailed('engine-unavailable', true, failed.failures, code, failed.warming)
+      }
+      if (deadline.aborted) return judgmentFailed('engine-unavailable', true, failed.failures, 'DEADLINE', failed.warming)
       if (code === 'ABORTED') throw error
-      return judgmentFailed('engine-unavailable', true)
+      return judgmentFailed('engine-unavailable', true, failed.failures)
     }
-    // A late answer was billed but is not used.
     facts.engine = result.engine
     facts.model = result.model
     facts.latencyMs = result.latencyMs
     if (result.engineId !== undefined) facts.engineId = result.engineId
     if (result.usage !== undefined) facts.judgeUsage = result.usage
-    if (deadline.aborted) return judgmentFailed('engine-unavailable', true, 'DEADLINE')
+    // The answer is judged against the engine that gave it. An engine the
+    // router refuses never gates, even when it answered: its call is billed and
+    // recorded, and its answer is discarded.
+    const answering = result.engineId === undefined || result.engineId === asked.engineId
+      ? asked
+      : this.engineSnapshot(engine, config, sticky, result.engineId)
+    if (answering.refused) return withEngine(keep('engine-uncalibrated'), answering)
+    // A late answer was billed but is not used.
+    if (deadline.aborted) return judgmentFailed('engine-unavailable', true, answering.failures, 'DEADLINE')
+    const thresholds = answering.thresholds
     const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const score = result.answers.find((answer): answer is JudgmentScoreAnswer =>
       answer.kind === 'score' && answer.id === DIFFICULTY_QUESTION_ID)
     if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) {
-      return judgmentFailed('invalid-answer', false)
+      return judgmentFailed('invalid-answer', false, answering.failures)
     }
     const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
     const difficulty = score === undefined ? undefined : { score: score.score, confidence: score.confidence }

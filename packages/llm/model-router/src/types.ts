@@ -500,9 +500,10 @@ export interface ModelRoutingEngineFailure {
    */
   code: JudgmentErrorCode | 'DEADLINE'
   /**
-   * The selected engine's registry state when it was still becoming ready. The
-   * router made no call, and the fold does not count the decision as a failed
-   * judgment toward `judgmentFailures.holdTolerance` or the breaker.
+   * The engine's registry state when it was becoming ready: before the call,
+   * which the router then did not make, or when the call's failure arrived.
+   * The fold does not count the decision as a failed judgment toward
+   * `judgmentFailures.holdTolerance` or the breaker.
    */
   engineState?: 'starting' | 'not-installed'
 }
