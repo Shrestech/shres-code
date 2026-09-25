@@ -30,7 +30,13 @@ import type { SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
 import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
 import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
-import ModelRoutingController, { KEEP_CURRENT_OPTION_ID, ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
+import ModelRoutingController, {
+  KEEP_CURRENT_OPTION_ID,
+  ROUTE_COMMAND,
+  ROUTE_QUESTION_ID,
+  DIFFICULTY_QUESTION_ID,
+  foldModelRoutingStats,
+} from '../src/index.ts'
 import * as ModelRouterInvariant from '../src/invariant.ts'
 import { FakeJudgment, SCRIPTED_CANDIDATE, SCRIPTED_ENGINE, SCRIPTED_OTHER_CANDIDATE } from './fake-judgment-provider.ts'
 
@@ -645,6 +651,7 @@ describe('real Loader composition', () => {
     expect(loaded.get('modelRouting')).toBeDefined()
     expect(loaded.commands.find(agent, ROUTE_COMMAND)).toBeDefined()
     expect(loaded.sessionProjections.snapshot(agent.session).values['modelRouting']).toBeDefined()
+    expect(loaded.sessionProjections.snapshot(agent.session).values['modelRoutingStats']).toBeDefined()
 
     const entry = [...loaded.loader.entries()]
       .find(candidate => candidate.options.name === '@shres-code/shres-code-model-router')
@@ -654,6 +661,44 @@ describe('real Loader composition', () => {
     expect(loaded.get('modelRouting')).toBeUndefined()
     expect(loaded.commands.find(agent, ROUTE_COMMAND)).toBeUndefined()
     expect(loaded.sessionProjections.snapshot(agent.session).values['modelRouting']).toBeUndefined()
+    expect(loaded.sessionProjections.snapshot(agent.session).values['modelRoutingStats']).toBeUndefined()
+  })
+
+  it('pushes routing statistics that match the log and reads a logged decision with the gate in force', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot()
+    const agent = createAgent(loaded, 'router-view')
+    await pinManualRoute(loaded, agent)
+    await turn(agent, 'First easy turn.')
+    await turn(agent, 'Second easy turn.')
+
+    const events = agent.session.events
+    const decisions = eventsOfType(events, 'model-routing/decision')
+    const calls = eventsOfType(events, 'assistant/message').filter(call => call.data.usage !== undefined)
+    const stats = loaded.sessionProjections.snapshot(agent.session).values.modelRoutingStats
+    // The pushed value is the pure fold of the same log.
+    expect(stats).toEqual(foldModelRoutingStats(events))
+    expect(decisions).toHaveLength(2)
+    expect(stats?.counts).toMatchObject({
+      decisions: decisions.length,
+      consults: decisions.filter(decision => decision.data.route !== undefined).length,
+      streaks: 1,
+      steps: calls.length,
+      downgradedSteps: calls.filter(call => call.data.message.source.model === CANDIDATE_MODEL).length,
+      keptStrong: 0,
+      turnsWithDecisions: 2,
+    })
+    // Both turns ran on the held candidate; the manual route served no call.
+    expect(stats?.models.map(model => [model.model, model.role, model.colorSlot, model.steps])).toEqual([
+      [CANDIDATE_MODEL, 'candidate', 1, 2],
+    ])
+    expect(stats?.timeline.marks).toEqual([{ i: 0, kind: 'down' }])
+    expect(stats?.recent.map(row => row.seq)).toEqual(decisions.map(decision => decision.seq).reverse())
+
+    const last = decisions.at(-1)!
+    const detail = loaded.modelRouting.decisionDetail(agent, last.seq)
+    expect(detail).toMatchObject({ seq: last.seq, time: last.time, turn: 2, step: 1, decision: last.data })
+    expect(detail.gate).toMatchObject({ downgradeThreshold: 0.7, downgradeMargin: 0.5, hold: { minSteps: 3 } })
+    expect(detail.gate).toEqual(loaded.modelRouting.gateView())
   })
 })
 

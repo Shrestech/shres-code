@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.modelRouting
 // seat and its {locked} owner share).
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting` SessionProjectionMap merge for useProjection.
-import type {} from '@shres-code/shres-code-model-router/client'
+import type { ModelRoutingGateView } from '@shres-code/shres-code-model-router/client'
+import { routingJudge, routingSettingsPage, type RoutingJudge } from './engine-source.ts'
+import { judgeRefused } from './view/derive.ts'
 import type { RoutingChipInjected } from './index.ts'
 import css from './RoutingChip.module.css'
 
@@ -13,13 +16,14 @@ import css from './RoutingChip.module.css'
 export type RoutingChipProps =
   PropsRuntime<'conversation.input.modelRouting'> & InjectFace<RoutingChipInjected> & PropsLocale<'modelRouting'>
 
-/** The chip's two gestures; each carries its own failure label. */
-type ChipAction = 'mode' | 'restore'
+/** The chip's gestures; each carries its own failure label. */
+type ChipAction = 'mode' | 'restore' | 'settings'
 
 /** English failure labels, one per gesture (error-surface policy: not localized). */
 const FAILURE_LABEL: Record<ChipAction, string> = {
   mode: 'failed to switch model routing',
   restore: 'failed to restore the strong model',
+  settings: 'failed to open Settings › Model routing',
 }
 
 /**
@@ -39,8 +43,15 @@ const FAILURE_LABEL: Record<ChipAction, string> = {
  * @param props - runtime share, injected face, and the locale seat.
  * @returns the chip, or null while routing is unavailable for this session.
  */
-export function RoutingChip({ useProjection, locked, available, setRouting, restoreStrong, t }: RoutingChipProps) {
+export function RoutingChip({
+  useProjection, useRoutingEngine, locked, reveal, available, setRouting, restoreStrong, loadGate, openRoutingSettings, t,
+}: RoutingChipProps) {
   const routing = useProjection('modelRouting')
+  const engineState = useRoutingEngine(state => state)
+  // Offered only while the page exists: opening a section that is not registered rejects.
+  const openSettings = routingSettingsPage(engineState) ? openRoutingSettings : undefined
+  const [confirm, setConfirm] = useState<ConfirmedJudge | null>(null)
+  const [confirmGate, setConfirmGate] = useState<ModelRoutingGateView | null>(null)
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
@@ -86,11 +97,48 @@ export function RoutingChip({ useProjection, locked, available, setRouting, rest
         title={on ? t('chip.on.title') : t('chip.off.title')}
         aria-busy={pending === 'mode'}
         disabled={locked || pending !== null}
-        onClick={() => { run('mode', () => setRouting(!on)) }}
+        onClick={() => {
+          if (on) {
+            run('mode', () => setRouting(false))
+            return
+          }
+          // Turning routing on is the gesture that starts sending conversation
+          // state to the judge, so a judge that sends it off this machine, or
+          // one not known yet, asks first. An id no engine registers is not
+          // known: an engine registering under it later is asked with no
+          // further gesture. A local judge, judgment switched off, or no
+          // dispatcher does not ask.
+          const judge = routingJudge(engineState)
+          if (!confirms(judge)) {
+            run('mode', () => setRouting(true))
+            return
+          }
+          setConfirm(judge)
+          setConfirmGate(null)
+          loadGate().then((gate) => {
+            if (aliveRef.current) setConfirmGate(gate)
+          }, () => {
+            // Without the cap the confirm names the destination alone; the
+            // gesture stays available, so nothing else needs the failure.
+          })
+        }}
       >
         {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
         {on ? 'auto' : 'Auto'}
       </button>
+      {reveal !== undefined && (
+        <button
+          type="button"
+          className={css.details}
+          aria-label={t('chip.details')}
+          title={t('chip.details')}
+          // Opening this session's Routing view changes no routing state, so a
+          // locked composer or a gesture in flight leaves it available.
+          onClick={() => { reveal({ view: 'routing', target: { kind: 'none' } }) }}
+        >
+          <span aria-hidden="true">⋯</span>
+        </button>
+      )}
       {idle && <span className={css.idle}>{t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}</span>}
       {strong !== undefined && (
         <button
@@ -107,10 +155,93 @@ export function RoutingChip({ useProjection, locked, available, setRouting, rest
           {t('idle.restore')}
         </button>
       )}
+      {confirm !== null && (
+        <Modal
+          open
+          onClose={() => { setConfirm(null) }}
+          title={t('confirm.title')}
+          description={t('confirm.body')}
+          closeLabel={t('confirm.close')}
+          footer={(
+            <span className={css.confirmActions}>
+              {openSettings !== undefined && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfirm(null)
+                    run('settings', async () => {
+                      await openSettings()
+                      return null
+                    })
+                  }}
+                >
+                  {t('confirm.openSettings')}
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => { setConfirm(null) }}>{t('confirm.cancel')}</Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setConfirm(null)
+                  run('mode', () => setRouting(true))
+                }}
+              >
+                {t('confirm.turnOn')}
+              </Button>
+            </span>
+          )}
+        >
+          <p className={css.confirmWarning}>{confirmWarning(confirm, confirmGate, t)}</p>
+          {/* Without a way to open Settings, the confirm names where the judge is changed. */}
+          {openSettings === undefined && <p className={css.confirmSettings}>{t('confirm.settings')}</p>}
+        </Modal>
+      )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
       {failure !== null && (
         <span className={css.error} role="status" title={failure.detail}>{FAILURE_LABEL[failure.action]}</span>
       )}
     </span>
   )
+}
+
+/**
+ * The confirm's warning: where the judge sends conversation state, with the
+ * per-consult character cap once the gate has loaded, or that the router
+ * refuses the judge and so sends nothing.
+ * @param judge - the judge the confirm was opened for.
+ * @param gate - the configured gate, or null until it loads.
+ * @param t - the chip's translate.
+ * @returns the warning sentence.
+ */
+function confirmWarning(
+  judge: ConfirmedJudge,
+  gate: ModelRoutingGateView | null,
+  t: RoutingChipProps['t'],
+): string {
+  if (judge.kind === 'none') return t('confirm.unregistered')
+  if (judge.kind !== 'engine') return t('confirm.unknown')
+  if (judgeRefused(judge, gate) === true) return t('confirm.refused')
+  const destination = judge.engine.destination ?? judge.engine.label
+  return gate === null
+    ? t('confirm.warning', { destination })
+    : t('confirm.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
+}
+
+/** A judge whose turn-on asks first: a remote engine, or one not known yet. */
+type ConfirmedJudge =
+  | Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }>
+  | { readonly kind: 'none'; readonly reason: 'unregistered' }
+
+/**
+ * Whether turning routing on asks first for this judge.
+ * @param judge - the router's judge.
+ * @returns true for a remote engine, a judge not known yet, or an id no engine registers.
+ */
+function confirms(judge: RoutingJudge): judge is ConfirmedJudge {
+  switch (judge.kind) {
+    case 'loading':
+    case 'failed': return true
+    case 'none': return judge.reason === 'unregistered'
+    case 'engine': return judge.engine.egress === 'remote'
+  }
 }

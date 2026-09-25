@@ -1060,7 +1060,7 @@ describe('TrajectoryTable', () => {
       <TrajectoryTable
         turns={CALL_TURNS}
         {...FOLD_PROPS}
-        inspectCallId="call-1"
+        inspectTarget={{ kind: 'call', callId: 'call-1' }}
         onInspectApplied={onInspectApplied}
       />,
     )
@@ -1076,7 +1076,7 @@ describe('TrajectoryTable', () => {
       <TrajectoryTable
         turns={CALL_TURNS}
         {...FOLD_PROPS}
-        inspectCallId="call-missing"
+        inspectTarget={{ kind: 'call', callId: 'call-missing' }}
         onInspectApplied={onInspectApplied}
       />,
     )
@@ -1085,7 +1085,109 @@ describe('TrajectoryTable', () => {
     expect(onInspectApplied).not.toHaveBeenCalled()
   })
 
+  /** Loaded ledger from seq 3: a user record, an assistant record at seq 5, and a tool call at seq 8. */
+  function eventTurns(firstSeq = 3): readonly TrajectoryTurnModel[] {
+    return [{
+      turn: 1,
+      groups: [
+        { title: 'Message', cells: [{ index: 1, kind: 'user', text: 'go', sourceSeq: firstSeq, timeSeconds: 0 }] },
+        {
+          title: 'Step 1',
+          cells: [
+            { index: 2, kind: 'message', text: 'Checking', outputDetail: 'Checking', sourceSeq: 5, timeSeconds: 1 },
+            {
+              index: 3, kind: 'tool', text: 'bash · {"command":"pwd"}', inputDetail: '{"command":"pwd"}',
+              callId: 'call-8', sourceSeq: 8, timeSeconds: 0.1,
+            },
+          ],
+        },
+      ],
+    }]
+  }
+
+  function rowSelected(container: HTMLElement, index: number): string | null {
+    return container.querySelector(`tr[data-record-index="${index}"]`)?.getAttribute('aria-selected') ?? null
+  }
+
+  it('an event target opens the record its event produced and acknowledges once', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        inspectTarget={{ kind: 'event', seq: 8 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 3)).toBe('true')
+    expect(screen.getByRole('complementary', { name: 'Event details' })).toBeTruthy()
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target with no record of its own opens the nearest earlier record', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        inspectTarget={{ kind: 'event', seq: 7 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 2)).toBe('true')
+    expect(rowSelected(view.container, 3)).toBe('false')
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target before the loaded history stays pending until its page loads', () => {
+    const onInspectApplied = vi.fn()
+    const target = { kind: 'event', seq: 1 } as const
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        historyStartSeq={3}
+        hasOlderRecords
+        inspectTarget={target}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(onInspectApplied).not.toHaveBeenCalled()
+    expect(screen.queryByRole('complementary', { name: 'Event details' })).toBeNull()
+
+    // The older page lands: the user record now starts the history at seq 1.
+    view.rerender(
+      <TrajectoryTable
+        turns={eventTurns(1)}
+        {...FOLD_PROPS}
+        historyStartSeq={1}
+        hasOlderRecords={false}
+        inspectTarget={target}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 1)).toBe('true')
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target no record precedes is acknowledged without opening a record', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        historyStartSeq={0}
+        inspectTarget={{ kind: 'event', seq: 1 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+    expect(view.container.querySelector('tr[aria-selected="true"]')).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Event details' })).toBeNull()
+  })
+
   const ROUTING_FOLD_PROPS = { ...FOLD_PROPS, t: makeTranslate(en) }
+  const EXPLAIN = 'Explain this routing decision in the Routing view'
 
   function routingCell(overrides: Partial<TrajectoryCellProps>): TrajectoryCellProps {
     return { index: 1, kind: 'routing', text: '', timeSeconds: 0, ...overrides }
@@ -1173,6 +1275,68 @@ describe('TrajectoryTable', () => {
     expect(screen.getByText('deepseek-official/deepseek-v4-flash')).toBeTruthy()
     expect(screen.getByText('streak entered · turn 3')).toBeTruthy()
     expect(screen.queryByText('Routed')).toBeNull()
+    // No reveal target was provided, so no row offers Explain.
+    expect(screen.queryByRole('button', { name: EXPLAIN })).toBeNull()
+  })
+
+  it('offers a keyboard-operable Explain on every ROUTING row that reveals its decision seq', () => {
+    const onExplainRouting = vi.fn()
+    const onToggleTurn = vi.fn()
+    render(
+      <TrajectoryTable
+        turns={ROUTING_TURNS}
+        {...ROUTING_FOLD_PROPS}
+        onToggleTurn={onToggleTurn}
+        onExplainRouting={onExplainRouting}
+      />,
+    )
+    const explains = screen.getAllByRole('button', { name: EXPLAIN })
+    expect(explains).toHaveLength(3)
+    const explain = explains[0]!
+    const row = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(row.contains(explain)).toBe(true)
+    // A native button: in the tab order, activated by Enter and Space.
+    expect(explain.tagName).toBe('BUTTON')
+    expect(explain.getAttribute('type')).toBe('button')
+    expect(explain.tabIndex).toBe(0)
+    expect(explain.textContent).toBe('Explain')
+
+    // The activation keys stay with the button; the row does not select itself.
+    fireEvent.keyDown(explain, { key: 'Enter' })
+    fireEvent.keyDown(explain, { key: ' ' })
+    expect(row.getAttribute('aria-selected')).toBe('false')
+    // Other keys still reach the row's own handling.
+    fireEvent.keyDown(explain, { key: 'ArrowDown' })
+    fireEvent.doubleClick(explain)
+    expect(onToggleTurn).not.toHaveBeenCalled()
+
+    fireEvent.click(explain)
+    expect(onExplainRouting).toHaveBeenCalledExactlyOnceWith(6)
+    expect(row.getAttribute('aria-selected')).toBe('false')
+    fireEvent.click(explains[2]!)
+    expect(onExplainRouting).toHaveBeenLastCalledWith(12)
+  })
+
+  it('offers no Explain on a ROUTING row without a decision seq', () => {
+    render(
+      <TrajectoryTable
+        turns={[{
+          turn: 1,
+          groups: [{
+            title: 'Step 1',
+            cells: [routingCell({
+              index: 1,
+              text: 'kept-strong · thin-margin',
+              routing: { outcome: 'kept-strong', reason: 'thin-margin', quiet: true },
+            })],
+          }],
+        }]}
+        {...ROUTING_FOLD_PROPS}
+        onExplainRouting={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('row', { name: /ROUTING/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: EXPLAIN })).toBeNull()
   })
 
   it('collapses a kept-strong decision that changed nothing to the quiet marker', () => {

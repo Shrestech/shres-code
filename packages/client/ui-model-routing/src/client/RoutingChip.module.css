@@ -81,3 +81,55 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+/* Routing details: opens this session's Routing view. */
+.details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.details:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-button-tool-bar-fill);
+}
+
+.details:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+/* Remote-judge confirm: the warning uses the warning surface. */
+.confirmWarning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-state-warn-secondary);
+  border-radius: 8px;
+  background: var(--dsw-alias-fill-tsp-secondary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmSettings {
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}

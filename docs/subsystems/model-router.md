@@ -739,6 +739,23 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 config(): ResolvedModelRouterConfig
 
 /**
+ * The gate configuration in force now. Decisions do not record it, so a
+ * drill-down reads the current values.
+ * @returns the thresholds, judgment deadline, difficulty band, and hold.
+ */
+@Remote('gate') gateView(): ModelRoutingGateView
+
+/**
+ * One logged decision, verbatim, with the turn and step it was logged in and
+ * the gate configuration in force now.
+ * @param agent - the session's Agent.
+ * @param seq - seq of a `model-routing/decision` event in that session's log.
+ * @returns the decision detail.
+ * @throws when the seq does not name a `model-routing/decision` event.
+ */
+@Remote('decision') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail
+
+/**
  * Read the logged mode and any selection awaiting the next accepted pre-step.
  * @param agent - the agent to read.
  * @returns the mode in force plus a pending selection, when present.
@@ -806,5 +823,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:419`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:439`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -59,6 +59,7 @@ import {
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
+  JudgmentEngineCalibration,
   JudgmentEngineId,
   JudgmentQuestion,
   JudgmentResult,
@@ -69,6 +70,7 @@ import type {
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
 import type {} from '@shres-code/shres-code-commands'
 import type {} from '@shres-code/shres-code-session-projection'
@@ -103,15 +105,28 @@ import {
   stickyState,
 } from './folds.ts'
 import { buildRoutingStateCandidates } from './state.ts'
+import {
+  applyStatsEvent,
+  createStatsState,
+  modelRoutingStatsSchema,
+  positionBefore,
+  routeMargin,
+  viewStats,
+} from './stats.ts'
+import type { ModelRoutingStatsState } from './stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
 import type {
+  ModelRoutingCalibration,
   ModelRoutingCandidate,
   ModelRoutingDecision,
+  ModelRoutingDecisionDetail,
   ModelRoutingEngineFailure,
+  ModelRoutingGateView,
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
+  ModelRoutingOperatingPoint,
   ModelRoutingProjection,
   ModelRoutingReason,
   ModelRoutingRouteFrom,
@@ -145,6 +160,7 @@ export {
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
+export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
 /** Settings namespace carrying the deployment's routing configuration. */
@@ -155,6 +171,29 @@ export const MODEL_ROUTER_SETTINGS_NAMESPACE = settingsNamespace('model-router')
  * `judgment.overrides` entry for `model-router` routes its asks.
  */
 export const MODEL_ROUTER_JUDGMENT_CONSUMER = judgmentConsumerId('model-router')
+
+/**
+ * How the router gates one engine's answers: `refused` when the engine's
+ * probabilities are only verbalized and no operating point accepts them (the
+ * router keeps the strong model without asking), else `calibrated` when its
+ * operating point names the preregistration that set it, `point` for an
+ * uncalibrated operating point, and `global` for the global thresholds. An
+ * engine the registry does not describe is judged by its operating point
+ * alone.
+ * @param calibration - the engine's declared calibration, when registered.
+ * @param point - the engine's operating point, when configured.
+ * @returns the routing calibration.
+ */
+export function routingCalibration(
+  calibration: JudgmentEngineCalibration | undefined,
+  point: ModelRoutingOperatingPoint | undefined,
+): ModelRoutingCalibration {
+  // A generative model's stated probabilities do not gate unless the
+  // deployment accepted them for this engine.
+  if (calibration === 'verbalized' && point?.acceptVerbalized !== true) return { kind: 'refused' }
+  if (point === undefined) return { kind: 'global' }
+  return point.calibratedBy === undefined ? { kind: 'point' } : { kind: 'calibrated', by: point.calibratedBy }
+}
 
 /** The route question's id, echoed by the answer this service reads. */
 export const ROUTE_QUESTION_ID = judgmentQuestionId('model-route')
@@ -392,25 +431,6 @@ function hasOpenTurn(events: readonly SessionEvent[]): boolean {
 }
 
 /**
- * The top-two probability margin of one choice answer.
- * @param probabilities - the answer's distribution.
- * @returns the margin between the two highest probabilities.
- */
-export function routeMargin(probabilities: Readonly<Record<string, number>>): number {
-  let top1 = 0
-  let top2 = 0
-  for (const value of Object.values(probabilities)) {
-    if (value > top1) {
-      top2 = top1
-      top1 = value
-    } else if (value > top2) {
-      top2 = value
-    }
-  }
-  return top1 - top2
-}
-
-/**
  * `ctx.modelRouting`: owns the logged routing mode, routing decisions, and
  * the consult `installModelSelection` reaches. No live mirror of the mode is
  * kept — the log is the state — and its configuration, mode, and decision events write no prompt, tool,
@@ -491,6 +511,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // which is what the config catalog walks.
   }) as z<ModelRouterConfig>
 
+  /** Binds `ctx.modelRouting` to the `modelRouting` Remote namespace. */
+  readonly typertRemote = bindTypertRemote(this, 'modelRouting')
   private source: () => ModelRouterConfig
   private lastRaw: ModelRouterConfig | undefined
   private lastGood: ResolvedModelRouterConfig | undefined
@@ -608,6 +630,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         // The accumulator keys its counted judgment failures by engine.
         stateVersion: 10,
       })
+      projectionCtx.sessionProjections.register<'modelRoutingStats', ModelRoutingStatsState>({
+        key: 'modelRoutingStats',
+        schema: modelRoutingStatsSchema,
+        init: createStatsState,
+        apply: applyStatsEvent,
+        view: viewStats,
+        // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency.
+        stateVersion: 4,
+      })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
     this.reportUnregisteredOperatingPoints(ctx)
@@ -711,9 +742,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const state = entry?.status().state
     return {
       ...engineId === undefined ? {} : { engineId },
-      // A generative model's stated probabilities do not gate unless the
-      // deployment accepted them for this engine.
-      refused: entry?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true,
+      refused: routingCalibration(entry?.descriptor.calibration, point).kind === 'refused',
       ...state === 'starting' || state === 'not-installed' ? { warming: state } : {},
       failures: judgmentFailuresFor(sticky.judgmentFailures, engineId),
       // Built in one fixed key order, so equal inputs log equal decisions.
@@ -815,6 +844,53 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.lastRaw = raw
     this.lastGood = next
     return next
+  }
+
+  /**
+   * The gate configuration in force now. Decisions do not record it, so a
+   * drill-down reads the current values.
+   * @returns the thresholds, judgment deadline, difficulty band, and hold.
+   */
+  @Remote('gate')
+  gateView(): ModelRoutingGateView {
+    const config = this.config()
+    return {
+      downgradeThreshold: config.downgradeThreshold,
+      downgradeMargin: config.downgradeMargin,
+      operatingPoints: config.operatingPoints.map(point => ({ ...point })),
+      engines: (this.ctx.get('judgmentEngines')?.list() ?? []).map(descriptor => ({
+        engine: String(descriptor.id),
+        calibration: routingCalibration(
+          descriptor.calibration,
+          config.operatingPoints.find(point => point.engine === String(descriptor.id)),
+        ),
+      })),
+      judgmentDeadlineMs: config.judgmentDeadlineMs,
+      entryScoreCeiling: config.entryScoreCeiling,
+      escalateBackScoreThreshold: config.escalateBackScoreThreshold,
+      difficultyLevels: [...config.difficultyLevels],
+      hold: { minSteps: config.hold.minSteps, maxSteps: config.hold.maxSteps },
+      stateMaxChars: config.state.maxChars,
+    }
+  }
+
+  /**
+   * One logged decision, verbatim, with the turn and step it was logged in and
+   * the gate configuration in force now.
+   * @param agent - the session's Agent.
+   * @param seq - seq of a `model-routing/decision` event in that session's log.
+   * @returns the decision detail.
+   * @throws when the seq does not name a `model-routing/decision` event.
+   */
+  @Remote('decision')
+  decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail {
+    const events = agent.session.events
+    const index = events.findIndex(event => event.seq === seq)
+    const event = events[index]
+    if (event?.type !== 'model-routing/decision') {
+      throw new Error(`session "${agent.session.id}" logs no model-routing/decision at seq ${String(seq)}`)
+    }
+    return { seq, time: event.time, ...positionBefore(events, index), decision: event.data, gate: this.gateView() }
   }
 
   /**
@@ -1524,6 +1600,26 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     session.append('model-routing/decision', decision)
   }
 
+  /**
+   * One sentence, with a leading space, naming where consults send this
+   * session's state when the engine selected for this router sends it off this
+   * machine and the router would ask it; empty otherwise.
+   * @param config - resolved configuration carrying the state cap and operating points.
+   * @returns the sentence, or an empty string.
+   */
+  private remoteEgressNotice(config: ResolvedModelRouterConfig): string {
+    const engine = this.ctx.get('judgment')
+    if (engine === undefined || !judgmentEnabled(engine.settings)) return ''
+    const id = engine.selectedEngine(MODEL_ROUTER_JUDGMENT_CONSUMER)
+    const entry = id === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(id)
+    if (entry === undefined || entry.descriptor.egress !== 'remote') return ''
+    const { descriptor } = entry
+    const point = config.operatingPoints.find(candidate => candidate.engine === String(descriptor.id))
+    if (routingCalibration(descriptor.calibration, point).kind === 'refused') return ''
+    const destination = descriptor.destination === undefined ? '' : ` at ${descriptor.destination}`
+    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this session to it${destination}.`
+  }
+
   /** Render the `/route` command's result. */
   private runCommand(agent: Agent, rawInput: string): { kind: 'success'; text: string } {
     const args = rawInput.trim()
@@ -1544,14 +1640,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     const wanted = args === 'on' ? true : args === 'off' ? false : undefined
     if (wanted === undefined) return { kind: 'success', text: 'Usage: /route [on|off]' }
+    // Turning routing on from a typed command states remote egress, as the Auto chip's confirm does.
+    const egress = wanted ? this.remoteEgressNotice(config) : ''
     switch (this.set(agent, wanted)) {
       case 'committed':
-        return { kind: 'success', text: wanted ? 'Model routing on.' : 'Model routing off.' }
+        return { kind: 'success', text: wanted ? `Model routing on.${egress}` : 'Model routing off.' }
       case 'queued':
         return {
           kind: 'success',
           text: wanted
-            ? 'Enabling model routing (applies from the next step).'
+            ? `Enabling model routing (applies from the next step).${egress}`
             : 'Disabling model routing (applies from the next step).',
         }
       case 'cancelled':

@@ -36,7 +36,8 @@
         "@shres-code/shres-code-client-locale",
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-client-ui-conversation",
-        "@shres-code/shres-code-model-router"
+        "@shres-code/shres-code-model-router",
+        "@shres-code/shres-code-client-ui-settings"
       ],
       "platform": "web"
     }
@@ -56,20 +57,23 @@
     "@shres-code/shres-code-model-router": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "clsx": "^2.1.1",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-locale": "workspace:^",
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-test-runtime": "workspace:^",
     "@shres-code/shres-code-client-ui-conversation": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-settings": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-client-web-react": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-model-router": "workspace:^",
     "@types/react": "~19.2.18",
-    "@shres-code/cordis": "workspace:^",
     "clsx": "^2.1.1",
     "react": "^19.2.8"
   },
@@ -78,5 +82,8 @@
     "lib/invariant.js",
     "lib/client.js",
     "lib/types/**/*.d.ts"
-  ]
+  ],
+  "dependencies": {
+    "@shres-code/shres-code-llm": "workspace:^"
+  }
 }

@@ -1861,10 +1861,21 @@
   background: var(--dsw-alias-state-business-tertiary);
 }
 
-.routingSummary {
-  display: inline-flex;
+/* The ROUTING cell keeps Explain in view: the summary shrinks and clips its
+   own chips, so a narrow content column never pushes the link out. */
+.routingCell {
+  display: flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
+}
+
+.routingSummary {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
   gap: 8px;
 }
 
@@ -1891,6 +1902,25 @@
 .routingStreak {
   background: var(--dsw-alias-state-business-tertiary);
   color: var(--dsw-alias-state-business-primary);
+}
+
+.routingExplain {
+  flex: none;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font: var(--dsw-font-xxs-12);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.routingExplain:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* The request boundary row carries the effective route the request used; the

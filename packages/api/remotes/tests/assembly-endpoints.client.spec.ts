@@ -79,8 +79,9 @@ function literal(node: ts.Expression | undefined): string | undefined {
 
 /**
  * Read the Remote endpoints one source file declares: each class extending
- * `TypertRemoteService`, its service key and wire namespace from the `super`
- * call, and each method decorated with `@Remote` or `@RemoteScope`.
+ * `TypertRemoteService` or binding itself with `bindTypertRemote(this, …)`,
+ * its service key and wire namespace from the `super` or binding call, and
+ * each method decorated with `@Remote` or `@RemoteScope`.
  */
 function declaredEndpoints(pkg: string, file: string, text = readFileSync(file, 'utf8')): Endpoint[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
@@ -100,28 +101,36 @@ function declaredEndpoints(pkg: string, file: string, text = readFileSync(file, 
         })
       })
       const extendsRemote = node.heritageClauses?.some(clause => clause.types.some(type => type.expression.getText(source) === 'TypertRemoteService')) === true
-      if (remoteMethods.length > 0 && !extendsRemote) {
-        throw new Error(`${file}: ${node.name?.text ?? 'a class'} marks Remote methods without extending TypertRemoteService; teach this guard its binding`)
-      }
-      if (extendsRemote) {
-        let binding: { service: string; namespace: string } | undefined
-        const findSuper = (inner: ts.Node): void => {
-          if (ts.isCallExpression(inner) && inner.expression.kind === ts.SyntaxKind.SuperKeyword) {
-            const service = literal(inner.arguments[1])
-            const options = inner.arguments[2]
-            const namespaceProperty = options !== undefined && ts.isObjectLiteralExpression(options)
-              ? options.properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(source) === 'namespace')
-              : undefined
-            const namespace = namespaceProperty !== undefined && ts.isPropertyAssignment(namespaceProperty)
-              ? literal(namespaceProperty.initializer)
-              : undefined
-            if (service === undefined) throw new Error(`${file}: the TypertRemoteService super call names no literal service key`)
-            binding = { service, namespace: namespace ?? service }
+      // Both bindings name the service key and an optional namespace the same way:
+      // super(ctx, key, { namespace }) and bindTypertRemote(this, key, { namespace }).
+      let binding: { service: string; namespace: string } | undefined
+      const findBinding = (inner: ts.Node): void => {
+        const isSuper = ts.isCallExpression(inner) && inner.expression.kind === ts.SyntaxKind.SuperKeyword
+        const isBind = ts.isCallExpression(inner) && ts.isIdentifier(inner.expression) && inner.expression.text === 'bindTypertRemote'
+          && inner.arguments[0]?.kind === ts.SyntaxKind.ThisKeyword
+        if (ts.isCallExpression(inner) && ((extendsRemote && isSuper) || isBind)) {
+          const call = inner
+          const service = literal(call.arguments[1])
+          const options = call.arguments[2]
+          const namespaceProperty = options !== undefined && ts.isObjectLiteralExpression(options)
+            ? options.properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(source) === 'namespace')
+            : undefined
+          const namespace = namespaceProperty !== undefined && ts.isPropertyAssignment(namespaceProperty)
+            ? literal(namespaceProperty.initializer)
+            : undefined
+          if (service === undefined) {
+            throw new Error(`${file}: the ${isBind ? 'bindTypertRemote' : 'TypertRemoteService super'} call names no literal service key`)
           }
-          ts.forEachChild(inner, findSuper)
+          binding = { service, namespace: namespace ?? service }
         }
-        ts.forEachChild(node, findSuper)
-        if (binding === undefined) throw new Error(`${file}: ${node.name?.text ?? 'a class'} extends TypertRemoteService without a super call`)
+        ts.forEachChild(inner, findBinding)
+      }
+      ts.forEachChild(node, findBinding)
+      if (remoteMethods.length > 0 && !extendsRemote && binding === undefined) {
+        throw new Error(`${file}: ${node.name?.text ?? 'a class'} marks Remote methods without extending TypertRemoteService or calling bindTypertRemote; teach this guard its binding`)
+      }
+      if (extendsRemote && binding === undefined) throw new Error(`${file}: ${node.name?.text ?? 'a class'} extends TypertRemoteService without a super call`)
+      if (binding !== undefined) {
         const { service, namespace } = binding
         endpoints.push(...remoteMethods.map(method => ({ pkg, service, namespace, method })))
       }
@@ -231,6 +240,20 @@ describe('api-remotes Client assembly endpoints', () => {
       .toThrow('names no literal service key')
     expect(() => declaredEndpoints('@guard/sample', 'nosuper.ts', 'class N extends TypertRemoteService { @Remote a() {} }'))
       .toThrow('without a super call')
+  })
+
+  it('reads a Service that binds itself with bindTypertRemote', () => {
+    const sample = [
+      "class Plain extends Service { readonly typertRemote = bindTypertRemote(this, 'plain')  @Remote('gate') gateView() {} }",
+      "class Wired extends Service { readonly typertRemote = bindTypertRemote(this, 'wired', { namespace: 'wire' })  @Remote read() {} }",
+    ].join('\n')
+    expect(declaredEndpoints('@guard/sample', 'bound.ts', sample).map(endpoint => `${endpoint.service}:${endpoint.namespace}/${endpoint.method}`))
+      .toEqual(['plain:plain/gate', 'wired:wire/read'])
+    expect(() => declaredEndpoints('@guard/sample', 'dynamic-bind.ts', 'class D extends Service { readonly r = bindTypertRemote(this, key)  @Remote a() {} }'))
+      .toThrow('the bindTypertRemote call names no literal service key')
+    // A binding of another object does not bind the class that declares the methods.
+    expect(() => declaredEndpoints('@guard/sample', 'other.ts', 'class O extends Service { readonly r = bindTypertRemote(other, \'x\')  @Remote a() {} }'))
+      .toThrow('teach this guard its binding')
   })
 })
 

@@ -10,7 +10,7 @@
  * surfaces as its own inline error line.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { ModelRoutingProjection } from '@shres-code/shres-code-model-router/client'
@@ -18,6 +18,9 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { RoutingChip, type RoutingChipProps } from '../src/client/RoutingChip.tsx'
 import { en } from '../src/client/locales.ts'
+import type { RoutingEngineState } from '../src/client/engine-source.ts'
+import { engines, LOCAL, REMOTE } from './fixtures/engines.client.ts'
+import { GATE } from './fixtures/routing-stats.client.ts'
 
 afterEach(cleanup)
 
@@ -74,6 +77,10 @@ function setup(options: {
   restoreStrong?: RoutingChipProps['restoreStrong']
   locked?: boolean
   available?: boolean
+  reveal?: RoutingChipProps['reveal']
+  engine?: RoutingEngineState
+  openRoutingSettings?: RoutingChipProps['openRoutingSettings']
+  loadGate?: RoutingChipProps['loadGate']
 } = {}) {
   const store = createSnapshotStore<{ value: ModelRoutingProjection | undefined }>({ value: options.routing })
   const useProjection = (_key: string, selector?: (v: unknown) => unknown) =>
@@ -83,6 +90,11 @@ function setup(options: {
   const props = {
     useProjection,
     locked: options.locked ?? false,
+    reveal: options.reveal,
+    useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) =>
+      selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
+    loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
+    ...options.openRoutingSettings === undefined ? {} : { openRoutingSettings: options.openRoutingSettings },
     available: options.available ?? true,
     setRouting,
     restoreStrong,
@@ -103,6 +115,18 @@ const restoreChip = () => screen.getByRole('button', { name: en['idle.restore.ti
 const idleWarning = () => screen.getByText(en['idle.warning'])
 
 describe('RoutingChip', () => {
+  it('opens this session\'s Routing view from Routing details, even while locked', () => {
+    const reveal = vi.fn()
+    setup({ routing: OFF, reveal, locked: true })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.details'] }))
+    expect(reveal).toHaveBeenCalledWith({ view: 'routing', target: { kind: 'none' } })
+  })
+
+  it('offers no Routing details without the session\'s reveal', () => {
+    setup({ routing: OFF })
+    expect(screen.queryByRole('button', { name: en['chip.details'] })).toBeNull()
+  })
+
   it('renders nothing while the host composes no routing projection', () => {
     const { view } = setup()
     expect(view.container.innerHTML).toBe('')
@@ -299,5 +323,134 @@ describe('RoutingChip', () => {
     fireEvent.click(restoreChip())
     failing.view.unmount()
     expect(() => { reject(new Error('late')) }).not.toThrow()
+  })
+})
+
+describe('RoutingChip remote-judge confirm', () => {
+  const REMOTE_JUDGE: RoutingEngineState = { kind: 'ready', snapshot: engines('typesafe') }
+
+  it('asks before turning routing on with a remote judge, naming the destination and the cap', async () => {
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE })
+    fireEvent.click(offChip())
+    const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
+    expect(dialog.textContent).toContain(en['confirm.body'])
+    await screen.findByText('This judge runs off this machine: each consult sends up to 12,000 characters of this session to api.typesafe.ai.')
+    expect(setRouting).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.turnOn'] }))
+    expect(setRouting).toHaveBeenCalledWith(true)
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+  })
+
+  it('names the destination alone while the cap loads or when it cannot be read', async () => {
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => Promise.reject(new Error('gone')) })
+    fireEvent.click(offChip())
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+  })
+
+  it('cancels or closes without switching', () => {
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}) })
+    for (const label of [en['confirm.cancel'], en['confirm.close']]) {
+      fireEvent.click(offChip())
+      fireEvent.click(screen.getByRole('button', { name: label }))
+      expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    }
+    expect(setRouting).not.toHaveBeenCalled()
+  })
+
+  it('names the engine when it reports no destination host', () => {
+    const { destination: _dropped, ...unnamedRemote } = REMOTE
+    const unnamed = engines('typesafe', { engines: [LOCAL, unnamedRemote] })
+    setup({ routing: OFF, engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
+    fireEvent.click(offChip())
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to Jev (TypeSafe).')).toBeTruthy()
+  })
+
+  it('says a judge the router refuses sends nothing, once gate() reports it', async () => {
+    const snapshot = engines('typesafe', { engines: [LOCAL, { ...REMOTE, calibration: 'verbalized' }] })
+    const refused = { ...GATE, engines: [{ engine: 'typesafe', calibration: { kind: 'refused' as const } }] }
+    setup({ routing: OFF, engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(refused) })
+    fireEvent.click(offChip())
+    await screen.findByText(en['confirm.refused'])
+  })
+
+  it('reports a rejected Open Settings on the chip', async () => {
+    const openRoutingSettings = vi.fn(() => Promise.reject(new Error('Settings is not composed')))
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}), openRoutingSettings })
+    fireEvent.click(offChip())
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.openSettings'] }))
+    const failure = await screen.findByText('failed to open Settings › Model routing')
+    expect(failure.getAttribute('title')).toBe('Settings is not composed')
+  })
+
+  it('names the section instead of offering Open Settings while the registry is not read', () => {
+    setup({ routing: OFF, engine: { kind: 'loading' }, openRoutingSettings: vi.fn(() => Promise.resolve()) })
+    fireEvent.click(offChip())
+    expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain(en['confirm.settings'])
+    expect(screen.queryByRole('button', { name: en['confirm.openSettings'] })).toBeNull()
+  })
+
+  it('offers Open Settings beside Cancel and Turn on, or names the section when it cannot open it', () => {
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}) })
+    fireEvent.click(offChip())
+    expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain(en['confirm.settings'])
+    expect(screen.queryByRole('button', { name: en['confirm.openSettings'] })).toBeNull()
+    cleanup()
+    const openRoutingSettings = vi.fn(() => Promise.resolve())
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}), openRoutingSettings })
+    fireEvent.click(offChip())
+    const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
+    expect(dialog.textContent).not.toContain(en['confirm.settings'])
+    expect(within(dialog).getAllByRole('button').map(button => button.textContent).slice(-3))
+      .toEqual([en['confirm.openSettings'], en['confirm.cancel'], en['confirm.turnOn']])
+    fireEvent.click(within(dialog).getByRole('button', { name: en['confirm.openSettings'] }))
+    expect(openRoutingSettings).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    expect(setRouting).not.toHaveBeenCalled()
+  })
+
+  it('asks when the judge is not known yet', () => {
+    for (const engine of [{ kind: 'loading' }, { kind: 'failed', message: 'x' }] as RoutingEngineState[]) {
+      const { setRouting } = setup({ routing: OFF, engine, loadGate: () => new Promise(() => {}) })
+      fireEvent.click(offChip())
+      expect(screen.getByText(en['confirm.unknown'])).toBeTruthy()
+      expect(setRouting).not.toHaveBeenCalled()
+      cleanup()
+    }
+  })
+
+  it('asks before turning on while the judge id names no registered engine, since one may register later', async () => {
+    const { setRouting } = setup({ routing: OFF, engine: { kind: 'ready', snapshot: engines('retired-engine') } })
+    fireEvent.click(offChip())
+    const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
+    expect(dialog.textContent).toContain(en['confirm.unregistered'])
+    expect(setRouting).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: en['confirm.turnOn'] }))
+    await waitFor(() => { expect(setRouting).toHaveBeenCalledWith(true) })
+  })
+
+  it('turns on directly with a local judge, judgment switched off, or no dispatcher, and never asks when turning off', () => {
+    const disabled = engines('laya', { selection: { enabled: false, engine: 'laya', overrides: {} } })
+    for (const engine of [{ kind: 'ready', snapshot: engines('laya') }, { kind: 'ready', snapshot: disabled }, { kind: 'no-dispatcher' }] as RoutingEngineState[]) {
+      const { setRouting } = setup({ routing: OFF, engine })
+      fireEvent.click(offChip())
+      expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+      expect(setRouting).toHaveBeenCalledWith(true)
+      cleanup()
+    }
+    const { setRouting } = setup({ routing: running(), engine: REMOTE_JUDGE })
+    fireEvent.click(onChip())
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    expect(setRouting).toHaveBeenCalledWith(false)
+  })
+
+  it('drops a cap that arrives after the chip unmounted', async () => {
+    let resolve!: (value: typeof GATE) => void
+    const { view } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise((res) => { resolve = res }) })
+    fireEvent.click(offChip())
+    view.unmount()
+    await act(async () => { resolve(GATE) })
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
   })
 })

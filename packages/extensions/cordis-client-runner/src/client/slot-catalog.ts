@@ -685,12 +685,16 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     kind: 'single',
     scope: 'session',
     summary: 'The named model-routing seat immediately left of the model-select seat — one occupant, so taking it means rendering the whole routing affordance yourself.',
-    doc: 'The named model-routing seat immediately left of the model-select seat —\none occupant, so taking it means rendering the whole routing affordance\nyourself. Same `locked`-only owner share and same renders-nothing-while-\nempty contract as the plan seat: a host composing no router registers no\nrouting projection, and the seat then draws nothing.',
+    doc: 'The named model-routing seat immediately left of the model-select seat —\none occupant, so taking it means rendering the whole routing affordance\nyourself. The owner share adds the session\'s `reveal` to `locked` (see\nRoutingControlOwnerProps), so the control can open a conversation\nview such as the Routing view. Same renders-nothing-while-empty contract as\nthe plan seat: a host composing no router registers no routing projection,\nand the seat then draws nothing.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/** Owner share of the routing control seat: the shared lock plus the session\'s reveal. */\nexport interface RoutingControlOwnerProps extends InputControlOwnerProps {\n  /**\n   * The same reveal the views receive ({@link ConvViewOwnerProps.reveal}): write\n   * the request, select the addressed view, and close the Activity popover.\n   * `{ kind: \'none\' }` opens the view with nothing to show. Absent while the\n   * composer has no session.\n   */\n  reveal?: ((request: InspectRequest) => void) | undefined\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'ConvViewOwnerProps',
+      'InputControlOwnerProps',
+      'InspectRequest',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
@@ -709,7 +713,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.modelRouting\', () => ctx.slots.register(\n      { name: \'conversation.input.modelRouting\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:240',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:242',
   },
   {
     key: 'conversation.input.overlay',
@@ -1081,9 +1085,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /** One-shot inspect request from another view (chat\'s Inspect button); null when idle. */\n  inspect?: { callId: CallId } | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n}',
+      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /**\n   * The pending inspect request addressed to this view; null when idle or when\n   * the request addresses another view, which keeps it until that view is the\n   * active one.\n   */\n  inspect?: InspectRequest | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n  /**\n   * Hand a target to a view: write the request, select that view, and close\n   * the Activity popover. A request to an unregistered view selects nothing\n   * visible (the tab ring falls back to Chat) and waits until the view registers.\n   */\n  reveal?: (request: InspectRequest) => void\n  /**\n   * Whether a \'conversation.view\' entry with this id is registered, so a reveal\n   * to it lands. Read it at render: the answer follows the view ledger.\n   */\n  canReveal?: (view: string) => boolean\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'InspectRequest',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
@@ -1099,6 +1105,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'conversation.session\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-conversation ChatView id \'chat\'',
+      'client-ui-model-routing RoutingView id \'routing\'',
       'client-ui-trajectory TrajectoryView id \'trajectory\'',
     ],
     replaceRisk: 'none',
