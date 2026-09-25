@@ -109,6 +109,18 @@
     - id: remote-admin
       name: '@shres-code/shres-code-host-remote-control/admin'
 
+    # The gesture-gated plugin and skill management namespace over the shared
+    # install core: status, parked install transactions for the profile the
+    # launcher provided, and skill add/remove. A composition without a
+    # profileRuntime service still loads it; plugin mutations then answer
+    # unsupported.
+    - id: plugin-admin
+      name: '@shres-code/shres-code-host-plugin-admin'
+
+    # Runtime downloads and the owned browser start only after local UI consent.
+    - id: browserskill
+      name: '@shres-code/shres-code-browserskill'
+
     - id: cordis-host-runner
       name: '@shres-code/shres-code-cordis-host-runner'
 
@@ -210,6 +222,9 @@
 
     - id: ui-settings-plugin-inventory
       name: '@shres-code/shres-code-client-ui-settings-plugin-inventory'
+
+    - id: ui-browserskill
+      name: '@shres-code/shres-code-client-ui-browserskill'
 
     - id: ui-conversation
       name: '@shres-code/shres-code-client-ui-conversation'

@@ -21,6 +21,8 @@ import type { ModelsCliCommand, ProviderTemplate } from './models-cli.ts'
 import { PROVIDER_TEMPLATES } from './models-cli.ts'
 import { DEFAULT_REMOTE_DAEMON_PORT } from '@shres-code/shres-code-host-remote-control'
 import type { RemoteCliCommand } from '@shres-code/shres-code-host-remote-control'
+import type { PluginManagementCommand } from './plugin-managed-cli.ts'
+import type { SkillCliCommand } from './skill-cli.ts'
 
 /** Boot a named profile and hand it the invocation's inner arguments. */
 interface ProfileInvocation {
@@ -49,6 +51,18 @@ interface PluginInvocation {
   args: string[]
 }
 
+/** Install or remove one profile plugin with explicit consent. */
+interface PluginManagementInvocation {
+  mode: 'plugin-management'
+  command: PluginManagementCommand
+}
+
+/** Manage copied skills in the Shres-specific installed directory. */
+interface SkillInvocation {
+  mode: 'skill'
+  command: SkillCliCommand
+}
+
 /** Select a declared profile edition: set its autoProvision and provision its packages. */
 interface EnableEditionInvocation {
   mode: 'enable-edition'
@@ -74,6 +88,8 @@ export type ShresInvocation =
   | ProfileInvocation
   | DumpConfigInvocation
   | PluginInvocation
+  | PluginManagementInvocation
+  | SkillInvocation
   | EnableEditionInvocation
   | ModelsInvocation
   | RemoteInvocation
@@ -99,7 +115,11 @@ Examples:
   shres --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
   shres --profile tui --resume <session>       arguments after the launcher flags reach the app
   shres --profile web --help                   the web app's own flags and help
-  shres plugin --profile tui add <package>     install a plugin into the tui profile
+  shres plugin --profile web install-plugin <spec>  install a plugin with confirmation
+  shres plugin --profile web remove-plugin <name>   remove a plugin with confirmation
+  shres skill add <directory>                  copy a local skill into Shres
+  shres skill list                            list Shres-managed skills
+  shres plugin --profile tui add <package>     expert pnpm forwarding (unmanaged)
   shres models list                            list providers and models from the same store as Settings → Models
   shres models set ollama-local llama3.2 --effort high
   shres providers add --template ollama-local
@@ -202,16 +222,32 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
       resolved = resolveBoot(web, 'web', options, args)
     })
 
-  const plugin = program.command('plugin').description('manage a profile\'s plugins by forwarding the remaining arguments to pnpm in the profile directory')
+  const plugin = program.command('plugin').description('install or remove Shres bundles, or forward expert pnpm arguments')
   plugin
     .requiredOption('--profile <name>', 'the profile whose plugins to manage (initialized on first use)')
     .allowUnknownOption()
-    .argument('[args...]', 'pnpm arguments, forwarded verbatim (add <pkg>, remove <pkg>, why <pkg>, ...)')
+    .argument('[args...]', 'install-plugin <spec> [--yes], remove-plugin <name> [--yes], or expert pnpm arguments')
     .action((args: string[], options: { profile: string }) => {
       rejectParentOptions('plugin')
       if (options.profile === '') program.error('error: --profile needs a name')
-      if (args.length === 0) program.error('error: plugin needs pnpm arguments to forward (e.g. add <package>)')
-      if (args[0] === 'enable-edition') {
+      if (args.length === 0) program.error('error: plugin needs a managed operation or pnpm arguments (e.g. install-plugin <package>)')
+      if (args[0] === 'install-plugin' || args[0] === 'remove-plugin') {
+        const targets = args.slice(1).filter(argument => argument !== '--yes')
+        const target = targets[0]
+        if (targets.length !== 1 || target === undefined || target === '' || target.startsWith('-')
+          || args.filter(argument => argument === '--yes').length > 1) {
+          program.error('error: plugin ' + args[0] + ' needs exactly one target and optional --yes')
+        }
+        resolved = {
+          mode: 'plugin-management',
+          command: {
+            kind: args[0] === 'install-plugin' ? 'install' : 'remove',
+            profile: options.profile,
+            target,
+            yes: args.includes('--yes'),
+          },
+        }
+      } else if (args[0] === 'enable-edition') {
         const edition = args[1]
         if (args.length !== 2 || edition === undefined || edition === '') {
           program.error('error: plugin enable-edition needs an edition name (shres plugin --profile <name> enable-edition <edition>)')
@@ -220,6 +256,24 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
       } else {
         resolved = { mode: 'plugin', profile: options.profile, args }
       }
+    })
+
+  const skill = program.command('skill').description('manage local copies of third-party skills without executing their instructions')
+  skill.command('add').argument('<directory>', 'local directory containing SKILL.md')
+    .action((directory: string) => {
+      rejectParentOptions('skill')
+      if (directory === '') program.error('error: skill add needs a directory')
+      resolved = { mode: 'skill', command: { kind: 'add', directory } }
+    })
+  skill.command('list').action(() => {
+    rejectParentOptions('skill')
+    resolved = { mode: 'skill', command: { kind: 'list' } }
+  })
+  skill.command('remove').argument('<name>', 'name of a Shres-managed installed skill')
+    .action((name: string) => {
+      rejectParentOptions('skill')
+      if (name === '') program.error('error: skill remove needs a name')
+      resolved = { mode: 'skill', command: { kind: 'remove', name } }
     })
 
   const models = program.command('models').description('list or set the default model using the same store as Settings → Models')

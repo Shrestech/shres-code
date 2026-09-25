@@ -132,6 +132,10 @@ function workspaceManifests(): WorkspaceManifest[] {
 }
 
 const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
+  // Public offline/type entries and the parser shared by both filesystem skill entries.
+  '@shres-code/shres-code-app-boot': ['lib/profile-plugin-types.js'],
+  '@shres-code/shres-code-skill': ['lib/name.js', 'lib/types.js'],
+  '@shres-code/shres-code-skill-filesystem': ['lib/install.js', 'lib/parse-*.js'],
   // Profile bundles publish their shres.bundle.patch layer beside the lib.
   '@shres-code/shres-code-base': ['cordis.patch.yml'],
   '@shres-code/shres-code-web-app': ['cordis.patch.yml'],

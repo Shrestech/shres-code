@@ -24,6 +24,7 @@ import {
   loadLayeredEnv,
   loadOverlayPatches,
   loadProfileDirectory,
+  provideProfileRuntime,
   type Profile,
 } from '@shres-code/shres-code-app-boot'
 import { provideCmdline } from '@shres-code/shres-code-cmdline'
@@ -370,6 +371,11 @@ export async function runDesktopHost(
     // Before any config-tree entry mounts, so every plugin reads the same
     // immutable launch-environment provenance snapshot.
     hostCtx.provide(SHRES_LAUNCH_ENVIRONMENT_KEY, environment)
+    provideProfileRuntime(hostCtx, {
+      profileDir: absoluteProject,
+      bootBundles: composition.profile.layers.map(layer => layer.packageName),
+      pluginMutations: 'unsupported',
+    })
     // The desktop composition runs without the webserver row, while the
     // client-modules and client-connection node halves statically inject
     // webServer. A no-op service satisfies those injects: their routes and

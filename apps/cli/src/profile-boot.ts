@@ -25,9 +25,15 @@ import {
   loadOptionalPatches,
   loadOverlayPatches,
   loadProfile,
+  nodePnpmRunner,
+  resolveProfileDir,
   PROFILE_PATCH_FILENAME,
+  ProfilePluginError,
+  provideProfileRuntime,
   watchUserPatches,
+  withRecoveredProfile,
   type Profile,
+  type RecoveredProfile,
 } from '@shres-code/shres-code-app-boot'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 
@@ -96,11 +102,81 @@ export function resolveTelemetryPatch(disabledEnv: string | undefined, hasRow: b
  * @param userLayer - `false` skips parsing `cordis.patch.yml` (the default dump).
  * @returns the loaded profile.
  */
-export function prepareProfile(name: string, userLayer = true): Profile {
+function prepareProfile(name: string, userLayer = true): Profile {
   healProfilesModuleFallback(INSTALL_ANCHOR)
   const profile = loadProfile(NAME, name, INSTALL_ANCHOR, undefined, { userLayer })
   writeFileSync(join(profile.dir, PROFILE_ROOT_FILENAME), PROFILE_ROOT_CONFIG)
   return profile
+}
+
+/**
+ * Report a completed recovery and refuse to continue when its dependency
+ * restoration failed: the restored manifest may then name packages that are
+ * missing from node_modules.
+ * @param recovered - the recovery outcome from the profile lease.
+ */
+function reportRecovery(recovered: RecoveredProfile): void {
+  if (recovered.kind !== 'recovered') return
+  process.stderr.write(JSON.stringify(recovered, null, 2) + '\n')
+  if (recovered.rollback?.reinstall === 'failed') {
+    throw new Error(NAME + ': profile metadata restored, but dependency restoration failed; repair the profile before booting')
+  }
+}
+
+/**
+ * Turn the profile lease's ownership failures into operator diagnostics; any
+ * other error passes through unchanged.
+ * @param profile - the profile name.
+ * @param error - the lease failure.
+ * @returns the error to raise.
+ */
+function leaseError(profile: string, error: unknown): unknown {
+  if (!(error instanceof ProfilePluginError)) return error
+  switch (error.code) {
+    case 'transaction-pending':
+      return new Error(error.pid === undefined
+        ? `${NAME}: profile ${profile} has a plugin transaction pending; retry after it settles`
+        : `${NAME}: install-plugin transaction by pid ${String(error.pid)} pending on profile ${profile}; retry after it settles`, { cause: error })
+    case 'lock-timeout':
+      return new Error(`${NAME}: profile ${profile} is locked by another shres process; retry after it finishes (${error.message})`, { cause: error })
+    case 'restore-failed':
+      return error
+  }
+}
+
+/**
+ * Run one profile-manifest reader or normalizer under the profile lease,
+ * after recovering an interrupted plugin transaction. The profile lease is
+ * released when `operation` returns; the operation must not start another
+ * managed profile operation.
+ * @param profile - the profile name.
+ * @param signal - cancels waiting for the lease and the recovery subprocess.
+ * @param operation - the synchronous or asynchronous work done while holding the lease.
+ * @returns the operation's result.
+ */
+async function withProfileLease<T>(profile: string, signal: AbortSignal, operation: () => T): Promise<T> {
+  try {
+    return await withRecoveredProfile(resolveProfileDir(profile), {
+      runner: nodePnpmRunner, signal, invokingCwd: process.cwd(),
+    }, (recovered) => {
+      reportRecovery(recovered)
+      return operation()
+    })
+  } catch (error) {
+    throw leaseError(profile, error)
+  }
+}
+
+/**
+ * {@link prepareProfile} under the profile lease, because loading a shipped
+ * profile can normalize and rewrite its manifest.
+ * @param name - the profile name.
+ * @param userLayer - `false` skips parsing `cordis.patch.yml`.
+ * @param signal - cancels waiting for the lease.
+ * @returns the loaded profile.
+ */
+export async function prepareProfileLeased(name: string, userLayer: boolean, signal: AbortSignal): Promise<Profile> {
+  return withProfileLease(name, signal, () => prepareProfile(name, userLayer))
 }
 
 /** One profile's patch layers (application order) and the row index of its pre-flag composition. */
@@ -206,21 +282,16 @@ function suppressShutdownError(ctx: Context, signal: AbortSignal, error: unknown
  * @returns the settled root context and the shutdown controller.
  */
 export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
-  const composed = composeProfile(options.profile, options.patchFiles)
-  // Provision enabled (autoProvision) editions before the tree mounts so the
-  // seat resolves a paid payload it declared. pnpm failure fails loud: the
-  // exact error is already on stderr, and boot must not proceed with a
-  // silently skipped missing payload.
-  const ensureCode = ensureProfileEditions(composed.profile.dir)
-  if (ensureCode !== 0) {
-    throw new Error(
-      `${NAME}: profile ${options.profile} auto-provision failed (pnpm exited ${ensureCode}); `
-      + 'the exact pnpm error is printed above — provisioning is never silently skipped',
-    )
-  }
   const app: { current?: Context } = {}
-  const shutdown = createProcessShutdown(async () => { await app.current?.fiber.dispose() })
   const signalShutdown = new AbortController()
+  let lease: Promise<ComposedProfile> | undefined
+  const shutdown = createProcessShutdown(async () => {
+    signalShutdown.abort()
+    // Startup reports lease errors; shutdown waits for the whole leased step
+    // (recovery, composition, provisioning) without replacing the signal exit code.
+    if (lease !== undefined) await Promise.allSettled([lease])
+    await app.current?.fiber.dispose()
+  })
   const interrupt = (code: number): void => {
     signalShutdown.abort()
     shutdown.interrupt(code)
@@ -236,6 +307,38 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     await app.current?.fiber.dispose()
   })
 
+  // Recovery, composition (which may normalize the manifest), and edition
+  // provisioning all write the profile, so they run under one profile lease.
+  // The lease is released before the long-lived boot below; the composed
+  // result is in memory and nothing after this point writes the manifest.
+  lease = withProfileLease(options.profile, signalShutdown.signal, () => {
+    const composition = composeProfile(options.profile, options.patchFiles)
+    // Enabled editions must finish provisioning before any profile entry
+    // mounts. The provisioning pnpm runs synchronously, so a signal during it
+    // is handled after it returns.
+    const ensureCode = ensureProfileEditions(composition.profile.dir)
+    if (ensureCode !== 0) {
+      throw new Error(
+        `${NAME}: profile ${options.profile} auto-provision failed (pnpm exited ${ensureCode}); `
+        + 'the exact pnpm error is printed above — provisioning is never silently skipped',
+      )
+    }
+    return composition
+  })
+  let composed: ComposedProfile
+  try {
+    composed = await lease
+  } catch (error) {
+    if (!signalShutdown.signal.aborted) throw error
+    await shutdown.shutdown(0)
+    throw error
+  } finally {
+    lease = undefined
+  }
+  if (signalShutdown.signal.aborted) {
+    await shutdown.shutdown(0)
+    throw new Error(NAME + ': profile startup interrupted')
+  }
   const rootConfig = join(composed.profile.dir, PROFILE_ROOT_FILENAME)
   // Recomposition for the live user layers: bundle layers below, overlays
   // above, so a user edit can never displace them. Parsed app arguments are
@@ -262,6 +365,11 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     // Before any config-tree entry mounts, so plugins resolve all launch-time
     // environment values from the same immutable provenance snapshot.
     hostCtx.provide(SHRES_LAUNCH_ENVIRONMENT_KEY, options.environment)
+    provideProfileRuntime(hostCtx, {
+      profileDir: composed.profile.dir,
+      bootBundles: composed.profile.layers.map(layer => layer.packageName),
+      pluginMutations: 'enabled',
+    })
     // The command line and bounded exit request are launcher facts available
     // to every app plugin that injects the argument snapshot.
     provideCmdline(hostCtx, {
@@ -277,7 +385,10 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // landed mid-setup. Watching is unconditional: a one-shot surface exits
   // through its bounded shutdown, which disposes the watchers before the
   // loop drains.
-  if (!signalShutdown.signal.aborted
+  // Read through a call: a signal can abort during the awaited boot, which
+  // the checker's narrowing from the pre-boot check cannot see.
+  const aborted = (): boolean => signalShutdown.signal.aborted
+  if (!aborted()
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     try {

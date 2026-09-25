@@ -16,6 +16,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [goal.md](goal.md) | persisted goal identity, lifecycle snapshots, activation, change records, and round attribution |
 | [schedule.md](schedule.md) | Session-local reminder records, durable transitions, active views, and ordinary-conversation delivery |
 | [commands.md](commands.md) | the human-command registry service: definitions, adapter discovery, direct invocation, results, and parsing views |
+| [profiles.md](profiles.md) | the `packages/boot` profile runtime snapshot a launcher provides, the managed plugin install/remove transaction results, and the host `pluginAdmin` status and token vocabulary |
 | [session.md](session.md) | the full `SessionEventMap` variant catalog, `TurnTrigger`/`TurnEndReason`, `deriveMessages()`, execution enclosure, and standalone events |
 | [persistence.md](persistence.md) | the durability seam: `SessionPersistence`, JSONL + SQLite backends, `session/flush`, crash recovery, `SessionHeader` |
 | [settings.md](settings.md) | the user-settings seam: `SettingsNamespace` registration, layered resolution (defaults → composition `base` → user document), owner scopes, hot commits |
@@ -41,6 +42,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
 | [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
 | [agent-team.md](agent-team.md) | Agent Teams durable records: branded ids, roster/task/mailbox snapshots, and the `team-message` source |
+| [browser.md](browser.md) | owned browser lifecycle, consent and operation records, session identities, and native browser command results |
 | [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
 | [speech.md](speech.md) | the speech I/O seam: `SpeechSynthesizeRequest`/`Result`, `SpeechTranscribeRequest`/`Result`, provider selection, Web mic, speaker, and Talk mode |
 | [spill.md](spill.md) | the spill storage seam: `SaveTextSpill`, `SpillOwner`/`SpillSource`, `SpillRef`, the branded `SpillLocator` |

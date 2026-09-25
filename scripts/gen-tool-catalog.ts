@@ -7,7 +7,9 @@
  */
 
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, join, resolve } from 'node:path'
 import { Context } from '@shres-code/cordis'
 import type { ToolSchema } from '@shres-code/shres-code-llm'
 import AgentRegistry from '@shres-code/shres-code-agent'
@@ -37,6 +39,7 @@ import * as ToolSubagentControl from '@shres-code/shres-code-tool-subagent-contr
 import * as ToolSubagentListAgents from '@shres-code/shres-code-tool-subagent-control/list-agents'
 import * as ToolSubagentReport from '@shres-code/shres-code-tool-subagent-report'
 import SkillRegistry from '@shres-code/shres-code-skill'
+import * as BrowserSkill from '@shres-code/shres-code-browserskill'
 import * as SkillFileSystem from '@shres-code/shres-code-skill-filesystem'
 import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
 import * as ToolAskUser from '@shres-code/shres-code-tool-ask-user'
@@ -210,6 +213,27 @@ export interface ToolPackage {
  * guard proves it is exhaustive against the on-disk glob.
  */
 const TOOL_PACKAGES: ToolPackage[] = [
+  {
+    pkg: '@shres-code/shres-code-browserskill',
+    dir: 'browserskill',
+    source: 'packages/browser/browserskill/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.skills', 'an initiating Agent and ready owned browser at execution time'],
+    writes: ['tool/call', 'owned browser state', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(SkillRegistry)
+      const home = await mkdtemp(join(tmpdir(), 'shres-catalog-home-'))
+      ctx.effect(() => () => rm(home, { recursive: true, force: true }), 'catalog.browserskill-home')
+      const previous = process.env.SHRES_HOME
+      process.env.SHRES_HOME = home
+      try {
+        await ctx.plugin(BrowserSkill)
+      } finally {
+        if (previous === undefined) delete process.env.SHRES_HOME
+        else process.env.SHRES_HOME = previous
+      }
+    },
+    note: 'Registration does not provision artifacts or launch a browser. The Web Settings install flow establishes readiness; commands use conversation-owned sessions and page results are framed as untrusted data.',
+  },
   {
     pkg: '@shres-code/shres-code-tool-ask-user',
     dir: 'tool-ask-user',
@@ -698,7 +722,7 @@ export type ToolCatalog = CatalogPackage[]
 
 /**
  * Assert the boot manifest covers every shipped tool package on disk (a
- * `tool-*` leaf under `packages/`).
+ * `tool-*` leaf under `packages/`, plus the native BrowserSkill runtime).
  * Booting has no source declaration to enumerate, so this glob restores the
  * "a new tool cannot be silently undocumented" guarantee: an unlisted package
  * fails the generator (and the freshness gate) until it is added to
@@ -707,7 +731,7 @@ export type ToolCatalog = CatalogPackage[]
  * `scanRoot` defaults to the repo root; a test may point it at a fixture tree.
  */
 export function assertManifestComplete(packages: ToolPackage[] = TOOL_PACKAGES, scanRoot: string = root): void {
-  const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot }).map(p => basename(p)).sort()
+  const onDisk = globSync(['packages/*/tool-*', 'packages/browser/browserskill'], { cwd: scanRoot }).map(p => basename(p)).sort()
   const listed = new Set(packages.map(p => p.dir))
   const missing = onDisk.filter(dir => !listed.has(dir))
   if (missing.length > 0) {
@@ -746,6 +770,7 @@ export function assertToolsHarvested(entry: ToolPackage, harvested: number): voi
  * schemas. A fresh Context per package keeps attribution clean (each entry's
  * schemas come from exactly that package) and isolates a boot failure to its
  * own entry. Disposed after harvest so no executor/provider outlives the run.
+ * Entries boot serially; an entry may override process env only around its own mount.
  */
 export async function collectToolCatalog(packages: ToolPackage[] = TOOL_PACKAGES): Promise<ToolCatalog> {
   assertManifestComplete(packages)
@@ -819,9 +844,9 @@ export function render(catalog: ToolCatalog): string {
     '',
     'Every model-facing tool a shipped plugin contributes to `ctx.tools`: the `name`, `description`, and JSON-Schema `parameters` the model receives via the system-prompt assembly. It complements the [subsystem pages](subsystems/core.md) (the types plus each page\'s generated Cordis API region) — this page is the *tools* the agent is offered.',
     '',
-    'This file is GENERATED and verified fresh by `pnpm run verify-tool-catalog` (part of `doc-sync`) — do not edit it by hand. Unlike the cordis catalog (a pure source-AST pass), this generator BOOTS each tool plugin on a real context and reads `ctx.tools.schemas()`, because a tool schema is not statically knowable (runtime-spread enums, concatenated descriptions, config-driven names, raw-JSON-Schema MCP tools). A completeness guard globs `packages/*/tool-*` and fails if any package is missing from the generator\'s boot manifest, so a new tool cannot be silently undocumented. See [the tool-schema-catalog Agent Note](../.agents/notes/implemented/process/2026-07-02-tool-schema-catalog.md).',
+    'This file is GENERATED and verified fresh by `pnpm run verify-tool-catalog` (part of `doc-sync`) — do not edit it by hand. Unlike the cordis catalog (a pure source-AST pass), this generator BOOTS each tool plugin on a real context and reads `ctx.tools.schemas()`, because a tool schema is not statically knowable (runtime-spread enums, concatenated descriptions, config-driven names, raw-JSON-Schema MCP tools). A completeness guard checks `packages/*/tool-*` and the native BrowserSkill runtime and fails if any package is missing from the generator\'s boot manifest, so a new tool cannot be silently undocumented. See [the tool-schema-catalog Agent Note](../.agents/notes/implemented/process/2026-07-02-tool-schema-catalog.md).',
     '',
-    'Scope: shipped product tools under `packages/*/tool-*`, each booted with its DEFAULT config, except where a Config field is REQUIRED with no default — there the generator must choose, and the per-package note records which branch this page shows. The registered tool NAME can be a load-time config (e.g. `tool-subagent`\'s `toolName`), so a deployment may expose a package under a different or additional name — a per-package note records those shipped aliases where they exist. The `examples/` demo tools (e.g. `echo`) are excluded, matching the cordis catalog\'s packages-only scope.',
+    'Scope: shipped tool packages and explicitly listed runtime-owned tools, each booted with its DEFAULT config, except where a Config field is REQUIRED with no default — there the generator must choose, and the per-package note records which branch this page shows. The registered tool NAME can be a load-time config (e.g. `tool-subagent`\'s `toolName`), so a deployment may expose a package under a different or additional name — a per-package note records those shipped aliases where they exist. The `examples/` demo tools (e.g. `echo`) are excluded, matching the cordis catalog\'s packages-only scope.',
     '',
     '## Tool Package Map',
     '',
