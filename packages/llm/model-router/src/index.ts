@@ -1127,7 +1127,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (failures !== undefined && config.judgmentFailures.breakerOpenTurns > 0
       && failures.count >= config.judgmentFailures.breakerThreshold
       && turn - failures.turn <= config.judgmentFailures.breakerOpenTurns) {
-      return keep('breaker-open')
+      return { ...keep('breaker-open'), ...selectedEngine === undefined ? {} : { engineId: selectedEngine } }
     }
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')

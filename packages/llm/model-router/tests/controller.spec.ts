@@ -1417,7 +1417,7 @@ describe('judgment failures', () => {
     expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 2, turn: 2, engineId: 'laya' })
     nextTurn(b, 3)
     expect(await b.resolve(3)).toBeUndefined()
-    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open' })
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open', engineId: 'laya' })
 
     // Another engine is not held to the first one's failures.
     b.engine.selected = judgmentEngineId('typesafe')
