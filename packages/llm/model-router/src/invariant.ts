@@ -36,6 +36,9 @@ export const inject = ['invariants']
  * chosen afresh, legitimately logs a header that does not match an earlier
  * decision, and checking that would reject a session turning routing off.
  *
+ * A mode or configuration value that marks `shadow` must also be `active`:
+ * shadow judges without rewriting, so it is never a way to switch routing off.
+ *
  * Configuration events may replace one another until the session records an
  * explicit `model-routing/mode`; after that point, even a same-valued
  * configuration append is an invalid producer transition because the user
@@ -53,6 +56,10 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
   ctx.on('internal/dispatch', (_mode, eventName, args) => {
     if (eventName !== 'session/event') return
     const [session, event] = args as [Session, SessionEvent]
+    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') {
+      // Shadow judges without rewriting, so it is a kind of active routing.
+      if (event.data.shadow === true && !event.data.active) fail(`a ${event.type} value marks shadow without active: true`)
+    }
     if (event.type === 'model-routing/configuration') {
       if (session.events.some(candidate => candidate.type === 'model-routing/mode')) {
         fail('a model-routing/configuration event cannot follow an explicit model-routing/mode selection')

@@ -13,6 +13,7 @@ import { ReasoningEffortId } from '@shres-code/shres-code-llm'
 import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import type {
   ModelRoutingCandidate,
+  ModelRoutingMode,
   ModelRoutingCandidateConfig,
   ModelRoutingObjective,
   ModelRoutingOperatingPoint,
@@ -21,8 +22,8 @@ import type {
   ModelRoutingRouteFromConfig,
 } from './types.ts'
 
-/** Whether routing starts in force. */
-export type ModelRoutingInitialMode = 'off' | 'on'
+/** The mode a session without an explicit user choice starts in. */
+export type ModelRoutingInitialMode = ModelRoutingMode
 
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
@@ -118,7 +119,11 @@ export interface ModelRoutingDifficultyToEffortConfig {
 
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
+  /**
+   * Deployment mode for sessions without an explicit user choice: `off`, `on`,
+   * or `shadow`, which judges and logs without rewriting a request. Changes
+   * commit between requests.
+   */
   initialMode: ModelRoutingInitialMode
   /**
    * The one shared pool of downgrade candidates, whose relative capability and
@@ -426,8 +431,8 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   // schema's to enforce for a composition entry, but programmatic construction
   // bypasses it, so they are re-judged here as raw values a type cannot vouch for.
   const raw = config as { initialMode?: unknown; onUnavailable?: unknown; inTurnFallback?: unknown; tier?: unknown }
-  if (raw.initialMode !== 'off' && raw.initialMode !== 'on') {
-    throw new Error('ModelRouterConfig.initialMode must be "off" or "on"')
+  if (raw.initialMode !== 'off' && raw.initialMode !== 'on' && raw.initialMode !== 'shadow') {
+    throw new Error('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
   }
   if (raw.onUnavailable !== undefined && raw.onUnavailable !== 'fallback' && raw.onUnavailable !== 'error') {
     throw new Error('ModelRouterConfig.onUnavailable must be "fallback" or "error"')

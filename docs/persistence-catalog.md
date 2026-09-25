@@ -115,7 +115,7 @@ Sources: [`packages/core/session/src/types.ts:350`](../packages/core/session/src
 }
 ```
 
-Source: [`packages/core/agent/src/types.ts:44`](../packages/core/agent/src/types.ts)
+Source: [`packages/core/agent/src/types.ts:28`](../packages/core/agent/src/types.ts)
 
 <a id="agentmodel-selection--log-only"></a>
 
@@ -133,30 +133,6 @@ Source: [`packages/core/agent/src/types.ts:44`](../packages/core/agent/src/types
 ```
 
 Source: [`packages/core/agent/src/types.ts:21`](../packages/core/agent/src/types.ts)
-
-<a id="agentroute-base--log-only"></a>
-
-#### `agent/route-base` — log-only
-
-```ts persistence-catalog
-/**
- * The manual route beneath a routed request. The model-selection hook
- * appends it before the request's `request/header` when a composed
- * `ctx.modelRouting` ran a route that differs from the manual route in
- * provider, model, or effort, so a reader without the router recovers the
- * route the agent returns to (`manualBaseOfLastHeader`). Required on read:
- * a build that skipped it would resume on the routed candidate. The two
- * routes differ, and each has a nonempty provider and model.
- */
-'agent/route-base': {
-  /** The manual route the request was routed from. */
-  manual: Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
-  /** The route the request ran. */
-  routed: Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
-}
-```
-
-Source: [`packages/core/agent/src/types.ts:32`](../packages/core/agent/src/types.ts)
 
 ### `agent-preset/*`
 
@@ -882,10 +858,10 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
  * selection. Log-only, non-surface, whole-value replace. Changes during
  * an open turn commit at its next accepted pre-step.
  */
-'model-routing/configuration': { active: boolean }
+'model-routing/configuration': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1047`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1031`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -900,7 +876,7 @@ Source: [`packages/llm/model-router/src/types.ts:1047`](../packages/llm/model-ro
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1059`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1043`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -908,14 +884,14 @@ Source: [`packages/llm/model-router/src/types.ts:1059`](../packages/llm/model-ro
 
 ```ts persistence-catalog
 /**
- * Whether model routing is in force from this point on: log-only,
- * non-surface, whole-value replace. The last `model-routing/mode` wins; a
- * log with none folds to inactive through {@link foldModelRouting}.
+ * The routing mode in force from this point on: log-only, non-surface,
+ * whole-value replace. The last `model-routing/mode` wins; a log with none
+ * folds to off through {@link foldModelRouting}.
  */
-'model-routing/mode': { active: boolean }
+'model-routing/mode': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1053`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1037`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

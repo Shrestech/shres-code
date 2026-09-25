@@ -74,11 +74,12 @@ function raw(overrides: Record<string, unknown>): ModelRouterConfig {
 describe('resolveConfig required fields', () => {
   it('requires the mode', () => {
     expect(() => resolveConfig(raw({ initialMode: undefined })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
     expect(() => resolveConfig(raw({ initialMode: 'sometimes' })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
     expect(() => resolveConfig(raw({ initialMode: '' })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
+    expect(resolveConfig(raw({ initialMode: 'shadow' })).initialMode).toBe('shadow')
   })
 
   it('requires the route question text', () => {
@@ -424,6 +425,13 @@ describe('resolveConfig bounds', () => {
     const { routeFrom: _routeFrom, ...unlisted } = valid()
     expect(() => resolveConfig(unlisted)).toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
     expect(resolveConfig({ ...unlisted, initialMode: 'off' }).routeFrom).toEqual([])
+  })
+
+  it('initialMode shadow requires non-empty routeFrom', () => {
+    const { routeFrom: _routeFrom, ...unlisted } = valid()
+    expect(() => resolveConfig({ ...unlisted, initialMode: 'shadow' }))
+      .toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
+    expect(resolveConfig(valid({ initialMode: 'shadow' })).initialMode).toBe('shadow')
   })
 
   it('rejects the removed turn-counted horizon key by name', () => {

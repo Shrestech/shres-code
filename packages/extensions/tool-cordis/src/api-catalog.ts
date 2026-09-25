@@ -1324,12 +1324,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the thresholds, judgment deadline, difficulty band, and hold.',
       },
       {
-        signature: '@Remote async poolStatus(): Promise<ModelRoutingPoolStatus>',
-        description: 'The pool and `routeFrom` allowlist in force, each model with the facts its adapter declares, and the router\'s own eligibility result for every (base, pool model) pair, computed as a turn without images would compute it. Makes no model request.',
-        parameters: [],
-        returns: 'the pool status.',
-      },
-      {
         signature: '@Remote(\'decision\') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail',
         description: 'One logged decision, verbatim, with the turn and step it was logged in and the gate configuration in force now.',
         parameters: [{ name: 'agent', description: 'the session\'s Agent.' }, { name: 'seq', description: 'seq of a `model-routing/decision` event in that session\'s log.' }],
@@ -1337,28 +1331,21 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when the seq does not name a `model-routing/decision` event.'],
       },
       {
-        signature: '@Remote(\'stats\') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>',
-        description: 'Routing statistics across one workspace\'s unarchived sessions, for the Settings overview: each session\'s `modelRoutingStats` value, rolled up over the sessions whose latest decision falls in the range. An attached session\'s value is its live one and a cold session\'s is the persisted projection cache\'s; no session log is read, so a cold session without a cached value on the current unit version is counted as not summarized.',
-        parameters: [{ name: 'request', description: 'the workspace and the range.' }],
-        returns: 'the workspace statistics.',
-        throws: ['when this host composes no workspace registry or the workspace is unknown.'],
-      },
-      {
-        signature: 'get(agent: Agent): { active: boolean; pending?: boolean }',
+        signature: 'get(agent: Agent): { mode: ModelRoutingMode; pending?: ModelRoutingMode }',
         description: 'Read the logged mode and any selection awaiting the next accepted pre-step.',
         parameters: [{ name: 'agent', description: 'the agent to read.' }],
         returns: 'the mode in force plus a pending selection, when present.',
       },
       {
-        signature: 'modeOf(session: Session, end: number = session.events.length): boolean',
+        signature: 'modeOf(session: Session, end: number = session.events.length): ModelRoutingMode',
         description: 'The mode in force on one session, derived from committed configuration and user mode events. A log with neither starts off.',
         parameters: [{ name: 'session', description: 'the session to read.' }, { name: 'end', description: 'fold the first `end` events; defaults to the whole log.' }],
-        returns: 'whether routing is active.',
+        returns: 'the mode in force.',
       },
       {
-        signature: 'set(agent: Agent, active: boolean): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
-        description: 'Switch routing on or off. Between turns the change is appended immediately; a changed value during an open turn waits for the next accepted pre-step. An explicit choice equal to the current value records user authority immediately and prevents later settings from overriding it.',
-        parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'active', description: 'whether routing should be active.' }],
+        signature: 'set(agent: Agent, mode: ModelRoutingMode): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
+        description: 'Switch routing on, off, or to shadow. Between turns the change is appended immediately; a changed value during an open turn waits for the next accepted pre-step. An explicit choice equal to the current value records user authority immediately and prevents later settings from overriding it.',
+        parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'mode', description: 'the mode routing should run in.' }],
         returns: 'what happened: `committed`, `queued`, `cancelled`, or `noop`.',
       },
       {
@@ -4417,10 +4404,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
-    name: 'LlmCacheUsage',
-    declaration: 'export type LlmCacheUsage = \'reported\' | \'unreported\';',
-  },
-  {
     name: 'LlmCallConfig',
     declaration: 'export interface LlmCallConfig {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n}',
   },
@@ -4450,7 +4433,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n    cacheUsage?: LlmCacheUsage;\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -4654,7 +4637,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingBreakReason',
-    declaration: 'export type ModelRoutingBreakReason = \'gate-failed\' | \'current-preferred\' | \'unknown-candidate\' | \'candidate-ineligible\' | \'escalated\' | \'manual-deviation\' | \'mode-off\' | \'route-errors\' | \'route-failed\' | \'hold-cap\' | \'base-unlisted\';',
+    declaration: 'export type ModelRoutingBreakReason = \'gate-failed\' | \'current-preferred\' | \'unknown-candidate\' | \'candidate-ineligible\' | \'escalated\' | \'manual-deviation\' | \'mode-off\' | \'route-errors\' | \'route-failed\' | \'hold-cap\' | \'base-unlisted\' | \'cold-point-return\';',
+  },
+  {
+    name: 'ModelRoutingCacheTtlView',
+    declaration: 'export interface ModelRoutingCacheTtlView {\n    readonly provider: string;\n    readonly model: string;\n    readonly ttlMs: number;\n    readonly source: \'adapter\' | \'fallback\';\n}',
   },
   {
     name: 'ModelRoutingCalibration',
@@ -4666,7 +4653,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingCandidateAssessment',
-    declaration: 'export interface ModelRoutingCandidateAssessment {\n    readonly id: string;\n    readonly provider: string;\n    readonly model: string;\n    readonly reasoningEffort?: string;\n    readonly difficultyReasoningEffort?: string;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly effectiveMaxTokens?: number;\n    readonly reason: ModelRoutingCandidateEligibilityReason;\n}',
+    declaration: 'export interface ModelRoutingCandidateAssessment {\n    readonly id: string;\n    readonly provider: string;\n    readonly model: string;\n    readonly reasoningEffort?: string;\n    readonly difficultyReasoningEffort?: string;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly effectiveMaxTokens?: number;\n    readonly promptCacheTtlMs?: number;\n    readonly reason: ModelRoutingCandidateEligibilityReason;\n}',
   },
   {
     name: 'ModelRoutingCandidateEligibility',
@@ -4678,11 +4665,23 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingCandidateRequirements',
-    declaration: 'export interface ModelRoutingCandidateRequirements {\n    readonly requiresImage: boolean;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly thinkingMode?: LlmThinkingMode;\n}',
+    declaration: 'export interface ModelRoutingCandidateRequirements {\n    readonly requiresImage: boolean;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly thinkingMode?: LlmThinkingMode;\n    readonly promptCacheTtlMs?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingColdPoint',
+    declaration: 'export interface ModelRoutingColdPoint {\n    kind: ModelRoutingColdPointKind;\n    ttlMs: number;\n    ttlSource: \'adapter\' | \'fallback\';\n    idleMs?: number;\n    lastBaseSeq?: number;\n    compactionSeq?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingColdPointKind',
+    declaration: 'export type ModelRoutingColdPointKind = \'session-start\' | \'post-compaction\' | \'manual-switch\' | \'no-cache\' | \'idle\';',
   },
   {
     name: 'ModelRoutingDecision',
-    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n    thresholds?: ModelRoutingThresholds;\n}',
+    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n    thresholds?: ModelRoutingThresholds;\n    coldPoint?: ModelRoutingColdPoint | null;\n    shadow?: true;\n    cache?: ModelRoutingDecisionCache;\n}',
+  },
+  {
+    name: 'ModelRoutingDecisionCache',
+    declaration: 'export interface ModelRoutingDecisionCache {\n    readonly base: ModelRoutingCacheTtlView;\n    readonly candidates?: readonly {\n        readonly id: string;\n        readonly ttlMs: number;\n        readonly source: \'adapter\' | \'fallback\';\n    }[];\n}',
   },
   {
     name: 'ModelRoutingDecisionDetail',
@@ -4694,7 +4693,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingEngineFailure',
-    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n    refusedBeforeDispatch?: true;\n}',
+    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n}',
   },
   {
     name: 'ModelRoutingEntryBaseView',
@@ -4714,11 +4713,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingInitialMode',
-    declaration: 'export type ModelRoutingInitialMode = \'off\' | \'on\';',
+    declaration: 'export type ModelRoutingInitialMode = ModelRoutingMode;',
   },
   {
     name: 'ModelRoutingInTurnFallback',
     declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
+  },
+  {
+    name: 'ModelRoutingMode',
+    declaration: 'export type ModelRoutingMode = \'off\' | \'on\' | \'shadow\';',
   },
   {
     name: 'ModelRoutingObjective',
@@ -4733,28 +4736,8 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingOutcome = \'downgraded\' | \'kept-strong\' | \'skipped\' | \'error\';',
   },
   {
-    name: 'ModelRoutingPoolBase',
-    declaration: 'export interface ModelRoutingPoolBase {\n    provider: string;\n    model: string;\n    objective: ModelRoutingObjective;\n    allowEveryTurn: boolean;\n    registered: boolean;\n    contextWindow?: number;\n}',
-  },
-  {
-    name: 'ModelRoutingPoolCandidate',
-    declaration: 'export interface ModelRoutingPoolCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n    description: string;\n    registered: boolean;\n    contextWindow?: number;\n    inputModalities?: string[];\n    efforts?: string[];\n    cacheUsage?: \'reported\' | \'unreported\';\n    alsoRouteFrom: boolean;\n    eligibility: ModelRoutingPoolEligibility[];\n}',
-  },
-  {
-    name: 'ModelRoutingPoolEligibility',
-    declaration: 'export interface ModelRoutingPoolEligibility {\n    provider: string;\n    model: string;\n    reason: ModelRoutingCandidateEligibilityReason;\n}',
-  },
-  {
-    name: 'ModelRoutingPoolStatus',
-    declaration: 'export interface ModelRoutingPoolStatus {\n    routeFrom: ModelRoutingPoolBase[];\n    candidates: ModelRoutingPoolCandidate[];\n}',
-  },
-  {
     name: 'ModelRoutingReason',
-    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
-  },
-  {
-    name: 'ModelRoutingReasonGroup',
-    declaration: 'export type ModelRoutingReasonGroup = \'switched\' | \'judge-no\' | \'fail-closed\' | \'engine\';',
+    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\' | \'warm-prefix\' | \'cold-point-return\';',
   },
   {
     name: 'ModelRoutingRequest',
@@ -4773,18 +4756,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelRoutingSelection {\n    candidateId: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n}',
   },
   {
-    name: 'ModelRoutingStatsRange',
-    declaration: 'export type ModelRoutingStatsRange = \'24h\' | \'7d\' | \'all\';',
-  },
-  {
-    name: 'ModelRoutingStatsRequest',
-    declaration: 'export interface ModelRoutingStatsRequest {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n}',
-  },
-  {
-    name: 'ModelRoutingStatsSnapshot',
-    declaration: 'export interface ModelRoutingStatsSnapshot {\n    counts: {\n        decisions: number;\n        consults: number;\n        downgradedSteps: number;\n        steps: number;\n        streaks: number;\n        keptStrong: number;\n        routeFailed: number;\n        judgeFailed: number;\n        deadlineHits: number;\n        warmUps: number;\n        turnsWithDecisions: number;\n    };\n    reasons: {\n        reason: string;\n        group: ModelRoutingReasonGroup;\n        count: number;\n    }[];\n    keptReasons: {\n        reason: string;\n        count: number;\n    }[];\n    exits: {\n        brokenBy: string;\n        count: number;\n    }[];\n    streakLengths: {\n        median: number | null;\n        max: number | null;\n    };\n    confidence: {\n        values: number[];\n        margins: number[];\n        max: number | null;\n        total: number;\n    };\n    latency: {\n        bucketsMs: number[];\n        counts: number[];\n        failed: number;\n        p50: number | null;\n        p95: number | null;\n        includesFailed: boolean;\n    };\n    eligibility: {\n        counts: number[];\n        p50: number | null;\n        p95: number | null;\n    };\n    criticalPath: {\n        totalMs: number;\n        perTurnMs: number | null;\n        judgeOnly: number;\n    };\n    judge: {\n        calls: number;\n        promptTokens: number;\n        outputTokens: number;\n    };\n    thresholds: {\n        downgradeThreshold: number;\n        downgradeMargin: number;\n        source: \'operating-point\' | \'global\';\n    /* …truncated — full shape in source */',
-  },
-  {
     name: 'ModelRoutingStickyView',
     declaration: 'export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView;',
   },
@@ -4795,14 +4766,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingUnavailablePolicy',
     declaration: 'export type ModelRoutingUnavailablePolicy = \'fallback\' | \'error\';',
-  },
-  {
-    name: 'ModelRoutingWorkspaceSession',
-    declaration: 'export interface ModelRoutingWorkspaceSession {\n    sessionId: string;\n    lastDecisionAt: number;\n    decisions: number;\n    steps: number;\n    downgradedSteps: number;\n}',
-  },
-  {
-    name: 'ModelRoutingWorkspaceStats',
-    declaration: 'export interface ModelRoutingWorkspaceStats {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n    computedAt: number;\n    sessions: {\n        members: number;\n        summarized: number;\n        inRange: number;\n        included: number;\n        capped: boolean;\n    };\n    counts: ModelRoutingStatsSnapshot[\'counts\'];\n    reasons: ModelRoutingStatsSnapshot[\'reasons\'];\n    routedSwitches: {\n        count: number;\n        tokens: number;\n    };\n    rows: ModelRoutingWorkspaceSession[];\n}',
   },
   {
     name: 'NoteJspaceInput',
@@ -4966,7 +4929,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly coldPoints: {\n        readonly unknownTtlMs: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',
@@ -5514,7 +5477,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SkillSource',
-    declaration: 'export type SkillSource = \'project-shres\' | \'project-agents\' | \'runtime\' | \'user-shres\' | \'user-agents\' | \'custom\' | \'bundled\' | \'installed\' | (string & {});',
+    declaration: 'export type SkillSource = \'project-shres\' | \'project-agents\' | \'runtime\' | \'user-shres\' | \'user-agents\' | \'custom\' | \'bundled\' | (string & {});',
   },
   {
     name: 'SkillSummary',

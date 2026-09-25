@@ -12,6 +12,8 @@ import type {
   ModelRoutingBreakReason,
   ModelRoutingDecision,
   ModelRoutingEntryBaseView,
+  ModelRoutingMode,
+  ModelRoutingModeRecord,
   ModelRoutingReason,
   ModelRoutingSelection,
   ModelRoutingStickyView,
@@ -133,27 +135,56 @@ export interface ModelRoutingStickyFoldState {
 }
 
 /**
- * Whether model routing is active after the first `end` events. The last
- * user mode or committed configuration event wins; a prefix with neither
- * uses `initialMode`.
+ * The mode one logged mode value names. An inactive record is off whatever else
+ * it carries, so a record that marks shadow without `active` cannot switch
+ * routing on; the invariant rejects such a record before it is published.
+ * @param record - a `model-routing/mode` or `model-routing/configuration` value.
+ * @returns `off` when inactive, `shadow` when marked shadow, and `on` otherwise.
+ */
+export function modeOfRecord(record: ModelRoutingModeRecord): ModelRoutingMode {
+  if (!record.active) return 'off'
+  return record.shadow === true ? 'shadow' : 'on'
+}
+
+/**
+ * The value that records one mode in a `model-routing/mode` or
+ * `model-routing/configuration` event.
+ * @param mode - the mode to record.
+ * @returns the logged value; `on` omits `shadow`, as logs from before shadow do.
+ */
+export function modeRecord(mode: ModelRoutingMode): ModelRoutingModeRecord {
+  switch (mode) {
+    case 'off':
+      return { active: false }
+    case 'on':
+      return { active: true }
+    case 'shadow':
+      return { active: true, shadow: true }
+  }
+}
+
+/**
+ * The model routing mode after the first `end` events. The last user mode or
+ * committed configuration event wins; a prefix with neither uses
+ * `initialMode`.
  * @param events - the session log or any prefix of it.
  * @param end - fold `events[0, end)`; defaults to the whole log.
  * @param initialMode - mode in force before the first event; defaults to off.
- * @returns whether routing is active.
+ * @returns the mode in force.
  */
 export function foldModelRouting(
   events: readonly SessionEvent[],
   end: number = events.length,
-  initialMode: boolean = false,
-): boolean {
-  let active = initialMode
+  initialMode: ModelRoutingMode = 'off',
+): ModelRoutingMode {
+  let mode = initialMode
   let index = 0
   for (const event of events) {
     if (index >= end) break
     index++
-    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') active = event.data.active
+    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') mode = modeOfRecord(event.data)
   }
-  return active
+  return mode
 }
 
 /**
@@ -428,7 +459,8 @@ export function advanceStickyFoldState(
     }
     case 'model-routing/mode':
     case 'model-routing/configuration':
-      if (event.data.active) return state
+      // Only `on` keeps a streak: off stops routing, and shadow never rewrites a request.
+      if (modeOfRecord(event.data) === 'on') return state
       return state.active ? breakSticky(state, 'mode-off') : state
     case 'model-routing/decision': {
       const sticky = event.data.sticky

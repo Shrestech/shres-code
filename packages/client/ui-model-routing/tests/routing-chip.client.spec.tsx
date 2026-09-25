@@ -33,11 +33,12 @@ const CHEAP = { candidateId: 'cheap', provider: 'deepseek', model: 'deepseek-v4-
 const STRONG = { provider: 'deepseek', model: 'deepseek-v4.1' }
 
 /** The off mode: the projection exists but no mode event has turned routing on. */
-const OFF: ModelRoutingProjection = { active: false, pending: false }
+const OFF: ModelRoutingProjection = { mode: 'off', active: false, pending: false }
 
 /** An on-mode projection holding one downgraded decision and the streak it entered. */
 function running(overrides: Partial<ModelRoutingProjection> = {}): ModelRoutingProjection {
   return {
+    mode: 'on',
     active: true,
     pending: false,
     last: { outcome: 'downgraded', reason: 'gate-passed', selection: CHEAP, confidence: 0.9111 },
@@ -53,6 +54,7 @@ function running(overrides: Partial<ModelRoutingProjection> = {}): ModelRoutingP
  */
 function idle(overrides: Partial<ModelRoutingProjection> = {}): ModelRoutingProjection {
   return {
+    mode: 'on',
     active: true,
     pending: false,
     last: { outcome: 'kept-strong', reason: 'candidate-equals-base', confidence: 0.93 },
@@ -66,6 +68,7 @@ function idle(overrides: Partial<ModelRoutingProjection> = {}): ModelRoutingProj
  * the projection carries no entry base, so there is no route to restore.
  */
 const IDLE_WITHOUT_BASE: ModelRoutingProjection = {
+  mode: 'on',
   active: true,
   pending: false,
   last: { outcome: 'kept-strong', reason: 'candidate-equals-base', confidence: 0.93 },
@@ -190,6 +193,7 @@ describe('RoutingChip', () => {
     // and the log holds no held streak for it yet.
     const { view } = setup({
       routing: {
+        mode: 'on',
         active: true,
         pending: false,
         last: { outcome: 'kept-strong', reason: 'low-confidence', hint: 'consider-stronger', confidence: 0.42 },
@@ -210,7 +214,7 @@ describe('RoutingChip', () => {
   })
 
   it('renders the on mode with no decision and no held streak yet as the mode alone', () => {
-    const { view } = setup({ routing: { active: true, pending: false, sticky: { active: false, stepsElapsed: 0 } } })
+    const { view } = setup({ routing: { mode: 'on', active: true, pending: false, sticky: { active: false, stepsElapsed: 0 } } })
 
     expect(onChip().textContent).toBe('auto')
     expect(view.container.textContent).toBe('auto')

@@ -200,9 +200,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
 }
 
 /** Routing on, with no decision logged yet. */
-export const ON: ModelRoutingProjection = { active: true, pending: false }
+export const ON: ModelRoutingProjection = { mode: 'on', active: true, pending: false }
 /** Routing off. */
-export const OFF: ModelRoutingProjection = { active: false, pending: false }
+export const OFF: ModelRoutingProjection = { mode: 'off', active: false, pending: false }
 
 /** One logged decision as the drill-down reads it: kept strong on low confidence. */
 export function decisionDetail(

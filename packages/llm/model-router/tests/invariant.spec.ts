@@ -89,6 +89,24 @@ describe('model-router invariant companion', () => {
     ])
   })
 
+  it('accepts shadow with active: true and rejects shadow without it, before publication', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    expect(() => {
+      session.append('model-routing/configuration', { active: true, shadow: true })
+      session.append('model-routing/mode', { active: true, shadow: true })
+    }).not.toThrow()
+
+    for (const type of ['model-routing/mode', 'model-routing/configuration'] as const) {
+      const rejected = ctx.sessions.create()
+      expect(() => {
+        rejected.append(type, { active: false, shadow: true })
+      }).toThrow(`a ${type} value marks shadow without active: true`)
+      // Rejected before publication: the malformed record never reached the log.
+      expect(rejected.events).toEqual([])
+    }
+  })
+
   it('rejects configuration after a same-valued explicit mode selection', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()

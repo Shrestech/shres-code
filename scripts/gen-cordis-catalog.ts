@@ -240,6 +240,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   AgentHandle: 'core.md',
   AgentRequestContent: 'core.md',
   ModelRoutingRequest: 'core.md',
+  ModelRoutingMode: 'model-router.md',
+  ModelRoutingModeRecord: 'model-router.md',
   ModelSelection: 'core.md',
   ModelPurpose: 'core.md',
   SaveSelectionOptions: 'core.md',

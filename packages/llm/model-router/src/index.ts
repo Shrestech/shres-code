@@ -105,6 +105,8 @@ import {
   createStickyFoldState,
   foldModelRouting,
   judgmentFailuresFor,
+  modeOfRecord,
+  modeRecord,
   readStickyFoldState,
   sameSelection,
   stickyState,
@@ -133,6 +135,7 @@ import type {
   ModelRoutingGateView,
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
+  ModelRoutingMode,
   ModelRoutingOperatingPoint,
   ModelRoutingPoolBase,
   ModelRoutingPoolCandidate,
@@ -172,7 +175,7 @@ export {
   MAX_LATENCY_JUDGMENT_DEADLINE_MS,
   resolveConfig,
 } from './config.ts'
-export { foldModelRouting, stickyState } from './folds.ts'
+export { foldModelRouting, modeOfRecord, modeRecord, stickyState } from './folds.ts'
 export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
@@ -271,14 +274,45 @@ interface PinnedDecision {
 
 /** A mode change awaiting an accepted request boundary. */
 interface PendingMode {
-  active: boolean
+  mode: ModelRoutingMode
   source: 'configuration' | 'user'
+}
+
+/** The `/route` arguments that select a mode. */
+const ROUTE_MODES: ReadonlySet<string> = new Set<ModelRoutingMode>(['off', 'on', 'shadow'])
+
+/** The `/route status` sentence for each mode. */
+const MODE_STATUS: Readonly<Record<ModelRoutingMode, string>> = {
+  off: 'Routing is off.',
+  on: 'Routing is on.',
+  shadow: 'Routing is in shadow: judging, never switching.',
+}
+
+/** The `/route` reply for a mode committed now. */
+const MODE_COMMITTED: Readonly<Record<ModelRoutingMode, string>> = {
+  off: 'Model routing off.',
+  on: 'Model routing on.',
+  shadow: 'Model routing in shadow: judging, never switching.',
+}
+
+/** The `/route` reply for a mode queued until the next step. */
+const MODE_QUEUED: Readonly<Record<ModelRoutingMode, string>> = {
+  off: 'Disabling model routing (applies from the next step).',
+  on: 'Enabling model routing (applies from the next step).',
+  shadow: 'Switching model routing to shadow (applies from the next step).',
+}
+
+/** The `/route` reply for the mode already in force. */
+const MODE_NOOP: Readonly<Record<ModelRoutingMode, string>> = {
+  off: 'Model routing is already off.',
+  on: 'Model routing is already on.',
+  shadow: 'Model routing is already in shadow.',
 }
 
 /** Projection unit state: mode and command fields plus the shared sticky fold. */
 interface ModelRoutingUnitState {
-  active: boolean
-  wanted: boolean | null
+  mode: ModelRoutingMode
+  wanted: ModelRoutingMode | null
   last: ModelRoutingLastDecision | null
   sticky: ModelRoutingStickyFoldState
   lastStrong: ModelRoutingEntryBaseView | null
@@ -385,6 +419,7 @@ function heldEntry(sticky: ModelRoutingStickyState): { enteredTurn?: number; ent
 
 /** Wire payload schema of the `modelRouting` projection. */
 const modelRoutingProjectionSchema = zod.object({
+  mode: zod.union([zod.literal('off'), zod.literal('on'), zod.literal('shadow')]),
   active: zod.boolean(),
   pending: zod.boolean(),
   last: zod.object({
@@ -455,7 +490,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * section schema. Unknown keys and wrong types fail plugin load by name.
    */
   static Config = z.object({
-    initialMode: z.union(['off', 'on']).required(),
+    initialMode: z.union(['off', 'on', 'shadow']).required(),
     candidates: z.array(z.object({
       id: z.string().required(),
       provider: z.string().required(),
@@ -575,7 +610,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         key: 'modelRouting',
         schema: modelRoutingProjectionSchema,
         init: () => ({
-          active: false,
+          mode: 'off',
           wanted: null,
           last: null,
           sticky: createStickyFoldState(),
@@ -586,13 +621,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         apply: (state, event) => {
           const sticky = advanceStickyFoldState(state.sticky, event)
           switch (event.type) {
-            case 'command/run':
+            case 'command/run': {
               if (event.data.name !== ROUTE_COMMAND || event.data.args === undefined) return state
-              if (event.data.args.trim() !== 'on' && event.data.args.trim() !== 'off') return state
-              return { ...state, wanted: event.data.args.trim() === 'on' }
+              const wanted = event.data.args.trim()
+              if (!ROUTE_MODES.has(wanted)) return state
+              return { ...state, wanted: wanted as ModelRoutingMode }
+            }
             case 'model-routing/mode':
             case 'model-routing/configuration':
-              return { ...state, active: event.data.active, wanted: null, sticky }
+              return { ...state, mode: modeOfRecord(event.data), wanted: null, sticky }
             case 'model-routing/decision': {
               const data = event.data
               const last: ModelRoutingLastDecision = {
@@ -628,8 +665,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         view: (state) => {
           const sticky = readStickyFoldState(state.sticky)
           return {
-            active: state.active,
-            pending: state.wanted !== null && state.wanted !== state.active,
+            mode: state.mode,
+            active: state.mode !== 'off',
+            pending: state.wanted !== null && state.wanted !== state.mode,
             ...state.last === null ? {} : { last: state.last },
             ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
             ...state.returnThinking === null ? {} : { returnThinking: state.returnThinking },
@@ -640,8 +678,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // The accumulator keys its counted judgment failures by engine.
-        stateVersion: 10,
+        // The unit state records the three-state mode.
+        stateVersion: 11,
       })
       projectionCtx.sessionProjections.register<'modelRoutingStats', ModelRoutingStatsState>({
         key: 'modelRoutingStats',
@@ -658,8 +696,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
-        description: 'Switch automatic model routing on or off, or report its state',
-        input: { hint: '[on|off]' },
+        description: 'Switch automatic model routing on, off, or to shadow, or report its state',
+        input: { hint: '[on|off|shadow]' },
         handler: ({ agent, rawInput }) => this.runCommand(agent, rawInput),
       })
     })
@@ -826,12 +864,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   /** Commit deployment defaults without replacing an explicit session choice. */
   private reconcileConfiguration(session: Session): void {
     if (this.hasManualMode(session) || this.pendingIntents.get(session)?.source === 'user') return
-    const active = this.config().initialMode === 'on'
-    if (active === this.modeOf(session)) {
+    const mode = this.config().initialMode
+    if (mode === this.modeOf(session)) {
       this.pendingIntents.delete(session)
       return
     }
-    const wanted: PendingMode = { active, source: 'configuration' }
+    const wanted: PendingMode = { mode, source: 'configuration' }
     if (hasOpenTurn(session.events)) this.pendingIntents.set(session, wanted)
     else this.commitMode(session, wanted)
   }
@@ -1087,10 +1125,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * @param agent - the agent to read.
    * @returns the mode in force plus a pending selection, when present.
    */
-  get(agent: Agent): { active: boolean; pending?: boolean } {
-    const active = this.modeOf(agent.session)
+  get(agent: Agent): { mode: ModelRoutingMode; pending?: ModelRoutingMode } {
+    const mode = this.modeOf(agent.session)
     const pending = this.pendingIntents.get(agent.session)
-    return pending === undefined ? { active } : { active, pending: pending.active }
+    return pending === undefined ? { mode } : { mode, pending: pending.mode }
   }
 
   /**
@@ -1098,29 +1136,29 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * and user mode events. A log with neither starts off.
    * @param session - the session to read.
    * @param end - fold the first `end` events; defaults to the whole log.
-   * @returns whether routing is active.
+   * @returns the mode in force.
    */
-  modeOf(session: Session, end: number = session.events.length): boolean {
+  modeOf(session: Session, end: number = session.events.length): ModelRoutingMode {
     return foldModelRouting(session.events, end)
   }
 
   /**
-   * Switch routing on or off. Between turns the change is appended
+   * Switch routing on, off, or to shadow. Between turns the change is appended
    * immediately; a changed value during an open turn waits for the next
    * accepted pre-step. An explicit choice equal to the current value records
    * user authority immediately and prevents later settings from overriding it.
    * @param agent - the agent to switch.
-   * @param active - whether routing should be active.
+   * @param mode - the mode routing should run in.
    * @returns what happened: `committed`, `queued`, `cancelled`, or `noop`.
    */
-  set(agent: Agent, active: boolean): 'committed' | 'queued' | 'cancelled' | 'noop' {
+  set(agent: Agent, mode: ModelRoutingMode): 'committed' | 'queued' | 'cancelled' | 'noop' {
     const session = agent.session
     const pending = this.pendingIntents.get(session)
     const logged = this.modeOf(session)
     const manual = this.hasManualMode(session)
-    if (pending?.source === 'user' && active === pending.active) return 'noop'
-    const wanted: PendingMode = { active, source: 'user' }
-    if (active === logged) {
+    if (pending?.source === 'user' && mode === pending.mode) return 'noop'
+    const wanted: PendingMode = { mode, source: 'user' }
+    if (mode === logged) {
       this.commitMode(session, wanted)
       return pending !== undefined ? 'cancelled' : manual ? 'noop' : 'committed'
     }
@@ -1136,11 +1174,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private commitMode(session: Session, wanted: PendingMode): void {
     const manual = this.hasManualMode(session)
     if (wanted.source === 'user') {
-      if (!manual || wanted.active !== this.modeOf(session)) {
-        session.append('model-routing/mode', { active: wanted.active })
+      if (!manual || wanted.mode !== this.modeOf(session)) {
+        session.append('model-routing/mode', modeRecord(wanted.mode))
       }
     } else {
-      session.append('model-routing/configuration', { active: wanted.active })
+      session.append('model-routing/configuration', modeRecord(wanted.mode))
     }
     // Delete only after the append succeeds so a later accepted pre-step can
     // retry a failed durable write.
@@ -1180,7 +1218,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // Only the hook calls the consult, so an agent reported unreachable has it now.
     this.adoptIfReachable(agent)
     const session = agent.session
-    const active = this.modeOf(session)
+    // Shadow never rewrites a request, so only `on` may route one.
+    const active = this.modeOf(session) === 'on'
     const pinned = this.pins.get(session)
     let state: RoutingState | undefined
     if (pinned !== undefined && pinned.turn === turn) {
@@ -1828,29 +1867,24 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       return { kind: 'success', text: 'Routing can\'t run for this agent: it has no model-selection hook.' }
     }
     if (args === '' || args === 'status') {
-      const { active, pending } = this.get(agent)
+      const { mode, pending } = this.get(agent)
       const sticky = stickyState(agent.session.events)
-      const state = active ? 'Routing is on.' : 'Routing is off.'
       const queued = pending === undefined ? '' : ' A change applies from the next step.'
       const held = sticky.active && sticky.candidate !== undefined
         ? ` Holding ${sticky.candidate.provider}/${sticky.candidate.model} for step ${sticky.stepsElapsed + 1} of at least ${config.hold.minSteps} and at most ${config.hold.maxSteps}.`
         : ''
-      return { kind: 'success', text: `${state}${queued}${held}` }
+      return { kind: 'success', text: `${MODE_STATUS[mode]}${queued}${held}` }
     }
-    const wanted = args === 'on' ? true : args === 'off' ? false : undefined
-    if (wanted === undefined) return { kind: 'success', text: 'Usage: /route [on|off]' }
-    // Turning routing on from a typed command states remote egress, as the Auto chip's confirm does.
-    const egress = wanted ? this.remoteEgressNotice(config) : ''
+    if (!ROUTE_MODES.has(args)) return { kind: 'success', text: 'Usage: /route [on|off|shadow]' }
+    const wanted = args as ModelRoutingMode
+    // A typed switch to on or shadow states remote egress, as the Auto chip's
+    // confirm does: shadow sends the same state off this machine.
+    const egress = wanted === 'off' ? '' : this.remoteEgressNotice(config)
     switch (this.set(agent, wanted)) {
       case 'committed':
-        return { kind: 'success', text: wanted ? `Model routing on.${egress}` : 'Model routing off.' }
+        return { kind: 'success', text: `${MODE_COMMITTED[wanted]}${egress}` }
       case 'queued':
-        return {
-          kind: 'success',
-          text: wanted
-            ? `Enabling model routing (applies from the next step).${egress}`
-            : 'Disabling model routing (applies from the next step).',
-        }
+        return { kind: 'success', text: `${MODE_QUEUED[wanted]}${egress}` }
       case 'cancelled':
         // The request reversed a pending selection and lands where the session
         // already is. The completed operation is \"a pending change was dropped\",
@@ -1858,7 +1892,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         // in the status line either way.
         return { kind: 'success', text: 'Model routing change cancelled.' }
       case 'noop':
-        return { kind: 'success', text: wanted ? 'Model routing is already on.' : 'Model routing is already off.' }
+        return { kind: 'success', text: MODE_NOOP[wanted] }
     }
   }
 }

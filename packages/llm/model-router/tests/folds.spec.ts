@@ -21,6 +21,8 @@ import {
   advanceStickyFoldState,
   createStickyFoldState,
   foldModelRouting,
+  modeOfRecord,
+  modeRecord,
   readStickyFoldState,
   stickyState,
 } from '../src/folds.ts'
@@ -104,29 +106,46 @@ function rawDecision(session: Session, sticky: unknown): void {
 describe('foldModelRouting', () => {
   it('folds an empty log to the caller\u2019s initial mode', () => {
     const session = scripted('mode-empty')
-    expect(foldModelRouting(session.events)).toBe(false)
-    expect(foldModelRouting(session.events, session.events.length, true)).toBe(true)
-    expect(foldModelRouting(session.events, 0, true)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('off')
+    expect(foldModelRouting(session.events, session.events.length, 'on')).toBe('on')
+    expect(foldModelRouting(session.events, 0, 'shadow')).toBe('shadow')
   })
 
   it('takes the last mode event', () => {
     const session = scripted('mode-last-wins')
     session.append('model-routing/mode', { active: true })
-    expect(foldModelRouting(session.events)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('on')
+    session.append('model-routing/mode', { active: true, shadow: true })
+    expect(foldModelRouting(session.events)).toBe('shadow')
     session.append('model-routing/mode', { active: false })
-    expect(foldModelRouting(session.events)).toBe(false)
-    session.append('model-routing/mode', { active: true })
-    expect(foldModelRouting(session.events)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('off')
+    session.append('model-routing/configuration', { active: true, shadow: true })
+    expect(foldModelRouting(session.events)).toBe('shadow')
   })
 
   it('honours the end prefix', () => {
     const session = scripted('mode-prefix')
     session.append('model-routing/mode', { active: true })
     session.append('model-routing/mode', { active: false })
-    expect(foldModelRouting(session.events, 1)).toBe(true)
-    expect(foldModelRouting(session.events, 0)).toBe(false)
+    expect(foldModelRouting(session.events, 1)).toBe('on')
+    expect(foldModelRouting(session.events, 0)).toBe('off')
     // Past the end nothing changes; the prefix rule is the whole rule.
-    expect(foldModelRouting(session.events, 99)).toBe(false)
+    expect(foldModelRouting(session.events, 99)).toBe('off')
+  })
+
+  it('reads a record from before shadow unchanged, and an inactive record as off whatever it marks', () => {
+    expect(modeOfRecord({ active: true })).toBe('on')
+    expect(modeOfRecord({ active: false })).toBe('off')
+    expect(modeOfRecord({ active: true, shadow: true })).toBe('shadow')
+    // Malformed durable history: shadow cannot switch routing on by itself.
+    expect(modeOfRecord({ active: false, shadow: true })).toBe('off')
+  })
+
+  it('records each mode additively, so on writes what logs before shadow wrote', () => {
+    expect(modeRecord('off')).toEqual({ active: false })
+    expect(modeRecord('on')).toEqual({ active: true })
+    expect(modeRecord('shadow')).toEqual({ active: true, shadow: true })
+    for (const mode of ['off', 'on', 'shadow'] as const) expect(modeOfRecord(modeRecord(mode))).toBe(mode)
   })
 })
 
@@ -345,6 +364,21 @@ describe('stickyState break reasons', () => {
     const session = entered('break-mode-off')
     session.append('model-routing/mode', { active: false })
     expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+  })
+
+  it('clears the streak with mode-off when the mode switches to shadow, which never rewrites a request', () => {
+    const user = entered('break-mode-shadow')
+    user.append('model-routing/mode', { active: true, shadow: true })
+    expect(stickyState(user.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+
+    const configured = entered('break-configuration-shadow')
+    configured.append('model-routing/configuration', { active: true, shadow: true })
+    expect(stickyState(configured.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+
+    // A record re-affirming on leaves the streak held.
+    const affirmed = entered('break-mode-on')
+    affirmed.append('model-routing/mode', { active: true })
+    expect(stickyState(affirmed.events).active).toBe(true)
   })
 
   it('records nothing for a mode event the fold saw while already strong', () => {

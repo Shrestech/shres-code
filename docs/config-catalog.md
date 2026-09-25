@@ -2524,7 +2524,11 @@ Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedb
 ```ts config-catalog
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
+  /**
+   * Deployment mode for sessions without an explicit user choice: `off`, `on`,
+   * or `shadow`, which judges and logs without rewriting a request. Changes
+   * commit between requests.
+   */
   initialMode: ModelRoutingInitialMode
   /**
    * The one shared pool of downgrade candidates, whose relative capability and
@@ -2620,8 +2624,8 @@ export interface ModelRouterConfig {
   tier?: 'fast' | 'accurate'
 }
 
-/** Whether routing starts in force. */
-export type ModelRoutingInitialMode = 'off' | 'on'
+/** The mode a session without an explicit user choice starts in. */
+export type ModelRoutingInitialMode = ModelRoutingMode
 
 /**
  * One allowlisted downgrade candidate as configuration states it: plain
@@ -2771,6 +2775,12 @@ export interface ModelRoutingStateConfig {
   /** Maximum complete context alternatives offered to a tokenizer-aware provider. Defaults to 8. */
   maxFitCandidates?: number
 }
+
+/**
+ * The routing mode in force: `off` never judges, `on` judges and may rewrite a
+ * request, and `shadow` judges and logs every decision but never rewrites one.
+ */
+export type ModelRoutingMode = 'off' | 'on' | 'shadow'
 
 /**
  * How a strong route that routing may start from is billed, which fixes what

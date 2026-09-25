@@ -472,7 +472,7 @@ describe('mode', () => {
     expect(await b.resolve(1)).toBeUndefined()
     expect(b.engine.asks).toHaveLength(0)
     expect(b.session.events.map(event => event.type)).toEqual(before)
-    expect(b.ctx.modelRouting.modeOf(b.session)).toBe(false)
+    expect(b.ctx.modelRouting.modeOf(b.session)).toBe('off')
   })
 
   it('with routing on judges the turn, logs the decision, and returns the allowlisted route', async () => {
@@ -515,23 +515,23 @@ describe('mode', () => {
 
   it('commits a between-turns switch, reports noop for the mode already in force, and folds it from the log', async () => {
     const b = await bench({ config: { ...CONFIG, initialMode: 'off' } })
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: false })
-    expect(b.ctx.modelRouting.set(b.agent, false)).toBe('committed')
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'off' })
+    expect(b.ctx.modelRouting.set(b.agent, 'off')).toBe('committed')
 
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('committed')
-    expect(b.ctx.modelRouting.modeOf(b.session)).toBe(true)
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true })
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('noop')
-    expect(b.ctx.modelRouting.set(b.agent, false)).toBe('committed')
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('committed')
+    expect(b.ctx.modelRouting.modeOf(b.session)).toBe('on')
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on' })
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('noop')
+    expect(b.ctx.modelRouting.set(b.agent, 'off')).toBe('committed')
     expect(b.session.events.flatMap(event => event.type === 'model-routing/mode' ? [event.data.active] : [])).toEqual([false, true, false])
   })
 
   it('queues a switch during an open turn and commits it at the next accepted pre-step', async () => {
     const b = await bench({ config: { ...CONFIG, initialMode: 'off' } })
     openTurn(b.session, 1)
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('queued')
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('noop')
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: false, pending: true })
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('queued')
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('noop')
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'off', pending: 'on' })
     expect(b.session.events.some(event => event.type === 'model-routing/mode')).toBe(false)
 
     const decision = await agentEvents(b.ctx, b.agent).waterfall(
@@ -540,14 +540,14 @@ describe('mode', () => {
       () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
     )
     expect(decision).toEqual({ kind: 'enter', messages: [] })
-    expect(b.ctx.modelRouting.modeOf(b.session)).toBe(true)
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true })
+    expect(b.ctx.modelRouting.modeOf(b.session)).toBe('on')
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on' })
   })
 
   it('leaves a queued switch uncommitted when the pre-step is rejected or aborted', async () => {
     const rejected = await bench({ config: { ...CONFIG, initialMode: 'off' } })
     openTurn(rejected.session, 1)
-    rejected.ctx.modelRouting.set(rejected.agent, true)
+    rejected.ctx.modelRouting.set(rejected.agent, 'on')
     await agentEvents(rejected.ctx, rejected.agent).waterfall(
       'agent/pre-step',
       { messages: [], turn: 1, step: 1, signal: rejected.signal },
@@ -557,7 +557,7 @@ describe('mode', () => {
 
     const aborted = await bench({ config: { ...CONFIG, initialMode: 'off' } })
     openTurn(aborted.session, 1)
-    aborted.ctx.modelRouting.set(aborted.agent, true)
+    aborted.ctx.modelRouting.set(aborted.agent, 'on')
     const controller = new AbortController()
     controller.abort()
     await agentEvents(aborted.ctx, aborted.agent).waterfall(
@@ -571,17 +571,17 @@ describe('mode', () => {
   it('cancels queued changes while preserving the explicit user selection', async () => {
     const cancelled = await bench({ config: { ...CONFIG, initialMode: 'off' } })
     openTurn(cancelled.session, 1)
-    expect(cancelled.ctx.modelRouting.set(cancelled.agent, true)).toBe('queued')
+    expect(cancelled.ctx.modelRouting.set(cancelled.agent, 'on')).toBe('queued')
     closeTurn(cancelled.session, 1)
     // An explicit choice remains authoritative even when it matches the deployment default.
-    expect(cancelled.ctx.modelRouting.set(cancelled.agent, false)).toBe('cancelled')
+    expect(cancelled.ctx.modelRouting.set(cancelled.agent, 'off')).toBe('cancelled')
     expect(cancelled.session.events.at(-1)).toMatchObject({ type: 'model-routing/mode', data: { active: false } })
-    expect(cancelled.ctx.modelRouting.get(cancelled.agent)).toEqual({ active: false })
+    expect(cancelled.ctx.modelRouting.get(cancelled.agent)).toEqual({ mode: 'off' })
 
     const netted = await bench({ config: { ...CONFIG, initialMode: 'off' } })
     openTurn(netted.session, 1)
-    netted.ctx.modelRouting.set(netted.agent, true)
-    netted.ctx.modelRouting.set(netted.agent, false)
+    netted.ctx.modelRouting.set(netted.agent, 'on')
+    netted.ctx.modelRouting.set(netted.agent, 'off')
     await agentEvents(netted.ctx, netted.agent).waterfall(
       'agent/pre-step',
       { messages: [], turn: 1, step: 1, signal: netted.signal },
@@ -608,28 +608,28 @@ describe('deployment mode and session authority', () => {
       if (session === b.session && key === 'modelRouting') changes.push({ seq, value })
     })
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'on' })
-    expect(b.ctx.modelRouting.modeOf(b.session)).toBe(true)
+    expect(b.ctx.modelRouting.modeOf(b.session)).toBe('on')
     expect(projectionOf(b.ctx, b.session).active).toBe(true)
     expect(changes.at(-1)).toMatchObject({ seq: 0, value: { active: true } })
     expect(b.session.events.at(-1)).toMatchObject({ type: 'model-routing/configuration', data: { active: true } })
 
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
-    expect(b.ctx.modelRouting.modeOf(b.session)).toBe(false)
+    expect(b.ctx.modelRouting.modeOf(b.session)).toBe('off')
     expect(projectionOf(b.ctx, b.session).active).toBe(false)
     expect(changes.at(-1)).toMatchObject({ seq: 1, value: { active: false } })
-    expect(b.ctx.modelRouting.modeOf(b.session, 1)).toBe(true)
+    expect(b.ctx.modelRouting.modeOf(b.session, 1)).toBe('on')
   })
 
   it('preserves an explicit same-valued user choice across settings updates and replay', async () => {
-    for (const active of [false, true]) {
-      const b = await bench({ settings: true, projections: true, config: { ...CONFIG, initialMode: active ? 'on' : 'off' } })
-      expect(b.ctx.modelRouting.set(b.agent, active)).toBe('committed')
-      expect(b.ctx.modelRouting.set(b.agent, active)).toBe('noop')
+    for (const mode of ['off', 'on', 'shadow'] as const) {
+      const b = await bench({ settings: true, projections: true, config: { ...CONFIG, initialMode: mode } })
+      expect(b.ctx.modelRouting.set(b.agent, mode)).toBe('committed')
+      expect(b.ctx.modelRouting.set(b.agent, mode)).toBe('noop')
       const before = b.session.events.length
-      await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: active ? 'off' : 'on' })
+      await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: mode === 'off' ? 'on' : 'off' })
       expect(b.session.events).toHaveLength(before)
-      expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active })
-      expect(projectionOf(b.ctx, b.session).active).toBe(active)
+      expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode })
+      expect(projectionOf(b.ctx, b.session)).toMatchObject({ mode, active: mode !== 'off' })
     }
   })
 
@@ -637,14 +637,14 @@ describe('deployment mode and session authority', () => {
     const b = await bench({ settings: true, projections: true })
     openTurn(b.session, 1)
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true, pending: false })
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on', pending: 'off' })
     await preStep(b, 'reject')
     const cancelled = new AbortController()
     cancelled.abort()
     await preStep(b, 'enter', cancelled.signal)
     expect(projectionOf(b.ctx, b.session).active).toBe(true)
     await preStep(b)
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: false })
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'off' })
     expect(projectionOf(b.ctx, b.session).active).toBe(false)
     expect(await b.resolve()).toBeUndefined()
     expect(b.engine.asks).toHaveLength(0)
@@ -655,7 +655,7 @@ describe('deployment mode and session authority', () => {
     openTurn(b.session, 1)
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'on' })
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true })
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on' })
     await preStep(b)
     expect(b.session.events.filter(event => event.type === 'model-routing/configuration')).toHaveLength(1)
   })
@@ -663,11 +663,11 @@ describe('deployment mode and session authority', () => {
   it('keeps a pending user choice ahead of later settings changes', async () => {
     const b = await bench({ settings: true, projections: true, config: { ...CONFIG, initialMode: 'off' } })
     openTurn(b.session, 1)
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('queued')
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('queued')
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'on' })
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
     await preStep(b)
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true })
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on' })
     expect(projectionOf(b.ctx, b.session).active).toBe(true)
     expect(b.session.events.at(-1)).toMatchObject({ type: 'model-routing/mode', data: { active: true } })
   })
@@ -676,9 +676,9 @@ describe('deployment mode and session authority', () => {
     const b = await bench({ settings: true })
     openTurn(b.session, 1)
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
-    expect(b.ctx.modelRouting.set(b.agent, true)).toBe('cancelled')
+    expect(b.ctx.modelRouting.set(b.agent, 'on')).toBe('cancelled')
     await preStep(b)
-    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ active: true })
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'on' })
     expect(b.session.events.at(-1)).toMatchObject({ type: 'model-routing/mode', data: { active: true } })
   })
 
@@ -735,12 +735,12 @@ describe('deployment mode and session authority', () => {
     const agent = { ...agentFor(session, currentContext), get ctx() { return currentContext } }
     b.ctx.agents.register(agent)
     openTurn(session, 1)
-    expect(b.ctx.modelRouting.set(agent, false)).toBe('queued')
+    expect(b.ctx.modelRouting.set(agent, 'off')).toBe('queued')
     currentContext = b.ctx.isolate('modelRouting')
     const before = session.events.length
     await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
     expect(session.events).toHaveLength(before)
-    expect(b.ctx.modelRouting.get(agent)).toEqual({ active: true })
+    expect(b.ctx.modelRouting.get(agent)).toEqual({ mode: 'on' })
     await agentEvents(b.ctx, agent).waterfall(
       'agent/pre-step',
       { messages: [], turn: 1, step: 1, signal: b.signal },
@@ -863,7 +863,7 @@ describe('the /route command', () => {
     const off = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true })
     expect(await route(off, '/route')).toBe('Routing is off.')
     expect(await route(off, '/route status')).toBe('Routing is off.')
-    expect(await route(off, '/route sidekick')).toBe('Usage: /route [on|off]')
+    expect(await route(off, '/route sidekick')).toBe('Usage: /route [on|off|shadow]')
 
     openTurn(off.session, 1)
     expect(await route(off, '/route on')).toBe('Enabling model routing (applies from the next step).')
@@ -893,7 +893,7 @@ describe('the /route command', () => {
     closeTurn(between.session, 1)
     expect(await route(between, '/route off')).toBe('Model routing change cancelled.')
     expect(between.session.events.at(-2)).toMatchObject({ type: 'model-routing/mode', data: { active: false } })
-    expect(between.ctx.modelRouting.get(between.agent)).toEqual({ active: false })
+    expect(between.ctx.modelRouting.get(between.agent)).toEqual({ mode: 'off' })
   })
 
   it('switches routing on, reports idempotence, and reports a held streak', async () => {
@@ -917,6 +917,45 @@ describe('the /route command', () => {
       () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
     )
     expect(await route(b, '/route off')).toBe('Model routing is already off.')
+  })
+
+  it('switches to shadow, reports it, and cancels a queued shadow like any other mode', async () => {
+    const b = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, projections: true })
+    expect(await route(b, '/route shadow')).toBe('Model routing in shadow: judging, never switching.')
+    expect(await route(b, '/route')).toBe('Routing is in shadow: judging, never switching.')
+    expect(await route(b, '/route shadow')).toBe('Model routing is already in shadow.')
+    // The no-op re-selection appends nothing: one mode event records shadow.
+    expect(b.session.events.filter(event => event.type === 'model-routing/mode').map(event => event.data))
+      .toEqual([{ active: true, shadow: true }])
+    expect(projectionOf(b.ctx, b.session)).toMatchObject({ mode: 'shadow', active: true, pending: false })
+
+    openTurn(b.session, 1)
+    expect(await route(b, '/route on')).toBe('Enabling model routing (applies from the next step).')
+    expect(projectionOf(b.ctx, b.session)).toMatchObject({ mode: 'shadow', pending: true })
+    expect(await route(b, '/route shadow')).toBe('Model routing change cancelled.')
+    expect(await route(b, '/route off')).toBe('Disabling model routing (applies from the next step).')
+    await agentEvents(b.ctx, b.agent).waterfall(
+      'agent/pre-step',
+      { messages: [], turn: 1, step: 1, signal: b.signal },
+      () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
+    )
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'off' })
+    closeTurn(b.session, 1)
+
+    openTurn(b.session, 2)
+    expect(await route(b, '/route shadow')).toBe('Switching model routing to shadow (applies from the next step).')
+    expect(b.ctx.modelRouting.get(b.agent)).toEqual({ mode: 'off', pending: 'shadow' })
+  })
+
+  it('states remote egress for shadow as it does for on, because shadow sends the same state', async () => {
+    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this session to it at api.typesafe.ai.'
+    const b = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
+    await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
+    await registeredEngine(b.ctx, 'typesafe', { state: 'ready' }, 'calibrated', PASSING, { egress: 'remote', destination: 'api.typesafe.ai' })
+    expect(await route(b, '/route shadow')).toBe(`Model routing in shadow: judging, never switching.${remoteNotice}`)
+    expect(await route(b, '/route off')).toBe('Model routing off.')
+    openTurn(b.session, 1)
+    expect(await route(b, '/route shadow')).toBe(`Switching model routing to shadow (applies from the next step).${remoteNotice}`)
   })
 
   it('names a remote judge, where it sends state, and the character cap when turned on', async () => {
@@ -3016,7 +3055,7 @@ describe('step judgments and request retries', () => {
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toEqual(CHEAP)
     // Between turns, so the off-switch commits immediately.
-    expect(b.ctx.modelRouting.set(b.agent, false)).toBe('committed')
+    expect(b.ctx.modelRouting.set(b.agent, 'off')).toBe('committed')
 
     expect(await b.resolve(1)).toBeUndefined()
     expect(await b.resolve(1)).toBeUndefined()
@@ -3201,6 +3240,7 @@ describe('the projection unit', () => {
   it('folds the empty log to inactive and not-pending', async () => {
     const b = await bench({ projections: true, config: { ...CONFIG, initialMode: 'off' } })
     expect(projectionOf(b.ctx, b.session)).toEqual({
+      mode: 'off',
       active: false,
       pending: false,
       sticky: { active: false, stepsElapsed: 0 },
@@ -3288,6 +3328,7 @@ describe('the projection unit', () => {
     await b.resolve(1)
 
     expect(projectionOf(b.ctx, b.session)).toEqual({
+      mode: 'on',
       active: true,
       pending: false,
       last: {
@@ -3322,7 +3363,7 @@ describe('the projection unit', () => {
     expect(await b.resolve(1)).toEqual(CHEAP)
 
     closeTurn(b.session, 1)
-    expect(b.ctx.modelRouting.set(b.agent, false)).toBe('committed')
+    expect(b.ctx.modelRouting.set(b.agent, 'off')).toBe('committed')
     expect(projectionOf(b.ctx, b.session).sticky).toEqual({ active: false, stepsElapsed: 0 })
     expect(stickyState(b.session.events)).toMatchObject({
       active: false,

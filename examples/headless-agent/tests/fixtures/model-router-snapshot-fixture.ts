@@ -170,7 +170,7 @@ export function apply(ctx: Context, config: Config): void {
     if (config.manualModeTurn === turn) {
       const routing = ctx.get('modelRouting')
       if (routing === undefined) throw new Error('model-router-snapshot-fixture: manualModeTurn requires modelRouting')
-      routing.set(agent, true)
+      routing.set(agent, 'on')
     }
     const deploymentMode = config.deploymentModes?.[turn - 1]
     if (deploymentMode !== undefined) {

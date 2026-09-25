@@ -580,15 +580,36 @@ export interface ModelRoutingStickyViewForUi {
 }
 
 /**
- * The `modelRouting` projection's wire value. `active` is the logged mode in
- * force (the last mode or configuration event, inactive before either) and
- * `pending` reports a logged `/route on|off` selection not yet recorded by a mode
- * event. Capability absence (model-router not composed) is the key's absence.
+ * The routing mode in force: `off` never judges, `on` judges and may rewrite a
+ * request, and `shadow` judges and logs every decision but never rewrites one.
+ */
+export type ModelRoutingMode = 'off' | 'on' | 'shadow'
+
+/**
+ * One logged mode value, stored additively: `active: false` is off, and
+ * `shadow: true`, valid only with `active: true`, is shadow. An active record
+ * without `shadow` is on, so logs written before shadow existed read unchanged.
+ */
+export interface ModelRoutingModeRecord {
+  /** Whether routing judges this session's requests. */
+  active: boolean
+  /** Judge and log without rewriting any request; valid only with `active: true`. */
+  shadow?: true
+}
+
+/**
+ * The `modelRouting` projection's wire value. `mode` is the logged mode in
+ * force (the last mode or configuration event, off before either) and
+ * `pending` reports a logged `/route on|off|shadow` selection not yet recorded
+ * by a mode event. Capability absence (model-router not composed) is the key's
+ * absence.
  */
 export interface ModelRoutingProjection {
-  /** Whether routing is in force. */
+  /** The routing mode in force. */
+  mode: ModelRoutingMode
+  /** Whether routing judges requests: `mode` is `on` or `shadow`. */
   active: boolean
-  /** Whether a logged `/route on|off` selection still awaits its mode commit. */
+  /** Whether a logged `/route on|off|shadow` selection still awaits its mode commit. */
   pending: boolean
   /** Last logged decision, when the log holds one. */
   last?: ModelRoutingLastDecision
@@ -1044,13 +1065,13 @@ declare module '@shres-code/shres-code-session/types' {
      * selection. Log-only, non-surface, whole-value replace. Changes during
      * an open turn commit at its next accepted pre-step.
      */
-    'model-routing/configuration': { active: boolean }
+    'model-routing/configuration': ModelRoutingModeRecord
     /**
-     * Whether model routing is in force from this point on: log-only,
-     * non-surface, whole-value replace. The last `model-routing/mode` wins; a
-     * log with none folds to inactive through {@link foldModelRouting}.
+     * The routing mode in force from this point on: log-only, non-surface,
+     * whole-value replace. The last `model-routing/mode` wins; a log with none
+     * folds to off through {@link foldModelRouting}.
      */
-    'model-routing/mode': { active: boolean }
+    'model-routing/mode': ModelRoutingModeRecord
     /**
      * One request's routing decision: log-only, append-only, and written after
      * the consult resolved the route, so a changed `request/header` that follows it
