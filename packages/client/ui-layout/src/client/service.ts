@@ -5,8 +5,7 @@
  * the per-session active view dissolved into ui-conversation's session store
  * (its only consumer). What remains here is the contract other plugins'
  * apply worlds reach for panel transitions (sidebar toggle from ui-sidebar,
- * details open/close from ui-conversation) and the full-page destination
- * (a Settings section a plugin links to) — writes stay inside the store's
+ * details open/close from ui-conversation) — writes stay inside the store's
  * declared action set, delivered as the registration's bound actions.
  */
 import type { BoundActions } from '@shres-code/shres-code-client-ui-slots'
@@ -28,12 +27,6 @@ export interface ILayout {
   openDetails(): void
   /** Close the details panel. */
   closeDetails(): void
-  /**
-   * Show a full-page destination above the workspace, keeping the mounted
-   * session and its draft, or return to the workspace.
-   * @param page - a destination id, such as a Settings section id (`model-routing`), or null for the workspace.
-   */
-  navigate(page: string | null): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -64,14 +57,6 @@ export class LayoutController implements ILayout {
   /** Close the details panel. */
   closeDetails(): void {
     this.#require().closeDetails()
-  }
-
-  /**
-   * Show a full-page destination above the workspace, or return to it.
-   * @param page - a destination id, or null for the workspace.
-   */
-  navigate(page: string | null): void {
-    this.#require().navigate(page)
   }
 
   #require(): PanelActions {

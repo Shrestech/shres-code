@@ -19,7 +19,7 @@ beforeEach(() => { localStorage.clear() })
 describe('createLayoutStore', () => {
   it('initializes the sidebar at its default width, details closed, wide viewport assumed', () => {
     const { store } = createLayoutStore().create()
-    expect(store.getSnapshot()).toEqual({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false, page: null })
+    expect(store.getSnapshot()).toEqual({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false })
   })
 
   it('each create() is an independent instance (factory is not a singleton)', () => {
@@ -55,7 +55,7 @@ describe('createLayoutStore', () => {
     actions.setSidebar(400)
     actions.setNarrow(true)
     actions.toggleSidebar()
-    expect(store.getSnapshot()).toEqual({ sidebar: 400, details: 0, narrow: true, narrowExpanded: true, page: null })
+    expect(store.getSnapshot()).toEqual({ sidebar: 400, details: 0, narrow: true, narrowExpanded: true })
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(false)
     expect(store.getSnapshot().sidebar).toBe(400)
@@ -69,7 +69,7 @@ describe('createLayoutStore', () => {
     actions.setNarrow(true)
     expect(store.getSnapshot().narrowExpanded).toBe(true)
     actions.setNarrow(false)
-    expect(store.getSnapshot()).toMatchObject({ narrow: false, narrowExpanded: false, page: null })
+    expect(store.getSnapshot()).toMatchObject({ narrow: false, narrowExpanded: false })
     actions.setNarrow(true)
     expect(store.getSnapshot().narrowExpanded).toBe(false)
   })
@@ -90,7 +90,6 @@ describe('createLayoutStore', () => {
     first.actions.setSidebar(400)
     first.actions.openDetails()
     first.actions.setDetails(500)
-    first.actions.navigate('model-routing')
     expect(localStorage.getItem(PERSIST_KEY)).toBeNull()
 
     const second = createLayoutStore().create()
@@ -99,15 +98,6 @@ describe('createLayoutStore', () => {
       details: 0,
       narrow: false,
       narrowExpanded: false,
-      page: null,
     })
-  })
-
-  it('shows a full-page destination and returns to the workspace', () => {
-    const { store, actions } = createLayoutStore().create()
-    actions.navigate('model-routing')
-    expect(store.getSnapshot().page).toBe('model-routing')
-    actions.navigate(null)
-    expect(store.getSnapshot().page).toBeNull()
   })
 })
