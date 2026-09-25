@@ -25,7 +25,9 @@
 
 .scopePill,
 .autoPill {
+  display: inline-block;
   padding: 1px 8px;
+  white-space: nowrap;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
   font-size: 12px;
@@ -289,10 +291,13 @@
   align-items: center;
   gap: 4px;
   margin-left: 6px;
+  white-space: nowrap;
 }
 
 .egressPill {
+  display: inline-block;
   margin-left: 6px;
+  white-space: nowrap;
   padding: 1px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
