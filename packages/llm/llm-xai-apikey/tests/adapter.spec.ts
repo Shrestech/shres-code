@@ -1,14 +1,14 @@
 /**
  * The mounted route: registry facts, default-off behavior, model
  * advertisement, one stream through the shared pi-ai adapter against a local
- * proxy stand-in, the missing-key failure, the service-tier body splice, and
- * registry disposal.
+ * proxy stand-in, the missing-key failure, the service-tier body splice,
+ * once-per-message replay-degradation warnings, and registry disposal.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import LlmRuntime, { BlockAssembler } from '@shres-code/shres-code-llm'
-import type { FinishReason, GenerateOptions, TokenUsage } from '@shres-code/shres-code-llm'
+import LlmRuntime, { BlockAssembler, createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { FinishReason, GenerateOptions, Message, TokenUsage } from '@shres-code/shres-code-llm'
 import * as LlmXaiApiKey from '../src/index.ts'
 import type { Config as XaiConfig } from '../src/config.ts'
 import { mockUpstream, textTurn } from './helpers.ts'
@@ -117,6 +117,35 @@ describe('llm-xai-apikey route', () => {
     const defaultBody = upstream!.bodies[1] as Record<string, unknown>
     expect(priorityBody.service_tier).toBe('priority')
     expect('service_tier' in defaultBody).toBe(false)
+  })
+
+  it('warns once per degraded history message across requests', async () => {
+    const context = await boot({ withKey: true, config: { enabled: true } })
+    const warn = vi.spyOn(context.logger, 'warn').mockImplementation(() => {})
+    // A session resumed from a log written before the replay version changed:
+    // two assistant messages carry replay state this build cannot use.
+    const degraded = (text: string) => createMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text }],
+      source: {
+        kind: 'model',
+        ...{
+          provider: 'xai-apikey',
+          model: 'grok-4.6',
+          replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [{ type: 'text' }] },
+        },
+      },
+    })
+    const history: Message[] = [degraded('first answer'), degraded('second answer')]
+    for (const text of ['one', 'two', 'three']) {
+      history.push(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'plugin', plugin: 'test' } }))
+      const result = await assemble(context, { model: 'grok-4.6', messages: [...history] })
+      expect(result.finish).toEqual({ kind: 'stop' })
+    }
+    const warnings = warn.mock.calls.filter(([line]) => String(line).includes('unusable replay state'))
+    expect(warnings).toHaveLength(2)
+    expect(String(warnings[0]![0])).toContain('llm-xai-apikey:')
+    warn.mockRestore()
   })
 
   it('disposal withdraws both the route and the directory entry', async () => {

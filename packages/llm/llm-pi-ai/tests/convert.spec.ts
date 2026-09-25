@@ -426,21 +426,22 @@ describe('toPiContext', () => {
 
   it('degrades unsupported replay-state versions to provider-neutral history', () => {
     const onDegrade = vi.fn()
+    const degraded = createMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'done' }],
+      source: {
+        kind: 'model',
+        ...{
+          provider: 'deepseek',
+          model: 'old',
+          replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [] },
+        },
+      },
+    })
     const context = toPiContext({
       provider: 'deepseek',
       model: 'm',
-      messages: [createMessage({
-        role: 'assistant',
-        content: [{ type: 'text', text: 'done' }],
-        source: {
-          kind: 'model',
-          ...{
-            provider: 'deepseek',
-            model: 'old',
-            replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [] },
-          },
-        },
-      })],
+      messages: [degraded],
     }, undefined, onDegrade)
     expect(context.messages[0]).toMatchObject({
       role: 'assistant',
@@ -449,7 +450,8 @@ describe('toPiContext', () => {
       model: 'old',
       content: [{ type: 'text', text: 'done' }],
     })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('unsupported version 2'))
+    // The observer receives the degraded message itself, so an adapter can report it once.
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('unsupported version 2'), degraded)
   })
 
   it('degrades the flat pre-envelope replay state a legacy session log carries', () => {
@@ -479,7 +481,7 @@ describe('toPiContext', () => {
       })],
     }, undefined, onDegrade)
     expect(context.messages[0]).toMatchObject({ role: 'assistant', api: 'shres-foreign' })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('expected a response object'))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('expected a response object'), expect.objectContaining({ role: 'assistant' }))
   })
 
   it('degrades replay metadata whose blocks do not match the durable content', () => {
@@ -502,7 +504,7 @@ describe('toPiContext', () => {
       api: 'shres-foreign',
       content: [{ type: 'thinking', thinking: 'done' }],
     })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block 0 does not match assistant content'))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block 0 does not match assistant content'), expect.objectContaining({ role: 'assistant' }))
   })
 
   it('degrades replay metadata whose block count differs from durable content', () => {
@@ -528,7 +530,7 @@ describe('toPiContext', () => {
       content: [{ type: 'text', text: 'done' }],
       stopReason: 'stop',
     })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block count does not match assistant content'))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block count does not match assistant content'), expect.objectContaining({ role: 'assistant' }))
   })
 
   const validResponse = {
@@ -592,7 +594,7 @@ describe('toPiContext', () => {
         },
       })],
     }, undefined, onDegrade)
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block 0 does not match assistant content'))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block 0 does not match assistant content'), expect.objectContaining({ role: 'assistant' }))
     expect(context.messages[0]).toMatchObject({ api: 'shres-foreign', content: [] })
   })
 
@@ -616,7 +618,7 @@ describe('toPiContext', () => {
       api: 'shres-foreign',
       content: [{ type: 'text', text: 'done' }],
     })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining(message))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining(message), expect.objectContaining({ role: 'assistant' }))
   }
 
   it.each([

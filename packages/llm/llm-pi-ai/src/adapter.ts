@@ -41,6 +41,7 @@ import {
 import type {
   GenerateOptions,
   LlmModelInfo,
+  Message,
   LlmProviderInfo,
   LlmResolvedModelInfo,
   LlmThinkingMode,
@@ -85,6 +86,9 @@ export interface PiAiAdapterOptions {
   /**
    * Observe one assistant history message degrading to provider-neutral
    * conversion because its stored replay state is unusable by this build.
+   * Every request rebuilds history from the session's durable messages, so
+   * such a message degrades on every request; the adapter calls this hook
+   * once per message, the first time it degrades.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
   /**
@@ -267,6 +271,15 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
  */
 export class PiAiAdapter extends LlmAdapter {
   private snapshot: PiAiSnapshot | undefined
+
+  /**
+   * Model sources of history messages whose replay degradation was already
+   * reported. Every request built from a session's history shares that
+   * session's durable message objects, so a message's source identifies it
+   * across requests. Held weakly: the tracking leaves with the session's
+   * history, so a long-running host does not accumulate it.
+   */
+  private readonly reportedReplayDegrades = new WeakSet<Message['source']>()
 
   constructor(private readonly config: PiAiAdapterOptions) {
     super()
@@ -463,7 +476,9 @@ export class PiAiAdapter extends LlmAdapter {
       if (containsImage && attachments === undefined) {
         throw new LlmError('pi-ai image input requires the durable attachment service', 'UNSUPPORTED_CONTENT')
       }
-      const onReplayDegrade = (reason: string): void => {
+      const onReplayDegrade = (reason: string, message: Message): void => {
+        if (this.reportedReplayDegrades.has(message.source)) return
+        this.reportedReplayDegrades.add(message.source)
         this.config.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
       }
       const context = attachments === undefined

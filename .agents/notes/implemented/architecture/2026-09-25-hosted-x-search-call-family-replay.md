@@ -28,7 +28,7 @@ The agent loop is unchanged: a step whose only calls are hosted has no local too
 ## Consequences
 
 - While the route hosts `x_search` and the sent request declares no client tool of that name, X searches under any of the five names are logged as `server-tool-call` blocks and never dispatched; the headless snapshots `hosted-search` and `hosted-search-only` pin this through the real agent loop, including a second step whose replayed request the fixture backend checks on the wire.
-- Session logs written with replay version 2 degrade one message to provider-neutral history on their next request, as before.
+- A session log written with replay version 2 degrades every version-2 assistant message to provider-neutral history on every request, because each request rebuilds history from the durable messages. The degraded bytes are deterministic, so only the first request after resume misses the prompt cache, and the adapter reports each degraded message once ([once-per-message reporting](../bug-fix/2026-09-25-replay-degrade-reported-once.md)).
 - A backend that adds a new X call name keeps it local until the constant lists it; unless a local tool of that name is registered, the loop then reports `UNKNOWN_TOOL` for that call, which makes the gap visible.
 - Client renderers must treat `status` as optional.
 
