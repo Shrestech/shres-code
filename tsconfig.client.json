@@ -94,6 +94,7 @@
     { "path": "./packages/client/ui-settings" },
     { "path": "./packages/client/ui-settings-general" },
     { "path": "./packages/client/ui-settings-models" },
+    { "path": "./packages/client/ui-settings-model-routing" },
     { "path": "./packages/client/ui-settings-shield" },
     { "path": "./packages/client/ui-settings-jspace" },
     { "path": "./packages/client/ui-jspace" },

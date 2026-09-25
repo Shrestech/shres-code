@@ -18,8 +18,9 @@ import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
 import * as LlmRetryPlugin from '@shres-code/shres-code-llm-retry'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
-import { judgmentEngineId } from '@shres-code/shres-code-judgment'
-import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
+import { JUDGMENT_SETTINGS_NAMESPACE, judgmentEngineId } from '@shres-code/shres-code-judgment'
+import JudgmentDispatch, { JudgmentEnginesGateway } from '@shres-code/shres-code-judgment-dispatch'
+import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
 import ShieldJudgmentEngine from '@shres-code/shres-code-judgment-shield'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
@@ -36,6 +37,7 @@ const CREDENTIALS_SPECIFIER = '@test/model-router-credentials'
 type ProviderKind = 'typesafe' | 'shield'
 const SHIELD_MODEL = 'convaiinnovations/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982'
 const ROUTER_SPECIFIER = '@shres-code/shres-code-model-router'
+const SETTINGS_SPECIFIER = '@shres-code/shres-code-settings-file'
 const RETRY_SPECIFIER = '@shres-code/shres-code-llm-retry'
 const PROVIDER = 'deepseek-official'
 const MANUAL_MODEL = 'deepseek-v4-pro'
@@ -257,10 +259,38 @@ const RETRY_ENTRY = [`- name: '${RETRY_SPECIFIER}'`]
  * @returns the loaded context.
  */
 async function loadSpine(endpoint: string, provider: ProviderKind, retry?: RetryPlacement): Promise<Context> {
-  const judgmentSpecifier = `@shres-code/shres-code-judgment-${provider}`
+  return loadComposition({ engines: { [provider]: endpoint }, defaultEngine: provider, ...retry === undefined ? {} : { retry } })
+}
+
+/** What one Loader composition mounts. */
+interface CompositionOptions {
+  /** The loopback endpoint of each judgment provider to compose. */
+  readonly engines: Partial<Record<ProviderKind, string>>
+  /** The dispatcher's composition default. */
+  readonly defaultEngine: ProviderKind
+  /** Where to compose llm-retry. */
+  readonly retry?: RetryPlacement
+  /** Whether to compose the file settings provider, so settings writes reach the dispatcher. */
+  readonly settings?: boolean
+}
+
+/**
+ * Boot the real agent spine, the dispatcher with each listed provider, and the model router through Loader.
+ * @param options - engines, default engine, retry placement, and settings provider.
+ * @returns the loaded context.
+ */
+async function loadComposition(options: CompositionOptions): Promise<Context> {
+  const { retry } = options
+  const providers = Object.keys(options.engines) as ProviderKind[]
   root = await mkdtemp(join(tmpdir(), 'shres-model-router-provider-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
+    ...options.settings === true ? [
+      `- name: '${SETTINGS_SPECIFIER}'`,
+      '  config:',
+      `    path: '${join(root, 'settings.yaml')}'`,
+      '    watch: false',
+    ] : [],
     "- name: '@shres-code/shres-code-llm'",
     "- name: '@shres-code/shres-code-session'",
     "- name: '@shres-code/shres-code-system-prompt'",
@@ -290,13 +320,15 @@ async function loadSpine(endpoint: string, provider: ProviderKind, retry?: Retry
     '    TYPESAFE_API_KEY: loader-key',
     "- name: '@shres-code/shres-code-judgment-dispatch'",
     '  config:',
-    `    defaultEngine: ${provider}`,
-    `- name: '${judgmentSpecifier}'`,
-    '  config:',
-    ...provider === 'typesafe' ? ['    apiKeyRef: TYPESAFE_API_KEY'] : [
-      `    models: { fast: '${SHIELD_MODEL}', accurate: '${SHIELD_MODEL}' }`,
-    ],
-    `    endpoint: '${endpoint}'`,
+    `    defaultEngine: ${options.defaultEngine}`,
+    ...providers.flatMap(provider => [
+      `- name: '@shres-code/shres-code-judgment-${provider}'`,
+      '  config:',
+      ...provider === 'typesafe' ? ['    apiKeyRef: TYPESAFE_API_KEY'] : [
+        `    models: { fast: '${SHIELD_MODEL}', accurate: '${SHIELD_MODEL}' }`,
+      ],
+      `    endpoint: '${options.engines[provider]}'`,
+    ]),
     `- name: '${ROUTER_SPECIFIER}'`,
     '  config:',
     '    initialMode: on',
@@ -333,7 +365,9 @@ async function loadSpine(endpoint: string, provider: ProviderKind, retry?: Retry
     ['@shres-code/shres-code-llm-deepseek', DeepSeekPlugin],
     [CREDENTIALS_SPECIFIER, MemoryCredentials],
     ['@shres-code/shres-code-judgment-dispatch', JudgmentDispatch],
-    [judgmentSpecifier, provider === 'typesafe' ? TypesafeJudgmentEngine : ShieldJudgmentEngine],
+    ['@shres-code/shres-code-judgment-typesafe', TypesafeJudgmentEngine],
+    ['@shres-code/shres-code-judgment-shield', ShieldJudgmentEngine],
+    [SETTINGS_SPECIFIER, FileSettingsProvider],
     [ROUTER_SPECIFIER, ModelRoutingController],
     [RETRY_SPECIFIER, LlmRetryPlugin],
   ])
@@ -536,5 +570,49 @@ describe.each<RetryPlacement>(['before-router', 'after-router'])('real llm-retry
     expect(decisions.map(decision => decision.reason)).toEqual(['gate-passed', 'route-failed'])
     expect(decisions[1]).toMatchObject({ failure: { code: 'SERVER', model: CANDIDATE_MODEL } })
     expect(eventsOfType(events, 'turn/end').map(event => event.data.reason.kind)).toEqual(['completed'])
+  })
+})
+
+describe('real judgment engine switch through the settings seam', () => {
+  it('a judgment.engine write changes the engine of the next decision, and the engine Remote reports the registry', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    modelServer = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
+    judgmentServer = new LoopbackJudgmentServer([{ choice: KEEP_CURRENT_OPTION_ID, score: 1 }], 'typesafe')
+    const shieldServer = new LoopbackJudgmentServer([{ choice: KEEP_CURRENT_OPTION_ID, score: 1 }], 'shield')
+    try {
+      const loaded = await loadComposition({
+        engines: { typesafe: await judgmentServer.start(), shield: await shieldServer.start() },
+        defaultEngine: 'typesafe',
+        settings: true,
+      })
+      let announced = 0
+      loaded.on('judgment/engines-updated', () => { announced += 1 })
+      const gateway: unknown = loaded.get('judgmentEnginesRemote')
+      if (!(gateway instanceof JudgmentEnginesGateway)) throw new Error('the judgmentEngines Remote is not mounted')
+
+      const before = gateway.snapshot()
+      expect(before.engines.map(engine => [engine.id, engine.state]))
+        .toEqual(loaded.judgmentEngines.entryList().map(entry => [entry.descriptor.id, entry.status().state]))
+      expect(before.engines.map(engine => [engine.id, engine.egress, engine.state])).toEqual([
+        ['typesafe', 'remote', 'ready'],
+        ['shield', 'local', 'ready'],
+      ])
+      expect(before.selection.engine).toBe('typesafe')
+
+      const first = createAgent(loaded, 'switch-before')
+      await turn(first, 'Keep the manual route for this uncertain turn.')
+      expect(eventsOfType(first.session.events, 'model-routing/decision')[0]?.data).toMatchObject({ engine: 'typesafe' })
+
+      await loaded.settings.mutate(JUDGMENT_SETTINGS_NAMESPACE, [{ op: 'set', path: ['engine'], value: 'shield' }])
+      expect(announced).toBeGreaterThan(0)
+      expect(gateway.snapshot().selection.engine).toBe('shield')
+
+      const second = createAgent(loaded, 'switch-after')
+      await turn(second, 'Keep the manual route for this uncertain turn.')
+      expect(eventsOfType(second.session.events, 'model-routing/decision')[0]?.data).toMatchObject({ engine: 'shield', model: SHIELD_MODEL })
+      expect(judgmentServer.requests).toHaveLength(1)
+      expect(shieldServer.requests.map(request => request.path)).toEqual(['/v1/judgments/fitted'])
+    } finally {
+      await shieldServer.close()
+    }
   })
 })

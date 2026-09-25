@@ -245,6 +245,7 @@
       "@shres-code/shres-code-client-ui-settings": ["./packages/client/ui-settings/src"],
       "@shres-code/shres-code-client-ui-settings-general": ["./packages/client/ui-settings-general/src"],
       "@shres-code/shres-code-client-ui-settings-models": ["./packages/client/ui-settings-models/src"],
+      "@shres-code/shres-code-client-ui-settings-model-routing": ["./packages/client/ui-settings-model-routing/src"],
       "@shres-code/shres-code-client-ui-settings-shield": ["./packages/client/ui-settings-shield/src"],
       "@shres-code/shres-code-client-ui-settings-jspace": ["./packages/client/ui-settings-jspace/src"],
       "@shres-code/shres-code-client-ui-settings-plugin-inventory": ["./packages/client/ui-settings-plugin-inventory/src"],

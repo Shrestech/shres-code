@@ -1,0 +1,28 @@
+- region "Model routing":
+  - text: Applies to all sessions
+  - paragraph: Configure how routing judges each turn. Each session turns routing on or off with the Auto chip in its chat input.
+  - region "Judgment engine":
+    - heading "Judgment engine" [level=3]
+    - paragraph: One judge for every session. Changing it takes effect at the next decision in every session with routing on.
+    - text: Engine
+    - combobox "Engine":
+      - option "Jev (TypeSafe) — remote" [selected]
+      - option "Shield (local gateway) — local"
+    - text: Not configured Remote · egress
+    - code: fast jev-preview · accurate jev-latest
+    - text: Uncalibrated
+    - paragraph: "judgment-typesafe: SHRES_E2E_ABSENT_TYPESAFE_KEY holds no value; store SHRES_E2E_ABSENT_TYPESAFE_KEY through the credentials service"
+    - note:
+      - strong: Conversation excerpts leave this machine.
+      - text: While a session has routing on, each consult sends up to 12,000 characters of that conversation to api.typesafe.ai. This warning also appears when a session turns routing on.
+  - region "Default for new sessions":
+    - heading "Default for new sessions" [level=3]
+    - paragraph: Sessions start with this mode; each session changes its own with the Auto chip in the chat input.
+    - radiogroup "Routing mode for new sessions":
+      - radio "Off" [checked]
+      - radio "On"
+  - region "Classifier":
+    - heading "Classifier" [level=3]
+    - paragraph: "Turns every judgment consumer off at once: routing, worker escalation, and compaction. Moved here from Models."
+    - switch "Turn the classifier off" [checked]
+    - text: Enabled

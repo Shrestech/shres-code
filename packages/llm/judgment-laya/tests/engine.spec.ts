@@ -214,7 +214,7 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
 describe('the laya Remote', { timeout: PROCESS_TIMEOUT_MS }, () => {
   /** The Remote service the engine mounted. */
   function remote(mounted: Context): LayaGatewayRemote {
-    const service = mounted.get('layaGatewayRemote')
+    const service: unknown = mounted.get('layaGatewayRemote')
     if (!(service instanceof LayaGatewayRemote)) throw new Error('the laya Remote is not mounted')
     return service
   }
@@ -223,14 +223,14 @@ describe('the laya Remote', { timeout: PROCESS_TIMEOUT_MS }, () => {
     const { ctx: mounted } = await mount()
     const service = remote(mounted)
     expect(service.typertRemote).toMatchObject({ serviceKey: 'layaGatewayRemote', namespace: 'laya' })
-    expect(remoteMethods(service).map(method => method.method).sort()).toEqual(['install', 'restart', 'status'])
+    expect(remoteMethods(service).map(method => method.method).sort()).toEqual(['gatewayStatus', 'installGateway', 'restartGateway'])
   })
 
   it('reports the pin and state, installs, and restarts through the Remote', async () => {
     const { ctx: mounted, engine } = await mount()
     const service = remote(mounted)
     await until(() => engine.status().state === 'not-installed')
-    expect(service.status()).toEqual({
+    expect(service.gatewayStatus()).toEqual({
       state: 'not-installed',
       detail: 'Laya is not installed; run /laya install',
       modelId: MODEL_ID,
@@ -239,13 +239,13 @@ describe('the laya Remote', { timeout: PROCESS_TIMEOUT_MS }, () => {
       installing: false,
     })
 
-    const installed = service.install()
-    expect(service.status().installing).toBe(true)
+    const installed = service.installGateway()
+    expect(service.gatewayStatus().installing).toBe(true)
     await expect(installed).resolves.toMatchObject({ modelDir: engine.config.modelDir, manifestSha256: fake.manifestSha256 })
     await until(() => engine.status().state === 'ready')
-    expect(service.status()).toEqual({ state: 'ready', modelId: MODEL_ID, checkpointContext: 1024, dtype: 'float16', installing: false })
+    expect(service.gatewayStatus()).toEqual({ state: 'ready', modelId: MODEL_ID, checkpointContext: 1024, dtype: 'float16', installing: false })
 
-    const restarted = await service.restart()
+    const restarted = await service.restartGateway()
     expect(restarted).toMatchObject({ modelId: MODEL_ID, installing: false })
     await until(() => engine.status().state === 'ready')
   })
@@ -256,7 +256,7 @@ describe('the laya Remote', { timeout: PROCESS_TIMEOUT_MS }, () => {
     await engine.install().catch(() => undefined)
     await until(() => engine.status().state === 'unavailable' && engine.lastExit() !== undefined, 20_000)
 
-    expect(remote(mounted).status()).toMatchObject({
+    expect(remote(mounted).gatewayStatus()).toMatchObject({
       state: 'unavailable',
       lastExit: { exitCode: 3, signal: null, timedOut: false },
     })
