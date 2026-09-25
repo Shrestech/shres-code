@@ -182,6 +182,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'domain': 'storage.md',
   'fs': 'filesystem.md',
   'goal': 'goal.md',
+  'judgment': 'judgment.md',
   'llm': 'llm-streaming.md',
   'remote-control': 'remote-control.md',
   'session': 'session.md',

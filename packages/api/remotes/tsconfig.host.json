@@ -53,6 +53,9 @@
       "path": "../../typert/registry"
     },
     {
+      "path": "../../llm/judgment"
+    },
+    {
       "path": "../../typert/protocol"
     }
   ]

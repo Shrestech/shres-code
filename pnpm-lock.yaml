@@ -1110,6 +1110,15 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../../llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-laya':
+        specifier: workspace:^
+        version: link:../../llm/judgment-laya
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
@@ -6495,6 +6504,9 @@ importers:
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6517,6 +6529,9 @@ importers:
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/judgment-guardrails:
     dependencies:
@@ -6560,6 +6575,9 @@ importers:
       '@shres-code/shres-code-home-paths':
         specifier: workspace:^
         version: link:../../util/home-paths
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6627,6 +6645,9 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/judgment-llm:
     dependencies:

@@ -923,22 +923,110 @@ describe('judgment-shield response validation', () => {
 })
 
 describe('engine registration', () => {
-  it('registers as a ready local fitting engine and withdraws when its own fiber disposes', async () => {
+  it('registers as a local fitting engine naming its models and destination, and withdraws when its own fiber disposes', async () => {
+    const server = await mockServer([])
     const ctx = engineContext()
     contexts.push(ctx)
-    const provider = await ctx.plugin(ShieldJudgmentEngine, { endpoint: 'http://127.0.0.1:8765', models: MODELS })
+    const provider = await ctx.plugin(ShieldJudgmentEngine, { endpoint: server.url, models: MODELS })
 
     const entry = ctx.judgmentEngines.get(SHIELD_ENGINE_ID)
     expect(entry?.engine).toBeInstanceOf(ShieldJudgmentEngine)
     expect(entry?.engine.fitting).toBeDefined()
-    expect(entry?.descriptor).toBe(SHIELD_ENGINE_DESCRIPTOR)
     expect(entry?.status()).toEqual({ state: 'ready' })
-    expect(ctx.judgmentEngines.list()).toEqual([
-      { id: 'shield', label: 'Shield (local gateway)', egress: 'local', calibration: 'calibrated', supportsFitting: true },
-    ])
+    expect(ctx.judgmentEngines.list()).toEqual([{
+      ...SHIELD_ENGINE_DESCRIPTOR,
+      models: MODELS,
+      destination: new URL(server.url).host,
+    }])
+    expect(server.requests).toEqual([])
 
     await provider.dispose()
 
     expect(ctx.judgmentEngines.get(SHIELD_ENGINE_ID)).toBeUndefined()
+  })
+})
+
+describe('gateway readiness', () => {
+  /** A loopback port nothing listens on: a server's port, released. */
+  async function closedPort(): Promise<string> {
+    const server = await mockServer([])
+    const url = server.url
+    await server.close()
+    return url
+  }
+
+  /** The registry status of the Shield engine. */
+  function statusOf(ctx: Context): unknown {
+    return ctx.judgmentEngines.get(SHIELD_ENGINE_ID)?.status()
+  }
+
+  it('finishes loading unavailable, naming the refused connection, when nothing listens', async () => {
+    const url = await closedPort()
+    const ctx = engineContext()
+    contexts.push(ctx)
+    await ctx.plugin(ShieldJudgmentEngine, { endpoint: url, models: MODELS })
+
+    const status = statusOf(ctx) as { state: string; detail?: string }
+    expect(status.state).toBe('unavailable')
+    expect(status.detail).toMatch(new RegExp(`^judgment-shield: the gateway at ${new URL(url).host} is not accepting connections: .*ECONNREFUSED`))
+  })
+
+  it('reports ready once a gateway starts listening, on a status read', async () => {
+    const url = await closedPort()
+    const ctx = engineContext()
+    contexts.push(ctx)
+    await ctx.plugin(ShieldJudgmentEngine, { endpoint: url, models: MODELS })
+    expect(statusOf(ctx)).toMatchObject({ state: 'unavailable' })
+    const { createServer } = await import('node:net')
+    const listener = createServer(socket => socket.destroy())
+    await new Promise<void>((resolve) => {
+      listener.listen(Number(new URL(url).port), '127.0.0.1', resolve)
+    })
+    try {
+      await vi.waitFor(() => {
+        expect(statusOf(ctx)).toEqual({ state: 'ready' })
+      })
+    } finally {
+      await new Promise<void>((resolve) => {
+        listener.close(() => {
+          resolve()
+        })
+      })
+    }
+  })
+
+  it('re-probes on its interval and announces a gateway that stopped', async () => {
+    const server = await mockServer([])
+    const ctx = engineContext()
+    contexts.push(ctx)
+    let announced = 0
+    ctx.judgmentEngines.subscribe(() => {
+      announced += 1
+    })
+    await ctx.plugin(ShieldJudgmentEngine, { endpoint: server.url, models: MODELS, readinessIntervalMs: 20 })
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    const before = announced
+
+    await server.close()
+
+    await vi.waitFor(() => {
+      expect(announced).toBeGreaterThan(before)
+      expect((ctx.judgmentEngines.get(SHIELD_ENGINE_ID)?.status() as { state: string }).state).toBe('unavailable')
+    })
+  })
+
+  it('reports ready after an answered ask and fitted ask, and leaves a failed ask to the probe', async () => {
+    const { ctx } = await harness([
+      { kind: 'json', status: 200, body: answerBody() },
+      { kind: 'json', status: 500, body: { error: 'boom' } },
+      { kind: 'json', status: 200, body: fittedBody() },
+    ])
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
+
+    await engine(ctx).ask(ask())
+    await failure(() => engine(ctx).ask(ask()))
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    await engine(ctx).fitting.ask(fittedAsk())
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
   })
 })

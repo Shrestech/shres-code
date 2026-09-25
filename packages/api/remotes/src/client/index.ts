@@ -5,6 +5,8 @@ import commandsRemote from '@shres-code/shres-code-commands/remote'
 import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
+import judgmentEnginesRemote from '@shres-code/shres-code-judgment-dispatch/remote'
+import layaRemote from '@shres-code/shres-code-judgment-laya/remote'
 import remoteControlRemote from '@shres-code/shres-code-host-remote-control/remote'
 import messageFeedbackRemote from '@shres-code/shres-code-message-feedback/remote'
 import modelRoutingRemote from '@shres-code/shres-code-model-router/remote'
@@ -15,6 +17,16 @@ import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
 export type {
+  JudgmentEngineModelsView, JudgmentEngineView, JudgmentEnginesSnapshot, JudgmentSelectionView,
+} from '@shres-code/shres-code-judgment-dispatch/types'
+export type {
+  JudgmentConsumerId, JudgmentEngineCalibration, JudgmentEngineEgress, JudgmentEngineHost, JudgmentEngineId,
+  JudgmentEngineState,
+} from '@shres-code/shres-code-judgment/types'
+export type {
+  LayaGatewayExitView, LayaGatewayState, LayaGatewayView, LayaInstallResult,
+} from '@shres-code/shres-code-judgment-laya/types'
+export type {
   ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldPayloadInfo,
   ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
   ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
@@ -22,6 +34,8 @@ export type {
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
+export type {} from '@shres-code/shres-code-judgment-dispatch/remote'
+export type {} from '@shres-code/shres-code-judgment-laya/remote'
 export type {} from '@shres-code/shres-code-host-remote-control/remote'
 // The remote namespaces' payload vocabulary rides the same rule as the shield
 // block above: a Client contribution names what it sends and receives through
@@ -43,6 +57,7 @@ export type { ApiRemoteForwardedEvent } from '../types.ts'
 export type {} from '@shres-code/shres-code-commands/types'
 export type {} from '@shres-code/shres-code-cordis-host-runner/types'
 export type {} from '@shres-code/shres-code-credentials/types'
+export type {} from '@shres-code/shres-code-judgment/types'
 export type {} from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-llm/types'
 export type {} from '@shres-code/shres-code-agent-presets/types'
@@ -129,7 +144,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, remoteControlRemote, messageFeedbackRemote,
-      modelRoutingRemote, speechRemote, shieldRemote,
+      modelRoutingRemote, speechRemote, shieldRemote, judgmentEnginesRemote, layaRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

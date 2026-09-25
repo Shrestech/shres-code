@@ -60,6 +60,15 @@
       "path": "../../settings/settings"
     },
     {
+      "path": "../../llm/judgment"
+    },
+    {
+      "path": "../../llm/judgment-dispatch"
+    },
+    {
+      "path": "../../llm/judgment-laya"
+    },
+    {
       "path": "../../typert/protocol"
     }
   ]

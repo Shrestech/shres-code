@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MAX_RESPONSE_BYTES,
   DEFAULT_MAX_REQUEST_BYTES,
+  DEFAULT_READINESS_INTERVAL_MS,
   DEFAULT_TIMEOUT_MS,
   MAX_RESPONSE_BYTES,
   resolveConfig,
@@ -21,10 +22,18 @@ describe('judgment-shield config', () => {
       timeoutMs: DEFAULT_TIMEOUT_MS,
       maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
       maxRequestBytes: DEFAULT_MAX_REQUEST_BYTES,
+      readinessIntervalMs: DEFAULT_READINESS_INTERVAL_MS,
     })
     expect(resolveTierModel(BASE.models, 'fast')).toBe('shield-fast@1')
     expect(resolveTierModel(BASE.models, 'accurate')).toBe('shield-accurate@1')
     expect(resolveTierModel(BASE.models, undefined)).toBe('shield-accurate@1')
+  })
+
+  it('keeps an explicit readiness interval and rejects one that is not a positive integer timer delay', () => {
+    expect(resolveConfig({ ...BASE, readinessIntervalMs: 250 })).toMatchObject({ readinessIntervalMs: 250 })
+    expect(() => resolveConfig({ ...BASE, readinessIntervalMs: 0 })).toThrow(/readinessIntervalMs must be a positive safe integer/)
+    expect(() => resolveConfig({ ...BASE, readinessIntervalMs: 1.5 })).toThrow(/readinessIntervalMs/)
+    expect(() => resolveConfig({ ...BASE, readinessIntervalMs: 2 ** 31 })).toThrow(/readinessIntervalMs/)
   })
 
   it('keeps explicit timeout and response limit', () => {

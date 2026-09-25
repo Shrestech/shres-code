@@ -323,6 +323,8 @@ Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask
 
 A consumer declares the id its asks carry with `declareJudgmentConsumer(ctx, id)`, which registers the id in `ctx.judgmentEngines` for the consumer's lifetime; `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves, and the model router declares `model-router` once its asks carry that id. An override is valid only for a declared consumer, so an override that would silently leave a consumer's asks on the default engine is refused instead.
 
+Configuration surfaces read the registry through the dispatcher's `judgmentEngines` Remote: `snapshot()` lists every engine with its descriptor facts and current status, the resolved selection, and the declared consumer ids, and the `judgment/engines-updated` event announces each change that would alter the snapshot. The engine selector in Settings › Model routing and the Routing view's engine status line both read it; see the [dispatcher README](../../packages/llm/judgment-dispatch/README.md#configuration-surfaces).
+
 Live-service checks apply only to what a configuration write changes: a write that changes `engine`, or adds or changes an override, is rejected naming that field when it names an unregistered engine, an engine whose descriptor names another host, or an undeclared consumer; entries the write leaves unchanged are not re-judged. A document the settings file loads or reloads is applied as written, because rejecting a file edit for the state of live services would leave the previous engine answering with no visible sign. An unregistered selection then fails its asks with `UNCONFIGURED`, with no fallback, and an undeclared consumer's override is ignored. Once the Loader settles, the dispatcher logs each such condition once at error level, again whenever a later change introduces one, and at info level when it resolves.
 
 ```ts type-equiv
@@ -347,15 +349,27 @@ interface JudgmentEngineDescriptor {
   readonly host?: JudgmentEngineHost
   /** URL of the terms that govern a remote engine's use. */
   readonly terms?: string
+  /**
+   * Model or pinned artifact id that answers each tier, for configuration
+   * surfaces; omission means the provider does not name one before an ask.
+   */
+  readonly models?: Readonly<Record<JudgmentTier, string>>
+  /**
+   * Host (and port) the engine sends state to, for configuration surfaces'
+   * egress notices; omission means the provider does not name one, and an
+   * engine with egress `none` names none.
+   */
+  readonly destination?: string
 }
 ```
 
 ```ts type-equiv
 /**
  * Where an engine sends the state it judges: `none` keeps it within the
- * harness process and processes the engine's provider supervises on this host,
- * `local` sends it to a service on this host that the deployment runs, and
- * `remote` sends it off the host to a third party.
+ * harness process and processes the engine's provider supervises on this
+ * machine, `local` sends it to a service on this machine that the deployment
+ * runs, and `remote` sends it off this machine — to a third party or to any
+ * other host, including one on the local network.
  */
 type JudgmentEngineEgress = 'none' | 'local' | 'remote'
 ```
@@ -540,6 +554,12 @@ register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegist
 list(): readonly JudgmentEngineDescriptor[]
 
 /**
+ * Read every registered engine with its status reader.
+ * @returns the entries, in registration order.
+ */
+entryList(): readonly JudgmentEngineEntry[]
+
+/**
  * Look up one registered engine.
  * @param id - the registry id.
  * @returns the entry, or `undefined` when no provider registered the id.
@@ -580,4 +600,28 @@ subscribe(listener: () => unknown): () => void
 ```
 
 Source: [`packages/llm/judgment/src/registry.ts:35`](../../packages/llm/judgment/src/registry.ts)
+
+<a id="judgment-events"></a>
+
+### `judgment/*` events
+
+<a id="judgmentengines-updated--emit"></a>
+
+#### `judgment/engines-updated` — emit
+
+The judgment engine view changed: an engine registered, unregistered, or announced a status change, a consumer id became declared or stopped being declared, or the `judgment` settings selection committed a new value. This payload-free notification comes from the service mounted as `ctx.judgment`; listeners re-read the engine list and selection.
+
+```ts cordis-catalog
+/**
+ * The judgment engine view changed: an engine registered, unregistered,
+ * or announced a status change, a consumer id became declared or stopped
+ * being declared, or the `judgment` settings selection committed a new
+ * value. This payload-free notification comes from the service mounted as
+ * `ctx.judgment`; listeners re-read the engine list and selection.
+ * @mode emit
+ */
+'judgment/engines-updated'(): void
+```
+
+Source: [`packages/llm/judgment/src/types.ts:23`](../../packages/llm/judgment/src/types.ts)
 <!-- END GENERATED cordis-surface -->

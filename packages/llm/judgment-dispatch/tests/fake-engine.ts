@@ -29,6 +29,8 @@ export interface FakeEngineConfig {
   status?: JudgmentEngineStatus
   /** Failure every ask rejects with. */
   failWith?: JudgmentError
+  /** Descriptor facts beyond the fixed fake ones. */
+  describe?: Partial<Pick<JudgmentEngineDescriptor, 'egress' | 'models' | 'destination' | 'terms' | 'label'>>
 }
 
 /** A registry-registered fake engine; plugin it once per id. */
@@ -52,6 +54,7 @@ export class FakeEngine implements JudgmentEngine {
       calibration: 'calibrated',
       supportsFitting: config.fitting === true,
       ...config.host === undefined ? {} : { host: config.host },
+      ...config.describe,
     }
     this.announce = registerJudgmentEngine(ctx, { engine: this, descriptor: this.descriptor, status: () => this.current })
   }
