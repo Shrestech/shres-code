@@ -10360,6 +10360,9 @@ importers:
       '@shres-code/shres-code-tool-cordis':
         specifier: workspace:^
         version: link:../../extensions/tool-cordis
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../protocol
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../registry

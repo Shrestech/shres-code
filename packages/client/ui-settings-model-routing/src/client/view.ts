@@ -5,6 +5,7 @@
 
 import type {
   JudgmentEngineState,
+  JudgmentEnginesSnapshot,
   JudgmentEngineView,
   LayaGatewayState,
   LayaGatewayView,
@@ -123,23 +124,75 @@ export function classifierEnabled(judgment: SettingsNamespaceView): boolean {
   return !(typeof value === 'object' && value !== null && (value as { enabled?: unknown }).enabled === false)
 }
 
+/** The engine one declared consumer asks. */
+export interface ConsumerRoute {
+  /** Declared consumer id. */
+  readonly consumer: string
+  /** Id of the engine the dispatcher asks for this consumer. */
+  readonly engineId: string
+  /** That engine, or undefined when no engine with that id is registered, so every ask fails. */
+  readonly engine: JudgmentEngineView | undefined
+  /** Whether a per-consumer override, rather than the selected engine, names it. */
+  readonly overridden: boolean
+}
+
 /**
- * Who evaluated the routing thresholds for one engine: the `calibratedBy` of
- * the `model-router.operatingPoints` entry for that engine. An engine with no
- * such entry, or an entry without `calibratedBy`, routes on configured
- * defaults and is shown as uncalibrated.
- * @param router - the resolved `model-router` section, when the Host exposes it.
- * @param engine - the engine's registry id.
- * @returns the non-empty `calibratedBy`, or undefined.
+ * The engine each declared consumer asks, by the dispatcher's rule: the
+ * consumer's `judgment.overrides` entry while the consumer is declared, else
+ * the selected engine.
+ * @param snapshot - the engine view.
+ * @returns one route per declared consumer, in declaration order.
  */
-export function calibratedBy(router: SettingsNamespaceView | null, engine: string): string | undefined {
+export function consumerRoutes(snapshot: JudgmentEnginesSnapshot): ConsumerRoute[] {
+  const { engine, overrides } = snapshot.selection
+  return snapshot.consumers.map((consumer) => {
+    const overridden = Object.hasOwn(overrides, consumer)
+    const engineId = overridden ? overrides[consumer] as string : engine
+    return { consumer, engineId, engine: snapshot.engines.find(candidate => candidate.id === engineId), overridden }
+  })
+}
+
+/**
+ * Overrides naming a consumer that is not declared, which the dispatcher ignores.
+ * @param snapshot - the engine view.
+ * @returns each ignored override's consumer and engine ids.
+ */
+export function ignoredOverrides(snapshot: JudgmentEnginesSnapshot): { consumer: string; engineId: string }[] {
+  const declared = new Set<string>(snapshot.consumers)
+  return Object.entries(snapshot.selection.overrides)
+    .filter(([consumer]) => !declared.has(consumer))
+    .map(([consumer, engineId]) => ({ consumer, engineId }))
+}
+
+/**
+ * How the router gates one engine's answers, read from `model-router.operatingPoints`:
+ * `refused` for a verbalized engine whose operating point does not set
+ * `acceptVerbalized` (the router keeps the strong model without asking), then
+ * `calibrated` when its operating point names `calibratedBy`, `point` when
+ * one without it applies, and `global` when none names the engine.
+ */
+export type RoutingCalibration =
+  | { readonly kind: 'calibrated'; readonly by: string }
+  | { readonly kind: 'point' }
+  | { readonly kind: 'global' }
+  | { readonly kind: 'refused' }
+
+/**
+ * The router's gate for one engine.
+ * @param router - the resolved `model-router` section, when the Host exposes it.
+ * @param engine - the engine the router asks.
+ * @returns the gate kind, and the evaluator of a calibrated operating point.
+ */
+export function routingCalibration(router: SettingsNamespaceView | null, engine: JudgmentEngineView): RoutingCalibration {
   const value = router?.value
   const points = typeof value === 'object' && value !== null ? (value as { operatingPoints?: unknown }).operatingPoints : undefined
-  if (!Array.isArray(points)) return undefined
-  for (const point of points) {
-    if (typeof point !== 'object' || point === null) continue
-    const { engine: id, calibratedBy: by } = point as { engine?: unknown; calibratedBy?: unknown }
-    if (id === engine && typeof by === 'string' && by.length > 0) return by
-  }
-  return undefined
+  const point = Array.isArray(points)
+    ? points.find((entry): entry is { engine: unknown; calibratedBy?: unknown; acceptVerbalized?: unknown } =>
+      typeof entry === 'object' && entry !== null && (entry as { engine?: unknown }).engine === engine.id)
+    : undefined
+  if (engine.calibration === 'verbalized' && point?.acceptVerbalized !== true) return { kind: 'refused' }
+  if (point === undefined) return { kind: 'global' }
+  return typeof point.calibratedBy === 'string' && point.calibratedBy.length > 0
+    ? { kind: 'calibrated', by: point.calibratedBy }
+    : { kind: 'point' }
 }

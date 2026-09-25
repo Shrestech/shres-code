@@ -17,7 +17,7 @@ import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentEngineDescriptor,
@@ -102,10 +102,11 @@ const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
  * Its status reports whether the deployment-run gateway is reachable:
  * `starting` until the first probe settles, then `ready` or `unavailable` with
  * the connection failure. A probe opens one TCP connection to the endpoint at
- * registration, every `readinessIntervalMs`, and whenever the status is read
- * while not `ready`; an answered ask also reports `ready`. A failed ask leaves
- * the status to the next probe, because an HTTP or answer failure comes from a
- * gateway that is reachable. The plugin finishes loading only once the first
+ * registration, every `readinessIntervalMs`, whenever the status is read
+ * while not `ready`, and after an ask fails with `UNAVAILABLE`; an answered
+ * ask reports `ready`. A failed ask never sets the status itself, because an
+ * HTTP or answer failure comes from a gateway that is reachable; the probe it
+ * starts decides. The plugin finishes loading only once the first
  * probe settles, so a Loader composition never routes an ask while the status
  * is still `starting`.
  */
@@ -234,12 +235,20 @@ export class ShieldJudgmentEngine implements JudgmentEngine {
   }
 
   /**
-   * Report `ready` once an ask or fitted ask answered; a failure passes through unchanged.
+   * Report `ready` once an ask or fitted ask answered. A failure passes through
+   * unchanged; an `UNAVAILABLE` one also starts a probe, so a gateway that went
+   * away is reported without waiting for the interval.
    * @param answer - the pending answer.
    * @returns the same answer.
    */
   private async observeAnswered<T>(answer: Promise<T>): Promise<T> {
-    const value = await answer
+    let value: T
+    try {
+      value = await answer
+    } catch (error) {
+      if (error instanceof JudgmentError && error.code === 'UNAVAILABLE') void this.probe()
+      throw error
+    }
     this.observe(READY)
     return value
   }

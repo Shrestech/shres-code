@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import ts from 'typescript'
 import { afterEach, describe, expect, it } from 'vitest'
-import { WorkspaceAnalyzer } from '../src/analyzer.ts'
+import { TYPERT_RESERVED_REMOTE_METHODS } from '@shres-code/shres-code-typert-protocol'
+import { RESERVED_REMOTE_METHODS, WorkspaceAnalyzer } from '../src/analyzer.ts'
 import type { InvocationModel } from '../src/model.ts'
 import { WorkspaceTypertGenerator } from '../src/workspace.ts'
 
@@ -586,6 +587,32 @@ export class DuplicateGoalService extends TypertRemoteService {
 `)
 
     expect(() => analyzeRemote(root, false)).toThrow(/Remote endpoint goals\/create conflicts/)
+  })
+
+  it('rejects a Remote exported under a name the Client namespace service owns', () => {
+    const renamed = copyFixture()
+    editFile(renamed, 'packages/remote/src/index.ts', source => source.replace('  @Remote\n  async create(', "  @Remote('install')\n  async create("))
+    expect(() => analyzeRemote(renamed, false))
+      .toThrow(/Remote method name install is reserved by the Client Remote namespace service/)
+
+    const method = copyFixture()
+    editFile(method, 'packages/remote/src/index.ts', source => `${source}
+export class RemovalService extends TypertRemoteService {
+  constructor() {
+    super(undefined, 'removal')
+  }
+
+  @Remote
+  remove(request: CreateGoalRequest): CreateGoalResult {
+    return { ref: request.title }
+  }
+}
+`)
+    expect(() => analyzeRemote(method, false)).toThrow(/Remote method name remove is reserved/)
+  })
+
+  it('reserves exactly the names typert-protocol documents', () => {
+    expect([...RESERVED_REMOTE_METHODS].sort()).toEqual([...TYPERT_RESERVED_REMOTE_METHODS].sort())
   })
 })
 

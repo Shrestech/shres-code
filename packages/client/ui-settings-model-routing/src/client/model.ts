@@ -23,6 +23,8 @@ export const JUDGMENT_NS = 'judgment'
 export const MODEL_ROUTER_NS = 'model-router'
 /** Registry id of the supervised local Laya engine. */
 export const LAYA_ENGINE = 'laya'
+/** Consumer id the model router declares and asks under. */
+export const ROUTER_CONSUMER = 'model-router'
 
 /** One Remote call's settlement, as the generated Client methods return it. */
 export type RemoteOutcome<T> =

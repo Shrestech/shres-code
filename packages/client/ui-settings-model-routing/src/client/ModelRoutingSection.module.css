@@ -210,6 +210,49 @@
   line-height: 17px;
 }
 
+.warningText {
+  margin: 0;
+}
+
+.warningList {
+  margin: 4px 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.consumers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consumerList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consumerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.consumerId {
+  font-family: var(--dsw-font-mono);
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .notice {
   margin: 0;
   font-size: 13px;

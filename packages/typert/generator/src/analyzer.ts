@@ -993,6 +993,12 @@ class FaceAnalyzer {
     }
     const methodName = method.name.text
     const exportedMethod = invocation.exportName ?? methodName
+    if (RESERVED_REMOTE_METHODS.has(exportedMethod)) {
+      this.fail(
+        method,
+        `Remote method name ${exportedMethod} is reserved by the Client Remote namespace service; export it under another name with @Remote('<name>')`,
+      )
+    }
 
     const lookups = this.lookupDeclarations()
     const lookupByHost = new Map(lookups.map(lookup => [lookup.hostSymbol, lookup]))
@@ -2885,6 +2891,19 @@ function stringLiteralValue(node: ts.Node | undefined): string | undefined {
     ? node.text
     : undefined
 }
+
+/**
+ * Method names the Client gateway's namespace Service already owns, so a Remote
+ * exported under one cannot mount. Generation bootstraps workspace artifacts
+ * before shres-typert-protocol is built, so this copy must equal
+ * `TYPERT_RESERVED_REMOTE_METHODS`; the Remote model spec pins the equality.
+ */
+export const RESERVED_REMOTE_METHODS: ReadonlySet<string> = new Set([
+  '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__', '__proto__',
+  'assertMethodAvailable', 'constructor', 'ctx', 'empty', 'has', 'hasOwnProperty', 'install',
+  'installDirect', 'installScoped', 'invokeRemote', 'isPrototypeOf', 'methods', 'name', 'namespace',
+  'propertyIsEnumerable', 'remove', 'toLocaleString', 'toString', 'valueOf',
+])
 
 function isRemoteSegment(value: string): boolean {
   // Generation bootstraps workspace artifacts before shres-typert-protocol is built,

@@ -51,17 +51,25 @@ export const LAYA_VIEW: LayaGatewayView = {
   installing: false,
 }
 
+/** Selection and consumer facts beyond the engines and the selected id. */
+export interface SnapshotExtras {
+  readonly enabled?: boolean
+  readonly overrides?: Record<string, string>
+  readonly consumers?: string[]
+}
+
 /**
- * An engine snapshot.
+ * An engine snapshot. The router's consumer is declared unless the extras list others.
  * @param engines - the registered engines.
  * @param engine - the selected id.
+ * @param extras - classifier switch, overrides, and declared consumers.
  * @returns the snapshot as the Remote returns it.
  */
-export function snapshot(engines: JudgmentEngineView[] = [TYPESAFE, LAYA], engine = 'typesafe'): JudgmentEnginesSnapshot {
+export function snapshot(engines: JudgmentEngineView[] = [TYPESAFE, LAYA], engine = 'typesafe', extras: SnapshotExtras = {}): JudgmentEnginesSnapshot {
   return {
     engines,
-    selection: { enabled: true, engine, overrides: {} },
-    consumers: [],
+    selection: { enabled: extras.enabled ?? true, engine, overrides: extras.overrides ?? {} },
+    consumers: (extras.consumers ?? ['model-router']) as unknown as JudgmentEnginesSnapshot['consumers'],
     thisHost: 'darwin-arm64',
   }
 }
@@ -78,7 +86,7 @@ export function namespace(ns: string, value: unknown, revision = 3): SettingsNam
 }
 
 /** The shipped model-router section, routing off by default. */
-export const ROUTER = namespace('model-router', { initialMode: 'off', state: { maxChars: 12000 } }, 7)
+export const ROUTER = namespace('model-router', { initialMode: 'off', state: { maxChars: 12000, maxFitCandidates: 4 } }, 7)
 /** The judgment section selecting TypeSafe. */
 export const JUDGMENT = namespace('judgment', { enabled: true, engine: 'typesafe' }, 4)
 

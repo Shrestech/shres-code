@@ -1029,4 +1029,20 @@ describe('gateway readiness', () => {
     await engine(ctx).fitting.ask(fittedAsk())
     expect(statusOf(ctx)).toEqual({ state: 'ready' })
   })
+
+  it('probes after an UNAVAILABLE ask, reporting a gateway that went away before the interval', async () => {
+    const server = await mockServer([])
+    const ctx = engineContext()
+    contexts.push(ctx)
+    await ctx.plugin(ShieldJudgmentEngine, { endpoint: server.url, models: MODELS })
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
+
+    await server.close()
+    const error = await failure(() => engine(ctx).ask(ask()))
+
+    expect(error.code).toBe('UNAVAILABLE')
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toMatchObject({ state: 'unavailable' })
+    })
+  })
 })

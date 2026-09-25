@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { calibratedBy, classifierEnabled, engineOption, initialMode, isRemote, lastExitText, modelsText, numberAt, stateLabel } from '../src/client/view.ts'
+import {
+  classifierEnabled, consumerRoutes, engineOption, ignoredOverrides, initialMode, isRemote, lastExitText, modelsText, numberAt,
+  routingCalibration, stateLabel,
+} from '../src/client/view.ts'
 import { en } from '../src/client/locales.ts'
-import { LAYA, LAYA_VIEW, TYPESAFE, namespace } from './fixtures.client.ts'
+import { LAYA, LAYA_VIEW, TYPESAFE, namespace, snapshot } from './fixtures.client.ts'
 
 /** Resolve a key the way the locale runtime does. */
 function t(key: keyof typeof en, params?: Record<string, unknown>): string {
@@ -50,7 +53,21 @@ describe('model routing view helpers', () => {
     expect(classifierEnabled(namespace('judgment', { enabled: false }))).toBe(false)
   })
 
-  it('reads who evaluated an engine\'s thresholds from the model-router operating points', () => {
+  it('selects each declared consumer\'s engine as the dispatcher does, and names the overrides it ignores', () => {
+    const view = snapshot([TYPESAFE, LAYA], 'laya', {
+      overrides: { 'model-router': 'typesafe', 'worker-escalation': 'gone', 'undeclared': 'typesafe' },
+      consumers: ['model-router', 'worker-escalation', 'compaction-jev', 'toString'],
+    })
+    expect(consumerRoutes(view)).toEqual([
+      { consumer: 'model-router', engineId: 'typesafe', engine: TYPESAFE, overridden: true },
+      { consumer: 'worker-escalation', engineId: 'gone', engine: undefined, overridden: true },
+      { consumer: 'compaction-jev', engineId: 'laya', engine: LAYA, overridden: false },
+      { consumer: 'toString', engineId: 'laya', engine: LAYA, overridden: false },
+    ])
+    expect(ignoredOverrides(view)).toEqual([{ consumer: 'undeclared', engineId: 'typesafe' }])
+  })
+
+  it('reads the router\'s gate for an engine from its operating points and the engine\'s calibration', () => {
     const router = namespace('model-router', { operatingPoints: [
       null,
       'not a point',
@@ -58,12 +75,16 @@ describe('model routing view helpers', () => {
       { engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1, calibratedBy: '' },
       { engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' },
     ] })
-    expect(calibratedBy(router, 'laya')).toBe('routing-eval-2026-09')
-    expect(calibratedBy(router, 'shield')).toBeUndefined()
-    expect(calibratedBy(router, 'typesafe')).toBeUndefined()
-    expect(calibratedBy(router, 'gone')).toBeUndefined()
-    expect(calibratedBy(namespace('model-router', { operatingPoints: 'none' }), 'laya')).toBeUndefined()
-    expect(calibratedBy(namespace('model-router', null), 'laya')).toBeUndefined()
-    expect(calibratedBy(null, 'laya')).toBeUndefined()
+    const verbalized = { ...TYPESAFE, id: 'llm', calibration: 'verbalized' } as never
+    expect(routingCalibration(router, LAYA)).toEqual({ kind: 'calibrated', by: 'routing-eval-2026-09' })
+    expect(routingCalibration(router, { ...LAYA, id: 'shield' } as never)).toEqual({ kind: 'point' })
+    expect(routingCalibration(router, TYPESAFE)).toEqual({ kind: 'point' })
+    expect(routingCalibration(router, { ...TYPESAFE, id: 'gone' } as never)).toEqual({ kind: 'global' })
+    expect(routingCalibration(router, verbalized)).toEqual({ kind: 'refused' })
+    expect(routingCalibration(namespace('model-router', { operatingPoints: [{ engine: 'llm', acceptVerbalized: true, calibratedBy: 'eval' }] }), verbalized))
+      .toEqual({ kind: 'calibrated', by: 'eval' })
+    expect(routingCalibration(namespace('model-router', { operatingPoints: 'none' }), LAYA)).toEqual({ kind: 'global' })
+    expect(routingCalibration(namespace('model-router', null), LAYA)).toEqual({ kind: 'global' })
+    expect(routingCalibration(null, LAYA)).toEqual({ kind: 'global' })
   })
 })
