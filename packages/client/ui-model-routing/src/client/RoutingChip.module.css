@@ -126,3 +126,24 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+.confirmSettings {
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.confirmLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-brand-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.confirmLink:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}

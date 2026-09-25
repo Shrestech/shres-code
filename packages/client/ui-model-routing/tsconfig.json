@@ -24,9 +24,6 @@
       "path": "../ui-conversation"
     },
     {
-      "path": "../ui-layout"
-    },
-    {
       "path": "../ui-primitives"
     },
     {

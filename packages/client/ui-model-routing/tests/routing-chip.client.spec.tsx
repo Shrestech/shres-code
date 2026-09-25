@@ -79,6 +79,7 @@ function setup(options: {
   available?: boolean
   reveal?: RoutingChipProps['reveal']
   engine?: RoutingEngineState
+  openRoutingSettings?: RoutingChipProps['openRoutingSettings']
   loadGate?: RoutingChipProps['loadGate']
 } = {}) {
   const store = createSnapshotStore<{ value: ModelRoutingProjection | undefined }>({ value: options.routing })
@@ -93,6 +94,7 @@ function setup(options: {
     useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) =>
       selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
+    ...options.openRoutingSettings === undefined ? {} : { openRoutingSettings: options.openRoutingSettings },
     available: options.available ?? true,
     setRouting,
     restoreStrong,
@@ -370,6 +372,21 @@ describe('RoutingChip remote-judge confirm', () => {
     setup({ routing: OFF, engine: { kind: 'ready', snapshot } })
     fireEvent.click(offChip())
     await screen.findByText(en['confirm.refused'])
+  })
+
+  it('points at Settings › Model routing to change the judge: as text, or as a link when it can open it', () => {
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}) })
+    fireEvent.click(offChip())
+    expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain('Change the judge in Settings › Model routing')
+    expect(screen.queryByRole('button', { name: 'Settings › Model routing' })).toBeNull()
+    cleanup()
+    const openRoutingSettings = vi.fn()
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}), openRoutingSettings })
+    fireEvent.click(offChip())
+    fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
+    expect(openRoutingSettings).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    expect(setRouting).not.toHaveBeenCalled()
   })
 
   it('asks when the judge is not known yet', () => {

@@ -43,7 +43,7 @@ const FAILURE_LABEL: Record<ChipAction, string> = {
  * @returns the chip, or null while routing is unavailable for this session.
  */
 export function RoutingChip({
-  useProjection, useRoutingEngine, locked, reveal, available, setRouting, restoreStrong, loadGate, t,
+  useProjection, useRoutingEngine, locked, reveal, available, setRouting, restoreStrong, loadGate, openRoutingSettings, t,
 }: RoutingChipProps) {
   const routing = useProjection('modelRouting')
   const engineState = useRoutingEngine(state => state)
@@ -174,6 +174,23 @@ export function RoutingChip({
           )}
         >
           <p className={css.confirmWarning}>{confirmWarning(confirm, confirmGate, t)}</p>
+          <p className={css.confirmSettings}>
+            {t('confirm.settings.before')}{' '}
+            {openRoutingSettings === undefined
+              ? t('status.settings.link')
+              : (
+                <button
+                  type="button"
+                  className={css.confirmLink}
+                  onClick={() => {
+                    setConfirm(null)
+                    openRoutingSettings()
+                  }}
+                >
+                  {t('status.settings.link')}
+                </button>
+              )}
+          </p>
         </Modal>
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}

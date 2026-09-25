@@ -47,8 +47,11 @@ export interface RoutingViewInjected {
    * @returns the gate; rejects when the host cannot read it.
    */
   loadGate: () => Promise<ModelRoutingGateView>
-  /** Open Settings › Model routing, where the judge and the routing defaults are configured for every session. */
-  openSettings: () => void
+  /**
+   * Open Settings › Model routing, where the judge and the routing defaults
+   * are configured for every session. Absent, the view names the section as text.
+   */
+  openRoutingSettings?: () => void
   /**
    * Framework-bound sources. `routerSettings` is the `model-router` settings
    * scope; its status is `loading` until the host answers whether it composes
@@ -73,7 +76,7 @@ type GateLoad = { kind: 'loading' } | { kind: 'loaded'; gate: ModelRoutingGateVi
  * @returns the view, or a notice when routing is unavailable for this session.
  */
 export function RoutingView({
-  useProjection, useSession, useRouterSettings, useRoutingEngine, available, loadDecision, loadGate, openSettings,
+  useProjection, useSession, useRouterSettings, useRoutingEngine, available, loadDecision, loadGate, openRoutingSettings,
   inspect, onInspectDone, reveal, canReveal, t,
 }: RoutingViewProps) {
   const stats = useProjection('modelRoutingStats')
@@ -160,13 +163,13 @@ export function RoutingView({
         {segment.uncalibrated === true && <span className={css.scopePill}>{t('judge.uncalibrated')}</span>}
         {notUsed !== undefined && <span className={css.egressPill} data-egress="remote">{t('judge.notUsed.pill')}</span>}
         {' · '}{t('status.settings.before')}{' '}
-        <button type="button" className={css.link} onClick={openSettings}>{t('status.settings.link')}</button>
+        <SettingsLink open={openRoutingSettings} label={t('status.settings.link')} />
       </p>
       {egress !== undefined && <p className={css.notice} role="status">{egress}</p>}
       {trouble !== undefined && (
         <p className={css.notice} role="status">
           {trouble}{' '}
-          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
         </p>
       )}
       {gateLoad.kind === 'failed' && (
@@ -178,14 +181,14 @@ export function RoutingView({
       {state === 'no-engine' && (
         <p className={css.notice} role="status">
           {t('state.noEngine')}{' '}
-          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
         </p>
       )}
       {state === 'base-unlisted' && <p className={css.notice} role="status">{t('state.baseUnlisted', { model: base ?? t('state.thisModel') })}</p>}
       {notUsed !== undefined && (
         <p className={css.notice} role="status">
           {notUsed}{' '}
-          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
         </p>
       )}
       {notUsed === undefined && engineUncalibratedRecorded(stats, routing.active) && (
@@ -238,4 +241,16 @@ export function RoutingView({
       )}
     </div>
   )
+}
+
+/**
+ * A reference to Settings › Model routing: a link when the view can open the
+ * section, and the same words as text when it cannot.
+ * @param props.open - opens the section, when available.
+ * @param props.label - the reference's words.
+ * @returns the link or the text.
+ */
+function SettingsLink({ open, label }: { open: (() => void) | undefined; label: string }) {
+  if (open === undefined) return <span>{label}</span>
+  return <button type="button" className={css.link} onClick={open}>{label}</button>
 }

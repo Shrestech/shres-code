@@ -21,8 +21,6 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 import type {} from '@shres-code/shres-code-model-router/client'
 // Type-only: pulls the settings plugin's Context merge (ctx.settingsScope).
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
-// Type-only: pulls the shell's Context merge (ctx.layout).
-import type {} from '@shres-code/shres-code-client-ui-layout/client'
 import { createRoutingEngineSource, type RoutingEngineSource } from './engine-source.ts'
 import { RoutingChip } from './RoutingChip.tsx'
 import { en, type RoutingKey } from './locales.ts'
@@ -47,9 +45,6 @@ const NS = 'modelRouting'
  * scope status is the host-composition fact the Routing view is listed by.
  */
 const MODEL_ROUTER_SETTINGS_NAMESPACE = 'model-router'
-
-/** The Settings section that configures the judge and routing for every session. */
-const MODEL_ROUTING_SETTINGS_SECTION = 'model-routing'
 
 /**
  * The model-selection directory one session's selection surfaces share,
@@ -108,6 +103,11 @@ export interface RoutingChipInjected {
    */
   loadGate: () => Promise<ModelRoutingGateView>
   /**
+   * Open Settings › Model routing, where the judge is chosen for every
+   * session. Absent, the confirm names the section as text.
+   */
+  openRoutingSettings?: () => void
+  /**
    * Framework-bound sources. `routingEngine` is the judgment engine facts,
    * which decide whether turning routing on asks for confirmation first.
    */
@@ -131,11 +131,10 @@ function remoteValue<T>(result: { ok: true; value: T } | { ok: false; error: { c
 /**
  * Required services: the slot registry, session binding lookup, the commands,
  * modelRouting, and judgmentEngines Remotes, the locale registry, settings
- * scopes, and the shell layout, which opens Settings › Model routing.
+ * scopes.
  */
 export const inject = [
   'slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'remote.judgmentEngines', 'locale', 'settingsScope',
-  'layout',
 ]
 
 /**
@@ -188,7 +187,6 @@ export function apply(ctx: ClientContext): void {
             available: ctx.sessions.subagentAddress(sessionId) === undefined,
             loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
             loadGate,
-            openSettings: () => { ctx.layout.navigate(MODEL_ROUTING_SETTINGS_SECTION) },
             hooks: { routerSettings: routerScope, routingEngine },
           }),
         }, RoutingView))

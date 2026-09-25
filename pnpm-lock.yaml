@@ -2719,9 +2719,6 @@ importers:
       '@shres-code/shres-code-client-ui-conversation':
         specifier: workspace:^
         version: link:../ui-conversation
-      '@shres-code/shres-code-client-ui-layout':
-        specifier: workspace:^
-        version: link:../ui-layout
       '@shres-code/shres-code-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives

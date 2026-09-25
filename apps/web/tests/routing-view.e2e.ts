@@ -10,8 +10,7 @@
 // router lists no Routing view in the same popover. A host with a local and a
 // remote judge switches between them through a real settings write: the
 // status line follows each switch without a reload, and the Auto chip asks
-// before turning routing on only while the remote judge is selected, and its
-// Settings link opens Settings › Model routing.
+// before turning routing on only while the remote judge is selected.
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -253,8 +252,7 @@ describe('web e2e: the Routing view follows a judge switch', () => {
     await page.getByRole('button', { name: 'Automatic model routing on, press to turn off' }).waitFor({ timeout: 30_000 })
     expect(await confirm.count()).toBe(0)
 
-    // The status line's link opens the Settings section that configures the judge.
-    await status.getByRole('button', { name: 'Settings › Model routing', exact: true }).click()
-    await page.locator('section[aria-label="Model routing"]').getByRole('combobox', { name: 'Engine' }).waitFor({ timeout: 30_000 })
+    // The status line names the Settings section that configures the judge.
+    expect(await status.textContent()).toContain('change it in Settings › Model routing')
   }, 180_000)
 })

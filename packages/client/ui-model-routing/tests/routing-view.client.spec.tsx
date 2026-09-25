@@ -45,7 +45,7 @@ interface Setup {
   inspect?: unknown
   onInspectDone?: () => void
   routerStatus?: 'loading' | 'ready' | 'unavailable'
-  openSettings?: () => void
+  openRoutingSettings?: () => void
   engine?: RoutingEngineState
   openState?: 'cold' | 'loading' | 'open' | 'error'
 }
@@ -66,7 +66,7 @@ function props(options: Setup): RoutingViewProps {
       selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
     available: options.available ?? true,
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
-    openSettings: options.openSettings ?? (() => {}),
+    ...options.openRoutingSettings === undefined ? {} : { openRoutingSettings: options.openRoutingSettings },
     loadDecision: options.loadDecision ?? ((seq: number) => Promise.resolve({ ...decisionDetail(), seq })),
     reveal: options.reveal,
     canReveal: options.canReveal,
@@ -472,14 +472,14 @@ describe('RoutingView judge facts', () => {
   it('reports a judge the router refuses: never asked, no egress warning', async () => {
     const verbalizedRemote = { ...REMOTE, calibration: 'verbalized' as const }
     const snapshot = engines('typesafe', { engines: [LOCAL, verbalizedRemote] })
-    const openSettings = vi.fn()
-    setup({ engine: { kind: 'ready', snapshot }, openSettings })
+    const openRoutingSettings = vi.fn()
+    setup({ engine: { kind: 'ready', snapshot }, openRoutingSettings })
     await screen.findByText('The judge, Jev (TypeSafe), is not used for routing: it only verbalizes its confidence and no operating point accepts it, so it is never asked and every step keeps the strong model.')
     expect(statusLine().textContent).toContain('Not used for routing')
     expect(screen.queryByText(/leave this machine/)).toBeNull()
     expect(screen.queryByText(en['state.engineUncalibrated'])).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
-    expect(openSettings).toHaveBeenCalledTimes(1)
+    expect(openRoutingSettings).toHaveBeenCalledTimes(1)
     cleanup()
     const accepted = { ...GATE, operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized: true }] }
     setup({ engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(accepted) })
@@ -487,19 +487,27 @@ describe('RoutingView judge facts', () => {
     expect(statusLine().textContent).not.toContain('Not used for routing')
   })
 
+  it('names Settings › Model routing as text when the view cannot open it', () => {
+    setup({ engine: { kind: 'no-dispatcher' } })
+    expect(statusLine().textContent).toContain('change it in Settings › Model routing')
+    expect(screen.queryByRole('button', { name: 'Settings › Model routing' })).toBeNull()
+    expect(screen.getByText('Open Settings › Model routing')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open Settings › Model routing' })).toBeNull()
+  })
+
   it('opens Settings › Model routing from the status line and the judge notices', () => {
-    const openSettings = vi.fn()
-    setup({ openSettings })
+    const openRoutingSettings = vi.fn()
+    setup({ openRoutingSettings })
     fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
-    expect(openSettings).toHaveBeenCalledTimes(1)
+    expect(openRoutingSettings).toHaveBeenCalledTimes(1)
     cleanup()
-    setup({ openSettings, engine: { kind: 'no-dispatcher' } })
+    setup({ openRoutingSettings, engine: { kind: 'no-dispatcher' } })
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
     cleanup()
     const starting = engines('laya', { engines: [{ ...LOCAL, state: 'starting' }, REMOTE] })
-    setup({ openSettings, engine: { kind: 'ready', snapshot: starting } })
+    setup({ openRoutingSettings, engine: { kind: 'ready', snapshot: starting } })
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
-    expect(openSettings).toHaveBeenCalledTimes(3)
+    expect(openRoutingSettings).toHaveBeenCalledTimes(3)
   })
 
   it('names why there is no judge, and a judge that is still being read', () => {
