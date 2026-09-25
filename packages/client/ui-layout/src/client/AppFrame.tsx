@@ -91,7 +91,9 @@ export function AppFrame({
   renderSlot,
 }: AppFrameProps) {
   const panels = useStore(s => s)
-  const [page, navigate] = useState<string | null>(null)
+  // The destination lives in the layout store so ctx.layout.navigate can open it from another plugin.
+  const page = panels.page
+  const navigate = actions.navigate
   const detailsSession = useSessions((s) => {
     const current = s.current
     return current !== undefined && s.byId[current]?.blank === false ? current : undefined
