@@ -88,6 +88,8 @@ describe('modelRouting Remote reads', () => {
       downgradeThreshold: 0.8,
       downgradeMargin: 0.1,
       operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.6, downgradeMargin: 0.2, calibratedBy: 'prereg-1', acceptVerbalized: false }],
+      // No judgment registry is composed here.
+      engines: [],
       judgmentDeadlineMs: 4_000,
       entryScoreCeiling: 1,
       escalateBackScoreThreshold: 1.5,
@@ -103,6 +105,7 @@ describe('modelRouting Remote reads', () => {
       downgradeThreshold: 0.8,
       downgradeMargin: 0.1,
       operatingPoints: [],
+      engines: [],
       judgmentDeadlineMs: DEFAULT_JUDGMENT_DEADLINE_MS,
       entryScoreCeiling: DEFAULT_ENTRY_SCORE_CEILING,
       escalateBackScoreThreshold: DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,

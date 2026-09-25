@@ -16,6 +16,8 @@ export const GATE: ModelRoutingGateView = {
   downgradeThreshold: 0.8,
   downgradeMargin: 0.1,
   operatingPoints: [],
+  // The router's calibration per engine; a test that reads it supplies its own.
+  engines: [],
   judgmentDeadlineMs: 1500,
   entryScoreCeiling: 2,
   escalateBackScoreThreshold: 3,

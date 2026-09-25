@@ -5,7 +5,7 @@
  * these values and compute nothing themselves.
  */
 import type {
-  ModelRoutingDecision, ModelRoutingDecisionDetail, ModelRoutingGateView, ModelRoutingStatsSnapshot,
+  ModelRoutingCalibration, ModelRoutingDecision, ModelRoutingDecisionDetail, ModelRoutingGateView, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
 import type { JudgmentEngineView } from '@shres-code/shres-code-api-remotes/client'
 import type { RoutingJudge } from '../engine-source.ts'
@@ -562,12 +562,27 @@ const STATE_TONE: Readonly<Record<JudgmentEngineView['state'], JudgeTone>> = {
 }
 
 /**
- * The status line's judge segment for the router's judge.
+ * How the router gates the judge's answers, as `gate()` reports it for the
+ * judge's registry id: the router's own rule, not the engine descriptor alone.
  * @param judge - the resolved judge.
+ * @param gate - the configured gate, or null while it loads.
+ * @returns the routing calibration, or undefined while it is not known.
+ */
+export function judgeCalibration(judge: RoutingJudge, gate: ModelRoutingGateView | null): ModelRoutingCalibration | undefined {
+  if (judge.kind !== 'engine' || gate === null) return undefined
+  const id = String(judge.engine.id)
+  return gate.engines.find(entry => entry.engine === id)?.calibration
+}
+
+/**
+ * The status line's judge segment for the router's judge. It is marked
+ * uncalibrated when the router gates it with uncalibrated thresholds.
+ * @param judge - the resolved judge.
+ * @param gate - the configured gate, or null while it loads.
  * @param t - the view's translate.
  * @returns the segment.
  */
-export function judgeSegment(judge: RoutingJudge, t: RoutingTranslate): JudgeSegment {
+export function judgeSegment(judge: RoutingJudge, gate: ModelRoutingGateView | null, t: RoutingTranslate): JudgeSegment {
   switch (judge.kind) {
     case 'loading': return { name: t('judge.loading') }
     case 'failed': return { name: t('judge.failed', { message: judge.message }) }
@@ -577,7 +592,7 @@ export function judgeSegment(judge: RoutingJudge, t: RoutingTranslate): JudgeSeg
       state: t(`judge.state.${judge.engine.state}`),
       tone: STATE_TONE[judge.engine.state],
       egress: judge.engine.egress,
-      uncalibrated: judge.engine.calibration !== 'calibrated',
+      uncalibrated: UNCALIBRATED.has(judgeCalibration(judge, gate)?.kind),
     }
   }
 }
@@ -596,19 +611,20 @@ export function judgeTrouble(judge: RoutingJudge, t: RoutingTranslate): string |
     : t('judge.trouble.detail', { name: judge.engine.label, state, detail: judge.engine.detail })
 }
 
+/** Routing calibrations whose thresholds no preregistration set. */
+const UNCALIBRATED: ReadonlySet<ModelRoutingCalibration['kind'] | undefined> = new Set(['point', 'global'])
+
 /**
- * Whether the router refuses the judge: an engine whose calibration is only
- * verbalized is never asked unless its operating point accepts it, which is
- * the router's own rule.
+ * Whether the router refuses the judge and so never asks it, as `gate()`
+ * reports for the judge's registry id.
  * @param judge - the resolved judge.
  * @param gate - the configured gate, or null while it loads.
- * @returns true or false, or undefined while the gate is needed and not loaded.
+ * @returns false without an engine judge, else whether the router refuses it, or undefined while that is not known.
  */
 export function judgeRefused(judge: RoutingJudge, gate: ModelRoutingGateView | null): boolean | undefined {
-  if (judge.kind !== 'engine' || judge.engine.calibration !== 'verbalized') return false
-  if (gate === null) return undefined
-  const id = String(judge.engine.id)
-  return gate.operatingPoints.find(point => point.engine === id)?.acceptVerbalized !== true
+  if (judge.kind !== 'engine') return false
+  const calibration = judgeCalibration(judge, gate)
+  return calibration === undefined ? undefined : calibration.kind === 'refused'
 }
 
 /**
@@ -639,8 +655,8 @@ export function egressWarning(
   t: RoutingTranslate,
 ): string | undefined {
   if (!active || judge.kind !== 'engine' || judge.engine.egress !== 'remote') return undefined
-  // A refused judge is never asked, and a verbalized one needs the gate to tell.
-  if (judgeRefused(judge, gate) !== false) return undefined
+  // Only a judge the router is known to refuse sends nothing.
+  if (judgeRefused(judge, gate) === true) return undefined
   const destination = judge.engine.destination ?? judge.engine.label
   return gate === null
     ? t('egress.warning', { destination })

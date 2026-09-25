@@ -9,13 +9,14 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeNotUsed, judgeRefused,
-  judgeSegment, judgeTrouble,
+  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeCalibration, judgeNotUsed,
+  judgeRefused, judgeSegment, judgeTrouble,
   latencyNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
 } from '../src/client/view/derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from '../src/client/view/format.ts'
+import type { ModelRoutingCalibration } from '@shres-code/shres-code-model-router/client'
 import type { RoutingJudge } from '../src/client/engine-source.ts'
 import { LOCAL, REMOTE } from './fixtures/engines.client.ts'
 import { activeStats, decisionDetail, emptyStats, GATE, liveStats } from './fixtures/routing-stats.client.ts'
@@ -338,16 +339,30 @@ describe('judge facts', () => {
   it('describes every engine state with a tone', () => {
     const states = ['ready', 'starting', 'unavailable', 'unconfigured', 'not-installed', 'unsupported-host'] as const
     expect(states.map((state) => {
-      const segment = judgeSegment({ kind: 'engine', engine: { ...LOCAL, state } }, t)
+      const segment = judgeSegment({ kind: 'engine', engine: { ...LOCAL, state } }, GATE, t)
       return [segment.state, segment.tone]
     })).toEqual([
       ['Ready', 'done'], ['Starting', 'ongoing'], ['Unavailable', 'error'],
       ['Not configured', 'warning'], ['Not installed', 'warning'], ['Not supported on this machine', 'error'],
     ])
-    expect(judgeSegment({ kind: 'engine', engine: REMOTE }, t)).toEqual({
+    expect(judgeSegment({ kind: 'engine', engine: REMOTE }, GATE, t)).toEqual({
       name: 'Jev (TypeSafe)', state: 'Ready', tone: 'done', egress: 'remote', uncalibrated: false,
     })
-    expect(judgeSegment({ kind: 'none', reason: 'unregistered' }, t)).toEqual({ name: 'the selected engine is not registered' })
+    expect(judgeSegment({ kind: 'none', reason: 'unregistered' }, GATE, t)).toEqual({ name: 'the selected engine is not registered' })
+  })
+
+  it('marks the judge uncalibrated by the router\'s calibration for it, not the engine descriptor', () => {
+    const judged = (calibration: ModelRoutingCalibration) => ({ ...GATE, engines: [{ engine: 'typesafe', calibration }] })
+    // TypeSafe declares `calibrated`, yet the router gates it with uncalibrated thresholds.
+    const remote: RoutingJudge = { kind: 'engine', engine: REMOTE }
+    expect(judgeSegment(remote, judged({ kind: 'global' }), t).uncalibrated).toBe(true)
+    expect(judgeSegment(remote, judged({ kind: 'point' }), t).uncalibrated).toBe(true)
+    expect(judgeSegment(remote, judged({ kind: 'calibrated', by: 'prereg-1' }), t).uncalibrated).toBe(false)
+    expect(judgeSegment(remote, judged({ kind: 'refused' }), t).uncalibrated).toBe(false)
+    // Unknown until gate() reports the engine.
+    expect(judgeSegment(remote, null, t).uncalibrated).toBe(false)
+    expect(judgeCalibration(remote, GATE)).toBeUndefined()
+    expect(judgeCalibration({ kind: 'loading' }, judged({ kind: 'global' }))).toBeUndefined()
   })
 
   it('reports trouble only for a selected judge that is not ready', () => {
@@ -367,27 +382,25 @@ describe('judge facts', () => {
   })
 })
 
-describe('the router\'s refusal of a verbalized judge', () => {
-  const verbalized: RoutingJudge = { kind: 'engine', engine: { ...REMOTE, calibration: 'verbalized' } }
-  const point = (acceptVerbalized: boolean) => ({
-    ...GATE, operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized }],
+describe('the router\'s refusal of a judge', () => {
+  const judge: RoutingJudge = { kind: 'engine', engine: { ...REMOTE, calibration: 'verbalized' } }
+  const judged = (calibration: ModelRoutingCalibration) => ({ ...GATE, engines: [{ engine: 'typesafe', calibration }] })
+
+  it('reads the refusal from gate(), and knows none before gate() reports the engine', () => {
+    expect(judgeRefused({ kind: 'loading' }, judged({ kind: 'refused' }))).toBe(false)
+    expect(judgeRefused(judge, null)).toBeUndefined()
+    expect(judgeRefused(judge, GATE)).toBeUndefined()
+    expect(judgeRefused(judge, judged({ kind: 'refused' }))).toBe(true)
+    expect(judgeRefused(judge, judged({ kind: 'point' }))).toBe(false)
   })
 
-  it('refuses a verbalized engine unless its operating point accepts it, as the router does', () => {
-    expect(judgeRefused({ kind: 'loading' }, GATE)).toBe(false)
-    expect(judgeRefused({ kind: 'engine', engine: REMOTE }, null)).toBe(false)
-    expect(judgeRefused(verbalized, null)).toBeUndefined()
-    expect(judgeRefused(verbalized, GATE)).toBe(true)
-    expect(judgeRefused(verbalized, point(false))).toBe(true)
-    expect(judgeRefused(verbalized, point(true))).toBe(false)
-  })
-
-  it('names a refused judge and withholds the egress warning until the router would ask it', () => {
-    expect(judgeNotUsed(verbalized, GATE, t)).toContain('is not used for routing')
-    expect(judgeNotUsed(verbalized, null, t)).toBeUndefined()
-    expect(judgeNotUsed({ kind: 'none', reason: 'disabled' }, GATE, t)).toBeUndefined()
-    expect(egressWarning(verbalized, true, GATE, t)).toBeUndefined()
-    expect(egressWarning(verbalized, true, null, t)).toBeUndefined()
-    expect(egressWarning(verbalized, true, point(true), t)).toContain('each consult sends up to 12,000 characters')
+  it('names a refused judge, and warns about egress unless the router is known to refuse it', () => {
+    expect(judgeNotUsed(judge, judged({ kind: 'refused' }), t)).toContain('is not used for routing')
+    expect(judgeNotUsed(judge, null, t)).toBeUndefined()
+    expect(judgeNotUsed({ kind: 'none', reason: 'disabled' }, judged({ kind: 'refused' }), t)).toBeUndefined()
+    expect(egressWarning(judge, true, judged({ kind: 'refused' }), t)).toBeUndefined()
+    // Not known yet: warn, since the judge may be asked.
+    expect(egressWarning(judge, true, null, t)).toContain('each consult sends part of this session')
+    expect(egressWarning(judge, true, judged({ kind: 'point' }), t)).toContain('each consult sends up to 12,000 characters')
   })
 })

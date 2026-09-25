@@ -59,6 +59,7 @@ import {
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
+  JudgmentEngineCalibration,
   JudgmentEngineId,
   JudgmentQuestion,
   JudgmentResult,
@@ -117,6 +118,7 @@ import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
 import type {
+  ModelRoutingCalibration,
   ModelRoutingCandidate,
   ModelRoutingDecision,
   ModelRoutingDecisionDetail,
@@ -124,6 +126,7 @@ import type {
   ModelRoutingGateView,
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
+  ModelRoutingOperatingPoint,
   ModelRoutingProjection,
   ModelRoutingReason,
   ModelRoutingRouteFrom,
@@ -168,6 +171,29 @@ export const MODEL_ROUTER_SETTINGS_NAMESPACE = settingsNamespace('model-router')
  * `judgment.overrides` entry for `model-router` routes its asks.
  */
 export const MODEL_ROUTER_JUDGMENT_CONSUMER = judgmentConsumerId('model-router')
+
+/**
+ * How the router gates one engine's answers: `refused` when the engine's
+ * probabilities are only verbalized and no operating point accepts them (the
+ * router keeps the strong model without asking), else `calibrated` when its
+ * operating point names the preregistration that set it, `point` for an
+ * uncalibrated operating point, and `global` for the global thresholds. An
+ * engine the registry does not describe is judged by its operating point
+ * alone.
+ * @param calibration - the engine's declared calibration, when registered.
+ * @param point - the engine's operating point, when configured.
+ * @returns the routing calibration.
+ */
+export function routingCalibration(
+  calibration: JudgmentEngineCalibration | undefined,
+  point: ModelRoutingOperatingPoint | undefined,
+): ModelRoutingCalibration {
+  // A generative model's stated probabilities do not gate unless the
+  // deployment accepted them for this engine.
+  if (calibration === 'verbalized' && point?.acceptVerbalized !== true) return { kind: 'refused' }
+  if (point === undefined) return { kind: 'global' }
+  return point.calibratedBy === undefined ? { kind: 'point' } : { kind: 'calibrated', by: point.calibratedBy }
+}
 
 /** The route question's id, echoed by the answer this service reads. */
 export const ROUTE_QUESTION_ID = judgmentQuestionId('model-route')
@@ -716,9 +742,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const state = entry?.status().state
     return {
       ...engineId === undefined ? {} : { engineId },
-      // A generative model's stated probabilities do not gate unless the
-      // deployment accepted them for this engine.
-      refused: entry?.descriptor.calibration === 'verbalized' && point?.acceptVerbalized !== true,
+      refused: routingCalibration(entry?.descriptor.calibration, point).kind === 'refused',
       ...state === 'starting' || state === 'not-installed' ? { warming: state } : {},
       failures: judgmentFailuresFor(sticky.judgmentFailures, engineId),
       // Built in one fixed key order, so equal inputs log equal decisions.
@@ -834,6 +858,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       downgradeThreshold: config.downgradeThreshold,
       downgradeMargin: config.downgradeMargin,
       operatingPoints: config.operatingPoints.map(point => ({ ...point })),
+      engines: (this.ctx.get('judgmentEngines')?.list() ?? []).map(descriptor => ({
+        engine: String(descriptor.id),
+        calibration: routingCalibration(
+          descriptor.calibration,
+          config.operatingPoints.find(point => point.engine === String(descriptor.id)),
+        ),
+      })),
       judgmentDeadlineMs: config.judgmentDeadlineMs,
       entryScoreCeiling: config.entryScoreCeiling,
       escalateBackScoreThreshold: config.escalateBackScoreThreshold,

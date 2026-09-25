@@ -453,8 +453,9 @@ function statusLine(): HTMLElement {
 }
 
 describe('RoutingView judge facts', () => {
-  it('names the judge, its state, its egress, and its calibration in the status line', async () => {
-    setup()
+  it('names the judge, its state, its egress, and the router\'s calibration for it in the status line', async () => {
+    const judged = { ...GATE, engines: [{ engine: 'laya', calibration: { kind: 'global' as const } }, { engine: 'typesafe', calibration: { kind: 'calibrated' as const, by: 'prereg-1' } }] }
+    setup({ loadGate: () => Promise.resolve(judged) })
     await gateLoaded()
     const status = statusLine()
     expect(status.textContent).toContain('Laya (local, MLX)')
@@ -463,7 +464,8 @@ describe('RoutingView judge facts', () => {
     expect(status.textContent).toContain('Uncalibrated')
     expect(status.textContent).toContain('change it in Settings › Model routing')
     cleanup()
-    setup({ engine: { kind: 'ready', snapshot: engines('typesafe') } })
+    setup({ engine: { kind: 'ready', snapshot: engines('typesafe') }, loadGate: () => Promise.resolve(judged) })
+    await gateLoaded()
     const remote = statusLine()
     expect(remote.textContent).toContain('Jev (TypeSafe)')
     expect(remote.textContent).toContain('Remote · egress')
@@ -474,7 +476,8 @@ describe('RoutingView judge facts', () => {
     const verbalizedRemote = { ...REMOTE, calibration: 'verbalized' as const }
     const snapshot = engines('typesafe', { engines: [LOCAL, verbalizedRemote] })
     const openRoutingSettings = vi.fn()
-    setup({ engine: { kind: 'ready', snapshot }, openRoutingSettings })
+    const refused = { ...GATE, engines: [{ engine: 'typesafe', calibration: { kind: 'refused' as const } }] }
+    setup({ engine: { kind: 'ready', snapshot }, openRoutingSettings, loadGate: () => Promise.resolve(refused) })
     await screen.findByText('The judge, Jev (TypeSafe), is not used for routing: it only verbalizes its confidence and no operating point accepts it, so it is never asked and every step keeps the strong model.')
     expect(statusLine().textContent).toContain('Not used for routing')
     expect(screen.queryByText(/leave this machine/)).toBeNull()
@@ -482,7 +485,11 @@ describe('RoutingView judge facts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
     expect(openRoutingSettings).toHaveBeenCalledTimes(1)
     cleanup()
-    const accepted = { ...GATE, operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized: true }] }
+    const accepted = {
+      ...GATE,
+      operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized: true }],
+      engines: [{ engine: 'typesafe', calibration: { kind: 'point' as const } }],
+    }
     setup({ engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(accepted) })
     await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
     expect(statusLine().textContent).not.toContain('Not used for routing')

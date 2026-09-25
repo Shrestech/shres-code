@@ -4640,6 +4640,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingBreakReason = \'gate-failed\' | \'current-preferred\' | \'unknown-candidate\' | \'candidate-ineligible\' | \'escalated\' | \'manual-deviation\' | \'mode-off\' | \'route-errors\' | \'route-failed\' | \'hold-cap\' | \'base-unlisted\';',
   },
   {
+    name: 'ModelRoutingCalibration',
+    declaration: 'export type ModelRoutingCalibration = {\n    kind: \'refused\';\n} | {\n    kind: \'calibrated\';\n    by: string;\n} | {\n    kind: \'point\';\n} | {\n    kind: \'global\';\n};',
+  },
+  {
     name: 'ModelRoutingCandidate',
     declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description: string;\n}',
   },
@@ -4685,7 +4689,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingGateView',
-    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    operatingPoints: ModelRoutingOperatingPoint[];\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
+    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    operatingPoints: ModelRoutingOperatingPoint[];\n    engines: {\n        engine: string;\n        calibration: ModelRoutingCalibration;\n    }[];\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
   },
   {
     name: 'ModelRoutingInactiveStickyView',

@@ -135,7 +135,7 @@ export function RoutingView({
   const state = routingViewState(stats, routing.active, judge)
   const verdict = routingVerdict(stats, gate, routing.active, t)
   const kpis = routingKpis(stats, gate, engineEgress(engineState), t)
-  const segment = judgeSegment(judge, t)
+  const segment = judgeSegment(judge, gate, t)
   const trouble = judgeTrouble(judge, t)
   const egress = egressWarning(judge, routing.active, gate, t)
   const notUsed = judgeNotUsed(judge, gate, t)

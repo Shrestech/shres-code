@@ -26,7 +26,7 @@ import type { LlmResolvedModelInfo, StreamChunk } from '@shres-code/shres-code-l
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
-import ModelRoutingController from '../src/index.ts'
+import ModelRoutingController, { routingCalibration } from '../src/index.ts'
 import { stickyState } from '../src/folds.ts'
 import type { ModelRoutingDecision } from '../src/types.ts'
 
@@ -264,6 +264,37 @@ describe('real Loader composition: router, judgment-dispatch, and registered eng
     expect(decisions().at(-1)).toMatchObject({ reason: 'gate-passed', engineId: 'other', engine: 'other' })
     expect(other.asks).toHaveLength(1)
     expect(other.asks[0]?.consumer).toBe('model-router')
+  })
+
+  it('classifies an engine by its declared calibration and operating point', () => {
+    const point = { engine: 'x', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized: false }
+    expect(routingCalibration('verbalized', undefined)).toEqual({ kind: 'refused' })
+    expect(routingCalibration('verbalized', point)).toEqual({ kind: 'refused' })
+    expect(routingCalibration('verbalized', { ...point, acceptVerbalized: true })).toEqual({ kind: 'point' })
+    expect(routingCalibration('logprob', undefined)).toEqual({ kind: 'global' })
+    expect(routingCalibration(undefined, { ...point, calibratedBy: 'prereg-x' })).toEqual({ kind: 'calibrated', by: 'prereg-x' })
+  })
+
+  it('reports in gate() how it gates every registered engine, by the rule its consults apply', { timeout: 30_000 }, async () => {
+    const { ctx, consult, decisions, engines } = await boot(
+      [{ id: 'cal' }, { id: 'pt' }, { id: 'verb', calibration: 'verbalized' }, { id: 'ok', calibration: 'verbalized' }],
+      'verb',
+      [
+        '    operatingPoints:',
+        '      - { engine: pt, downgradeThreshold: 0.9, downgradeMargin: 0.5, calibratedBy: prereg-pt }',
+        '      - { engine: ok, downgradeThreshold: 0.7, downgradeMargin: 0.2, acceptVerbalized: true }',
+      ],
+    )
+    expect(ctx.modelRouting.gateView().engines).toEqual([
+      { engine: 'cal', calibration: { kind: 'global' } },
+      { engine: 'pt', calibration: { kind: 'calibrated', by: 'prereg-pt' } },
+      { engine: 'verb', calibration: { kind: 'refused' } },
+      { engine: 'ok', calibration: { kind: 'point' } },
+    ])
+    // The engine gate() reports refused is the one the consult refuses.
+    await consult(1)
+    expect(decisions()[0]).toMatchObject({ reason: 'engine-uncalibrated', engineId: 'verb' })
+    expect(engines['verb']!.asks).toHaveLength(0)
   })
 
   it('refuses a verbalized engine selected while candidates are assessed, and asks nothing', { timeout: 30_000 }, async () => {

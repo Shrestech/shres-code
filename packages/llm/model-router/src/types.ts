@@ -95,6 +95,19 @@ export interface ModelRoutingOperatingPointConfig {
   acceptVerbalized?: boolean
 }
 
+/**
+ * How the router gates one engine's answers (`routingCalibration`):
+ * `refused` — verbalized probabilities no operating point accepts, so the
+ * router never asks it and keeps the strong model; `calibrated` — its
+ * operating point, set by the preregistration `by`; `point` — an
+ * uncalibrated operating point; `global` — the uncalibrated global thresholds.
+ */
+export type ModelRoutingCalibration =
+  | { kind: 'refused' }
+  | { kind: 'calibrated'; by: string }
+  | { kind: 'point' }
+  | { kind: 'global' }
+
 /** One resolved operating point. */
 export interface ModelRoutingOperatingPoint {
   /** Registry id of the engine this point applies to. */
@@ -850,6 +863,8 @@ export interface ModelRoutingGateView {
   downgradeMargin: number
   /** Per-engine floors, which replace the two above for the engine each names. */
   operatingPoints: ModelRoutingOperatingPoint[]
+  /** How the router gates each engine the registry describes now, by registry id. */
+  engines: { engine: string; calibration: ModelRoutingCalibration }[]
   /** Deadline of one judgment call, in milliseconds. */
   judgmentDeadlineMs: number
   /** Difficulty at or above which a streak is not entered. */
