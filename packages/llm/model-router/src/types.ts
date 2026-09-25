@@ -888,6 +888,76 @@ export interface ModelRoutingGateView {
   stateMaxChars: number
 }
 
+/** One `routeFrom` entry as the pool status reports it. */
+export interface ModelRoutingPoolBase {
+  /** Provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. */
+  objective: ModelRoutingObjective
+  /** Whether per-turn entry from a `quota` route is allowed. */
+  allowEveryTurn: boolean
+  /** Whether the llm runtime registers the provider route now. */
+  registered: boolean
+  /** The model's declared context window, in tokens, when its adapter states one. */
+  contextWindow?: number
+}
+
+/** How the router's eligibility check judges one pool model from one `routeFrom` base. */
+export interface ModelRoutingPoolEligibility {
+  /** Provider route of the base. */
+  provider: string
+  /** Model id of the base. */
+  model: string
+  /**
+   * The router's eligibility result for this pair, before any conversation:
+   * the result a turn without images gets.
+   */
+  reason: ModelRoutingCandidateEligibilityReason
+}
+
+/** One pool model as the pool status reports it. */
+export interface ModelRoutingPoolCandidate {
+  /** Configuration id, as the route question names it. */
+  id: string
+  /** Provider route of the pool model. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** The configured effort, when one is set. */
+  reasoningEffort?: string
+  /** The configured description. */
+  description: string
+  /** Whether the llm runtime registers the provider route now. */
+  registered: boolean
+  /** The model's declared context window, in tokens, when its adapter states one. */
+  contextWindow?: number
+  /** Declared input modalities, when the adapter states them. */
+  inputModalities?: string[]
+  /** Efforts the model's route offers, in adapter order, when it exposes reasoning control. */
+  efforts?: string[]
+  /** Whether the route's usage reports prompt-cache counts, when the adapter declares it. */
+  cacheUsage?: 'reported' | 'unreported'
+  /** Whether the same provider and model is also a `routeFrom` entry. */
+  alsoRouteFrom: boolean
+  /** The eligibility result from each `routeFrom` base, in `routeFrom` order. */
+  eligibility: ModelRoutingPoolEligibility[]
+}
+
+/**
+ * The configured pool and `routeFrom` allowlist, each model with the facts its
+ * adapter declares and the router's eligibility result for every
+ * (base, pool model) pair. JSON only; computed from the configuration in
+ * force and the llm runtime's registrations when read.
+ */
+export interface ModelRoutingPoolStatus {
+  /** The `routeFrom` entries, in configuration order. */
+  routeFrom: ModelRoutingPoolBase[]
+  /** The pool, in configuration order. */
+  candidates: ModelRoutingPoolCandidate[]
+}
+
 /** One logged decision with the position and config a drill-down renders. */
 export interface ModelRoutingDecisionDetail {
   /** Seq of the `model-routing/decision` event. */

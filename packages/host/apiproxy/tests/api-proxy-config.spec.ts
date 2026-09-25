@@ -696,15 +696,31 @@ describe('settings domain', () => {
   })
 
   it.each([
-    ['an invalid namespace name', 'Not A Namespace', {}],
-    ['a schema-invalid patch', 'llm-deepseek', { baseURL: 42 }],
-  ])('rejects %s as settings-rejected', async (_case, ns, patch) => {
+    ['an invalid namespace name', 'Not A Namespace', {}, { ns: 'Not A Namespace' }],
+    ['a schema-invalid patch, naming the field', 'llm-deepseek', { baseURL: 42 }, { ns: 'llm-deepseek', path: ['baseURL'] }],
+  ])('rejects %s as settings-rejected', async (_case, ns, patch, details) => {
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.settings.update(request({ ns, patch })))
     expect(error.code).toBe('settings-rejected')
-    expect(error.details).toEqual({ ns })
+    expect(error.details).toEqual(details)
+  })
+
+  it('names the list index a schema failure reached, and no field for a whole-section schema failure', async () => {
+    const ctx = await harness()
+    // Two exposed product namespaces, standing in for the router's pool list and a whole-section refusal.
+    ctx.settings.register(settingsNamespace('model-router'), z.object({ candidates: z.array(z.object({ id: z.string().required(), weight: z.number() })) }))
+    ctx.settings.register(settingsNamespace('judgment'), z.object({ engine: z.string() }), {
+      validate: (_value, cause) => {
+        if (cause === 'write') throw new z.ValidationError('the section as a whole is refused', {})
+      },
+    })
+    const api = createApiProxy(ctx, DEFAULTS)
+    const item = expectErr(await api.settings.replace(request({ ns: 'model-router', section: { candidates: [{ id: 'a', weight: 1 }, { weight: 2 }] } })))
+    expect(item).toEqual({ code: 'settings-rejected', message: '$.candidates[1].id missing required value', details: { ns: 'model-router', path: ['candidates', 1, 'id'] } })
+    const root = expectErr(await api.settings.replace(request({ ns: 'judgment', section: { engine: 'x' } })))
+    expect(root.details).toEqual({ ns: 'judgment' })
   })
 
   it('reports the field an owner validation names, and none for any other refusal', async () => {

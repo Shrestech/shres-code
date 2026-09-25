@@ -82,6 +82,7 @@ import type {} from '@shres-code/shres-code-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.
+import z from '@shres-code/schemastery'
 import { SettingsConflictError, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@shres-code/shres-code-settings'
 import { credentialRef } from '@shres-code/shres-code-credentials'
@@ -2126,7 +2127,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * boundary is refused before the seam is touched; every seam refusal —
    * unknown or invalid namespace, read-only provider, schema validation,
    * owner validation, storage — becomes one `settings-rejected` carrying the
-   * seam's own message, plus the field path an owner's `SettingsFieldError` names.
+   * seam's own message, plus the field path an owner's `SettingsFieldError`
+   * or the schema's validation failure names.
    */
   async function settingsWrite(
     request: RpcRequest<unknown>,
@@ -2147,10 +2149,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           details: { ns, expected: error.expected, actual: error.actual },
         })
       }
+      const path = fieldPathOf(error)
       return err(request, {
         code: 'settings-rejected',
         message: error instanceof Error ? error.message : String(error),
-        details: error instanceof SettingsFieldError ? { ns, path: [...error.path] } : { ns },
+        details: path === undefined ? { ns } : { ns, path },
       })
     }
     let branded: SettingsNamespace
@@ -3940,4 +3943,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return Promise.resolve({ accepted: true })
     },
   }
+}
+
+/**
+ * The field a settings refusal names: an owner's `SettingsFieldError` path,
+ * or the path a schema validation failure reached, keys and array indices from
+ * the section root. A refusal of the whole section names none.
+ * @param error - the seam's refusal.
+ * @returns the path, or undefined when the refusal names no field.
+ */
+function fieldPathOf(error: unknown): (string | number)[] | undefined {
+  if (error instanceof SettingsFieldError) return [...error.path]
+  if (!z.ValidationError.is(error)) return undefined
+  const path = (error.options.path ?? []).filter((segment): segment is string | number => typeof segment !== 'symbol')
+  return path.length === 0 ? undefined : path
 }

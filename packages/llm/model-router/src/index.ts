@@ -68,8 +68,9 @@ import type {
   JudgmentService,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
+import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
 import type {} from '@shres-code/shres-code-commands'
@@ -127,6 +128,9 @@ import type {
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
   ModelRoutingOperatingPoint,
+  ModelRoutingPoolBase,
+  ModelRoutingPoolCandidate,
+  ModelRoutingPoolStatus,
   ModelRoutingProjection,
   ModelRoutingReason,
   ModelRoutingRouteFrom,
@@ -652,9 +656,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })
     installSettingsSection(ctx, MODEL_ROUTER_SETTINGS_NAMESPACE, ModelRoutingController.Config, config, {
       // A stored section this router could not act on is refused where it is
-      // written, naming the offending key.
-      validate: (next) => {
-        resolveConfig(next)
+      // written, naming the offending key. The live route check runs on a
+      // write only, never on a load or reload, and only for the routes the
+      // write adds or changes.
+      validate: (next, cause) => {
+        const resolved = resolveConfig(next)
+        if (cause === 'write') this.assertRegisteredRoutes(resolved, this.config())
       },
       setSource: (next) => {
         this.source = next
@@ -871,6 +878,105 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       difficultyLevels: [...config.difficultyLevels],
       hold: { minSteps: config.hold.minSteps, maxSteps: config.hold.maxSteps },
       stateMaxChars: config.state.maxChars,
+    }
+  }
+
+  /**
+   * The pool and `routeFrom` allowlist in force, each model with the facts its
+   * adapter declares, and the router's own eligibility result for every
+   * (base, pool model) pair, computed as a turn without images would compute it.
+   * Makes no model request.
+   * @returns the pool status.
+   */
+  @Remote
+  async poolStatus(): Promise<ModelRoutingPoolStatus> {
+    const config = this.config()
+    const llm = this.ctx.get('llm')
+    const registered = new Set((llm?.listProviders() ?? []).map(provider => provider.id))
+    const infoOf = async (provider: string, model: string): Promise<LlmResolvedModelInfo | undefined> => {
+      if (llm === undefined || !registered.has(provider)) return undefined
+      try {
+        return await llm.resolveModelInfo(provider, model)
+      } catch {
+        // An adapter that cannot describe the model states no facts; the
+        // eligibility result below names why it cannot route.
+        return undefined
+      }
+    }
+    const routeFrom: ModelRoutingPoolBase[] = await Promise.all(config.routeFrom.map(async (entry) => {
+      const info = await infoOf(entry.provider, entry.model)
+      return {
+        provider: entry.provider,
+        model: entry.model,
+        objective: entry.objective,
+        allowEveryTurn: entry.allowEveryTurn,
+        registered: registered.has(entry.provider),
+        ...info?.context === undefined ? {} : { contextWindow: info.context.contextWindow },
+      }
+    }))
+    const byBase = llm === undefined
+      ? []
+      : await Promise.all(config.routeFrom.map(async entry => ({
+        entry,
+        assessments: (await assessModelRoutingCandidates(
+          llm,
+          { provider: entry.provider, model: entry.model },
+          [],
+          config.candidates,
+          config.difficultyToEffort,
+        )).assessments,
+      })))
+    const candidates: ModelRoutingPoolCandidate[] = await Promise.all(config.candidates.map(async (candidate) => {
+      const info = await infoOf(candidate.provider, candidate.model)
+      return {
+        id: candidate.id,
+        provider: candidate.provider,
+        model: candidate.model,
+        ...candidate.reasoningEffort === undefined ? {} : { reasoningEffort: String(candidate.reasoningEffort) },
+        description: candidate.description,
+        registered: registered.has(candidate.provider),
+        ...info?.context === undefined ? {} : { contextWindow: info.context.contextWindow },
+        ...info?.inputModalities === undefined ? {} : { inputModalities: [...info.inputModalities] },
+        ...info?.reasoning === undefined ? {} : { efforts: info.reasoning.efforts.map(effort => String(effort.id)) },
+        ...info?.cacheUsage === undefined ? {} : { cacheUsage: info.cacheUsage },
+        alsoRouteFrom: config.routeFrom.some(entry => entry.provider === candidate.provider && entry.model === candidate.model),
+        // Each base's check assesses every pool model once, keyed by its unique id.
+        eligibility: byBase.flatMap(({ entry, assessments }) => assessments
+          .filter(assessment => assessment.id === candidate.id)
+          .map(assessment => ({ provider: entry.provider, model: entry.model, reason: assessment.reason }))),
+      }
+    }))
+    return { routeFrom, candidates }
+  }
+
+  /**
+   * Refuse a written pool model or `routeFrom` entry whose provider route the
+   * llm runtime does not register. Only the entries the write adds, or whose
+   * provider or model it changes, are checked: an entry already in force is
+   * not re-judged, so a route that went away does not block an unrelated
+   * edit. The model id is not checked, because catalogs are advisory; the
+   * eligibility check decides at run time.
+   * @param next - the section being written.
+   * @param previous - the section in force.
+   * @throws SettingsFieldError at the entry's `provider` naming the route.
+   */
+  private assertRegisteredRoutes(next: ResolvedModelRouterConfig, previous: ResolvedModelRouterConfig): void {
+    const registered = new Set((this.ctx.get('llm')?.listProviders() ?? []).map(provider => provider.id))
+    const inForce = (entries: readonly { provider: string; model: string }[], provider: string, model: string): boolean =>
+      entries.some(entry => entry.provider === provider && entry.model === model)
+    for (const [index, candidate] of next.candidates.entries()) {
+      if (registered.has(candidate.provider) || inForce(previous.candidates, candidate.provider, candidate.model)) continue
+      throw new SettingsFieldError(
+        ['candidates', index, 'provider'],
+        `ModelRouterConfig.candidates["${candidate.id}"].provider "${candidate.provider}" is not a registered route`,
+      )
+    }
+    for (const [index, entry] of next.routeFrom.entries()) {
+      if (registered.has(entry.provider) || inForce(previous.routeFrom, entry.provider, entry.model)) continue
+      throw new SettingsFieldError(
+        ['routeFrom', index, 'provider'],
+        `ModelRouterConfig.routeFrom["${entry.provider}/${entry.model}"].provider "${entry.provider}" is not a registered route`,
+      )
     }
   }
 

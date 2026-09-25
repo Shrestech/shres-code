@@ -10,6 +10,7 @@
  */
 
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import type {
   ModelRoutingCandidate,
   ModelRoutingCandidateConfig,
@@ -393,6 +394,21 @@ function assertNonEmptyString(name: string, value: unknown): asserts value is st
 }
 
 /**
+ * {@link assertNonEmptyString} for a field a configuration surface edits: the
+ * rejection names the field's path in the section, so the surface shows it
+ * beside that field.
+ * @param path - keys and indices from the section root to the field.
+ * @param name - the field's name in the message.
+ * @param value - the value to check.
+ * @throws SettingsFieldError at the path when the value is not a non-empty string.
+ */
+function assertNonEmptyField(path: readonly (string | number)[], name: string, value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new SettingsFieldError(path, `${name} must be a non-empty string`)
+  }
+}
+
+/**
  * Resolve, validate, and detach the router configuration.
  *
  * Schemastery normalizes a composition entry before the plugin starts, but
@@ -426,19 +442,21 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   assertRatio('ModelRouterConfig.downgradeThreshold', config.downgradeThreshold)
   assertRatio('ModelRouterConfig.downgradeMargin', config.downgradeMargin)
   const seen = new Set<string>()
-  const candidates: ModelRoutingCandidate[] = (config.candidates ?? []).map((candidate) => {
+  const candidates: ModelRoutingCandidate[] = (config.candidates ?? []).map((candidate, index) => {
     const id = candidate.id
-    assertNonEmptyString('ModelRouterConfig.candidates[].id', id)
+    const at = (field: string): (string | number)[] => ['candidates', index, field]
+    assertNonEmptyField(at('id'), 'ModelRouterConfig.candidates[].id', id)
     if (id === KEEP_CURRENT_OPTION_ID) {
-      throw new Error(`ModelRouterConfig.candidates["${id}"].id is reserved for the keep-current route option`)
+      throw new SettingsFieldError(at('id'), `ModelRouterConfig.candidates["${id}"].id is reserved for the keep-current route option`)
     }
-    assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].provider`, candidate.provider)
-    assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].model`, candidate.model)
-    if (seen.has(id)) throw new Error(`ModelRouterConfig.candidates lists "${id}" more than once`)
+    assertNonEmptyField(at('provider'), `ModelRouterConfig.candidates["${id}"].provider`, candidate.provider)
+    assertNonEmptyField(at('model'), `ModelRouterConfig.candidates["${id}"].model`, candidate.model)
+    if (seen.has(id)) throw new SettingsFieldError(at('id'), `ModelRouterConfig.candidates lists "${id}" more than once`)
     seen.add(id)
-    assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].description`, candidate.description)
+    assertNonEmptyField(at('description'), `ModelRouterConfig.candidates["${id}"].description`, candidate.description)
     if (candidate.description.length > MAX_CANDIDATE_DESCRIPTION_CHARS) {
-      throw new Error(
+      throw new SettingsFieldError(
+        at('description'),
         `ModelRouterConfig.candidates["${id}"].description must be at most ${MAX_CANDIDATE_DESCRIPTION_CHARS} characters`,
       )
     }
@@ -518,7 +536,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   const routeFrom = resolveRouteFrom(config.routeFrom ?? [], judgmentDeadlineMs)
   const operatingPoints = resolveOperatingPoints(config.operatingPoints ?? [])
   if (config.initialMode !== 'off' && routeFrom.length === 0) {
-    throw new Error('ModelRouterConfig.routeFrom is empty: routing can never run')
+    throw new SettingsFieldError(['routeFrom'], 'ModelRouterConfig.routeFrom is empty: routing can never run')
   }
   const onUnavailable = config.onUnavailable ?? 'fallback'
   const inTurnFallback = config.inTurnFallback ?? 'manual'
@@ -610,29 +628,36 @@ function resolveRouteFrom(
 ): readonly ModelRoutingRouteFrom[] {
   const seen = new Set<string>()
   return Object.freeze(entries.map((entry, index) => {
-    assertNonEmptyString(`ModelRouterConfig.routeFrom[${index}].provider`, entry.provider)
-    assertNonEmptyString(`ModelRouterConfig.routeFrom[${index}].model`, entry.model)
+    const at = (field: string): (string | number)[] => ['routeFrom', index, field]
+    assertNonEmptyField(at('provider'), `ModelRouterConfig.routeFrom[${index}].provider`, entry.provider)
+    assertNonEmptyField(at('model'), `ModelRouterConfig.routeFrom[${index}].model`, entry.model)
     const name = `ModelRouterConfig.routeFrom["${entry.provider}/${entry.model}"]`
     const key = JSON.stringify([entry.provider, entry.model])
-    if (seen.has(key)) throw new Error(`ModelRouterConfig.routeFrom lists "${entry.provider}/${entry.model}" more than once`)
+    if (seen.has(key)) {
+      throw new SettingsFieldError(at('model'), `ModelRouterConfig.routeFrom lists "${entry.provider}/${entry.model}" more than once`)
+    }
     seen.add(key)
     // Read through an unknown-typed view: programmatic construction bypasses the schema.
     const raw = entry as { objective?: unknown; allowEveryTurn?: unknown }
     if (typeof raw.objective !== 'string' || !OBJECTIVES.has(raw.objective)) {
-      throw new Error(`${name}.objective must be "quota", "dollars", or "latency"`)
+      throw new SettingsFieldError(at('objective'), `${name}.objective must be "quota", "dollars", or "latency"`)
     }
     if (raw.allowEveryTurn !== undefined && typeof raw.allowEveryTurn !== 'boolean') {
-      throw new Error(`${name}.allowEveryTurn must be a boolean`)
+      throw new SettingsFieldError(at('allowEveryTurn'), `${name}.allowEveryTurn must be a boolean`)
     }
     const allowEveryTurn = entry.allowEveryTurn ?? false
     if (entry.objective === 'latency' && judgmentDeadlineMs > MAX_LATENCY_JUDGMENT_DEADLINE_MS) {
-      throw new Error(
+      throw new SettingsFieldError(
+        at('objective'),
         `${name}.objective "latency" requires judgmentDeadlineMs of at most ${MAX_LATENCY_JUDGMENT_DEADLINE_MS}`,
       )
     }
     // Per-turn entry is the only entry policy, so a quota route opts into it.
     if (entry.objective === 'quota' && !allowEveryTurn) {
-      throw new Error(`${name}.objective "quota" requires allowEveryTurn: true under the per-turn entry policy`)
+      throw new SettingsFieldError(
+        at('allowEveryTurn'),
+        `${name}.objective "quota" requires allowEveryTurn: true under the per-turn entry policy`,
+      )
     }
     return Object.freeze({ provider: entry.provider, model: entry.model, objective: entry.objective, allowEveryTurn })
   }))

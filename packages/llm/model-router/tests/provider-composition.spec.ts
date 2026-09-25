@@ -21,6 +21,7 @@ import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import { JUDGMENT_SETTINGS_NAMESPACE, judgmentEngineId } from '@shres-code/shres-code-judgment'
 import JudgmentDispatch, { JudgmentEnginesGateway } from '@shres-code/shres-code-judgment-dispatch'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
+import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import TypesafeJudgmentEngine from '@shres-code/shres-code-judgment-typesafe'
 import ShieldJudgmentEngine from '@shres-code/shres-code-judgment-shield'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
@@ -30,6 +31,7 @@ import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import ModelRoutingController, {
   KEEP_CURRENT_OPTION_ID,
+  MODEL_ROUTER_SETTINGS_NAMESPACE,
   ROUTE_QUESTION_ID,
 } from '../src/index.ts'
 
@@ -48,7 +50,8 @@ const ROUTE_REMAINDER = 0.1
 const COMPOSITION_TIMEOUT_MS = 60_000
 
 interface RouteScript {
-  readonly choice: typeof KEEP_CURRENT_OPTION_ID | typeof CANDIDATE_ID
+  /** The route option the judge picks: `keep-current` or a pool id. */
+  readonly choice: string
   readonly score: number
 }
 
@@ -144,12 +147,16 @@ class LoopbackJudgmentServer {
       : body.questions ?? {}
     for (const [id, question] of Object.entries(questions)) {
       if (question.type === 'choice') {
+        // The pick carries ROUTE_CONFIDENCE; every other offered option shares the remainder.
+        const options = Object.keys(question.criteria as Record<string, unknown>)
+        const others = options.filter(option => option !== script.choice)
         answers[id] = {
           type: 'choice',
           choice: script.choice,
-          probabilities: script.choice === KEEP_CURRENT_OPTION_ID
-            ? { [KEEP_CURRENT_OPTION_ID]: ROUTE_CONFIDENCE, [CANDIDATE_ID]: ROUTE_REMAINDER }
-            : { [KEEP_CURRENT_OPTION_ID]: ROUTE_REMAINDER, [CANDIDATE_ID]: ROUTE_CONFIDENCE },
+          probabilities: Object.fromEntries(options.map(option => [
+            option,
+            option === script.choice ? ROUTE_CONFIDENCE : ROUTE_REMAINDER / others.length,
+          ])),
           confidence: ROUTE_CONFIDENCE,
         }
       } else if (question.type === 'score') {
@@ -613,5 +620,50 @@ describe('real judgment engine switch through the settings seam', () => {
     } finally {
       await shieldServer.close()
     }
+  })
+})
+
+describe('real shared-pool edit through the settings seam', () => {
+  it('a model-router pool write changes the pool the next decision assesses and routes to; an unregistered route is refused', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    modelServer = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
+    judgmentServer = new LoopbackJudgmentServer([
+      { choice: CANDIDATE_ID, score: 1 },
+      { choice: 'lite', score: 1 },
+    ], 'typesafe')
+    const loaded = await loadComposition({ engines: { typesafe: await judgmentServer.start() }, defaultEngine: 'typesafe', settings: true })
+    const namespace = MODEL_ROUTER_SETTINGS_NAMESPACE
+
+    const first = createAgent(loaded, 'pool-before')
+    await turn(first, 'Use the cheaper route for this small lookup.')
+    const before = eventsOfType(first.session.events, 'model-routing/decision')[0]?.data
+    expect(before?.candidateEligibility?.candidates.map(candidate => candidate.id)).toEqual([CANDIDATE_ID])
+    expect(Object.keys(routeCriteria(0))).toEqual([KEEP_CURRENT_OPTION_ID, CANDIDATE_ID])
+
+    const pool = (loaded.settings.get(namespace) as { candidates: Record<string, unknown>[] }).candidates
+    await loaded.settings.mutate(namespace, [{ op: 'set', path: ['candidates'], value: [
+      ...pool,
+      { id: 'lite', provider: PROVIDER, model: CANDIDATE_MODEL, description: 'lookups and one-line edits' },
+    ] }])
+
+    const second = createAgent(loaded, 'pool-after')
+    await turn(second, 'Use the cheaper route for this small lookup.')
+    const after = eventsOfType(second.session.events, 'model-routing/decision')[0]?.data
+    expect(after?.candidateEligibility?.candidates.map(candidate => candidate.id)).toEqual([CANDIDATE_ID, 'lite'])
+    expect(after).toMatchObject({ outcome: 'downgraded', selection: { candidateId: 'lite', model: CANDIDATE_MODEL } })
+    expect(Object.keys(routeCriteria(1))).toEqual([KEEP_CURRENT_OPTION_ID, CANDIDATE_ID, 'lite'])
+
+    // A route the llm runtime does not register is refused at the write, naming the entry; the pool is unchanged.
+    const refusal = await loaded.settings.mutate(namespace, [{ op: 'set', path: ['candidates'], value: [
+      ...(loaded.settings.get(namespace) as { candidates: Record<string, unknown>[] }).candidates,
+      { id: 'typo', provider: 'deepsek-official', model: CANDIDATE_MODEL, description: 'a misspelled route' },
+    ] }]).then(() => undefined, (error: unknown) => error)
+    expect(refusal).toBeInstanceOf(SettingsFieldError)
+    expect(refusal).toMatchObject({
+      path: ['candidates', 2, 'provider'],
+      message: 'ModelRouterConfig.candidates["typo"].provider "deepsek-official" is not a registered route',
+    })
+    expect((loaded.settings.get(namespace) as { candidates: { id: string }[] }).candidates.map(candidate => candidate.id))
+      .toEqual([CANDIDATE_ID, 'lite'])
+    expect(judgmentServer.requests).toHaveLength(2)
   })
 })

@@ -1324,6 +1324,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the thresholds, judgment deadline, difficulty band, and hold.',
       },
       {
+        signature: '@Remote async poolStatus(): Promise<ModelRoutingPoolStatus>',
+        description: 'The pool and `routeFrom` allowlist in force, each model with the facts its adapter declares, and the router\'s own eligibility result for every (base, pool model) pair, computed as a turn without images would compute it. Makes no model request.',
+        parameters: [],
+        returns: 'the pool status.',
+      },
+      {
         signature: '@Remote(\'decision\') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail',
         description: 'One logged decision, verbatim, with the turn and step it was logged in and the gate configuration in force now.',
         parameters: [{ name: 'agent', description: 'the session\'s Agent.' }, { name: 'seq', description: 'seq of a `model-routing/decision` event in that session\'s log.' }],
@@ -4404,6 +4410,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
+    name: 'LlmCacheUsage',
+    declaration: 'export type LlmCacheUsage = \'reported\' | \'unreported\';',
+  },
+  {
     name: 'LlmCallConfig',
     declaration: 'export interface LlmCallConfig {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n}',
   },
@@ -4433,7 +4443,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n    cacheUsage?: LlmCacheUsage;\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -4714,6 +4724,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingOutcome',
     declaration: 'export type ModelRoutingOutcome = \'downgraded\' | \'kept-strong\' | \'skipped\' | \'error\';',
+  },
+  {
+    name: 'ModelRoutingPoolBase',
+    declaration: 'export interface ModelRoutingPoolBase {\n    provider: string;\n    model: string;\n    objective: ModelRoutingObjective;\n    allowEveryTurn: boolean;\n    registered: boolean;\n    contextWindow?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingPoolCandidate',
+    declaration: 'export interface ModelRoutingPoolCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n    description: string;\n    registered: boolean;\n    contextWindow?: number;\n    inputModalities?: string[];\n    efforts?: string[];\n    cacheUsage?: \'reported\' | \'unreported\';\n    alsoRouteFrom: boolean;\n    eligibility: ModelRoutingPoolEligibility[];\n}',
+  },
+  {
+    name: 'ModelRoutingPoolEligibility',
+    declaration: 'export interface ModelRoutingPoolEligibility {\n    provider: string;\n    model: string;\n    reason: ModelRoutingCandidateEligibilityReason;\n}',
+  },
+  {
+    name: 'ModelRoutingPoolStatus',
+    declaration: 'export interface ModelRoutingPoolStatus {\n    routeFrom: ModelRoutingPoolBase[];\n    candidates: ModelRoutingPoolCandidate[];\n}',
   },
   {
     name: 'ModelRoutingReason',

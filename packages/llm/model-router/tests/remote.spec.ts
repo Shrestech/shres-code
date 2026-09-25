@@ -1,7 +1,8 @@
 /**
- * The `modelRouting` Remote reads: the Gateway binding and its two direct
- * methods, `gate` (the gate configuration in force now) and `decision` (one
- * logged decision, verbatim, with the turn and step it was logged in).
+ * The `modelRouting` Remote reads: the Gateway binding and its direct
+ * methods, `gate` (the gate configuration in force now), `poolStatus` (see
+ * pool-status.spec.ts), and `decision` (one logged decision, verbatim, with
+ * the turn and step it was logged in).
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -64,11 +65,12 @@ const DECISION: ModelRoutingDecision = {
 }
 
 describe('modelRouting Remote reads', () => {
-  it('publishes the modelRouting namespace with the gate and decision methods', async () => {
+  it('publishes the modelRouting namespace with the gate, poolStatus, and decision methods', async () => {
     const { ctx } = await setup()
     expect(ctx.modelRouting.typertRemote).toMatchObject({ serviceKey: 'modelRouting', namespace: 'modelRouting' })
     expect(remoteMethods(ctx.modelRouting)).toEqual([
       { method: 'gateView', exportName: 'gate', invocation: { kind: 'direct' } },
+      { method: 'poolStatus', invocation: { kind: 'direct' } },
       { method: 'decisionDetail', exportName: 'decision', invocation: { kind: 'direct' } },
     ])
   })

@@ -626,6 +626,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   ModelRoutingDecisionDetail: 'the modelRouting.decision read is owned by packages/llm/model-router/README.md',
   ModelRoutingGateView: 'the modelRouting.gate read is owned by packages/llm/model-router/README.md',
+  ModelRoutingPoolStatus: 'the modelRouting.poolStatus read is owned by packages/llm/model-router/README.md',
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',
   BeginCommandRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
