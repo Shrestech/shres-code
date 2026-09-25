@@ -398,12 +398,14 @@ export function routeMargin(decision: ModelRoutingDecision): number | undefined 
  * operating point changed since.
  */
 export interface DecisionThresholds {
-  /**
-   * Whether the confidence and margin floors were recorded on the decision or
-   * read from the configuration now. The difficulty scores are always the
-   * configuration now: decisions do not record them.
-   */
+  /** Whether the confidence and margin floors were recorded on the decision or read from the configuration now. */
   source: 'recorded' | 'now'
+  /**
+   * Whether the difficulty scores were recorded on the decision, which it
+   * does when the consult asked the difficulty question, or read from the
+   * configuration now.
+   */
+  difficultySource: 'recorded' | 'now'
   /** Where recorded floors came from: the engine's operating point or the global defaults. */
   origin?: 'operating-point' | 'global'
   /** The preregistration that set recorded floors; absent means they are uncalibrated. */
@@ -420,18 +422,24 @@ export interface DecisionThresholds {
 
 /**
  * Resolve the thresholds a drill-down compares one decision with: the
- * confidence and margin floors the decision recorded as applied, else the
- * configuration in force now, uncalibrated, from the `modelRouting.decision`
- * read's gate. The difficulty scores always come from the gate.
+ * thresholds the decision recorded as applied, else the configuration in
+ * force now, uncalibrated, from the `modelRouting.decision` read's gate. A
+ * decision records the difficulty scores only when its consult asked the
+ * difficulty question; otherwise they too come from the gate.
  * @param detail - the decision detail.
- * @returns the thresholds and their source.
+ * @returns the thresholds and their sources.
  */
 export function decisionThresholds(detail: ModelRoutingDecisionDetail): DecisionThresholds {
   const recorded = detail.decision.thresholds
-  const difficulty = {
-    entryScoreCeiling: detail.gate.entryScoreCeiling,
-    escalateBackScoreThreshold: detail.gate.escalateBackScoreThreshold,
-  }
+  const entry = recorded?.entryScoreCeiling
+  const escalate = recorded?.escalateBackScoreThreshold
+  const difficulty = entry !== undefined && escalate !== undefined
+    ? { difficultySource: 'recorded' as const, entryScoreCeiling: entry, escalateBackScoreThreshold: escalate }
+    : {
+      difficultySource: 'now' as const,
+      entryScoreCeiling: detail.gate.entryScoreCeiling,
+      escalateBackScoreThreshold: detail.gate.escalateBackScoreThreshold,
+    }
   if (recorded === undefined) {
     return {
       source: 'now',

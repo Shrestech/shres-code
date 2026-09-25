@@ -335,6 +335,15 @@ describe('RoutingView decisions and drill-down', () => {
     expect(within(drawer).getByText('Threshold at the time · the engine\'s operating point · calibrated by prereg-7')).toBeTruthy()
     expect(within(drawer).getByText('threshold at the time 0.70')).toBeTruthy()
     expect(within(drawer).getByText(en['drill.difficulty.now'])).toBeTruthy()
+    cleanup()
+    const withDifficulty = decisionDetail({
+      thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 1, escalateBackScoreThreshold: 2.5, source: 'global' },
+    })
+    setup({ loadDecision: () => Promise.resolve(withDifficulty) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 22.1' }))
+    const recordedDrawer = await screen.findByRole('dialog')
+    await within(recordedDrawer).findByText('enter below 1 · exit at 2.5')
+    expect(within(recordedDrawer).queryByText(en['drill.difficulty.now'])).toBeNull()
   })
 
   it('reads a warm-up and a state size recorded without its text', async () => {

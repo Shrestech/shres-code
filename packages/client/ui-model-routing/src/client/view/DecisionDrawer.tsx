@@ -205,7 +205,7 @@ function DecisionBody({ detail, showState, onShowState, t }: {
         max={levels}
         t={t}
       />
-      {thresholds.source === 'recorded' && <p className={css.muted}>{t('drill.difficulty.now')}</p>}
+      {thresholds.source === 'recorded' && thresholds.difficultySource === 'now' && <p className={css.muted}>{t('drill.difficulty.now')}</p>}
 
       <h3 className={css.section}>{t('drill.why')}</h3>
       <ol className={css.path}>

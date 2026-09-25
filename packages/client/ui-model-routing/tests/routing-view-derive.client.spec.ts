@@ -203,17 +203,26 @@ describe('decision thresholds', () => {
   it('compares a decision that recorded none with the configuration now, uncalibrated', () => {
     const thresholds = decisionThresholds(decisionDetail())
     expect(thresholds).toEqual({
-      source: 'now', downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+      source: 'now', difficultySource: 'now', downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
     })
     expect(thresholdSourceLabel(thresholds, t)).toBe('Threshold now · uncalibrated')
     expect(thresholdValueLabel(thresholds, 0.8, t)).toBe('threshold now 0.80')
   })
 
-  it('prefers the floors a decision recorded, keeping the difficulty scores of now', () => {
+  it('prefers the thresholds a decision recorded, and the difficulty scores only when it asked the difficulty question', () => {
     const global = decisionThresholds(decisionDetail({ thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'global' } }))
     expect(global).toEqual({
-      source: 'recorded', origin: 'global', downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+      source: 'recorded', origin: 'global', difficultySource: 'now',
+      downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
     })
+    const withDifficulty = decisionThresholds(decisionDetail({
+      thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 1, escalateBackScoreThreshold: 2.5, source: 'global' },
+    }))
+    expect(withDifficulty).toMatchObject({ difficultySource: 'recorded', entryScoreCeiling: 1, escalateBackScoreThreshold: 2.5 })
+    const onlyEntry = decisionThresholds(decisionDetail({
+      thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 1, source: 'global' },
+    }))
+    expect(onlyEntry).toMatchObject({ difficultySource: 'now', entryScoreCeiling: 2, escalateBackScoreThreshold: 3 })
     expect(thresholdSourceLabel(global, t)).toBe('Threshold at the time · global defaults · uncalibrated')
     expect(thresholdValueLabel(global, 0.7, t)).toBe('threshold at the time 0.70')
     const point = decisionThresholds(decisionDetail({

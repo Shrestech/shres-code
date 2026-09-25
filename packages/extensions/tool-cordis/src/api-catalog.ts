@@ -4709,7 +4709,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingRecordedThresholds',
-    declaration: 'export interface ModelRoutingRecordedThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
+    declaration: 'export interface ModelRoutingRecordedThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    entryScoreCeiling?: number;\n    escalateBackScoreThreshold?: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
   },
   {
     name: 'ModelRoutingRequest',

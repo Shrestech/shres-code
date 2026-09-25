@@ -759,9 +759,13 @@ export interface ModelRoutingRecordedThresholds {
   downgradeThreshold: number
   /** Top-two margin floor applied. */
   downgradeMargin: number
-  /** Whether they came from the engine's operating point or the global defaults. */
+  /** Difficulty at or above which no streak is entered; present when the consult asked the difficulty question. */
+  entryScoreCeiling?: number
+  /** Difficulty at or above which a held streak escalates; present when the consult asked the difficulty question. */
+  escalateBackScoreThreshold?: number
+  /** Whether the confidence and margin floors came from the engine's operating point or the global defaults. */
   source: 'operating-point' | 'global'
-  /** Id of the preregistration whose replay set them; absent means uncalibrated. */
+  /** Id of the preregistration whose replay set the operating point; absent means uncalibrated. */
   calibratedBy?: string
 }
 
