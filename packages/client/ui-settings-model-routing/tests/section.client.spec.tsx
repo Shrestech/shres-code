@@ -89,48 +89,124 @@ describe('Settings › Model routing page', () => {
     expect([...select.options].map(option => option.textContent)).toEqual(['Jev (TypeSafe) — remote', 'Laya (local MLX) — local'])
     expect(select.value).toBe('typesafe')
     expect(screen.getByText(en.stateReady)).toBeTruthy()
-    expect(screen.getByText(en.egressRemote).getAttribute('title')).toBe(en.egressRemoteTitle)
+    expect(screen.getAllByText(en.egressRemote).map(pill => pill.getAttribute('title'))).toEqual([en.egressRemoteTitle, en.egressRemoteTitle])
     expect(screen.getByText('fast jev-1.13.0-fast · accurate jev-1.13.0')).toBeTruthy()
-    expect(screen.getAllByText(en.uncalibrated)[0]?.getAttribute('title')).toBe(en.uncalibratedTitle)
+    const consumers = screen.getByRole('list', { name: en.consumersGroup })
+    const row = within(consumers).getByText('model-router').closest('li') as HTMLElement
+    expect(within(row).getByText('Jev (TypeSafe)')).toBeTruthy()
+    expect(within(row).getByText(en.consumerSelected)).toBeTruthy()
+    expect(within(row).getByText(en.uncalibratedGlobal).getAttribute('title')).toBe(en.uncalibratedGlobalTitle)
   })
 
-  it('warns that a remote engine sends conversation excerpts off this machine, bounded by the router state cap', () => {
+  it('warns that the router sends conversation excerpts to a remote engine, bounded by the router state cap', () => {
     mount(double(ready()))
     const warning = screen.getByRole('note')
-    expect(warning.textContent).toBe('Conversation excerpts leave this machine. While a session has routing on, each consult sends up to 12,000 characters of that conversation to api.typesafe.ai. This warning also appears when a session turns routing on.')
+    expect(within(warning).getByText(en.remoteWarningLead)).toBeTruthy()
+    expect(within(warning).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation.',
+    ])
+    expect(within(warning).getByText(en.remoteWarningTail)).toBeTruthy()
     cleanup()
     mount(double(ready({ router: null, engines: snapshot([{ ...TYPESAFE, destination: undefined } as never]) })))
-    expect(screen.getByRole('note').textContent).toContain('each consult sends part of that conversation to a host off this machine.')
+    expect(within(screen.getByRole('note')).getByRole('listitem').textContent)
+      .toBe('model-router asks Jev (TypeSafe) at a host off this machine: each routing consult, in a session with routing on, sends part of that conversation.')
   })
 
-  it('shows Calibrated for an engine the router has an evaluated operating point for, and Uncalibrated otherwise', () => {
-    const router = namespace('model-router', {
-      initialMode: 'off',
-      operatingPoints: [
-        { engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' },
-        { engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1 },
-      ],
+  it('warns about every consumer an override sends to a remote engine while the selected engine is local', () => {
+    // A consumer's override applies while it is declared, exactly as the dispatcher selects its engine.
+    const probe = snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never], 'laya', {
+      overrides: { 'worker-escalation': 'typesafe', 'model-router': 'typesafe' },
+      consumers: ['model-router', 'worker-escalation'],
     })
-    mount(double(ready({ router, engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never], 'laya') })))
-    expect(screen.getByText(en.calibrated).getAttribute('title'))
-      .toBe('Routing thresholds for this engine were evaluated by routing-eval-2026-09 (model-router operating point).')
-    expect(screen.queryByText(en.uncalibrated)).toBeNull()
+    mount(double(ready({ engines: probe })))
+
+    expect(screen.queryByText(en.localNote)).toBeNull()
+    const warning = screen.getByRole('note')
+    expect(within(warning).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation.',
+      'worker-escalation asks Jev (TypeSafe) at api.typesafe.ai: every ask sends the state this consumer judges, whatever the session\'s routing mode.',
+    ])
+    const rows = within(screen.getByRole('list', { name: en.consumersGroup })).getAllByRole('listitem')
+    expect(rows.map(row => within(row).queryByText(en.consumerOverride) !== null)).toEqual([true, true])
+    expect(within(rows[0] as HTMLElement).getByText(en.egressRemote)).toBeTruthy()
+  })
+
+  it('warns about a remote non-router consumer without the routing tail, and bounds a fitting remote engine by its alternatives', () => {
+    const lanShield = { ...LAYA, id: 'shield', label: 'Shield (LAN gateway)', egress: 'remote', destination: '192.168.1.20:8787', state: 'ready', detail: undefined } as never
+    mount(double(ready({ engines: snapshot([TYPESAFE, LAYA, lanShield], 'laya', {
+      overrides: { 'compaction-jev': 'typesafe', 'model-router': 'shield' },
+      consumers: ['compaction-jev', 'model-router'],
+    }) })))
+    expect(within(screen.getByRole('note')).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+      'compaction-jev asks Jev (TypeSafe) at api.typesafe.ai: every ask sends the state this consumer judges, whatever the session\'s routing mode.',
+      'model-router asks Shield (LAN gateway) at 192.168.1.20:8787: each routing consult, in a session with routing on, sends up to 4 alternative excerpts of that conversation, each at most 12,000 characters.',
+    ])
     cleanup()
-    mount(double(ready({ router })))
-    expect(screen.getByText(en.uncalibrated)).toBeTruthy()
-    expect(screen.queryByText(en.calibrated)).toBeNull()
+    mount(double(ready({ engines: snapshot([TYPESAFE, LAYA], 'laya', {
+      overrides: { 'compaction-jev': 'typesafe' },
+      consumers: ['compaction-jev', 'model-router'],
+    }) })))
+    expect(within(screen.getByRole('note')).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(screen.getByRole('note')).queryByText(en.remoteWarningTail)).toBeNull()
+  })
+
+  it('says why nothing leaves: the classifier is off, no consumer is composed, or every consumer asks a local engine', () => {
+    mount(double(ready({ engines: snapshot(undefined, 'typesafe', { enabled: false }) })))
+    expect(screen.getByText(en.egressOff)).toBeTruthy()
+    expect(screen.queryByRole('note')).toBeNull()
+    cleanup()
+    mount(double(ready({ engines: snapshot(undefined, 'typesafe', { consumers: [] }) })))
+    expect(screen.getByText(en.egressNoConsumers)).toBeTruthy()
+    expect(screen.queryByRole('list', { name: en.consumersGroup })).toBeNull()
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+
+  it('lists an override naming an engine that is not composed, and an override the dispatcher ignores', () => {
+    mount(double(ready({ engines: snapshot([TYPESAFE, LAYA], 'laya', {
+      overrides: { 'model-router': 'gone', 'judgment-guardrails': 'typesafe' },
+      consumers: ['model-router'],
+    }) })))
+    const row = within(screen.getByRole('list', { name: en.consumersGroup })).getByRole('listitem')
+    expect(row.textContent).toContain('engine "gone" is not composed, so its asks fail')
+    expect(screen.getByText('The override for judgment-guardrails names typesafe and is ignored: no such consumer is composed.')).toBeTruthy()
+    expect(screen.getByText(en.localNote)).toBeTruthy()
+    cleanup()
+    mount(double(ready({ engines: snapshot([TYPESAFE], 'typesafe', { overrides: { 'judgment-guardrails': 'typesafe' }, consumers: [] }) })))
+    expect(screen.queryByRole('list', { name: en.consumersGroup })).toBeNull()
+    expect(screen.getByText(/The override for judgment-guardrails/)).toBeTruthy()
+  })
+
+  it('shows how the router gates the engine it asks, from its operating points and the engine\'s calibration', () => {
+    const points = (operatingPoints: unknown[]) => namespace('model-router', { initialMode: 'off', operatingPoints })
+    const judge = { ...TYPESAFE, id: 'llm', label: 'LLM judge', calibration: 'verbalized', egress: 'none', destination: undefined } as never
+    const badge = (router: ReturnType<typeof namespace>, engine = 'laya'): HTMLElement => {
+      mount(double(ready({ router, engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never, judge], engine) })))
+      const row = within(screen.getByRole('list', { name: en.consumersGroup })).getByRole('listitem')
+      const found = within(row).getAllByText(/Calibrated|Uncalibrated|Not used for routing/)[0] as HTMLElement
+      cleanup()
+      return found
+    }
+    const calibrated = badge(points([{ engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' }]))
+    expect(calibrated.textContent).toBe('Calibrated (routing-eval-2026-09)')
+    expect(calibrated.getAttribute('title')).toBe('Routing gates this engine\'s answers with the operating point routing-eval-2026-09 evaluated.')
+    expect(badge(points([{ engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08 }])).textContent).toBe(en.uncalibratedPoint)
+    expect(badge(points([{ engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1, calibratedBy: 'x' }])).textContent).toBe(en.uncalibratedGlobal)
+    expect(badge(points([]), 'llm').textContent).toBe(en.routingRefused)
+    expect(badge(points([{ engine: 'llm', downgradeThreshold: 0.9, downgradeMargin: 0.2, acceptVerbalized: true }]), 'llm').textContent).toBe(en.uncalibratedPoint)
+    mount(double(ready({ router: null })))
+    expect(screen.queryByText(/Uncalibrated|Calibrated|Not used for routing/)).toBeNull()
   })
 
   it('omits the model id of an engine whose provider names none', () => {
     const { models: _models, ...bare } = TYPESAFE
     mount(double(ready({ laya: null, engines: snapshot([bare]) })))
     expect(screen.queryByText(/jev-1\.13\.0/)).toBeNull()
-    expect(screen.getByText(en.egressRemote)).toBeTruthy()
+    expect(screen.getAllByText(en.egressRemote)).toHaveLength(2)
   })
 
-  it('shows a local engine as local with no warning', () => {
+  it('shows a local engine as local, and says nothing leaves when every consumer asks a local engine', () => {
     mount(double(ready({ engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never], 'laya') })))
-    expect(screen.getByText(en.egressLocal).getAttribute('title')).toBe(en.egressLocalTitle)
+    expect(screen.getAllByText(en.egressLocal).map(pill => pill.getAttribute('title'))).toEqual([en.egressLocalTitle, en.egressLocalTitle])
     expect(screen.getByText(en.localNote)).toBeTruthy()
     expect(screen.queryByRole('note')).toBeNull()
     expect(screen.getAllByText(LAYA_VIEW.modelId).length).toBeGreaterThan(0)
@@ -286,11 +362,14 @@ describe('Settings › Model routing page', () => {
     const s = scripted()
     const controller = createModelRoutingController(s.api, s.remotes)
     mount(controller)
-    await screen.findByText(en.egressRemote)
+    await screen.findByRole('note')
+    expect(screen.getAllByText(en.egressRemote)).toHaveLength(2)
     s.remotes.snapshot.mockResolvedValue(remoteOk(snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never], 'laya')))
     fireEvent.change(screen.getByRole('combobox', { name: en.engineLabel }), { target: { value: 'laya' } })
-    await screen.findByText(en.egressLocal)
+    await screen.findByText(en.localNote)
+    expect(screen.getAllByText(en.egressLocal)).toHaveLength(2)
     expect(screen.queryByText(en.egressRemote)).toBeNull()
+    expect(screen.queryByRole('note')).toBeNull()
     expect(s.mutate.mock.calls[0]?.[0]).toMatchObject({ ns: 'judgment', ops: [{ op: 'set', path: ['engine'], value: 'laya' }] })
     void act
     void remoteFail

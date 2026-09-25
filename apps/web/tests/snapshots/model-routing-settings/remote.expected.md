@@ -3,18 +3,28 @@
   - paragraph: Configure how routing judges each turn. Each session turns routing on or off with the Auto chip in its chat input.
   - region "Judgment engine":
     - heading "Judgment engine" [level=3]
-    - paragraph: One judge for every session. Changing it takes effect at the next decision in every session with routing on.
+    - paragraph: The engine every judgment consumer asks, unless a per-consumer override names another. A change applies from each consumer's next ask, in every session.
     - text: Engine
     - combobox "Engine":
       - option "Jev (TypeSafe) — remote" [selected]
       - option "Shield (local gateway) — local"
     - text: Not configured Remote · egress
     - code: fast jev-preview · accurate jev-latest
-    - text: Uncalibrated
     - paragraph: "judgment-typesafe: SHRES_E2E_ABSENT_TYPESAFE_KEY holds no value; store SHRES_E2E_ABSENT_TYPESAFE_KEY through the credentials service"
+    - text: Consumers
+    - list "Engine each judgment consumer asks":
+      - listitem:
+        - code: model-router
+        - text: "Jev (TypeSafe) Remote · egress Uncalibrated: global thresholds Selected engine"
     - note:
-      - strong: Conversation excerpts leave this machine.
-      - text: While a session has routing on, each consult sends up to 12,000 characters of that conversation to api.typesafe.ai. This warning also appears when a session turns routing on.
+      - paragraph:
+        - strong: Conversation excerpts leave this machine.
+        - text: "These consumers send the state they judge to a remote engine:"
+      - list:
+        - listitem:
+          - code: model-router
+          - text: "asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation."
+      - paragraph: This warning also appears when a session turns routing on.
   - region "Default for new sessions":
     - heading "Default for new sessions" [level=3]
     - paragraph: Sessions start with this mode; each session changes its own with the Auto chip in the chat input.
@@ -23,6 +33,6 @@
       - radio "On"
   - region "Classifier":
     - heading "Classifier" [level=3]
-    - paragraph: "Turns every judgment consumer off at once: routing, worker escalation, and compaction. Moved here from Models."
+    - paragraph: Turns every judgment consumer off at once, such as routing, worker escalation, and compaction. Moved here from Models.
     - switch "Turn the classifier off" [checked]
     - text: Enabled
