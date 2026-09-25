@@ -18,7 +18,6 @@ import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
 import { Button, IconPlusOutline16, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type { InjectFace } from '@shres-code/shres-code-client-ui-slots'
-import type { SettingsSectionOwnerProps } from '@shres-code/shres-code-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
@@ -38,13 +37,15 @@ export interface ModelsSectionInjected {
   api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
   /** Section copy. */
   t: (key: keyof typeof en) => string
+  /** Open Settings at another registered section, through `ctx.settingsPages`; absent while no Settings pages face exists. */
+  openSettings?: (sectionId: string) => void
 }
 
 /**
  * Props delivered by the slot outlet: the inject face spread flat (the
  * renderer erases the share boundary at the render call).
  */
-export type ModelsSectionComponentProps = InjectFace<ModelsSectionInjected> & Pick<SettingsSectionOwnerProps, 'openSection'>
+export type ModelsSectionComponentProps = InjectFace<ModelsSectionInjected>
 
 /** Partial component face used to exercise the pre-injection render path. */
 export type ModelsSectionProps = Partial<ModelsSectionComponentProps>
@@ -180,9 +181,9 @@ export function providerCopy(template: string, target: ProviderIdentity): string
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, api, t, openSection } = props
+  const { controller, useSnapshot, api, t, openSettings } = props
   if (controller === undefined || useSnapshot === undefined || api === undefined || t === undefined) return null
-  return <Loaded injected={{ controller, useSnapshot, api, t, ...openSection === undefined ? {} : { openSection } }} />
+  return <Loaded injected={{ controller, useSnapshot, api, t, ...openSettings === undefined ? {} : { openSettings } }} />
 }
 
 function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactNode {
@@ -302,7 +303,7 @@ function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactN
             {providerCopy(t('savedProvider'), savedIdentity)}
           </p>
         )}
-      {state.namespaces.has('judgment') ? <RoutingLink openSection={injected.openSection} t={t} /> : null}
+      {state.namespaces.has('judgment') ? <RoutingLink openSettings={injected.openSettings} t={t} /> : null}
       <ul className={styles['rows']}>
         {listed.map((row) => {
           const target = targetOf(row)
@@ -596,17 +597,17 @@ function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactN
 
 /**
  * The one-line pointer to Settings › Model routing, which owns the classifier
- * switch and the judgment engine; plain text where the shell offers no navigation.
+ * switch and the judgment engine; plain text where no Settings pages face is injected.
  */
-function RoutingLink({ openSection, t }: { openSection: ((id: string) => void) | undefined; t: ModelsSectionComponentProps['t'] }): ReactNode {
+function RoutingLink({ openSettings, t }: { openSettings: ModelsSectionComponentProps['openSettings']; t: ModelsSectionComponentProps['t'] }): ReactNode {
   return (
     <p className={styles['advancedHint']}>
       {t('routingLinkLead')}
       {' '}
-      {openSection === undefined
+      {openSettings === undefined
         ? t('routingLinkTarget')
         : (
-          <button type="button" className={styles['linkButton']} onClick={() => { openSection('model-routing') }}>
+          <button type="button" className={styles['linkButton']} onClick={() => { openSettings('model-routing') }}>
             {t('routingLinkTarget')}
           </button>
         )}

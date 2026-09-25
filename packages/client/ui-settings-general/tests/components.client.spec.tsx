@@ -42,11 +42,14 @@ describe('chrome content', () => {
 })
 
 describe('GeneralSection', () => {
-  function mount() {
+  function mount(item?: string) {
     const renderSlot = vi.fn(
       ((key: string) => <div data-testid={`slot-${key}`} />) as GeneralSectionComponentProps['renderSlot'],
     )
-    const props: GeneralSectionComponentProps = { ...kit, renderSlot, close: vi.fn(), t, useItems: select => select(['language', 'appearance', 'plugin-item']) }
+    const props: GeneralSectionComponentProps = {
+      ...kit, renderSlot, close: vi.fn(), t, useItems: select => select(['language', 'appearance', 'plugin-item']),
+      ...item === undefined ? {} : { item },
+    }
     const view = render(<GeneralSection {...props} />)
     return { view, renderSlot }
   }
@@ -56,6 +59,12 @@ describe('GeneralSection', () => {
     expect(renderSlot).toHaveBeenCalledWith('settings.general.item', {}, { only: 'language' })
     expect(renderSlot).toHaveBeenCalledWith('settings.general.item', {}, { only: 'plugin-item' })
     expect(screen.getAllByTestId('slot-settings.general.item')).toHaveLength(3)
+  })
+
+  it('renders only the focused item when the shell names one', () => {
+    const { renderSlot } = mount('appearance')
+    expect(renderSlot.mock.calls).toEqual([['settings.general.item', {}, { only: 'appearance' }]])
+    expect(screen.getAllByTestId('slot-settings.general.item')).toHaveLength(1)
   })
 })
 

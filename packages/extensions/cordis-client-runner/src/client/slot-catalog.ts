@@ -1528,7 +1528,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` and `openSection` are the shell affordances a section\n * receives: `close` for flows that leave settings altogether (starting a\n * session from a section), `openSection` for a link to another page, as the\n * onboarding coordinator\'s owner share offers.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Navigate to another registered section by id; the Settings shell always supplies it. */\n  openSection?: (id: string) => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
+      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` is the one shell affordance a section receives, for flows\n * that leave settings altogether (starting a session from a section); a link\n * to another section goes through `ctx.settingsPages`, delivered as a callback\n * in the section\'s inject face.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [

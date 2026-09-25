@@ -103,16 +103,14 @@ export interface SettingsHeaderOwnerProps {
 /**
  * Owner share of a settings section entry. The shell owns page visibility
  * and navigation; a section's data arrives through its own inject faces and
- * stores. `close` and `openSection` are the shell affordances a section
- * receives: `close` for flows that leave settings altogether (starting a
- * session from a section), `openSection` for a link to another page, as the
- * onboarding coordinator's owner share offers.
+ * stores. `close` is the one shell affordance a section receives, for flows
+ * that leave settings altogether (starting a session from a section); a link
+ * to another section goes through `ctx.settingsPages`, delivered as a callback
+ * in the section's inject face.
  */
 export interface SettingsSectionOwnerProps {
   /** Return to the workspace. */
   close: () => void
-  /** Navigate to another registered section by id; the Settings shell always supplies it. */
-  openSection?: (id: string) => void
   /** Optional preference id for a focused view of a contributed item. */
   item?: string
 }
