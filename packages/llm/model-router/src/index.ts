@@ -672,6 +672,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       escalateBackScoreThreshold: config.escalateBackScoreThreshold,
       difficultyLevels: [...config.difficultyLevels],
       hold: { minSteps: config.hold.minSteps, maxSteps: config.hold.maxSteps },
+      stateMaxChars: config.state.maxChars,
     }
   }
 

@@ -694,6 +694,8 @@ export interface ModelRoutingGateView {
   difficultyLevels: string[]
   /** Streak horizon and cap, in model steps. */
   hold: { minSteps: number; maxSteps: number }
+  /** Hard cap, in characters, on the conversation state one consult sends to the judge. */
+  stateMaxChars: number
 }
 
 /** One logged decision with the position and config a drill-down renders. */

@@ -18,6 +18,7 @@ import ModelRoutingController, {
   DEFAULT_HOLD_MIN_STEPS,
   DEFAULT_JUDGMENT_DEADLINE_MS,
 } from '../src/index.ts'
+import { DEFAULT_STATE_MAX_CHARS } from '../src/config.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 import type { ModelRoutingDecision } from '../src/types.ts'
 
@@ -80,6 +81,7 @@ describe('modelRouting Remote reads', () => {
       difficulty: { entryScoreCeiling: 1 },
       escalateBack: { scoreThreshold: 1.5 },
       hold: { minSteps: 2, maxSteps: 7 },
+      state: { maxChars: 8_000 },
     })
     expect(ctx.modelRouting.gateView()).toEqual({
       downgradeThreshold: 0.8,
@@ -89,6 +91,7 @@ describe('modelRouting Remote reads', () => {
       escalateBackScoreThreshold: 1.5,
       difficultyLevels: ['easy', 'medium', 'hard'],
       hold: { minSteps: 2, maxSteps: 7 },
+      stateMaxChars: 8_000,
     })
   })
 
@@ -102,6 +105,7 @@ describe('modelRouting Remote reads', () => {
       escalateBackScoreThreshold: DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
       difficultyLevels: [...DEFAULT_DIFFICULTY_LEVELS],
       hold: { minSteps: DEFAULT_HOLD_MIN_STEPS, maxSteps: DEFAULT_HOLD_MAX_STEPS },
+      stateMaxChars: DEFAULT_STATE_MAX_CHARS,
     })
   })
 
