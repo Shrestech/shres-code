@@ -1,0 +1,74 @@
+# Keyless model-routing composition with an LLM judge: the shipping `cordis.yml`
+# spine and the router composed ON, with `judgment-llm` answering the router's
+# questions on the same loopback stub route the agent runs on. The judge is a
+# verbalized engine, so its operating point sets acceptVerbalized; without it
+# the router refuses it as engine-uncalibrated.
+
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        config:
+          baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are headless-agent, a coding assistant.
+
+            Verify your work by running the code or tests. Keep answers brief and
+            factual.
+      - insert:
+          - id: agent-default-model
+            name: '@shres-code/shres-code-agent-default-model'
+            config:
+              provider: deepseek-official
+              model: deepseek-v4-pro
+          - id: model-router
+            name: '@shres-code/shres-code-model-router'
+            config:
+              initialMode: on
+              candidates:
+                - id: flash
+                  provider: deepseek-official
+                  model: deepseek-v4-flash
+                  description: a small, well-scoped change in familiar code
+              routeFrom:
+                - provider: deepseek-official
+                  model: deepseek-v4-pro
+                  objective: dollars
+              downgradeThreshold: 0.7
+              downgradeMargin: 0.5
+              operatingPoints:
+                - engine: llm:deepseek-official/deepseek-v4-flash
+                  downgradeThreshold: 0.8
+                  downgradeMargin: 0.3
+                  acceptVerbalized: true
+              hold:
+                minSteps: 3
+              routeInstructions: Pick the cheapest route that can finish this turn.
+              difficultyInstructions: Rate how much reasoning this turn needs.
+          - id: judgment-dispatch
+            name: '@shres-code/shres-code-judgment-dispatch'
+            config:
+              defaultEngine: llm:deepseek-official/deepseek-v4-flash
+          - id: judgment-llm
+            name: '@shres-code/shres-code-judgment-llm'
+            config:
+              provider: deepseek-official
+              model: deepseek-v4-flash
+              # The stub route is on this machine; a real DeepSeek route is remote.
+              egress: local
+              maxStateTokens: 16000
+          # Installs the agent's live model selection, as in every router snapshot;
+          # its scripted engine is registered but not selected.
+          - id: model-router-snapshot-fixture
+            name: './tests/fixtures/model-router-snapshot-fixture.ts'

@@ -391,7 +391,7 @@ describe('normalizeSessionLog', () => {
     expect(out).not.toContain('999')
   })
 
-  it('zeroes a routing decision eligibilityMs and a failed call latency, keeping an answered call latency', () => {
+  it('zeroes the wall-clock eligibilityMs and latencyMs of routing records', () => {
     const failed = JSON.stringify({
       type: 'model-routing/decision', seq: 2, time: 5,
       data: { reason: 'engine-unavailable', eligibilityMs: 13, latencyMs: 1507, engineFailure: { code: 'DEADLINE' } },
@@ -405,7 +405,8 @@ describe('normalizeSessionLog', () => {
     const out = normalizeSessionLog(`${header({})}\n${failed}\n${answered}\n${other}\n${mode}\n`, ctx)
     expect(out).toContain('"data":{"active":true}')
     expect(out).toContain('"eligibilityMs":0,"latencyMs":0,"engineFailure":{"code":"DEADLINE"}')
-    expect(out).toContain('"reason":"gate-passed","eligibilityMs":0,"latencyMs":273')
+    expect(out).toContain('"reason":"gate-passed","eligibilityMs":0,"latencyMs":0')
+    expect(out).not.toContain('273')
     expect(out).not.toContain('1507')
     expect(out).toContain('"data":"not-an-object"')
   })
