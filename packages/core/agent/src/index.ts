@@ -14,6 +14,7 @@ import type { Scoped } from '@shres-code/shres-code-scope'
 import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import type { TypertContext, TypertLookup } from '@shres-code/shres-code-typert-protocol'
 import type { Agent, AgentOptions } from './runtime-types.ts'
+import { installModelSelection, modelSelectionInstalled } from './model-selection.ts'
 
 export * from './runtime-types.ts'
 export * from './types.ts'
@@ -461,7 +462,10 @@ export class AgentRegistry extends Service {
    * advanced ordered-lifecycle primitive used by the async agent factory: it
    * first completes setup while the agent is unpublished, then assigns the
    * returned detach closure into its pre-installed composite teardown before
-   * calling {@link announce}. Ordinary callers use {@link register}.
+   * calling {@link announce}. Ordinary callers use {@link register}. A root
+   * agent, one whose session header records no delegation depth, leaves with
+   * its model-selection hook installed ({@link installModelSelection}) unless
+   * setup already installed it, so every `agent/created` listener sees it.
    * @param agent - the prepared, unpublished agent.
    * @param owner - live agent whose scoped context created this agent, or
    *   undefined for a top-level runtime root. This is runtime ownership, not
@@ -480,6 +484,11 @@ export class AgentRegistry extends Service {
     // This is the authoritative collision boundary. Concurrent create/resume
     // operations may both prepare, but only one exact entry can publish.
     if (this.store.has(id)) throw new Error(`agent "${id}" is already registered`)
+    // Every root agent can be routed, whichever front end created it; a
+    // delegated child is routed only by the policy that spawned it.
+    if ((agent.session.header.delegationDepth ?? 0) === 0 && !modelSelectionInstalled(agent)) {
+      installModelSelection(agent)
+    }
     const entry: AgentEntry = {
       id,
       agent,

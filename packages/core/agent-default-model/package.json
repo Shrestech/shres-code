@@ -55,6 +55,7 @@
     "@shres-code/shres-code-scope": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   }
 }

@@ -20,7 +20,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
-import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
+import AgentRegistry, { agentEvents, modelSelectionInstalled, provideModelSelection } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import JudgmentService, {
@@ -60,7 +60,7 @@ import type {
   ModelModality,
   StreamChunk,
 } from '@shres-code/shres-code-llm'
-import SessionStore from '@shres-code/shres-code-session'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import { CommandId } from '@shres-code/shres-code-commands/brand'
@@ -756,6 +756,97 @@ describe('deployment mode and session authority', () => {
     expect(cold.events).toHaveLength(0)
     b.ctx.agents.register(agentFor(cold, b.ctx))
     expect(projectionOf(b.ctx, cold).active).toBe(true)
+  })
+})
+
+describe('adoption', () => {
+  it('adopts only root agents: a delegated child gets no routing mode and is never routed', async () => {
+    const b = await bench()
+    const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+    // A fork child is seeded with its parent's log, routing mode included, and a
+    // front end may still give it a model-selection hook.
+    const childSession = b.ctx.sessions.create(SessionId('delegated-child'), {
+      seed: b.session.events.filter(event => event.type === 'model-routing/configuration').map(event => ({ ...event })),
+      meta: { delegationDepth: 1 },
+    })
+    const child = agentFor(childSession, b.ctx)
+    provideModelSelection(child, { current: undefined, assembled: undefined })
+    b.ctx.agents.register(child)
+    expect(modelSelectionInstalled(child)).toBe(true)
+    expect(childSession.events.filter(event => event.type === 'model-routing/configuration').map(event => event.data))
+      .toEqual([{ active: true }])
+    expect(error).not.toHaveBeenCalled()
+    // A child with a hook and no seeded mode is not adopted, so it gets no mode.
+    const freshSession = b.ctx.sessions.create(SessionId('delegated-fresh'), { meta: { delegationDepth: 2 } })
+    const fresh = agentFor(freshSession, b.ctx)
+    provideModelSelection(fresh, { current: undefined, assembled: undefined })
+    b.ctx.agents.register(fresh)
+    expect(freshSession.events.filter(event => event.type === 'model-routing/configuration')).toEqual([])
+    expect(await b.ctx.modelRouting.resolveRequest(child, 1, 1, STRONG, b.signal, {
+      config: STRONG,
+      content: { messages: [], system: '', tools: [] },
+    })).toBeUndefined()
+    expect(childSession.events.filter(event => event.type === 'model-routing/decision')).toEqual([])
+    expect(b.engine.asks).toEqual([])
+    // The root agent the bench registered was adopted, with its hook.
+    expect(modelSelectionInstalled(b.agent)).toBe(true)
+    expect(b.session.events.some(event => event.type === 'model-routing/configuration')).toBe(true)
+  })
+
+  it('adopts an unreachable root once a front end gives it the hook, through /route or the consult', async () => {
+    const b = await bench({ commands: true })
+    vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+    const announce = b.ctx.emit.bind(b.ctx) as unknown as (name: string, payload: unknown) => void
+
+    // Through the command: a later provider installs the hook, and /route adopts.
+    const viaCommand = agentFor(b.ctx.sessions.create(), b.ctx)
+    announce('agent/created', { agent: viaCommand })
+    provideModelSelection(viaCommand, { current: undefined, assembled: undefined })
+    const status = await b.ctx.commands.execute(viaCommand, '/route', b.signal)
+    expect(status?.result).toEqual({ kind: 'success', text: 'Routing is on.' })
+    expect(viaCommand.session.events.filter(event => event.type === 'model-routing/configuration').map(event => event.data))
+      .toEqual([{ active: true }])
+
+    // Through the consult: the hook's first request adopts the agent and routes it.
+    const viaConsult = agentFor(b.ctx.sessions.create(), b.ctx)
+    announce('agent/created', { agent: viaConsult })
+    provideModelSelection(viaConsult, { current: undefined, assembled: undefined })
+    user(viaConsult.session, 'a small change')
+    const routed = await b.ctx.modelRouting.resolveRequest(viaConsult, 1, 1, STRONG, b.signal, {
+      config: STRONG,
+      content: { messages: viaConsult.session.deriveMessages(), system: '', tools: [] },
+    })
+    expect(routed).toEqual(CHEAP)
+    expect(viaConsult.session.events.filter(event => event.type === 'model-routing/decision')).toHaveLength(1)
+  })
+
+  it('adopts a user fork, which records a parent session but no delegation depth', async () => {
+    const b = await bench()
+    const forkSession = b.ctx.sessions.create(SessionId('user-fork'), { meta: { parentSession: b.session.id } })
+    const fork = agentFor(forkSession, b.ctx)
+    b.ctx.agents.register(fork)
+    expect(modelSelectionInstalled(fork)).toBe(true)
+    expect(forkSession.events.filter(event => event.type === 'model-routing/configuration').map(event => event.data))
+      .toEqual([{ active: true }])
+  })
+
+  it('reports a root agent without a model-selection hook once, records no mode for it, and says so on /route', async () => {
+    const b = await bench({ commands: true })
+    const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+    const session = b.ctx.sessions.create()
+    const unhooked = agentFor(session, b.ctx)
+    // A registry that did not install the hook announces the agent anyway.
+    const announce = b.ctx.emit.bind(b.ctx) as unknown as (name: string, payload: unknown) => void
+    announce('agent/created', { agent: unhooked })
+    announce('agent/created', { agent: unhooked })
+    const reports = error.mock.calls.filter(call => String(call[0]).startsWith('model-router: agent'))
+    expect(reports.map(call => String(call[1]))).toEqual([String(unhooked.id)])
+    expect(session.events.filter(event => event.type === 'model-routing/configuration')).toEqual([])
+    for (const line of ['/route', '/route status', '/route on']) {
+      const execution = await b.ctx.commands.execute(unhooked, line, b.signal)
+      expect(execution?.result).toEqual({ kind: 'success', text: 'Routing can\'t run for this agent: it has no model-selection hook.' })
+    }
+    expect(session.events.filter(event => event.type === 'model-routing/configuration')).toEqual([])
   })
 })
 
