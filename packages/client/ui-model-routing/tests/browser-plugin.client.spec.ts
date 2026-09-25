@@ -30,6 +30,7 @@ import { apply as nodeApply } from '../src/index.ts'
 
 const SID = 's-routing' as SessionId
 const CHILD = 's-routing-child' as SessionId
+const SEAT = 's-routing-seat' as SessionId
 
 const STRONG = { provider: 'deepseek', model: 'deepseek-v4.1' }
 
@@ -80,6 +81,8 @@ async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {
   ctx.provide('sessions', {
     subagentAddress: (id: SessionId): SubagentAddress | undefined =>
       id === CHILD ? { parentSessionId: SID, childSessionId: CHILD, mode: 'continuable' } : undefined,
+    // A Team seat: delegated, reached through no subagent address.
+    list: { getSnapshot: () => ({ byId: { [SEAT]: { origin: 'subagent' } } }), subscribe: () => () => {} },
   })
   const select = vi.fn((_selection: { provider: string; model: string }) => Promise.resolve())
   if (options.directories !== false) {
@@ -114,7 +117,7 @@ describe('ui-model-routing browser apply', () => {
     ctx.provide('remote.judgmentEngines', enginesRemote)
     ctx.provide('settingsScope', { bind: routerScope('ready').bind })
     ctx.provide('locale', new LocaleRuntime(ctx))
-    ctx.provide('sessions', { subagentAddress: () => undefined })
+    ctx.provide('sessions', { subagentAddress: () => undefined, list: { getSnapshot: () => ({ byId: {} }), subscribe: () => () => {} } })
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     expect(ctx.slots.entries('conversation.input.modelRouting')).toHaveLength(0)
@@ -154,6 +157,8 @@ describe('ui-model-routing browser apply', () => {
 
     // An addressed subagent session gets no Agent-bound command channel.
     expect(seat(CHILD).available).toBe(false)
+    // A Team seat is a delegated child the router does not adopt.
+    expect(seat(SEAT).available).toBe(false)
 
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.modelRouting')).toHaveLength(0)
@@ -173,6 +178,7 @@ describe('ui-model-routing browser apply', () => {
     const face = entry.inject as unknown as (id: SessionId) => RoutingViewInjected
     expect(face(SID).available).toBe(true)
     expect(face(CHILD).available).toBe(false)
+    expect(face(SEAT).available).toBe(false)
     await expect(face(SID).loadDecision(1037)).resolves.toEqual({ seq: 1037 })
     expect(b.routingRemote.decision).toHaveBeenCalledWith(SID, 1037)
     await expect(face(SID).loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })

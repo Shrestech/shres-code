@@ -143,6 +143,12 @@ export const inject = [
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  // The router adopts root agents only. A delegated child (a subagent or a
+  // Team seat) is recorded with origin `subagent`, as every session whose
+  // delegation depth is above zero is; one reached by address counts too.
+  const routable = (sessionId: SessionId): boolean =>
+    ctx.sessions.subagentAddress(sessionId) === undefined
+    && ctx.sessions.list.getSnapshot().byId[sessionId]?.origin !== 'subagent'
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-model-routing: dictionaries')
   // Registration-time text (the view's label in the Activity popover) reads
   // through the bound translate as a thunk, so it follows the active locale.
@@ -184,7 +190,7 @@ export function apply(ctx: ClientContext): void {
           locale: NS,
           label: () => t('view.routing'),
           inject: (sessionId: SessionId): RoutingViewInjected => ({
-            available: ctx.sessions.subagentAddress(sessionId) === undefined,
+            available: routable(sessionId),
             loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
             loadGate,
             hooks: { routerSettings: routerScope, routingEngine },
@@ -207,7 +213,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.input.modelRouting',
     locale: NS,
     inject: (sessionId: SessionId): RoutingChipInjected => ({
-      available: ctx.sessions.subagentAddress(sessionId) === undefined,
+      available: routable(sessionId),
       // Failure strings stay English (error-surface policy: not localized).
       setRouting: async (next) => {
         const line = next ? '/route on' : '/route off'
