@@ -701,7 +701,23 @@ describe('a root agent no front end provided a model selection for', () => {
     const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
     expect(decisions.map(event => event.data.reason)).toEqual(['gate-passed', 'hold-cap', 'current-preferred'])
     expect([requestedModel(0), requestedModel(1), requestedModel(2)]).toEqual([CANDIDATE_MODEL, MANUAL_MODEL, MANUAL_MODEL])
-    expect(bases()).toEqual([MANUAL, MANUAL, MANUAL])
+    const recordedBases = bases()
+
+    // The return keeps the creation route's effective effort, not merely its
+    // model: compare with an agent that never routed, whose first request runs
+    // the creation route as the adapter resolves it.
+    const returned = eventsOfType(agent.session.events, 'request/header')
+      .map(event => event.data.header.config)
+      .find(config => config.model === MANUAL_MODEL)
+    const control = createAgent(loaded, 'router-empty-source-cap-control')
+    const off = await loaded.commands.execute(control, `/${ROUTE_COMMAND} off`, new AbortController().signal)
+    expect(off?.result.kind).toBe('success')
+    await turn(control, 'Unrouted turn.')
+    const creation = eventsOfType(control.session.events, 'request/header').at(-1)?.data.header.config
+    expect(creation?.model).toBe(MANUAL_MODEL)
+    expect(creation?.reasoningEffort).toBeDefined()
+    expect(returned?.reasoningEffort).toBe(creation?.reasoningEffort)
+    expect(recordedBases).toEqual([MANUAL, MANUAL, MANUAL])
   })
 
   it('runs the creation route after /route off ends a streak, with the routed header still last', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
