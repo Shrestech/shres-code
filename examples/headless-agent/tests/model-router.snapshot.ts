@@ -343,6 +343,50 @@ describe('headless model-routing snapshots', () => {
     }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
+  it('routes on an LLM judge accepted through its operating point', async () => {
+    // One judge request, answered by the judgment_answer tool call, then the
+    // agent's own request on the routed candidate.
+    const server = await startMockLlmServer({
+      sequence: ['tool_call_success', 'success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+      toolName: 'judgment_answer',
+      toolArguments: JSON.stringify({
+        answers: {
+          'model-route': { 'keep-current': 0.005, flash: 0.995 },
+          'turn-difficulty': { 0: 0.9, 1: 0.1, 2: 0, 3: 0, 4: 0 },
+        },
+      }),
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-llm-judge.cordis.snapshot.yml'),
+        promptFixture: 'model-router-llm-judge',
+      }, server)
+      await expectArmFixtures('model-router-llm-judge', output)
+
+      const decision = eventRecords(output.stream).map(eventOf).find(event => event['type'] === 'model-routing/decision')
+      expect(decision?.['data']).toMatchObject({
+        outcome: 'downgraded',
+        reason: 'gate-passed',
+        engine: 'llm',
+        model: 'deepseek-v4-flash',
+        engineId: 'llm:deepseek-official/deepseek-v4-flash',
+        selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        thresholds: { downgradeThreshold: 0.8, downgradeMargin: 0.3, source: 'operating-point' },
+      })
+      // The judge asked with the answer tool on its own route; the agent then ran the candidate.
+      expect(server.requests).toHaveLength(2)
+      const judgeBody = server.requests[0]?.body as { model?: unknown; tools?: { function?: { name?: unknown } }[] }
+      expect(judgeBody.model).toBe('deepseek-v4-flash')
+      expect(judgeBody.tools?.map(tool => tool.function?.name)).toEqual(['judgment_answer'])
+      expect(requestedModel(server, 1)).toBe('deepseek-v4-flash')
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('rejudges a tool continuation and returns to the strong model for hard evidence', async () => {
     const evidence = 'Distributed transaction deadlock across services.'
     const server = await startMockLlmServer({

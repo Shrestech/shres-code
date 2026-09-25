@@ -74,12 +74,13 @@ const WINDOW = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/
 /**
  * @typedef {object} JudgmentRecord - one routing judgment record.
  * @property {JudgmentKind} kind
- * @property {string | null} engine
+ * @property {string | null} engine - the answering engine's name, else the registry id a failed call was routed to.
+ * @property {string | null} engineId - the registry id the dispatcher routed the call to.
  * @property {string | null} model
  * @property {number | null} latencyMs
  * @property {number | null} eligibilityMs
  * @property {boolean} awaited - the consult sat on the request's critical path.
- * @property {CallUsage | null} usage - the judge's own usage, when the record carries one.
+ * @property {CallUsage | null} usage - the judge's own usage (`judgeUsage`, or a pre-8b `usage`), when the record carries one.
  * @property {number | null} time - event timestamp (epoch ms).
  */
 
@@ -345,14 +346,17 @@ export function foldSessionAccounting(text) {
       })
     } else if (Object.hasOwn(JUDGMENT_KINDS, type)) {
       const kind = JUDGMENT_KINDS[/** @type {keyof typeof JUDGMENT_KINDS} */ (type)]
+      const engineId = stringOrNull(data.engineId)
       judgments.push({
         kind,
-        engine: stringOrNull(data.engine),
+        // A failed call names no answering engine, only the registry id it was routed to.
+        engine: stringOrNull(data.engine) ?? engineId,
+        engineId,
         model: stringOrNull(data.model),
         latencyMs: finiteOrNull(data.latencyMs),
         eligibilityMs: finiteOrNull(data.eligibilityMs),
         awaited: typeof data.awaited === 'boolean' ? data.awaited : kind !== 'shadow-decision',
-        usage: readUsage(data.usage),
+        usage: readUsage(data.judgeUsage ?? data.usage),
         time,
       })
     }

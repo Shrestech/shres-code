@@ -57,6 +57,12 @@ export interface ModelRoutingJudgmentFailures {
   readonly count: number
   /** Turn of the latest failed judgment call. */
   readonly turn: number
+  /**
+   * Registry id of the engine the counted calls were routed to; absent when a
+   * single-engine service answered or the log predates the field. A failure
+   * routed to another engine starts a new count.
+   */
+  readonly engineId?: string
 }
 
 /** Decision reasons that record a judgment call that failed. */
@@ -442,12 +448,38 @@ export function advanceStickyFoldState(
  * @returns the accumulator with the judgment-failure count applied.
  */
 function countJudgment(state: ModelRoutingStickyFoldState, decision: ModelRoutingDecision): ModelRoutingStickyFoldState {
-  if (FAILED_JUDGMENT_REASONS.has(decision.reason)) {
-    return { ...state, judgmentFailures: { count: (state.judgmentFailures?.count ?? 0) + 1, turn: state.currentTurn } }
+  // An engine that is still becoming ready has not failed.
+  if (FAILED_JUDGMENT_REASONS.has(decision.reason) && decision.engineFailure?.engineState === undefined) {
+    const previous = judgmentFailuresFor(state.judgmentFailures, decision.engineId)
+    const engineId = decision.engineId ?? previous?.engineId
+    return {
+      ...state,
+      judgmentFailures: {
+        count: (previous?.count ?? 0) + 1,
+        turn: state.currentTurn,
+        ...engineId === undefined ? {} : { engineId },
+      },
+    }
   }
   if (decision.route === undefined || state.judgmentFailures === undefined) return state
   const { judgmentFailures: _failures, ...answered } = state
   return answered
+}
+
+/**
+ * The counted judgment failures that apply to one engine. Failures routed to
+ * another engine do not count against it, so a switch starts from none; a
+ * count or an engine without an id matches any.
+ * @param failures - the fold's counted failures.
+ * @param engineId - the engine about to be asked or that just failed.
+ * @returns the failures that apply, or undefined.
+ */
+export function judgmentFailuresFor(
+  failures: ModelRoutingJudgmentFailures | undefined,
+  engineId: string | undefined,
+): ModelRoutingJudgmentFailures | undefined {
+  if (failures === undefined || engineId === undefined || failures.engineId === undefined) return failures
+  return failures.engineId === engineId ? failures : undefined
 }
 
 /**

@@ -1071,6 +1071,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'fittingFor(_consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined',
+        description: 'The fitting capability that answers one consumer\'s fitted asks. A dispatcher answers with the engine it selects for `consumer`, so a consumer that names itself reads its fitting here rather than from fitting, which follows the deployment-wide selection. A single-engine implementation answers every consumer with fitting.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the fitting capability, or `undefined` when the engine answering this consumer has none.',
+      },
+      {
+        signature: 'selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined',
+        description: 'The registry id of the engine that answers one consumer\'s asks, read before an ask so a consumer can attribute its own state to an engine. A single-engine implementation selects nothing and returns `undefined`.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the selected registry id, or `undefined` when this service does not select engines.',
+      },
+      {
         signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
         description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id. An implementation must honour `input.signal` at every await, settling promptly with `ABORTED` once it aborts: a consumer\'s deadline bounds the answer it uses, but bounds its wait only when the engine aborts.',
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
@@ -4605,6 +4617,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
   },
   {
+    name: 'ModelRoutingOperatingPoint',
+    declaration: 'export interface ModelRoutingOperatingPoint {\n    readonly engine: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly calibratedBy?: string;\n    readonly acceptVerbalized: boolean;\n}',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
   },
@@ -4778,7 +4794,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
   },
   {
     name: 'ResolvedModelRoutingState',
