@@ -189,7 +189,12 @@ export function apply(ctx: Context): void {
    */
   const sessionReveal = (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ((request: InspectRequest) => void) => {
     const reveal = createReveal(actions)
+    const tracked = reveals.has(sessionId)
     reveals.set(sessionId, reveal)
+    // The entry leaves with the session's scope, so a closed session keeps none.
+    if (!tracked) {
+      sessions.binding(sessionId)?.ctx.effect(() => () => { reveals.delete(sessionId) }, 'ui-conversation: session reveal')
+    }
     return reveal
   }
 

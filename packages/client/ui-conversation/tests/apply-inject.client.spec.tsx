@@ -416,6 +416,19 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('drops a session\'s reveal with its scope', async () => {
+    const b = await bench()
+    const { instance } = b.conversationApi(ROOT)
+    const reveal = b.composerApi(ROOT).reveal!
+    // A later mount of the same session re-records its reveal on the one scope.
+    b.conversationApi(ROOT)
+    await b.runtime.sessions.remove(ROOT)
+    instance.actions.setView('chat')
+    reveal({ view: 'routing', target: { kind: 'none' } })
+    expect(instance.store.getSnapshot().view).toBe('chat')
+    await b.runtime.dispose()
+  })
+
   it('inspectCall (chat view face) reveals the call in the Trajectory view', async () => {
     const b = await bench()
     const { instance, injected } = b.chatViewApi(ROOT)
