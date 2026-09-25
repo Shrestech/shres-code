@@ -94,7 +94,7 @@ export function routingVerdict(
     if (top !== undefined) parts.push(t('verdict.top', { reason: top.reason, count: top.count }))
   } else {
     const served = stats.models.filter(model => model.role === 'candidate' && model.steps > 0).map(model => model.model)
-    headline = t('verdict.served', {
+    headline = t(counts.streaks === 1 ? 'verdict.served.one' : 'verdict.served', {
       share: formatPercent(counts.downgradedSteps / counts.steps),
       models: served.join(', '),
       streaks: counts.streaks,
@@ -154,7 +154,7 @@ export function routingKpis(
       id: 'pool-steps',
       label: t('kpi.pool'),
       value: formatPercent(counts.steps === 0 ? 0 : counts.downgradedSteps / counts.steps),
-      detail: t('kpi.pool.detail', { steps: counts.downgradedSteps, total: counts.steps, streaks: counts.streaks }),
+      detail: t(counts.streaks === 1 ? 'kpi.pool.detail.one' : 'kpi.pool.detail', { steps: counts.downgradedSteps, total: counts.steps, streaks: counts.streaks }),
     },
     {
       id: 'kept-strong',

@@ -79,6 +79,10 @@ describe('routingVerdict', () => {
   it('states the served share for an active session', () => {
     expect(routingVerdict(activeStats(), GATE, true, t)?.headline)
       .toBe('Routing served 38.0% of steps on deepseek-v4.1-flash, kimi-k3 across 6 streaks.')
+    const one = { ...activeStats(), counts: { ...activeStats().counts, streaks: 1 } }
+    expect(routingVerdict(one, GATE, true, t)?.headline)
+      .toBe('Routing served 38.0% of steps on deepseek-v4.1-flash, kimi-k3 in one streak.')
+    expect(routingKpis(one, GATE, undefined, t).find(tile => tile.id === 'pool-steps')?.detail).toBe('38 of 100 steps · 1 streak')
   })
 })
 

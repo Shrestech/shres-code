@@ -35,6 +35,7 @@ export const en = {
   'verdict.best.threshold': 'The best candidate reached {best} confidence; switching requires {threshold}.',
   'verdict.top': 'Most kept-strong decisions were "{reason}" ({count}).',
   'verdict.served': 'Routing served {share} of steps on {models} across {streaks} streaks.',
+  'verdict.served.one': 'Routing served {share} of steps on {models} in one streak.',
   'verdict.off': 'Routing is Off for this session now; these are the decisions it made while it was On.',
 
   'kpi.none': '—',
@@ -42,6 +43,7 @@ export const en = {
   'kpi.decisions.detail': '{consults} judged · {failed} failed',
   'kpi.pool': 'Steps on pool models',
   'kpi.pool.detail': '{steps} of {total} steps · {streaks} streaks',
+  'kpi.pool.detail.one': '{steps} of {total} steps · 1 streak',
   'kpi.kept': 'Kept strong',
   'kpi.kept.detail': 'top: {reason} ({count})',
   'kpi.routeFailed': 'Route-failed retries',
