@@ -793,6 +793,33 @@ describe('adoption', () => {
     expect(b.session.events.some(event => event.type === 'model-routing/configuration')).toBe(true)
   })
 
+  it('adopts an unreachable root once a front end gives it the hook, through /route or the consult', async () => {
+    const b = await bench({ commands: true })
+    vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+    const announce = b.ctx.emit.bind(b.ctx) as unknown as (name: string, payload: unknown) => void
+
+    // Through the command: a later provider installs the hook, and /route adopts.
+    const viaCommand = agentFor(b.ctx.sessions.create(), b.ctx)
+    announce('agent/created', { agent: viaCommand })
+    provideModelSelection(viaCommand, { current: undefined, assembled: undefined })
+    const status = await b.ctx.commands.execute(viaCommand, '/route', b.signal)
+    expect(status?.result).toEqual({ kind: 'success', text: 'Routing is on.' })
+    expect(viaCommand.session.events.filter(event => event.type === 'model-routing/configuration').map(event => event.data))
+      .toEqual([{ active: true }])
+
+    // Through the consult: the hook's first request adopts the agent and routes it.
+    const viaConsult = agentFor(b.ctx.sessions.create(), b.ctx)
+    announce('agent/created', { agent: viaConsult })
+    provideModelSelection(viaConsult, { current: undefined, assembled: undefined })
+    user(viaConsult.session, 'a small change')
+    const routed = await b.ctx.modelRouting.resolveRequest(viaConsult, 1, 1, STRONG, b.signal, {
+      config: STRONG,
+      content: { messages: viaConsult.session.deriveMessages(), system: '', tools: [] },
+    })
+    expect(routed).toEqual(CHEAP)
+    expect(viaConsult.session.events.filter(event => event.type === 'model-routing/decision')).toHaveLength(1)
+  })
+
   it('adopts a user fork, which records a parent session but no delegation depth', async () => {
     const b = await bench()
     const forkSession = b.ctx.sessions.create(SessionId('user-fork'), { meta: { parentSession: b.session.id } })

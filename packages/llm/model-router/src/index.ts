@@ -497,7 +497,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private readonly pins = new WeakMap<Session, PinnedDecision>()
   private readonly pendingIntents = new WeakMap<Session, PendingMode>()
   private readonly liveAgents = new Set<Agent>()
-  /** Root agents this controller could not adopt because they carry no model-selection hook. */
+  /** Root agents this controller has not adopted because they carried no model-selection hook when announced. */
   private readonly unreachable = new WeakSet<Agent>()
 
   /**
@@ -751,6 +751,18 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.reconcileConfiguration(agent.session)
   }
 
+  /**
+   * Adopt a root agent reported unreachable once it carries the hook, which a
+   * front end providing its selection later installs. Its routing mode is
+   * committed then, or at the next accepted pre-step while a turn is open.
+   */
+  private adoptIfReachable(agent: Agent): void {
+    if (!this.unreachable.has(agent) || !modelSelectionInstalled(agent)) return
+    this.unreachable.delete(agent)
+    this.liveAgents.add(agent)
+    this.reconcileConfiguration(agent.session)
+  }
+
   /** Resolve service ownership through the agent's current isolation realm. */
   private ownsAgent(agent: Agent): boolean {
     const service = agent.ctx.get('modelRouting') as (ModelRoutingController & {
@@ -900,6 +912,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // A delegated child is routed only by the policy that spawned it, even
     // when a front end gave it a model-selection hook.
     if (delegatedChild(agent)) return undefined
+    // Only the hook calls the consult, so an agent reported unreachable has it now.
+    this.adoptIfReachable(agent)
     const session = agent.session
     const active = this.modeOf(session)
     const pinned = this.pins.get(session)
@@ -1514,6 +1528,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private runCommand(agent: Agent, rawInput: string): { kind: 'success'; text: string } {
     const args = rawInput.trim()
     const config = this.config()
+    this.adoptIfReachable(agent)
     if (this.unreachable.has(agent)) {
       return { kind: 'success', text: 'Routing can\'t run for this agent: it has no model-selection hook.' }
     }

@@ -7084,6 +7084,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 1.3.0
+        version: 1.3.0(zod@4.4.3)
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
@@ -7093,6 +7096,9 @@ importers:
       '@shres-code/cordis-plugin-loader':
         specifier: workspace:^
         version: link:../../../vendor/loader
+      '@shres-code/shres-code-acp':
+        specifier: workspace:^
+        version: link:../../acp/acp
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent

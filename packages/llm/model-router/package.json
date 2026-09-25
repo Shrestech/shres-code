@@ -67,6 +67,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "1.3.0",
+    "@shres-code/shres-code-acp": "workspace:^",
     "@shres-code/shres-code-agent": "workspace:^",
     "@shres-code/shres-code-agent-loop": "workspace:^",
     "@shres-code/shres-code-agent-default-model": "workspace:^",

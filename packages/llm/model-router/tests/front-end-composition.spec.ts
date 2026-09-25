@@ -4,7 +4,10 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import type { Stream } from '@agentclientprotocol/sdk'
 import { Context } from '@shres-code/cordis'
+import * as AcpServer from '@shres-code/shres-code-acp'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
 import AgentRegistry from '@shres-code/shres-code-agent'
@@ -24,14 +27,14 @@ import { FakeJudgment, SCRIPTED_CANDIDATE } from './fake-judgment-provider.ts'
 /**
  * REAL Loader compositions of front ends that provide no model selection of
  * their own: the JSON-RPC server, which creates each session's agent on its
- * first prompt, and an agent the agent loop pre-creates from its `agents`
- * config. Neither composes `agent-default-model` nor calls `selectionFor`; the
+ * first prompt, the ACP server, which creates it on `session/new`, and an
+ * agent the agent loop pre-creates from its `agents` config. Neither composes `agent-default-model` nor calls `selectionFor`; the
  * agent registry's model-selection hook is what reaches the router, so each
  * records a routing decision and runs the routed candidate.
  *
  * TEST DOUBLES: the loopback stub model server and the scripted judgment
- * engine. The JSON-RPC server's stdio is an in-memory stream pair, as its own
- * plugin tests use.
+ * engine. The JSON-RPC and ACP servers run over in-memory streams, as their
+ * own plugin tests do.
  */
 
 const PROVIDER = 'deepseek-official'
@@ -73,7 +76,7 @@ interface Wire {
  * @param wire - the JSON-RPC server's stdio, when the composition mounts it.
  * @returns the loaded root context.
  */
-async function boot(agentLoopAgents: readonly string[], wire?: Wire): Promise<Context> {
+async function boot(agentLoopAgents: readonly string[], wire?: Wire, acpStream?: Stream): Promise<Context> {
   server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
   root = await mkdtemp(join(tmpdir(), 'shres-model-router-front-end-'))
   const configPath = join(root, 'cordis.yml')
@@ -103,6 +106,7 @@ async function boot(agentLoopAgents: readonly string[], wire?: Wire): Promise<Co
     '    routeInstructions: Pick the cheapest route that can finish this turn.',
     '    difficultyInstructions: Rate how much reasoning this turn needs.',
     ...wire === undefined ? [] : ["- name: '@test/jsonrpc'"],
+    ...acpStream === undefined ? [] : ["- name: '@test/acp'", '  config:', `    provider: ${PROVIDER}`, `    model: ${MANUAL_MODEL}`],
     '',
   ].join('\n'))
   const modules = new Map<string, unknown>([
@@ -121,6 +125,14 @@ async function boot(agentLoopAgents: readonly string[], wire?: Wire): Promise<Co
       apply: (ctx: Context, config: JsonRpcServer.JsonRpcConfig) => {
         if (wire === undefined) throw new Error('the JSON-RPC row needs the in-memory stdio')
         JsonRpcServer.apply(ctx, { ...config, input: wire.input, output: wire.output, exit: () => undefined })
+      },
+    }],
+    // The shipped ACP plugin, handed its in-memory transport through its runtime-only config field.
+    ['@test/acp', {
+      ...AcpServer,
+      apply: (ctx: Context, config: AcpServer.AcpConfig) => {
+        if (acpStream === undefined) throw new Error('the ACP row needs the in-memory transport')
+        AcpServer.apply(ctx, { ...config, stream: acpStream })
       },
     }],
   ])
@@ -182,6 +194,25 @@ describe('front ends that provide no model selection reach the router', () => {
       && (frame['params'] as { status?: string } | undefined)?.status === 'idle'), 'idle status')
     const agent = ctx.agents.list().find(candidate => String(candidate.id) === 'rpc')
     if (agent === undefined) throw new Error('the JSON-RPC session has no live agent')
+    expect(decisions(agent)).toMatchObject([{ outcome: 'downgraded', reason: 'gate-passed' }])
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+  })
+
+  it('routes an ACP session created by session/new', { timeout: TIMEOUT_MS }, async () => {
+    const agentToClient = new TransformStream<Uint8Array, Uint8Array>()
+    const clientToAgent = new TransformStream<Uint8Array, Uint8Array>()
+    const ctx = await boot([], undefined, ndJsonStream(agentToClient.writable, clientToAgent.readable))
+    // oxlint-disable-next-line typescript/no-deprecated -- the client the ACP package's own test harness drives
+    const client = new ClientSideConnection(() => ({
+      sessionUpdate: () => Promise.resolve(),
+      requestPermission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
+    }), ndJsonStream(clientToAgent.writable, agentToClient.readable))
+    await client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const { sessionId } = await client.newSession({ cwd: root ?? process.cwd(), mcpServers: [] })
+    const response = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'a small change' }] })
+    expect(response.stopReason).toBe('end_turn')
+    const agent = ctx.agents.list().find(candidate => String(candidate.id) === sessionId)
+    if (agent === undefined) throw new Error('the ACP session has no live agent')
     expect(decisions(agent)).toMatchObject([{ outcome: 'downgraded', reason: 'gate-passed' }])
     expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
   })
