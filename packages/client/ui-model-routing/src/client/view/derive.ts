@@ -593,6 +593,33 @@ export function judgeTrouble(judge: RoutingJudge, t: RoutingTranslate): string |
 }
 
 /**
+ * Whether the router refuses the judge: an engine whose calibration is only
+ * verbalized is never asked unless its operating point accepts it, which is
+ * the router's own rule.
+ * @param judge - the resolved judge.
+ * @param gate - the configured gate, or null while it loads.
+ * @returns true or false, or undefined while the gate is needed and not loaded.
+ */
+export function judgeRefused(judge: RoutingJudge, gate: ModelRoutingGateView | null): boolean | undefined {
+  if (judge.kind !== 'engine' || judge.engine.calibration !== 'verbalized') return false
+  if (gate === null) return undefined
+  const id = String(judge.engine.id)
+  return gate.operatingPoints.find(point => point.engine === id)?.acceptVerbalized !== true
+}
+
+/**
+ * The notice for a judge the router refuses, which is never asked.
+ * @param judge - the resolved judge.
+ * @param gate - the configured gate, or null while it loads.
+ * @param t - the view's translate.
+ * @returns the notice, or undefined when the router asks the judge or the gate is not loaded.
+ */
+export function judgeNotUsed(judge: RoutingJudge, gate: ModelRoutingGateView | null, t: RoutingTranslate): string | undefined {
+  if (judge.kind !== 'engine' || judgeRefused(judge, gate) !== true) return undefined
+  return t('judge.notUsed', { name: judge.engine.label })
+}
+
+/**
  * The warning shown while routing is on and the judge sends conversation
  * state off this machine.
  * @param judge - the resolved judge.
@@ -608,6 +635,8 @@ export function egressWarning(
   t: RoutingTranslate,
 ): string | undefined {
   if (!active || judge.kind !== 'engine' || judge.engine.egress !== 'remote') return undefined
+  // A refused judge is never asked, and a verbalized one needs the gate to tell.
+  if (judgeRefused(judge, gate) !== false) return undefined
   const destination = judge.engine.destination ?? judge.engine.label
   return gate === null
     ? t('egress.warning', { destination })

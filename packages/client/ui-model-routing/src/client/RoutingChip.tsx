@@ -6,8 +6,9 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-co
 // seat and its {locked} owner share).
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting` SessionProjectionMap merge for useProjection.
-import type {} from '@shres-code/shres-code-model-router/client'
+import type { ModelRoutingGateView } from '@shres-code/shres-code-model-router/client'
 import { routingJudge, type RoutingJudge } from './engine-source.ts'
+import { judgeRefused } from './view/derive.ts'
 import type { RoutingChipInjected } from './index.ts'
 import css from './RoutingChip.module.css'
 
@@ -47,7 +48,7 @@ export function RoutingChip({
   const routing = useProjection('modelRouting')
   const engineState = useRoutingEngine(state => state)
   const [confirm, setConfirm] = useState<Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }> | null>(null)
-  const [stateMaxChars, setStateMaxChars] = useState<number | null>(null)
+  const [confirmGate, setConfirmGate] = useState<ModelRoutingGateView | null>(null)
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
@@ -109,9 +110,9 @@ export function RoutingChip({
             return
           }
           setConfirm(judge)
-          setStateMaxChars(null)
+          setConfirmGate(null)
           loadGate().then((gate) => {
-            if (aliveRef.current) setStateMaxChars(gate.stateMaxChars)
+            if (aliveRef.current) setConfirmGate(gate)
           }, () => {
             // Without the cap the confirm names the destination alone; the
             // gesture stays available, so nothing else needs the failure.
@@ -172,7 +173,7 @@ export function RoutingChip({
             </span>
           )}
         >
-          <p className={css.confirmWarning}>{confirmWarning(confirm, stateMaxChars, t)}</p>
+          <p className={css.confirmWarning}>{confirmWarning(confirm, confirmGate, t)}</p>
         </Modal>
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
@@ -185,20 +186,22 @@ export function RoutingChip({
 
 /**
  * The confirm's warning: where the judge sends conversation state, with the
- * per-consult character cap once the gate has loaded.
+ * per-consult character cap once the gate has loaded, or that the router
+ * refuses the judge and so sends nothing.
  * @param judge - the judge the confirm was opened for.
- * @param stateMaxChars - the per-consult cap, or null until it loads.
+ * @param gate - the configured gate, or null until it loads.
  * @param t - the chip's translate.
  * @returns the warning sentence.
  */
 function confirmWarning(
   judge: Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }>,
-  stateMaxChars: number | null,
+  gate: ModelRoutingGateView | null,
   t: RoutingChipProps['t'],
 ): string {
   if (judge.kind !== 'engine') return t('confirm.unknown')
+  if (judgeRefused(judge, gate) === true) return t('confirm.refused')
   const destination = judge.engine.destination ?? judge.engine.label
-  return stateMaxChars === null
+  return gate === null
     ? t('confirm.warning', { destination })
-    : t('confirm.warning.chars', { destination, chars: stateMaxChars.toLocaleString('en-US') })
+    : t('confirm.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
 }

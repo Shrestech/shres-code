@@ -36,9 +36,10 @@ const PROMPT = 'Inspect the supplied evidence with the bash tool, then answer br
 /**
  * The host composition row the shipped Web surface lacks: the model router,
  * named by its built entry because the product install anchor does not list
- * it. Its configuration mirrors the recording's.
+ * it. Its configuration mirrors the recording's; `extra` appends router config
+ * lines at the config's indentation.
  */
-const OVERLAY = (router: string) => `- insert:
+const OVERLAY = (router: string, extra = '') => `- insert:
     - id: model-router
       name: '${router}'
       config:
@@ -58,6 +59,21 @@ const OVERLAY = (router: string) => `- insert:
           minSteps: 3
         routeInstructions: Pick the cheapest route that can finish this turn.
         difficultyInstructions: Rate how much reasoning this turn needs.
+${extra}`
+
+/**
+ * Operating points accepting both LLM judges' verbalized confidence: without
+ * them the router refuses a verbalized engine and never sends it state.
+ */
+const ACCEPT_JUDGES = `        operatingPoints:
+          - engine: '${LOCAL_JUDGE}'
+            downgradeThreshold: 0.7
+            downgradeMargin: 0.5
+            acceptVerbalized: true
+          - engine: '${REMOTE_JUDGE}'
+            downgradeThreshold: 0.7
+            downgradeMargin: 0.5
+            acceptVerbalized: true
 `
 
 /**
@@ -191,7 +207,7 @@ describe('web e2e: the Routing view follows a judge switch', () => {
   beforeAll(async () => {
     overlayDir = await mkdtemp(join(tmpdir(), 'shres-routing-judges-'))
     const overlay = join(overlayDir, 'routing-judges.overlay.yml')
-    await writeFile(overlay, OVERLAY(ROUTER) + JUDGES)
+    await writeFile(overlay, OVERLAY(ROUTER, ACCEPT_JUDGES) + JUDGES)
     scaffold = await launchWebScaffold({ extraOverlayPath: overlay })
     await seedSession(scaffold, await readFile(SEED, 'utf8'), SEED_ID)
     browser = await chromium.launch()

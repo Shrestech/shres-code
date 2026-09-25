@@ -9,7 +9,8 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeSegment, judgeTrouble,
+  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, gatePath, judgeNotUsed, judgeRefused,
+  judgeSegment, judgeTrouble,
   latencyScopeNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
@@ -362,5 +363,30 @@ describe('judge facts', () => {
     expect(egressWarning(remote, false, GATE, t)).toBeUndefined()
     expect(egressWarning(JUDGE, true, GATE, t)).toBeUndefined()
     expect(egressWarning({ kind: 'loading' }, true, GATE, t)).toBeUndefined()
+  })
+})
+
+describe('the router\'s refusal of a verbalized judge', () => {
+  const verbalized: RoutingJudge = { kind: 'engine', engine: { ...REMOTE, calibration: 'verbalized' } }
+  const point = (acceptVerbalized: boolean) => ({
+    ...GATE, operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized }],
+  })
+
+  it('refuses a verbalized engine unless its operating point accepts it, as the router does', () => {
+    expect(judgeRefused({ kind: 'loading' }, GATE)).toBe(false)
+    expect(judgeRefused({ kind: 'engine', engine: REMOTE }, null)).toBe(false)
+    expect(judgeRefused(verbalized, null)).toBeUndefined()
+    expect(judgeRefused(verbalized, GATE)).toBe(true)
+    expect(judgeRefused(verbalized, point(false))).toBe(true)
+    expect(judgeRefused(verbalized, point(true))).toBe(false)
+  })
+
+  it('names a refused judge and withholds the egress warning until the router would ask it', () => {
+    expect(judgeNotUsed(verbalized, GATE, t)).toContain('is not used for routing')
+    expect(judgeNotUsed(verbalized, null, t)).toBeUndefined()
+    expect(judgeNotUsed({ kind: 'none', reason: 'disabled' }, GATE, t)).toBeUndefined()
+    expect(egressWarning(verbalized, true, GATE, t)).toBeUndefined()
+    expect(egressWarning(verbalized, true, null, t)).toBeUndefined()
+    expect(egressWarning(verbalized, true, point(true), t)).toContain('each consult sends up to 12,000 characters')
   })
 })

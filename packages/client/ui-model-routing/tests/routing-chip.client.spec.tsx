@@ -365,6 +365,13 @@ describe('RoutingChip remote-judge confirm', () => {
     expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to Jev (TypeSafe).')).toBeTruthy()
   })
 
+  it('says a refused judge sends nothing once the gate shows no operating point accepts it', async () => {
+    const snapshot = engines('typesafe', { engines: [LOCAL, { ...REMOTE, calibration: 'verbalized' }] })
+    setup({ routing: OFF, engine: { kind: 'ready', snapshot } })
+    fireEvent.click(offChip())
+    await screen.findByText(en['confirm.refused'])
+  })
+
   it('asks when the judge is not known yet', () => {
     for (const engine of [{ kind: 'loading' }, { kind: 'failed', message: 'x' }] as RoutingEngineState[]) {
       const { setRouting } = setup({ routing: OFF, engine, loadGate: () => new Promise(() => {}) })

@@ -469,6 +469,24 @@ describe('RoutingView judge facts', () => {
     expect(remote.textContent).not.toContain('Uncalibrated')
   })
 
+  it('reports a judge the router refuses: never asked, no egress warning', async () => {
+    const verbalizedRemote = { ...REMOTE, calibration: 'verbalized' as const }
+    const snapshot = engines('typesafe', { engines: [LOCAL, verbalizedRemote] })
+    const openSettings = vi.fn()
+    setup({ engine: { kind: 'ready', snapshot }, openSettings })
+    await screen.findByText('The judge, Jev (TypeSafe), is not used for routing: it only verbalizes its confidence and no operating point accepts it, so it is never asked and every step keeps the strong model.')
+    expect(statusLine().textContent).toContain('Not used for routing')
+    expect(screen.queryByText(/leave this machine/)).toBeNull()
+    expect(screen.queryByText(en['state.engineUncalibrated'])).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
+    expect(openSettings).toHaveBeenCalledTimes(1)
+    cleanup()
+    const accepted = { ...GATE, operatingPoints: [{ engine: 'typesafe', downgradeThreshold: 0.7, downgradeMargin: 0.1, acceptVerbalized: true }] }
+    setup({ engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(accepted) })
+    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    expect(statusLine().textContent).not.toContain('Not used for routing')
+  })
+
   it('opens Settings › Model routing from the status line and the judge notices', () => {
     const openSettings = vi.fn()
     setup({ openSettings })
@@ -538,7 +556,8 @@ describe('RoutingView judge facts', () => {
       thresholds: [{ downgradeThreshold: 0.7, downgradeMargin: 0.1, source: 'operating-point' as const, calibratedBy: null, consults: 4 }],
       latency: { ...activeStats().latency, withEligibility: 0 },
     }
-    setup({ stats, routing: ON })
+    // A judge the router asks, so the recorded refusal is what the notice reports.
+    setup({ stats, routing: ON, engine: { kind: 'ready', snapshot: engines('typesafe') } })
     // The note compares with the gate, so it appears once the gate has loaded.
     await screen.findByText('The line is the threshold now. 4 consults recorded other thresholds at the time: confidence ≥ 0.70, margin ≥ 0.10.')
     expect(screen.getByText(en['state.engineUncalibrated'])).toBeTruthy()

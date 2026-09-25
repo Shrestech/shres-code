@@ -23,8 +23,8 @@ import {
 } from './charts.tsx'
 import { DecisionDrawer } from './DecisionDrawer.tsx'
 import {
-  egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, judgeSegment, judgeTrouble, routingKpis, routingVerdict,
-  routingViewState, strongRoute,
+  egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gateFor, judgeNotUsed, judgeSegment, judgeTrouble,
+  routingKpis, routingVerdict, routingViewState, strongRoute,
 } from './derive.ts'
 import { RecentDecisions } from './RecentDecisions.tsx'
 import css from './RoutingView.module.css'
@@ -135,6 +135,7 @@ export function RoutingView({
   const segment = judgeSegment(judge, t)
   const trouble = judgeTrouble(judge, t)
   const egress = egressWarning(judge, routing.active, gate, t)
+  const notUsed = judgeNotUsed(judge, gate, t)
   const trajectory = reveal !== undefined && canReveal?.('trajectory') === true
     ? (seq: number) => { reveal({ view: 'trajectory', target: { kind: 'event', seq } }) }
     : undefined
@@ -157,6 +158,7 @@ export function RoutingView({
           <span className={css.egressPill} data-egress={segment.egress}>{t(`judge.egress.${segment.egress}`)}</span>
         )}
         {segment.uncalibrated === true && <span className={css.scopePill}>{t('judge.uncalibrated')}</span>}
+        {notUsed !== undefined && <span className={css.egressPill} data-egress="remote">{t('judge.notUsed.pill')}</span>}
         {' · '}{t('status.settings.before')}{' '}
         <button type="button" className={css.link} onClick={openSettings}>{t('status.settings.link')}</button>
       </p>
@@ -180,7 +182,15 @@ export function RoutingView({
         </p>
       )}
       {state === 'base-unlisted' && <p className={css.notice} role="status">{t('state.baseUnlisted', { model: base ?? t('state.thisModel') })}</p>}
-      {engineUncalibratedRecorded(stats, routing.active) && <p className={css.notice} role="status">{t('state.engineUncalibrated')}</p>}
+      {notUsed !== undefined && (
+        <p className={css.notice} role="status">
+          {notUsed}{' '}
+          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+        </p>
+      )}
+      {notUsed === undefined && engineUncalibratedRecorded(stats, routing.active) && (
+        <p className={css.notice} role="status">{t('state.engineUncalibrated')}</p>
+      )}
       {engineTroubleRecorded(stats) && <p className={css.notice} role="status">{t('state.engineTrouble')}</p>}
       {state === 'never-used'
         ? <section className={css.card}><p>{t('state.neverUsed')}</p></section>
