@@ -122,6 +122,63 @@ describe('createSnapshotStore', () => {
     const revived = createSnapshotStore(init(), { persist: { name: 'spec-store' } })
     expect(revived.getSnapshot().a.n).toBe(42)
   })
+
+  it('leaves transient fields out of what it writes and restores them from init', () => {
+    const backing = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => backing.get(k) ?? null,
+      setItem: (k: string, v: string) => { backing.set(k, v) },
+      removeItem: (k: string) => { backing.delete(k) },
+    })
+    const fresh = () => ({ draft: '', open: false })
+    const store = createSnapshotStore(fresh(), { persist: { name: 'spec-transient', transient: ['open'] } })
+    store.update((d) => {
+      d.draft = 'kept'
+      d.open = true
+    })
+    expect(JSON.parse(backing.get('spec-transient')!)).toEqual({ draft: 'kept' })
+    // A value written before the field was transient is restored from init too.
+    backing.set('spec-transient', JSON.stringify({ draft: 'kept', open: true }))
+    const revived = createSnapshotStore(fresh(), { persist: { name: 'spec-transient', transient: ['open'] } })
+    expect(revived.getSnapshot()).toEqual({ draft: 'kept', open: false })
+    // A persisted primitive, from a store that once had an object state, is restored as written.
+    backing.set('spec-transient', JSON.stringify('legacy text'))
+    expect(createSnapshotStore(fresh(), { persist: { name: 'spec-transient', transient: ['open'] } }).getSnapshot()).toBe('legacy text')
+  })
+
+  it('fails loud for a transient field the initial state does not have at the top level', () => {
+    expect(() => createSnapshotStore({ draft: '' }, { persist: { name: 'spec-typo', transient: ['opne'] } }))
+      .toThrow("snapshot store 'spec-typo': transient field 'opne' is not a top-level field of the initial state")
+    expect(() => createSnapshotStore({ panel: { open: false } }, { persist: { name: 'spec-nested', transient: ['panel.open'] } }))
+      .toThrow("transient field 'panel.open'")
+    expect(() => createSnapshotStore('', { persist: { name: 'spec-text', transient: ['open'] } }))
+      .toThrow("snapshot store 'spec-text': transient field 'open'")
+  })
+})
+
+describe('snapshot store persistence failures', () => {
+  it('reports a value it cannot restore or write and keeps working, and skips freezing in production', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('localStorage', {
+      getItem: () => '{not json',
+      setItem: () => { throw new Error('quota') },
+      removeItem: () => {},
+    })
+    const store = createSnapshotStore({ draft: '', open: false }, { persist: { name: 'spec-broken', transient: ['open'] } })
+    expect(store.getSnapshot()).toEqual({ draft: '', open: false })
+    store.update((d) => { d.draft = 'still works' })
+    expect(store.getSnapshot().draft).toBe('still works')
+    expect(errors.mock.calls.map((call: unknown[]) => call[0] as string)).toEqual([
+      "snapshot store 'spec-broken' rehydration failed:",
+      "snapshot store 'spec-broken' persistence failed:",
+    ])
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ draft: 'prod', open: true }), setItem: () => {}, removeItem: () => {} })
+    vi.stubEnv('NODE_ENV', 'production')
+    const production = createSnapshotStore({ draft: '', open: false }, { persist: { name: 'spec-prod', transient: ['open'] } })
+    expect(production.getSnapshot()).toEqual({ draft: 'prod', open: false })
+    expect(Object.isFrozen(production.getSnapshot())).toBe(false)
+    vi.unstubAllEnvs()
+  })
 })
 
 describe('defineStore', () => {
@@ -186,6 +243,50 @@ describe('defineStore', () => {
     expect(backing.has('spec.chat.s1')).toBe(false)
     expect(backing.has('spec.chat.s2')).toBe(true)
     expect(backing.has('spec.chat')).toBe(true)
+  })
+
+  it('passes a declaration\'s transient fields to persistence', () => {
+    const backing = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => backing.get(k) ?? null,
+      setItem: (k: string, v: string) => { backing.set(k, v) },
+      removeItem: (k: string) => { backing.delete(k) },
+    })
+    const handle = defineStore({
+      init: () => ({ draft: '', open: false }),
+      persist: 'spec.popover',
+      transient: ['open'],
+      actions: { open: (d) => { d.open = true } },
+    })
+    const instance = handle.create('s1')
+    const seen = vi.fn()
+    const unsubscribe = instance.subscribe(seen)
+    instance.actions.open()
+    expect(seen).toHaveBeenCalledTimes(1)
+    unsubscribe()
+    expect(instance.getSnapshot()).toEqual({ draft: '', open: true })
+    expect(JSON.parse(backing.get('spec.popover.s1')!)).toEqual({ draft: '' })
+    // A reload restores the persisted fields and starts the transient one from init.
+    backing.set('spec.popover.s2', JSON.stringify({ draft: 'kept', open: true }))
+    expect(handle.create('s2').getSnapshot()).toEqual({ draft: 'kept', open: false })
+  })
+
+  it('rejects a declaration naming a transient field init() does not produce, naming it', () => {
+    expect(() => defineStore({
+      init: () => ({ draft: '', open: false }),
+      persist: 'spec.typo',
+      // @ts-expect-error -- the declaration admits only top-level fields of the state
+      transient: ['opened'],
+      actions: {},
+    })).toThrow("snapshot store 'spec.typo': transient field 'opened' is not a top-level field of the initial state")
+  })
+
+  it('rejects transient fields on a declaration without a persist key', () => {
+    expect(() => defineStore({
+      init: () => ({ draft: '', open: false }),
+      transient: ['open', 'draft'],
+      actions: {},
+    })).toThrow('defineStore: transient fields [open, draft] need a persist key')
   })
 
   it('clearPersisted is a no-op without a persist declaration or without storage', () => {
