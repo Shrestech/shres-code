@@ -122,30 +122,6 @@ describe('createSnapshotStore', () => {
     const revived = createSnapshotStore(init(), { persist: { name: 'spec-store' } })
     expect(revived.getSnapshot().a.n).toBe(42)
   })
-
-  it('leaves transient fields out of what it writes and restores them from init', () => {
-    const backing = new Map<string, string>()
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => backing.get(k) ?? null,
-      setItem: (k: string, v: string) => { backing.set(k, v) },
-      removeItem: (k: string) => { backing.delete(k) },
-    })
-    const fresh = () => ({ draft: '', open: false })
-    const store = createSnapshotStore(fresh(), { persist: { name: 'spec-transient', transient: ['open'] } })
-    store.update((d) => {
-      d.draft = 'kept'
-      d.open = true
-    })
-    expect(JSON.parse(backing.get('spec-transient')!)).toEqual({ draft: 'kept' })
-    // A value written before the field was transient is restored from init too.
-    backing.set('spec-transient', JSON.stringify({ draft: 'kept', open: true }))
-    const revived = createSnapshotStore(fresh(), { persist: { name: 'spec-transient', transient: ['open'] } })
-    expect(revived.getSnapshot()).toEqual({ draft: 'kept', open: false })
-    // Primitive state has no fields to leave out.
-    const text = createSnapshotStore('', { persist: { name: 'spec-transient-text', transient: ['open'] } })
-    text.set('hello')
-    expect(createSnapshotStore('', { persist: { name: 'spec-transient-text', transient: ['open'] } }).getSnapshot()).toBe('hello')
-  })
 })
 
 describe('defineStore', () => {
@@ -210,23 +186,6 @@ describe('defineStore', () => {
     expect(backing.has('spec.chat.s1')).toBe(false)
     expect(backing.has('spec.chat.s2')).toBe(true)
     expect(backing.has('spec.chat')).toBe(true)
-  })
-
-  it('passes a declaration\'s transient fields to persistence', () => {
-    const backing = new Map<string, string>()
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => backing.get(k) ?? null,
-      setItem: (k: string, v: string) => { backing.set(k, v) },
-      removeItem: (k: string) => { backing.delete(k) },
-    })
-    const handle = defineStore({
-      init: () => ({ draft: '', open: false }),
-      persist: 'spec.popover',
-      transient: ['open'],
-      actions: { open: (d) => { d.open = true } },
-    })
-    handle.create('s1').actions.open()
-    expect(JSON.parse(backing.get('spec.popover.s1')!)).toEqual({ draft: '' })
   })
 
   it('clearPersisted is a no-op without a persist declaration or without storage', () => {

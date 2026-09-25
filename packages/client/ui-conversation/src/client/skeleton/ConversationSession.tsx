@@ -9,6 +9,7 @@ import type {
 } from '../contract/slots.ts'
 import type { ViewTab } from '../contract/views.ts'
 import { readInspectRequest } from '../inspect.ts'
+import { readActivityOpen } from '../stores.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -88,7 +89,7 @@ export function ConversationSessionHeader({
   )
   const activityRunningId = useId()
   // Open state lives in the session's chat store so a view's reveal closes the popover.
-  const activityOpen = useStore(s => s.activityOpen)
+  const activityOpen = useStore(s => readActivityOpen(s.activityOpen))
   const activityRef = useRef<HTMLDivElement | null>(null)
   const activityPanelRef = useRef<HTMLDivElement | null>(null)
   const activityTriggerRef = useRef<HTMLButtonElement | null>(null)
