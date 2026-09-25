@@ -9,6 +9,7 @@ import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-c
 import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import type { Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool as PiTool } from '@earendil-works/pi-ai'
 import { toPiAssistant } from './replay.ts'
+import type { ReplayDegradeObserver } from './replay.ts'
 
 /** Join the text blocks of a harness message. */
 function flattenText(message: Message): string {
@@ -84,7 +85,7 @@ function piContext(options: GenerateOptions, messages: PiMessage[]): PiContext {
   }
 }
 
-function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: string) => void): PiContext {
+function textOnlyContext(options: GenerateOptions, onReplayDegrade?: ReplayDegradeObserver): PiContext {
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
   for (const message of options.messages) {
@@ -132,7 +133,7 @@ function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: st
 export function toPiContext(
   options: GenerateOptions,
   attachments?: undefined,
-  onReplayDegrade?: (reason: string) => void,
+  onReplayDegrade?: ReplayDegradeObserver,
 ): PiContext
 /**
  * Convert harness history to a pi-ai Context while resolving durable images.
@@ -145,12 +146,12 @@ export function toPiContext(
 export function toPiContext(
   options: GenerateOptions,
   attachments: AttachmentStore,
-  onReplayDegrade?: (reason: string) => void,
+  onReplayDegrade?: ReplayDegradeObserver,
 ): Promise<PiContext>
 export function toPiContext(
   options: GenerateOptions,
   attachments?: AttachmentStore,
-  onReplayDegrade?: (reason: string) => void,
+  onReplayDegrade?: ReplayDegradeObserver,
 ): PiContext | Promise<PiContext> {
   return attachments === undefined
     ? textOnlyContext(options, onReplayDegrade)
@@ -160,7 +161,7 @@ export function toPiContext(
 async function toPiContextWithImages(
   options: GenerateOptions,
   attachments: AttachmentStore,
-  onReplayDegrade?: (reason: string) => void,
+  onReplayDegrade?: ReplayDegradeObserver,
 ): Promise<PiContext> {
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []

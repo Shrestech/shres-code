@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import LlmRuntime, { BlockAssembler, createMessage, createUserMessage } from '@shres-code/shres-code-llm'
-import type { FinishReason, GenerateOptions, StreamChunk, TokenUsage } from '@shres-code/shres-code-llm'
+import type { FinishReason, GenerateOptions, Message, StreamChunk, TokenUsage } from '@shres-code/shres-code-llm'
 import * as LlmClaudeSession from '../src/index.ts'
 import type { Config as ClaudeSessionConfig } from '../src/config.ts'
 import { accessToken, mockAnthropic, writeCredentialsDocument } from './helpers.ts'
@@ -127,24 +127,35 @@ describe('llm-claude-session route', () => {
     expect(upstream!.requests).toHaveLength(0)
   })
 
-  it('warns through the plugin-owned hook when history replay state is unusable', async () => {
+  it('warns once per degraded history message across requests', async () => {
     const context = await boot()
     const warn = vi.spyOn(context.logger, 'warn').mockImplementation(() => {})
-    const history = createMessage({
+    // A session resumed from a log written before the replay version changed:
+    // two assistant messages carry replay state this build cannot use.
+    const degraded = (text: string) => createMessage({
       role: 'assistant',
-      content: [{ type: 'text', text: 'earlier answer' }],
+      content: [{ type: 'text', text }],
       source: {
         kind: 'model',
         ...{
           provider: 'claude-session',
           model: 'claude-opus-5',
-          replayState: { response: { kind: 'pi-ai', version: 3 }, blocks: [] },
+          replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [{ type: 'text' }] },
         },
       },
     })
-    const result = await assemble(context, { model: 'claude-opus-5', messages: [history] })
-    expect(result.finish).toEqual({ kind: 'stop' })
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unusable replay state'))
+    const history: Message[] = [degraded('first answer'), degraded('second answer')]
+    for (const text of ['one', 'two', 'three']) {
+      history.push(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'plugin', plugin: 'test' } }))
+      const assembler = new BlockAssembler()
+      for await (const chunk of context.llm.stream({ provider: 'claude-session', model: 'claude-opus-5', messages: [...history] })) {
+        assembler.push(chunk)
+      }
+      expect(assembler.finish).toEqual({ kind: 'stop' })
+    }
+    const warnings = warn.mock.calls.filter(([line]) => String(line).includes('unusable replay state'))
+    expect(warnings).toHaveLength(2)
+    expect(String(warnings[0]![0])).toContain('llm-claude-session:')
     warn.mockRestore()
   })
 

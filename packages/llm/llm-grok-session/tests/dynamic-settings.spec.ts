@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import LlmRuntime, { BlockAssembler, createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { Message } from '@shres-code/shres-code-llm'
 import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
 import * as LlmGrokSession from '../src/index.ts'
@@ -138,28 +139,35 @@ describe('llm-grok-session settings lifecycle', () => {
     expect(finish.failure.message).toMatch(/durable attachment service/)
   })
 
-  it('warns through the plugin-owned hook when history replay state is unusable', async () => {
+  it('warns once per degraded history message across requests', async () => {
     const context = await boot()
     const warn = vi.spyOn(context.logger, 'warn').mockImplementation(() => {})
-    const history = createMessage({
+    // A session resumed from a log written before the replay version changed:
+    // two assistant messages carry replay state this build cannot use.
+    const degraded = (text: string) => createMessage({
       role: 'assistant',
-      content: [{ type: 'text', text: 'earlier answer' }],
+      content: [{ type: 'text', text }],
       source: {
         kind: 'model',
         ...{
           provider: 'grok-session',
           model: 'grok-4.6',
-          replayState: { response: { kind: 'pi-ai', version: 3 }, blocks: [] },
+          replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [{ type: 'text' }] },
         },
       },
     })
-    const assembler = new BlockAssembler()
-    for await (const chunk of context.llm.stream({
-      provider: 'grok-session',
-      model: 'grok-4.6',
-      messages: [history],
-    })) assembler.push(chunk)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unusable replay state'))
+    const history: Message[] = [degraded('first answer'), degraded('second answer')]
+    for (const text of ['one', 'two', 'three']) {
+      history.push(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'plugin', plugin: 'test' } }))
+      const assembler = new BlockAssembler()
+      for await (const chunk of context.llm.stream({ provider: 'grok-session', model: 'grok-4.6', messages: [...history] })) {
+        assembler.push(chunk)
+      }
+      expect(assembler.finish).toEqual({ kind: 'stop' })
+    }
+    const warnings = warn.mock.calls.filter(([line]) => String(line).includes('unusable replay state'))
+    expect(warnings).toHaveLength(2)
+    expect(String(warnings[0]![0])).toContain('llm-grok-session:')
     warn.mockRestore()
   })
 })
