@@ -6,6 +6,7 @@ Compiler-independent declarations shared by business packages, generated Typert 
 
 - `@Remote` marks a public instance method for direct invocation on its registered Cordis Service.
 - `@RemoteScope(key)` marks a method whose receiver is selected from a merge-declared scoped Context kind.
+- `TYPERT_RESERVED_REMOTE_METHODS` lists the names a Remote cannot be exported under: the Client gateway mounts each namespace as a Cordis Service that already owns them (`install`, `has`, `remove`, `namespace`, `ctx`, …, and every `Object.prototype` member). The generator rejects such a name at build time, and the gateway refuses to mount one.
 - `TypertRemoteService` binds the Cordis key passed to `super(ctx, serviceKey, options?)` to the same default wire namespace.
 - `bindTypertRemote(this, serviceKey, options?)` provides the same visible, frozen binding for a Service that cannot inherit from `TypertRemoteService`.
 - `remoteMethods(service)` returns a detached declaration-order snapshot used by the Gateway's SRC fallback.

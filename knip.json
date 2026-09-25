@@ -150,9 +150,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@shres-code/shres-code-api-gateway"
       ]
     },
     "packages/client/ui-primitives": {
