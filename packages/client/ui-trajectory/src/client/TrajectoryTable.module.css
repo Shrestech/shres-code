@@ -1861,10 +1861,21 @@
   background: var(--dsw-alias-state-business-tertiary);
 }
 
-.routingSummary {
-  display: inline-flex;
+/* The ROUTING cell keeps Explain in view: the summary shrinks and clips its
+   own chips, so a narrow content column never pushes the link out. */
+.routingCell {
+  display: flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
+}
+
+.routingSummary {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
   gap: 8px;
 }
 

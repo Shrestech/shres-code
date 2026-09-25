@@ -2695,12 +2695,12 @@ export function TrajectoryTable({
                       <td className={css.content}>
                         {record.cell.routing !== undefined
                           ? (
-                            <>
+                            <span className={css.routingCell}>
                               <RoutingRecord row={record.cell.routing} t={t} />
                               {onExplainRouting !== undefined && record.cell.sourceSeq !== undefined && (
                                 <RoutingExplain seq={record.cell.sourceSeq} onExplain={onExplainRouting} t={t} />
                               )}
-                            </>
+                            </span>
                           )
                           : isRequestOnly
                             ? null
