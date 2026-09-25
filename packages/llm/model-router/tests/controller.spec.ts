@@ -18,15 +18,26 @@
  * \`session/event\` and runs this package's invariant companion.
  */
 
-import { describe, expect, it } from 'vitest'
-import { Context } from '@shres-code/cordis'
+import { describe, expect, it, vi } from 'vitest'
+import { Context, Service } from '@shres-code/cordis'
 import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
-import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
+import JudgmentService, {
+  JUDGMENT_SETTINGS_NAMESPACE,
+  JudgmentEngineRegistry,
+  JudgmentError,
+  judgmentEngineId,
+  registerJudgmentEngine,
+} from '@shres-code/shres-code-judgment'
+import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import type {
   JudgmentAnswer,
   JudgmentChoiceAnswer,
+  JudgmentConsumerId,
+  JudgmentEngineCalibration,
+  JudgmentEngineId,
+  JudgmentEngineStatus,
   JudgmentInput,
   JudgmentFittingEngine,
   JudgmentTokenLimits,
@@ -58,11 +69,12 @@ import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import ModelRoutingController, {
   DIFFICULTY_QUESTION_ID,
   KEEP_CURRENT_OPTION_ID,
+  MODEL_ROUTER_JUDGMENT_CONSUMER,
   MODEL_ROUTER_SETTINGS_NAMESPACE,
   ROUTE_QUESTION_ID,
   stateHash,
 } from '../src/index.ts'
-import { stickyState } from '../src/folds.ts'
+import { judgmentFailuresFor, stickyState } from '../src/folds.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 import type { ModelRoutingDecision, ModelRoutingProjection } from '../src/types.ts'
 
@@ -122,6 +134,21 @@ class ScriptedJudgment extends JudgmentService {
   failure: Error | undefined
   /** Optional deferred response used by cancellation tests. */
   askOverride: ((input: JudgmentInput) => Promise<JudgmentResult>) | undefined
+  /** Fields a dispatcher and a metered engine add to every answer. */
+  stamp: Pick<JudgmentResult, 'engineId' | 'usage'> = {}
+  /** Registry id this service reports as selected, as a dispatcher does. */
+  selected: JudgmentEngineId | undefined
+  /** Fitting reported only for the router's consumer id. */
+  fittingForConsumer: JudgmentFittingEngine | undefined
+
+  override selectedEngine(): JudgmentEngineId | undefined {
+    return this.selected
+  }
+
+  override fittingFor(consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined {
+    if (this.fittingForConsumer !== undefined && consumer === MODEL_ROUTER_JUDGMENT_CONSUMER) return this.fittingForConsumer
+    return this.fitting
+  }
 
   override ask(input: JudgmentInput): Promise<JudgmentResult> {
     this.asks.push(input)
@@ -136,8 +163,96 @@ class ScriptedJudgment extends JudgmentService {
     if (this.score !== undefined && input.questions.some(question => question.kind === 'score')) {
       answers.push(this.score)
     }
-    return Promise.resolve({ answers, engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 3 })
+    return Promise.resolve({ answers, engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 3, ...this.stamp })
   }
+}
+
+/** TEST DOUBLE: a registry engine that answers PASSING and EASY, with a status the test sets. */
+interface RegisteredEngine {
+  readonly asks: JudgmentInput[]
+  setStatus(status: JudgmentEngineStatus): void
+}
+
+/**
+ * Register one scripted engine with `ctx.judgmentEngines`.
+ * @param ctx - context carrying the dispatcher's registry.
+ * @param id - registry id.
+ * @param status - initial status.
+ * @returns the engine's asks and its status control.
+ */
+async function registeredEngine(
+  ctx: Context,
+  id: string,
+  status: JudgmentEngineStatus,
+  calibration: JudgmentEngineCalibration = 'calibrated',
+  choice: JudgmentChoiceAnswer = PASSING,
+): Promise<RegisteredEngine> {
+  const asks: JudgmentInput[] = []
+  let current = status
+  let announce: () => void = () => undefined
+  await ctx.plugin({
+    name: `engine-${id}`,
+    inject: ['judgmentEngines'],
+    apply: (inner: Context) => {
+      const engine = {
+        ask: (input: JudgmentInput): Promise<JudgmentResult> => {
+          asks.push(input)
+          return Promise.resolve({ answers: [choice, EASY], engine: id, model: `${id}-1`, latencyMs: 2 })
+        },
+      }
+      announce = registerJudgmentEngine(inner, {
+        engine,
+        descriptor: { id: judgmentEngineId(id), label: id, egress: 'none', calibration, supportsFitting: false },
+        status: () => current,
+      })
+    },
+  })
+  return {
+    asks,
+    setStatus: (next) => {
+      current = next
+      announce()
+    },
+  }
+}
+
+/** TEST DOUBLE: the Loader's settle point, which the test releases or fails. */
+class SettleGate extends Service {
+  readonly settle = Promise.withResolvers<undefined>()
+
+  constructor(ctx: Context) {
+    super(ctx, 'loader')
+  }
+
+  async await(): Promise<void> {
+    await this.settle.promise
+  }
+}
+
+/** A scripted service over a registry of named engines, and the engine a test restarts. */
+interface Mismatched {
+  readonly b: Bench
+  readonly warm: RegisteredEngine
+}
+
+/** Provide a bare engine registry, so a scripted `ctx.judgment` can name registered engines. */
+async function engineRegistry(ctx: Context): Promise<void> {
+  await ctx.plugin({
+    name: 'engine-registry',
+    apply: (inner: Context) => { inner.provide('judgmentEngines', new JudgmentEngineRegistry(() => undefined)) },
+  })
+}
+
+/**
+ * Mount a {@link SettleGate} as `ctx.loader`.
+ * @param ctx - the bench context.
+ * @returns the mounted gate.
+ */
+async function settleGate(ctx: Context): Promise<SettleGate> {
+  let gate: SettleGate | undefined
+  await ctx.plugin({ name: 'settle-gate', apply: (inner: Context) => { gate = new SettleGate(inner) } })
+  if (gate === undefined) throw new Error('the settle gate did not mount')
+  return gate
 }
 
 /** TEST DOUBLE: exact route metadata used by the controller's capability preflight. */
@@ -153,7 +268,13 @@ class RoutingCapabilityAdapter extends LlmAdapter {
     this.overrides[`${provider}/${model}`] = info
   }
 
-  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+  /** Action run once, inside the next capability read. */
+  duringAssessment: (() => Promise<void>) | undefined
+
+  override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    const action = this.duringAssessment
+    this.duringAssessment = undefined
+    if (action !== undefined) await action()
     const override = this.overrides[`${provider}/${model}`]
     return Promise.resolve({
       provider,
@@ -1089,6 +1210,110 @@ describe('judgment failures', () => {
     expect(late.decision()).not.toHaveProperty('route')
   })
 
+  it('classifies a late coded failure by its code, not as the deadline', async () => {
+    const lateReject = (error: JudgmentError) => (): Promise<JudgmentResult> => new Promise((_resolve, reject) => {
+      setTimeout(() => { reject(error) }, 40)
+    })
+    const tooLarge = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    tooLarge.engine.askOverride = lateReject(new JudgmentError('INPUT_TOO_LARGE', 'late body-limit rejection'))
+    expect(await tooLarge.resolve(1)).toBeUndefined()
+    expect(tooLarge.decision()).toMatchObject({ reason: 'judgment-input-too-large', latencyMs: expect.any(Number) as unknown })
+    expect(tooLarge.decision()).not.toHaveProperty('engineFailure')
+
+    const unavailable = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    unavailable.engine.askOverride = lateReject(new JudgmentError('UNAVAILABLE', 'late refusal'))
+    expect(await unavailable.resolve(1)).toBeUndefined()
+    expect(unavailable.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' } })
+
+    const invalid = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    invalid.engine.askOverride = lateReject(new JudgmentError('INVALID_ANSWER', 'late garbage'))
+    expect(await invalid.resolve(1)).toBeUndefined()
+    expect(invalid.decision()).toMatchObject({ reason: 'invalid-answer', engineFailure: { code: 'INVALID_ANSWER' } })
+
+    // An uncoded failure after the deadline is the deadline.
+    const uncoded = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    uncoded.engine.askOverride = () => new Promise((_resolve, reject) => {
+      setTimeout(() => { reject(new Error('socket closed')) }, 40)
+    })
+    expect(await uncoded.resolve(1)).toBeUndefined()
+    expect(uncoded.decision()).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' } })
+  })
+
+  it('records the routed engine and the router-measured latency of a failed call', async () => {
+    const stamped = await bench()
+    stamped.engine.failure = new JudgmentError('UNAVAILABLE', 'laya is restarting', { engineId: judgmentEngineId('laya') })
+    expect(await stamped.resolve(1)).toBeUndefined()
+    expect(stamped.decision()).toMatchObject({
+      reason: 'engine-unavailable',
+      engineId: 'laya',
+      latencyMs: expect.any(Number) as unknown,
+      engineFailure: { code: 'UNAVAILABLE' },
+    })
+    expect(stamped.decision()).not.toHaveProperty('engine')
+
+    // An unstamped failure is attributed to the engine selected before the ask.
+    const selected = await bench()
+    selected.engine.selected = judgmentEngineId('typesafe')
+    selected.engine.failure = new Error('socket hang up')
+    expect(await selected.resolve(1)).toBeUndefined()
+    expect(selected.decision()).toMatchObject({ engineId: 'typesafe', latencyMs: expect.any(Number) as unknown })
+
+    // A single-engine service selects nothing, so an unstamped failure names none.
+    const single = await bench()
+    single.engine.failure = new JudgmentError('UNAVAILABLE', 'down')
+    expect(await single.resolve(1)).toBeUndefined()
+    expect(single.decision()).not.toHaveProperty('engineId')
+  })
+
+  it('records the engine, usage, and timing facts of an answered call and names the router on every ask', async () => {
+    const b = await bench()
+    openTurn(b.session, 1)
+    const text = 'a small change'
+    user(b.session, text)
+    b.engine.stamp = { engineId: judgmentEngineId('laya'), usage: { inputTokens: 900, outputTokens: 5, cacheReadTokens: 0 } }
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    const decision = b.decision()
+    expect(b.engine.asks[0]?.consumer).toBe(MODEL_ROUTER_JUDGMENT_CONSUMER)
+    expect(decision).toMatchObject({
+      engine: 'scripted-judgment',
+      model: 'scripted-1',
+      latencyMs: 3,
+      engineId: 'laya',
+      judgeUsage: { inputTokens: 900, outputTokens: 5, cacheReadTokens: 0 },
+      eligibilityMs: expect.any(Number) as unknown,
+      inputChars: b.engine.asks[0]?.state.length,
+    })
+    expect(decision.inputChars).toBeGreaterThan(text.length)
+
+    // A late answer is not used, but its call is recorded.
+    const late = await bench({ config: { ...CONFIG, judgmentDeadlineMs: 10 } })
+    late.engine.askOverride = () => new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ answers: [PASSING, EASY], engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 40, engineId: judgmentEngineId('laya'), usage: { inputTokens: 1, outputTokens: 1 } })
+      }, 40)
+    })
+    expect(await late.resolve(1)).toBeUndefined()
+    expect(late.decision()).toMatchObject({
+      reason: 'engine-unavailable', engineFailure: { code: 'DEADLINE' },
+      engine: 'scripted-judgment', latencyMs: 40, engineId: 'laya', judgeUsage: { inputTokens: 1, outputTokens: 1 },
+    })
+    expect(late.decision()).not.toHaveProperty('route')
+  })
+
+  it('declares the router consumer id to the judgment registry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'none' })
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(false)
+    const fiber = await ctx.plugin(ModelRoutingController, CONFIG)
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(true)
+    await fiber.dispose()
+    expect(ctx.judgmentEngines.hasConsumer(MODEL_ROUTER_JUDGMENT_CONSUMER)).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
   it('records the engine code of a classified failure and none for an unclassified one', async () => {
     const classified = await bench()
     classified.engine.failure = new JudgmentError('UNAVAILABLE', 'the classifier could not be reached')
@@ -1211,6 +1436,404 @@ describe('judgment failures', () => {
     expect(off.decision(1)).toMatchObject({ reason: 'engine-unavailable' })
   })
 
+  it('counts failures per engine: a switch resets the breaker and the hold tolerance', async () => {
+    const b = await bench({
+      config: { ...CONFIG, judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 5 } },
+    })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.selected = judgmentEngineId('laya')
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'laya gateway exited')
+    expect(await b.resolve(1)).toBeUndefined()
+    nextTurn(b, 2)
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 2, turn: 2, engineId: 'laya' })
+    nextTurn(b, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open', engineId: 'laya' })
+
+    // Another engine is not held to the first one's failures.
+    b.engine.selected = judgmentEngineId('typesafe')
+    nextTurn(b, 4)
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'engine-unavailable', engineId: 'typesafe' })
+    expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 1, turn: 4, engineId: 'typesafe' })
+    b.engine.failure = undefined
+    nextTurn(b, 5)
+    expect(await b.resolve(5)).toEqual(CHEAP)
+
+    // A held streak's tolerance restarts on a switch too.
+    const held = await heldInto({ ...CONFIG, hold: { minSteps: 1 }, judgmentFailures: { holdTolerance: 1 } })
+    held.engine.selected = judgmentEngineId('laya')
+    held.engine.failure = new Error('socket hang up')
+    expect(await held.resolve(2)).toEqual(CHEAP)
+    expect(held.decision(1)).toMatchObject({ reason: 'judgment-failure-held', engineId: 'laya' })
+    held.engine.selected = judgmentEngineId('typesafe')
+    nextTurn(held, 3)
+    expect(await held.resolve(3)).toEqual(CHEAP)
+    expect(held.decision(2)).toMatchObject({ reason: 'judgment-failure-held', engineId: 'typesafe' })
+    nextTurn(held, 4)
+    expect(await held.resolve(4)).toBeUndefined()
+    expect(held.decision(3)).toMatchObject({ reason: 'engine-unavailable', sticky: { active: false } })
+  })
+
+  it('holds a breaker opened by a count without an engine id against the next selected engine', async () => {
+    // A single-engine service selects nothing, so its failures carry no engine id,
+    // as every count logged before per-engine counting does.
+    const b = await bench({ config: { ...CONFIG, judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 5 } } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'down')
+    expect(await b.resolve(1)).toBeUndefined()
+    nextTurn(b, 2)
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(stickyState(b.session.events).judgmentFailures).toEqual({ count: 2, turn: 2 })
+
+    // The first engine selected afterwards is held off until the window closes.
+    b.engine.failure = undefined
+    b.engine.selected = judgmentEngineId('laya')
+    nextTurn(b, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open', engineId: 'laya' })
+    expect(b.engine.asks).toHaveLength(2)
+    nextTurn(b, 8)
+    expect(await b.resolve(8)).toEqual(CHEAP)
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+  })
+
+  it('keeps counting a pre-engine-id failure against any engine', () => {
+    const failures = { count: 2, turn: 3 }
+    expect(judgmentFailuresFor(failures, 'laya')).toBe(failures)
+    expect(judgmentFailuresFor({ ...failures, engineId: 'laya' }, undefined)).toEqual({ ...failures, engineId: 'laya' })
+    expect(judgmentFailuresFor({ ...failures, engineId: 'laya' }, 'typesafe')).toBeUndefined()
+    expect(judgmentFailuresFor(undefined, 'laya')).toBeUndefined()
+  })
+
+  it('does not count a starting or not-installed engine as a failure and makes no call', async () => {
+    const b = await bench({
+      engine: false,
+      config: { ...CONFIG, hold: { minSteps: 1 }, judgmentFailures: { holdTolerance: 0, breakerThreshold: 1, breakerOpenTurns: 5 } },
+    })
+    await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    const laya = await registeredEngine(b.ctx, 'laya', { state: 'starting' })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    for (const turn of [1, 2, 3]) {
+      if (turn > 1) nextTurn(b, turn)
+      expect(await b.resolve(turn)).toBeUndefined()
+      expect(b.decisions().at(-1)).toMatchObject({
+        outcome: 'kept-strong',
+        reason: 'engine-unavailable',
+        engineId: 'laya',
+        engineFailure: { code: 'UNAVAILABLE', engineState: 'starting' },
+      })
+      expect(b.decisions().at(-1)).not.toHaveProperty('latencyMs')
+    }
+    laya.setStatus({ state: 'not-installed', detail: 'run /laya install' })
+    nextTurn(b, 4)
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ engineFailure: { engineState: 'not-installed' } })
+    expect(laya.asks).toHaveLength(0)
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // Once ready, the first consult asks; the warm-up opened no breaker.
+    laya.setStatus({ state: 'ready' })
+    nextTurn(b, 5)
+    expect(await b.resolve(5)).toEqual(CHEAP)
+    expect(laya.asks).toHaveLength(1)
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'gate-passed', engineId: 'laya' })
+
+    // A restart while a streak holds keeps the candidate without spending the tolerance.
+    laya.setStatus({ state: 'starting' })
+    for (const turn of [6, 7]) {
+      nextTurn(b, turn)
+      expect(await b.resolve(turn)).toEqual(CHEAP)
+      expect(b.decisions().at(-1)).toMatchObject({ reason: 'judgment-failure-held', engineFailure: { engineState: 'starting' } })
+    }
+    expect(stickyState(b.session.events)).toMatchObject({ active: true })
+    expect(stickyState(b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // An engine that is registered but failing still counts.
+    laya.setStatus({ state: 'unavailable', detail: 'gateway exited 1' })
+    nextTurn(b, 8)
+    expect(await b.resolve(8)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' } })
+    expect(b.decisions().at(-1)?.engineFailure).not.toHaveProperty('engineState')
+    expect(stickyState(b.session.events).judgmentFailures).toMatchObject({ count: 1, engineId: 'laya' })
+  })
+
+  it('refuses a verbalized engine without an accepting operating point and asks it with one', async () => {
+    const refused = await bench({ engine: false })
+    await refused.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:ollama/qwen3:8b' })
+    const judge = await registeredEngine(refused.ctx, 'llm:ollama/qwen3:8b', { state: 'ready' }, 'verbalized')
+    expect(await refused.resolve(1)).toBeUndefined()
+    expect(refused.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'engine-uncalibrated', engineId: 'llm:ollama/qwen3:8b' })
+    expect(refused.decision()).not.toHaveProperty('candidateEligibility')
+    expect(judge.asks).toHaveLength(0)
+
+    // A point that does not accept verbalized answers refuses too.
+    const unaccepted = await bench({
+      engine: false,
+      config: { ...CONFIG, operatingPoints: [{ engine: 'llm:ollama/qwen3:8b', downgradeThreshold: 0.9, downgradeMargin: 0.2 }] },
+    })
+    await unaccepted.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:ollama/qwen3:8b' })
+    await registeredEngine(unaccepted.ctx, 'llm:ollama/qwen3:8b', { state: 'ready' }, 'verbalized')
+    expect(await unaccepted.resolve(1)).toBeUndefined()
+    expect(unaccepted.decision()).toMatchObject({ reason: 'engine-uncalibrated' })
+
+    const accepted = await bench({
+      engine: false,
+      config: {
+        ...CONFIG,
+        operatingPoints: [{ engine: 'llm:ollama/qwen3:8b', downgradeThreshold: 0.85, downgradeMargin: 0.2, acceptVerbalized: true }],
+      },
+    })
+    await accepted.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:ollama/qwen3:8b' })
+    const acceptedJudge = await registeredEngine(accepted.ctx, 'llm:ollama/qwen3:8b', { state: 'ready' }, 'verbalized')
+    expect(await accepted.resolve(1)).toEqual(CHEAP)
+    expect(acceptedJudge.asks).toHaveLength(1)
+    expect(accepted.decision()).toMatchObject({
+      reason: 'gate-passed',
+      thresholds: { downgradeThreshold: 0.85, downgradeMargin: 0.2, source: 'operating-point' },
+    })
+    expect(accepted.decision().thresholds).not.toHaveProperty('calibratedBy')
+  })
+
+  it('gates a calibrated engine with its operating point, else the global defaults marked uncalibrated', async () => {
+    // Confidence 0.75 fails the global 0.8 floor and passes a calibrated 0.7 point.
+    const borderline = { ...PASSING, confidence: 0.75 }
+    const pointed = await bench({
+      engine: false,
+      config: {
+        ...CONFIG,
+        operatingPoints: [
+          { engine: 'laya', downgradeThreshold: 0.7, downgradeMargin: 0.1, calibratedBy: 'prereg-2026-10-routing-v1' },
+          { engine: 'typesafe', downgradeThreshold: 0.95, downgradeMargin: 0.3 },
+        ],
+      },
+    })
+    await pointed.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    await registeredEngine(pointed.ctx, 'laya', { state: 'ready' }, 'calibrated', borderline)
+    expect(await pointed.resolve(1)).toEqual(CHEAP)
+    // Every threshold in force is recorded, in one fixed key order.
+    expect(Object.entries(pointed.decision().thresholds!)).toEqual([
+      ['downgradeThreshold', 0.7],
+      ['downgradeMargin', 0.1],
+      ['entryScoreCeiling', 2],
+      ['escalateBackScoreThreshold', 3],
+      ['source', 'operating-point'],
+      ['calibratedBy', 'prereg-2026-10-routing-v1'],
+    ])
+    expect(pointed.decision().reason).toBe('gate-passed')
+
+    // Laya without a point uses the global defaults, uncalibrated, and is not fail-closed.
+    const global = await bench({ engine: false })
+    await global.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    await registeredEngine(global.ctx, 'laya', { state: 'ready' }, 'calibrated', borderline)
+    expect(await global.resolve(1)).toBeUndefined()
+    expect(global.decision()).toMatchObject({
+      reason: 'low-confidence',
+      thresholds: { downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'global' },
+    })
+    expect(global.decision().thresholds).not.toHaveProperty('calibratedBy')
+
+    // A single-engine service selects no engine, so no point applies.
+    const single = await bench({ config: { ...CONFIG, operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.99, downgradeMargin: 0.9 }] } })
+    expect(await single.resolve(1)).toEqual(CHEAP)
+    expect(single.decision()).toMatchObject({ thresholds: { source: 'global' } })
+
+    // Without the difficulty question no difficulty threshold is in force.
+    const { difficultyInstructions: _omitted, ...routeOnly } = CONFIG
+    const plain = await bench({ config: { ...routeOnly, hold: { minSteps: 0 } } })
+    expect(await plain.resolve(1)).toEqual(CHEAP)
+    expect(plain.decision().thresholds).toEqual({ downgradeThreshold: 0.8, downgradeMargin: 0.1, source: 'global' })
+
+    // The difficulty thresholds come from the configuration in force at the consult.
+    const tuned = await bench({ config: { ...CONFIG, difficulty: { entryScoreCeiling: 3 }, escalateBack: { scoreThreshold: 4 } } })
+    expect(await tuned.resolve(1)).toEqual(CHEAP)
+    expect(tuned.decision().thresholds).toMatchObject({ entryScoreCeiling: 3, escalateBackScoreThreshold: 4 })
+  })
+
+  it('reports an operating point for an unregistered engine once after the settle, and when it resolves', async () => {
+    const b = await bench({
+      engine: false,
+      settings: true,
+      config: {
+        ...CONFIG,
+        operatingPoints: [
+          { engine: 'laya', downgradeThreshold: 0.7, downgradeMargin: 0.1 },
+          { engine: 'layya', downgradeThreshold: 0.7, downgradeMargin: 0.1 },
+        ],
+      },
+    })
+    const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+    const info = vi.spyOn(b.ctx.logger, 'info').mockImplementation(() => b.ctx.logger)
+    const gate = await settleGate(b.ctx)
+    await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    await registeredEngine(b.ctx, 'laya', { state: 'ready' })
+    const reports = (): string[] => error.mock.calls
+      .filter(call => String(call[0]).startsWith('model-router: operatingPoints'))
+      .map(call => String(call[1]))
+    expect(reports()).toEqual([])
+
+    gate.settle.resolve(undefined)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(reports()).toEqual(['layya'])
+    await registeredEngine(b.ctx, 'other', { state: 'ready' })
+    expect(reports()).toEqual(['layya'])
+
+    await registeredEngine(b.ctx, 'layya', { state: 'ready' })
+    expect(info.mock.calls.map(call => String(call[1]))).toContain('layya')
+
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+      operatingPoints: [{ engine: 'gone', downgradeThreshold: 0.7, downgradeMargin: 0.1 }],
+    })
+    expect(reports()).toEqual(['layya', 'gone'])
+    const infos = info.mock.calls.length
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { operatingPoints: [] })
+    // A report the configuration no longer names is forgotten without a resolution log.
+    expect(info.mock.calls.length).toBe(infos)
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+      operatingPoints: [{ engine: 'gone', downgradeThreshold: 0.7, downgradeMargin: 0.1 }],
+    })
+    expect(reports()).toEqual(['layya', 'gone', 'gone'])
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: 'off' })
+    expect(reports()).toEqual(['layya', 'gone', 'gone'])
+  })
+
+  it('reports nothing when the settle fails or the router leaves before it', async () => {
+    for (const outcome of ['reject', 'dispose'] as const) {
+      const b = await bench({
+        engine: false,
+        config: { ...CONFIG, operatingPoints: [{ engine: 'layya', downgradeThreshold: 0.7, downgradeMargin: 0.1 }] },
+      })
+      const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
+      const gate = await settleGate(b.ctx)
+      await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+      if (outcome === 'reject') gate.settle.reject(new Error('a fiber failed to load'))
+      else {
+        await b.routerFiber.dispose()
+        gate.settle.resolve(undefined)
+      }
+      await new Promise(resolve => setImmediate(resolve))
+      expect(error.mock.calls.filter(call => String(call[0]).startsWith('model-router: operatingPoints'))).toEqual([])
+    }
+  })
+
+  it('re-reads the judgment service and its engine immediately before the ask', async () => {
+    // The service leaves while candidates are assessed.
+    const absent = await bench({ engine: false })
+    const fiber = await absent.ctx.plugin(ScriptedJudgment)
+    absent.adapter.duringAssessment = () => fiber.dispose().then(() => undefined)
+    expect(await absent.resolve(1)).toBeUndefined()
+    expect(absent.decision()).toMatchObject({ reason: 'engine-absent' })
+
+    // The deployment switch turns judgment off while candidates are assessed.
+    const disabled = await bench({ settings: true })
+    disabled.adapter.duringAssessment = () => disabled.ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { enabled: false })
+    expect(await disabled.resolve(1)).toBeUndefined()
+    expect(disabled.decision()).toMatchObject({ reason: 'engine-disabled' })
+    expect(disabled.engine.asks).toHaveLength(0)
+
+    // A switch to an engine whose breaker is open is not asked.
+    const b = await bench({ config: { ...CONFIG, judgmentFailures: { holdTolerance: 0, breakerThreshold: 2, breakerOpenTurns: 5 } } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    b.engine.selected = judgmentEngineId('laya')
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'laya gateway exited')
+    expect(await b.resolve(1)).toBeUndefined()
+    nextTurn(b, 2)
+    expect(await b.resolve(2)).toBeUndefined()
+    b.engine.failure = undefined
+    b.engine.selected = judgmentEngineId('typesafe')
+    b.adapter.duringAssessment = () => {
+      b.engine.selected = judgmentEngineId('laya')
+      return Promise.resolve()
+    }
+    nextTurn(b, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decisions().at(-1)).toMatchObject({ reason: 'breaker-open', engineId: 'laya' })
+    expect(b.engine.asks).toHaveLength(2)
+  })
+  it('judges an answer or a failure against the engine that produced it', async () => {
+    const mismatched = async (config: ModelRouterConfig = CONFIG): Promise<Mismatched> => {
+      const b = await bench({ config })
+      await engineRegistry(b.ctx)
+      await registeredEngine(b.ctx, 'cal', { state: 'ready' })
+      await registeredEngine(b.ctx, 'verb', { state: 'ready' }, 'verbalized')
+      await registeredEngine(b.ctx, 'pt', { state: 'ready' })
+      const warm = await registeredEngine(b.ctx, 'warm', { state: 'ready' })
+      b.engine.selected = judgmentEngineId('cal')
+      return { b, warm }
+    }
+
+    // An answer from a refused engine is recorded and discarded.
+    const refused = (await mismatched()).b
+    refused.engine.stamp = { engineId: judgmentEngineId('verb'), usage: { inputTokens: 10, outputTokens: 2 } }
+    expect(await refused.resolve(1)).toBeUndefined()
+    expect(refused.engine.asks).toHaveLength(1)
+    expect(refused.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'engine-uncalibrated',
+      engineId: 'verb',
+      engine: 'scripted-judgment',
+      latencyMs: 3,
+      judgeUsage: { inputTokens: 10, outputTokens: 2 },
+    })
+    expect(refused.decision()).not.toHaveProperty('route')
+    expect(refused.decision()).not.toHaveProperty('thresholds')
+
+    // An answer from another engine is gated by that engine's operating point.
+    const pointed = (await mismatched({
+      ...CONFIG,
+      operatingPoints: [{ engine: 'pt', downgradeThreshold: 0.95, downgradeMargin: 0.1, calibratedBy: 'prereg-1' }],
+    })).b
+    pointed.engine.stamp = { engineId: judgmentEngineId('pt') }
+    expect(await pointed.resolve(1)).toBeUndefined()
+    expect(pointed.decision()).toMatchObject({
+      reason: 'low-confidence',
+      engineId: 'pt',
+      thresholds: { downgradeThreshold: 0.95, source: 'operating-point', calibratedBy: 'prereg-1' },
+    })
+
+    // A failure stamped with an engine that is warming up is not counted.
+    const stampedWarm = await mismatched()
+    stampedWarm.warm.setStatus({ state: 'starting' })
+    stampedWarm.b.engine.failure = new JudgmentError('UNAVAILABLE', 'warm is starting', { engineId: judgmentEngineId('warm') })
+    expect(await stampedWarm.b.resolve(1)).toBeUndefined()
+    expect(stampedWarm.b.decision()).toMatchObject({
+      reason: 'engine-unavailable',
+      engineId: 'warm',
+      engineFailure: { code: 'UNAVAILABLE', engineState: 'starting' },
+    })
+    expect(stickyState(stampedWarm.b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // An engine that starts restarting during the ask has not failed.
+    const restarting = await mismatched()
+    restarting.b.engine.selected = judgmentEngineId('warm')
+    restarting.b.engine.askOverride = () => {
+      restarting.warm.setStatus({ state: 'starting' })
+      return Promise.reject(new JudgmentError('UNAVAILABLE', 'the gateway closed the connection'))
+    }
+    expect(await restarting.b.resolve(1)).toBeUndefined()
+    expect(restarting.b.decision()).toMatchObject({
+      engineId: 'warm',
+      engineFailure: { code: 'UNAVAILABLE', engineState: 'starting' },
+    })
+    expect(stickyState(restarting.b.session.events)).not.toHaveProperty('judgmentFailures')
+
+    // The same holds for a restart that outlives the deadline.
+    const late = await mismatched({ ...CONFIG, judgmentDeadlineMs: 10 })
+    late.b.engine.selected = judgmentEngineId('warm')
+    late.b.engine.askOverride = (input) => {
+      late.warm.setStatus({ state: 'starting' })
+      return new Promise((_resolve, reject) => {
+        input.signal?.addEventListener('abort', () => { reject(new JudgmentError('ABORTED', 'cancelled')) }, { once: true })
+      })
+    }
+    expect(await late.b.resolve(1)).toBeUndefined()
+    expect(late.b.decision()).toMatchObject({ engineFailure: { code: 'DEADLINE', engineState: 'starting' } })
+  })
   it('keeps state-too-large and judgment-input-too-large as immediate strong exits of a held streak', async () => {
     const b = await heldInto({ ...CONFIG, hold: { minSteps: 1 } })
     b.engine.failure = new JudgmentError('INPUT_TOO_LARGE', 'complete serialized request exceeds the body limit')
@@ -3249,5 +3872,30 @@ describe('atomic judgment input fitting', () => {
     delete b.engine.fitting
     expect(await b.resolve()).toEqual(CHEAP)
     expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('reads its fitting for its own consumer id and records the offered characters and the routed engine', async () => {
+    const b = await bench()
+    user(b.session, 'earlier task')
+    user(b.session, 'continue')
+    const offered: string[][] = []
+    // Only the router's consumer has fitting, as under an override to a fitting engine.
+    b.engine.fittingForConsumer = {
+      ask: async (input) => {
+        offered.push([...input.states])
+        expect(input.consumer).toBe(MODEL_ROUTER_JUDGMENT_CONSUMER)
+        return { kind: 'unfit', engine: 'laya', model: 'pinned', limits: FIT_LIMITS, reason: 'state', engineId: judgmentEngineId('laya') }
+      },
+    }
+    expect(b.engine.fitting).toBeUndefined()
+    expect(await b.resolve()).toBeUndefined()
+    expect(b.engine.asks).toEqual([])
+    expect(b.decision()).toMatchObject({
+      reason: 'judgment-input-too-large',
+      engineId: 'laya',
+      latencyMs: expect.any(Number) as unknown,
+      inputChars: offered[0]!.reduce((total, text) => total + text.length, 0),
+    })
+    expect(offered[0]).toHaveLength(2)
   })
 })

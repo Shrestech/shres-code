@@ -50,7 +50,7 @@ A settings write switches the engine that answers the next ask without a reload,
 
 A composition that mounts an engine provider without the dispatcher fails to load, because the provider injects `judgmentEngines`. The shipped providers always report `ready` and surface credential and transport failures per ask; a provider that supervises a local process reports its own lifecycle through `status()`.
 
-Routing decisions record the provider-reported `engine` and `model`, not the selected registry id or the operating point it was gated under, and the router's asks carry no consumer id, so a `model-router` override is rejected until the router declares that id.
+The router declares consumer `model-router` and records the registry id and the thresholds each decision was gated under; the [engine-facts note](../feature/2026-09-25-model-router-engine-facts.md) records how.
 
 This decision replaces the single-provider `ctx.judgment` mount described in the [shipped Jev routing record](../feature/2026-09-20-jev-judgment-routing-shipped.md) and the [owned Shield judgments record](../feature/2026-09-23-owned-shield-judgments.md); both remain active for their other decisions.
 

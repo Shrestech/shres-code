@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@shres-code/cordis'
-import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentEngineDescriptor,
@@ -28,7 +28,7 @@ export interface FakeEngineConfig {
   /** Initial status. */
   status?: JudgmentEngineStatus
   /** Failure every ask rejects with. */
-  failWith?: JudgmentError
+  failWith?: Error
   /** Descriptor facts beyond the fixed fake ones. */
   describe?: Partial<Pick<JudgmentEngineDescriptor, 'egress' | 'models' | 'destination' | 'terms' | 'label'>>
 }
@@ -73,6 +73,7 @@ export class FakeEngine implements JudgmentEngine {
 
   private askFitted(input: JudgmentFittingInput): Promise<JudgmentFittingResult> {
     this.fittedAsks.push(input)
+    if (this.config.failWith !== undefined) return Promise.reject(this.config.failWith)
     const limits = { maxSequenceTokens: 8, maxHeadTokens: 4, maxBatchTokens: 16, manifestSha256: 'fake' }
     if (input.states[0] === 'unfit') {
       return Promise.resolve({ kind: 'unfit', engine: `fake-${this.config.id}`, model: `${this.config.id}-1`, limits, reason: 'state' })

@@ -157,15 +157,36 @@ describe('routing', () => {
     expect(remote.asks).toHaveLength(0)
   })
 
-  it('propagates the selected engine own failure unchanged', async () => {
+  it('propagates the selected engine own failure with its registry id attached', async () => {
     const ctx = root()
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
-    const thrown = new JudgmentError('INVALID_ANSWER', 'alpha answered garbage')
+    const cause = new Error('socket hang up')
+    const thrown = new JudgmentError('INVALID_ANSWER', 'alpha answered garbage', { cause })
     const beta = await engine(ctx, { id: 'beta' })
     await engine(ctx, { id: 'alpha', failWith: thrown })
 
-    await expect(ctx.judgment.ask(ASK)).rejects.toBe(thrown)
+    const failed = await failure(() => ctx.judgment.ask(ASK))
+    expect(failed).toMatchObject({ code: 'INVALID_ANSWER', message: 'alpha answered garbage', engineId: 'alpha' })
+    expect(failed.cause).toBe(cause)
     expect(beta.asks).toHaveLength(0)
+  })
+
+  it('stamps its own routing failures and leaves an already-stamped or non-judgment failure unchanged', async () => {
+    const ctx = root()
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'missing' })
+    expect(await failure(() => ctx.judgment.ask(ASK))).toMatchObject({ code: 'UNCONFIGURED', engineId: 'missing' })
+
+    const stamped = new JudgmentError('UNAVAILABLE', 'nested dispatch', { engineId: judgmentEngineId('inner') })
+    const nested = root()
+    await nested.plugin(JudgmentDispatch, { defaultEngine: 'outer' })
+    await engine(nested, { id: 'outer', failWith: stamped })
+    await expect(nested.judgment.ask(ASK)).rejects.toBe(stamped)
+
+    const foreign = new TypeError('engine broke its contract')
+    const broken = root()
+    await broken.plugin(JudgmentDispatch, { defaultEngine: 'broken' })
+    await engine(broken, { id: 'broken', failWith: foreign })
+    await expect(broken.judgment.ask(ASK)).rejects.toBe(foreign)
   })
 
   it('routes a consumer with an override to its own engine', async () => {
@@ -255,6 +276,37 @@ describe('fitting', () => {
     expect(plain.asks).toHaveLength(0)
   })
 
+  it('resolves fitting per consumer: an override to a fitting engine fits while the default does not', async () => {
+    const ctx = root()
+    await withSettings(ctx)
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'plain' })
+    const plain = await engine(ctx, { id: 'plain' })
+    const fitter = await engine(ctx, { id: 'fitter', fitting: true })
+    await consumer(ctx, 'model-router')
+    await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { overrides: { 'model-router': 'fitter' } })
+    const router = judgmentConsumerId('model-router')
+
+    expect(ctx.judgment.fitting).toBeUndefined()
+    expect(ctx.judgment.fittingFor()).toBeUndefined()
+    expect(ctx.judgment.fittingFor(judgmentConsumerId('worker-escalation'))).toBeUndefined()
+    const fitting = ctx.judgment.fittingFor(router)
+    expect(fitting).toBeDefined()
+    const answered = await fitting!.ask({ states: ['s'], questions: [], consumer: router })
+    expect(answered.kind === 'answered' ? answered.result.engineId : undefined).toBe('fitter')
+    expect(fitter.fittedAsks).toHaveLength(1)
+    expect(plain.asks).toHaveLength(0)
+    expect(ctx.judgment.selectedEngine(router)).toBe('fitter')
+    expect(ctx.judgment.selectedEngine()).toBe('plain')
+  })
+
+  it('stamps the routed engine on a fitted ask failure', async () => {
+    const ctx = root()
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'fitter' })
+    await engine(ctx, { id: 'fitter', fitting: true, failWith: new JudgmentError('INPUT_TOO_LARGE', 'too big') })
+    const failed = await failure(() => ctx.judgment.fitting!.ask({ states: ['s'], questions: [] }))
+    expect(failed).toMatchObject({ code: 'INPUT_TOO_LARGE', message: 'too big', engineId: 'fitter' })
+  })
+
   it('fails a fitted ask to an engine that is not ready', async () => {
     const ctx = root()
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'fitter' })
@@ -266,6 +318,7 @@ describe('fitting', () => {
 
     expect(failed.code).toBe('UNAVAILABLE')
     expect(failed.message).toBe('judgment engine "fitter" is unavailable: gateway exited 1')
+    expect(failed.engineId).toBe('fitter')
     expect(fitter.fittedAsks).toHaveLength(0)
   })
 })

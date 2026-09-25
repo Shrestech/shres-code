@@ -597,6 +597,7 @@ describe('real judgment engine switch through the settings seam', () => {
         ['shield', 'local', 'ready'],
       ])
       expect(before.selection.engine).toBe('typesafe')
+      expect(before.consumers).toContain('model-router')
 
       const first = createAgent(loaded, 'switch-before')
       await turn(first, 'Keep the manual route for this uncertain turn.')

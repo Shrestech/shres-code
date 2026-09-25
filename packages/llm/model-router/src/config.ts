@@ -14,6 +14,8 @@ import type {
   ModelRoutingCandidate,
   ModelRoutingCandidateConfig,
   ModelRoutingObjective,
+  ModelRoutingOperatingPoint,
+  ModelRoutingOperatingPointConfig,
   ModelRoutingRouteFrom,
   ModelRoutingRouteFromConfig,
 } from './types.ts'
@@ -129,10 +131,22 @@ export interface ModelRouterConfig {
    * judgment call. Must be non-empty unless `initialMode` is `off`.
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
-  /** Route confidence at or above which a candidate may be selected. Required. */
+  /**
+   * Route confidence at or above which a candidate may be selected. Required.
+   * The global default for any engine without an operating point.
+   */
   downgradeThreshold: number
-  /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
+  /**
+   * Required top-two probability margin (`top1 - top2`) for a selection.
+   * Required. The global default for any engine without an operating point.
+   */
   downgradeMargin: number
+  /**
+   * Gate thresholds per judgment engine, which replace the global defaults
+   * for the engine each names. At most one per engine. A `verbalized` engine
+   * gates only through a point that sets `acceptVerbalized`.
+   */
+  operatingPoints?: ModelRoutingOperatingPointConfig[]
   /** Streak horizon and cap, in model steps. */
   hold?: ModelRoutingHoldConfig
   /** Entry side of the difficulty band. */
@@ -221,6 +235,8 @@ export interface ResolvedModelRouterConfig {
   readonly downgradeThreshold: number
   /** Top-two margin floor. */
   readonly downgradeMargin: number
+  /** Detached operating points in configuration order. */
+  readonly operatingPoints: readonly ModelRoutingOperatingPoint[]
   /** Streak horizon and cap, in model steps. */
   readonly hold: { readonly minSteps: number; readonly maxSteps: number }
   /** Difficulty at or above which a streak is not entered. */
@@ -341,6 +357,7 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'routeFrom',
   'downgradeThreshold',
   'downgradeMargin',
+  'operatingPoints',
   'hold',
   'difficulty',
   'reentryCooldownTurns',
@@ -499,6 +516,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     throw new Error('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
   }
   const routeFrom = resolveRouteFrom(config.routeFrom ?? [], judgmentDeadlineMs)
+  const operatingPoints = resolveOperatingPoints(config.operatingPoints ?? [])
   if (config.initialMode !== 'off' && routeFrom.length === 0) {
     throw new Error('ModelRouterConfig.routeFrom is empty: routing can never run')
   }
@@ -549,6 +567,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     routeFrom,
     downgradeThreshold: config.downgradeThreshold,
     downgradeMargin: config.downgradeMargin,
+    operatingPoints,
     hold: Object.freeze({ minSteps, maxSteps }),
     entryScoreCeiling,
     reentryCooldownTurns,
@@ -616,6 +635,39 @@ function resolveRouteFrom(
       throw new Error(`${name}.objective "quota" requires allowEveryTurn: true under the per-turn entry policy`)
     }
     return Object.freeze({ provider: entry.provider, model: entry.model, objective: entry.objective, allowEveryTurn })
+  }))
+}
+
+/**
+ * Resolve the per-engine operating points.
+ * @param entries - the configured points.
+ * @returns the frozen points in configuration order.
+ * @throws Error naming the point when its engine is empty or listed twice, a
+ *   threshold is outside [0, 1], `calibratedBy` is empty, or
+ *   `acceptVerbalized` is not a boolean.
+ */
+function resolveOperatingPoints(entries: readonly ModelRoutingOperatingPointConfig[]): readonly ModelRoutingOperatingPoint[] {
+  const seen = new Set<string>()
+  return Object.freeze(entries.map((entry, index) => {
+    assertNonEmptyString(`ModelRouterConfig.operatingPoints[${index}].engine`, entry.engine)
+    const name = `ModelRouterConfig.operatingPoints["${entry.engine}"]`
+    if (seen.has(entry.engine)) throw new Error(`ModelRouterConfig.operatingPoints lists engine "${entry.engine}" more than once`)
+    seen.add(entry.engine)
+    assertRatio(`${name}.downgradeThreshold`, entry.downgradeThreshold)
+    assertRatio(`${name}.downgradeMargin`, entry.downgradeMargin)
+    // Read through an unknown-typed view: programmatic construction bypasses the schema.
+    const raw = entry as { calibratedBy?: unknown; acceptVerbalized?: unknown }
+    if (raw.calibratedBy !== undefined) assertNonEmptyString(`${name}.calibratedBy`, raw.calibratedBy)
+    if (raw.acceptVerbalized !== undefined && typeof raw.acceptVerbalized !== 'boolean') {
+      throw new Error(`${name}.acceptVerbalized must be a boolean`)
+    }
+    return Object.freeze({
+      engine: entry.engine,
+      downgradeThreshold: entry.downgradeThreshold,
+      downgradeMargin: entry.downgradeMargin,
+      ...entry.calibratedBy === undefined ? {} : { calibratedBy: entry.calibratedBy },
+      acceptVerbalized: entry.acceptVerbalized ?? false,
+    })
   }))
 }
 

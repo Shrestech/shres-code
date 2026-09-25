@@ -161,6 +161,11 @@ type ModelRoutingReason =
   /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
   /**
+   * The selected engine declares `verbalized` calibration and no operating
+   * point accepts it, so it is not asked and the manual route stands.
+   */
+  | 'engine-uncalibrated'
+  /**
    * The manual route runs budget thinking with reasoning enabled, so every
    * other candidate is excluded and no judgment runs: returning to it after a
    * routed segment would run the manual model without thinking.
@@ -239,12 +244,39 @@ interface ModelRoutingDecision {
   hint?: 'consider-stronger'
   /** Sticky-fold facts after this decision. */
   sticky: ModelRoutingStickyView
-  /** Engine that answered the judgment call, when one was made. */
+  /** Engine that answered the judgment call, as the provider named it, when one answered. */
   engine?: string
   /** Exact model that answered, when a judgment call was made. */
   model?: string
-  /** Duration of the judgment call in milliseconds, when one was made. */
+  /**
+   * Duration of the judgment call in milliseconds, when one was made: the
+   * engine's own figure for an answer, and the router's wall-clock measure from
+   * the ask to its failure for a failed call.
+   */
   latencyMs?: number
+  /**
+   * Registry id of the engine the judgment call was routed to, as the
+   * dispatcher stamped it on the answer or the failure; absent when a
+   * single-engine implementation served `ctx.judgment`.
+   */
+  engineId?: string
+  /**
+   * Token usage of the judgment call's own model request, exactly as the
+   * engine reported it, so {@link TokenUsage}'s presence contract holds; absent
+   * when the engine reported none.
+   */
+  judgeUsage?: TokenUsage
+  /**
+   * Duration of the candidate capability assessment in milliseconds, when this
+   * decision ran one: it sits on the request's critical path with the call.
+   */
+  eligibilityMs?: number
+  /**
+   * Characters of state the router handed to the engine for the judgment call:
+   * the one state of a plain ask, or every alternative a fitted ask offered.
+   * `judgmentInput.state` records the exact text a fitted answer used.
+   */
+  inputChars?: number
   /** The failed downgraded request a `route-failed` decision retries on the manual route. */
   failure?: ModelRoutingFailure
   /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
@@ -253,6 +285,8 @@ interface ModelRoutingDecision {
   engineFailure?: ModelRoutingEngineFailure
   /** Billing objective of the `routeFrom` entry the manual route matched, when it matched one. */
   objective?: ModelRoutingObjective
+  /** The thresholds in force for the route and difficulty answers, when a judgment call answered. */
+  thresholds?: ModelRoutingThresholds
 }
 ```
 
@@ -271,8 +305,41 @@ interface ModelRoutingFailure {
 ```ts type-equiv
 /** A failed judgment call as a decision records it. */
 interface ModelRoutingEngineFailure {
-  /** The engine's error code, or `DEADLINE` when `judgmentDeadlineMs` expired before an answer. */
+  /**
+   * The engine's error code, whenever the failure arrived, or `DEADLINE` when
+   * `judgmentDeadlineMs` expired first and the failure was a cancellation or
+   * carried no code, or an answer arrived after it.
+   */
   code: JudgmentErrorCode | 'DEADLINE'
+  /**
+   * The engine's registry state when it was becoming ready: before the call,
+   * which the router then did not make, or when the call's failure arrived.
+   * The fold does not count the decision as a failed judgment toward
+   * `judgmentFailures.holdTolerance` or the breaker.
+   */
+  engineState?: 'starting' | 'not-installed'
+}
+```
+
+```ts type-equiv
+/**
+ * The thresholds in force when a consult judged a route answer, as the
+ * decision records them, so a later configuration change does not
+ * reinterpret the log.
+ */
+interface ModelRoutingThresholds {
+  /** Route-confidence floor applied. */
+  downgradeThreshold: number
+  /** Top-two margin floor applied. */
+  downgradeMargin: number
+  /** Difficulty at or above which no streak is entered; present when the consult asked the difficulty question. */
+  entryScoreCeiling?: number
+  /** Difficulty at or above which a held streak escalates; present when the consult asked the difficulty question. */
+  escalateBackScoreThreshold?: number
+  /** Whether the confidence and margin floors came from the engine's operating point or the global defaults. */
+  source: 'operating-point' | 'global'
+  /** Id of the preregistration whose replay set the operating point; absent means uncalibrated. */
+  calibratedBy?: string
 }
 ```
 
@@ -280,7 +347,7 @@ One decision is logged per fresh judged request step as `model-routing/decision`
 
 ## Failed judgment calls
 
-Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure`, and an unclassified error records none. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest, and clears the count on a decision that carries a route answer. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
+Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. The gate applies the `operatingPoints` entry for the selected engine, else the global `downgradeThreshold` and `downgradeMargin`, and an answered decision records them in `thresholds` with their `source` and any `calibratedBy`, plus `entryScoreCeiling` and `escalateBackScoreThreshold` when the consult asked the difficulty question, so the log keeps the thresholds in force at each decision. A selected engine whose registry descriptor declares `verbalized` calibration is refused as `engine-uncalibrated`, without eligibility or a call, unless its operating point sets `acceptVerbalized`. The engine checks are read again, with no await before the call, so they describe the engine the dispatcher asks; an answer stamped with another engine's id is gated by that engine's point, and discarded as `engine-uncalibrated` when that engine is refused, and a failure from an engine that is `starting` or `not-installed` when it arrives is not counted. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest and the `engineId` they were routed to, and clears the count on a decision that carries a route answer. A failure routed to another engine starts a new count, and the consult reads the count only against the engine `ctx.judgment.selectedEngine('model-router')` selects, so an engine switch clears the breaker and the hold tolerance at once. A selected engine whose registry status is `starting` or `not-installed` is not asked; the decision records `engineFailure.engineState`, and the fold does not count it. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
 
 ## In-turn fallback
 
@@ -402,6 +469,12 @@ interface ModelRoutingJudgmentFailures {
   readonly count: number
   /** Turn of the latest failed judgment call. */
   readonly turn: number
+  /**
+   * Registry id of the engine the counted calls were routed to; absent when a
+   * single-engine service answered or the log predates the field. A failure
+   * routed to another engine starts a new count.
+   */
+  readonly engineId?: string
 }
 ```
 
@@ -437,6 +510,29 @@ interface ModelRoutingRouteFromConfig {
    * refuses a quota route without it.
    */
   allowEveryTurn?: boolean
+}
+```
+
+```ts type-equiv
+/**
+ * The gate thresholds one judgment engine is operated at, as configuration
+ * states them. Thresholds do not transfer between engines, so a point applies
+ * only to the engine it names.
+ */
+interface ModelRoutingOperatingPointConfig {
+  /** Registry id of the engine this point applies to. */
+  engine: string
+  /** Route confidence at or above which a candidate may be selected. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. */
+  downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds; absence marks them uncalibrated. */
+  calibratedBy?: string
+  /**
+   * Allow gating on an engine whose descriptor declares `verbalized`
+   * calibration. Without it such an engine is refused as `engine-uncalibrated`.
+   */
+  acceptVerbalized?: boolean
 }
 ```
 
@@ -524,10 +620,22 @@ interface ModelRouterConfig {
    * judgment call. Must be non-empty unless `initialMode` is `off`.
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
-  /** Route confidence at or above which a candidate may be selected. Required. */
+  /**
+   * Route confidence at or above which a candidate may be selected. Required.
+   * The global default for any engine without an operating point.
+   */
   downgradeThreshold: number
-  /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
+  /**
+   * Required top-two probability margin (`top1 - top2`) for a selection.
+   * Required. The global default for any engine without an operating point.
+   */
   downgradeMargin: number
+  /**
+   * Gate thresholds per judgment engine, which replace the global defaults
+   * for the engine each names. At most one per engine. A `verbalized` engine
+   * gates only through a point that sets `acceptVerbalized`.
+   */
+  operatingPoints?: ModelRoutingOperatingPointConfig[]
   /** Streak horizon and cap, in model steps. */
   hold?: ModelRoutingHoldConfig
   /** Entry side of the difficulty band. */
@@ -698,5 +806,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:381`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:412`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

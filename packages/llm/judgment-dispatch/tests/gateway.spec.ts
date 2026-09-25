@@ -30,7 +30,7 @@ async function boot(): Promise<{ ctx: Context; gateway: JudgmentEnginesGateway; 
     count += 1
   })
   await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
-  const gateway = ctx.get('judgmentEnginesRemote')
+  const gateway: unknown = ctx.get('judgmentEnginesRemote')
   if (!(gateway instanceof JudgmentEnginesGateway)) throw new Error('the judgmentEngines Remote is not mounted')
   return { ctx, gateway, events: () => count }
 }
@@ -104,7 +104,7 @@ describe('the judgmentEngines Remote', () => {
     expect(gateway.snapshot().engines[0]?.models).toEqual({ fast: 'x', accurate: 'y' })
   })
 
-  it('announces judgment/engines-updated on registry changes and judgment selection commits only', async () => {
+  it('announces judgment/engines-updated on engine, status, and consumer-declaration changes and judgment selection commits only', async () => {
     const { ctx, events } = await boot()
     const start = events()
     const alpha = await engine(ctx, { id: 'alpha' })
@@ -112,9 +112,19 @@ describe('the judgmentEngines Remote', () => {
     alpha.setStatus({ state: 'unavailable', detail: 'down' })
     expect(events()).toBe(start + 2)
 
+    const consumer = await ctx.plugin({
+      name: 'model-router-consumer',
+      apply: (inner: Context) => {
+        declareJudgmentConsumer(inner, judgmentConsumerId('model-router'))
+      },
+    })
+    expect(events()).toBe(start + 3)
+    await consumer.dispose()
+    expect(events()).toBe(start + 4)
+
     await ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { enabled: false })
-    expect(events()).toBe(start + 3)
+    expect(events()).toBe(start + 5)
     ctx.emit('settings/updated', settingsNamespace('other-namespace'), {}, {}, 'update')
-    expect(events()).toBe(start + 3)
+    expect(events()).toBe(start + 5)
   })
 })
