@@ -44,6 +44,7 @@
     "@shres-code/shres-code-judgment": "workspace:*",
     "@shres-code/shres-code-judgment-dispatch": "workspace:*",
     "@shres-code/shres-code-judgment-llm": "workspace:*",
+    "@shres-code/shres-code-judgment-typesafe": "workspace:*",
     "@shres-code/shres-code-jspace": "workspace:*",
     "@shres-code/shres-code-jspace-prompt": "workspace:*",
     "@shres-code/shres-code-ledger": "workspace:*",

@@ -692,6 +692,9 @@ importers:
       '@shres-code/shres-code-judgment-llm':
         specifier: workspace:*
         version: link:../packages/llm/judgment-llm
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:*
+        version: link:../packages/llm/judgment-typesafe
       '@shres-code/shres-code-ledger':
         specifier: workspace:*
         version: link:../packages/ledger/ledger
