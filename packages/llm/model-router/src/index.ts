@@ -1600,6 +1600,26 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     session.append('model-routing/decision', decision)
   }
 
+  /**
+   * One sentence, with a leading space, naming where consults send this
+   * session's state when the engine selected for this router sends it off this
+   * machine and the router would ask it; empty otherwise.
+   * @param config - resolved configuration carrying the state cap and operating points.
+   * @returns the sentence, or an empty string.
+   */
+  private remoteEgressNotice(config: ResolvedModelRouterConfig): string {
+    const engine = this.ctx.get('judgment')
+    if (engine === undefined || !judgmentEnabled(engine.settings)) return ''
+    const id = engine.selectedEngine(MODEL_ROUTER_JUDGMENT_CONSUMER)
+    const entry = id === undefined ? undefined : this.ctx.get('judgmentEngines')?.get(id)
+    if (entry === undefined || entry.descriptor.egress !== 'remote') return ''
+    const { descriptor } = entry
+    const point = config.operatingPoints.find(candidate => candidate.engine === String(descriptor.id))
+    if (routingCalibration(descriptor.calibration, point).kind === 'refused') return ''
+    const destination = descriptor.destination === undefined ? '' : ` at ${descriptor.destination}`
+    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this session to it${destination}.`
+  }
+
   /** Render the `/route` command's result. */
   private runCommand(agent: Agent, rawInput: string): { kind: 'success'; text: string } {
     const args = rawInput.trim()
@@ -1620,14 +1640,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     const wanted = args === 'on' ? true : args === 'off' ? false : undefined
     if (wanted === undefined) return { kind: 'success', text: 'Usage: /route [on|off]' }
+    // Turning routing on from a typed command states remote egress, as the Auto chip's confirm does.
+    const egress = wanted ? this.remoteEgressNotice(config) : ''
     switch (this.set(agent, wanted)) {
       case 'committed':
-        return { kind: 'success', text: wanted ? 'Model routing on.' : 'Model routing off.' }
+        return { kind: 'success', text: wanted ? `Model routing on.${egress}` : 'Model routing off.' }
       case 'queued':
         return {
           kind: 'success',
           text: wanted
-            ? 'Enabling model routing (applies from the next step).'
+            ? `Enabling model routing (applies from the next step).${egress}`
             : 'Disabling model routing (applies from the next step).',
         }
       case 'cancelled':

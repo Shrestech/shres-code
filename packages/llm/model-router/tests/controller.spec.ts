@@ -36,6 +36,7 @@ import type {
   JudgmentChoiceAnswer,
   JudgmentConsumerId,
   JudgmentEngineCalibration,
+  JudgmentEngineDescriptor,
   JudgmentEngineId,
   JudgmentEngineStatus,
   JudgmentInput,
@@ -186,6 +187,7 @@ async function registeredEngine(
   status: JudgmentEngineStatus,
   calibration: JudgmentEngineCalibration = 'calibrated',
   choice: JudgmentChoiceAnswer = PASSING,
+  facts: Partial<Pick<JudgmentEngineDescriptor, 'egress' | 'destination'>> = {},
 ): Promise<RegisteredEngine> {
   const asks: JudgmentInput[] = []
   let current = status
@@ -202,7 +204,7 @@ async function registeredEngine(
       }
       announce = registerJudgmentEngine(inner, {
         engine,
-        descriptor: { id: judgmentEngineId(id), label: id, egress: 'none', calibration, supportsFitting: false },
+        descriptor: { id: judgmentEngineId(id), label: id, egress: 'none', calibration, supportsFitting: false, ...facts },
         status: () => current,
       })
     },
@@ -915,6 +917,38 @@ describe('the /route command', () => {
       () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
     )
     expect(await route(b, '/route off')).toBe('Model routing is already off.')
+  })
+
+  it('names a remote judge, where it sends state, and the character cap when turned on', async () => {
+    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this session to it at api.typesafe.ai.'
+    const off = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
+    await off.ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
+    await registeredEngine(off.ctx, 'typesafe', { state: 'ready' }, 'calibrated', PASSING, { egress: 'remote', destination: 'api.typesafe.ai' })
+    expect(await route(off, '/route on')).toBe(`Model routing on.${remoteNotice}`)
+    expect(await route(off, '/route off')).toBe('Model routing off.')
+    openTurn(off.session, 1)
+    expect(await route(off, '/route on')).toBe(`Enabling model routing (applies from the next step).${remoteNotice}`)
+
+    // No judge, a local judge, and a remote one the router refuses send nothing off this machine.
+    const none = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
+    expect(await route(none, '/route on')).toBe('Model routing on.')
+    const local = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
+    await local.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
+    await registeredEngine(local.ctx, 'laya', { state: 'ready' }, 'calibrated', PASSING, { egress: 'local' })
+    expect(await route(local, '/route on')).toBe('Model routing on.')
+    const refused = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
+    await refused.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:x' })
+    await registeredEngine(refused.ctx, 'llm:x', { state: 'ready' }, 'verbalized', PASSING, { egress: 'remote' })
+    expect(await route(refused, '/route on')).toBe('Model routing on.')
+    // No destination named: the sentence ends at the judge.
+    const unnamed = await bench({
+      config: { ...CONFIG, initialMode: 'off', operatingPoints: [{ engine: 'llm:x', downgradeThreshold: 0.9, downgradeMargin: 0.2, acceptVerbalized: true }] },
+      commands: true,
+      engine: false,
+    })
+    await unnamed.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:x' })
+    await registeredEngine(unnamed.ctx, 'llm:x', { state: 'ready' }, 'verbalized', PASSING, { egress: 'remote' })
+    expect(await route(unnamed, '/route on')).toBe('Model routing on. The judge, llm:x, runs off this machine: each consult sends up to 12,000 characters of this session to it.')
   })
 })
 
