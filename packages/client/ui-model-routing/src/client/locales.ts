@@ -97,6 +97,7 @@ export const en = {
   'kpi.egress': 'Sent off-machine',
   'kpi.egress.unit': 'chars',
   'kpi.egress.unknown': 'judge egress unknown until the engine registry reports it',
+  'kpi.egress.unlisted': '{asks} asks to an engine this host does not list, so where they went is unknown',
   'kpi.egress.local': 'local engine only',
   'kpi.egress.atMost': '{asks} asks to a remote engine · at most',
   'kpi.egress.exact': '{asks} asks to a remote engine',

@@ -215,28 +215,37 @@ export function routingKpis(
   ]
 }
 
-/** The off-machine tile, which needs each engine's egress class. */
+/**
+ * The off-machine tile, which needs each engine's egress class: unknown until
+ * the registry is read, and for asks to an engine the registry does not list,
+ * which the tile counts apart from the remote characters it can attribute.
+ */
 function egressKpi(
   stats: ModelRoutingStatsSnapshot,
   egressOf: ((engine: string) => 'none' | 'local' | 'remote' | undefined) | undefined,
   t: RoutingTranslate,
 ): RoutingKpi {
   const label = t('kpi.egress')
-  const classes = stats.egress.map(row => ({ row, egress: egressOf?.(row.engine) }))
-  if (classes.some(entry => entry.egress === undefined)) {
-    return { id: 'egress', label, value: t('kpi.none'), detail: t('kpi.egress.unknown') }
-  }
+  if (egressOf === undefined) return { id: 'egress', label, value: t('kpi.none'), detail: t('kpi.egress.unknown') }
+  const classes = stats.egress.map(row => ({ row, egress: egressOf(row.engine) }))
+  const unlisted = classes.filter(entry => entry.egress === undefined).reduce((sum, entry) => sum + entry.row.asks, 0)
   const remote = classes.filter(entry => entry.egress === 'remote').map(entry => entry.row)
-  if (remote.length === 0) return { id: 'egress', label, value: '0', detail: t('kpi.egress.local') }
+  const unlistedDetail = t('kpi.egress.unlisted', { asks: unlisted })
+  if (remote.length === 0) {
+    return unlisted === 0
+      ? { id: 'egress', label, value: '0', detail: t('kpi.egress.local') }
+      : { id: 'egress', label, value: t('kpi.none'), detail: unlistedDetail }
+  }
   const chars = remote.reduce((sum, row) => sum + row.chars, 0)
   const asks = remote.reduce((sum, row) => sum + row.asks, 0)
   const atMost = remote.some(row => row.bound === 'at-most')
+  const detail = t(atMost ? 'kpi.egress.atMost' : 'kpi.egress.exact', { asks })
   return {
     id: 'egress',
     label,
     value: atMost ? `≤ ${formatTokens(chars)}` : formatTokens(chars),
     unit: t('kpi.egress.unit'),
-    detail: t(atMost ? 'kpi.egress.atMost' : 'kpi.egress.exact', { asks }),
+    detail: unlisted === 0 ? detail : `${detail} · ${unlistedDetail}`,
   }
 }
 

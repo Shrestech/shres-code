@@ -119,8 +119,25 @@ describe('routingKpis', () => {
 
   it('reports unknown egress before the registry reports it, and local-only egress after', () => {
     expect(routingKpis(liveStats(), GATE, undefined, t).at(-1)).toMatchObject({ value: '—', detail: 'judge egress unknown until the engine registry reports it' })
-    expect(routingKpis(liveStats(), GATE, () => undefined, t).at(-1)?.value).toBe('—')
+    expect(routingKpis(liveStats(), GATE, () => undefined, t).at(-1)).toMatchObject({
+      value: '—', detail: '22 asks to an engine this host does not list, so where they went is unknown',
+    })
     expect(routingKpis(liveStats(), GATE, () => 'local', t).at(-1)).toMatchObject({ value: '0', detail: 'local engine only' })
+  })
+
+  it('counts remote characters it can attribute beside asks to an unlisted engine', () => {
+    const stats = {
+      ...liveStats(),
+      egress: [
+        { engine: 'typesafe', asks: 22, chars: 264_000, bound: 'exact' as const },
+        { engine: 'retired', asks: 3, chars: 9_000, bound: 'at-most' as const },
+      ],
+    }
+    const egressOf = (engine: string) => (engine === 'typesafe' ? 'remote' as const : undefined)
+    expect(routingKpis(stats, GATE, egressOf, t).at(-1)).toMatchObject({
+      value: '264k',
+      detail: '22 asks to a remote engine · 3 asks to an engine this host does not list, so where they went is unknown',
+    })
   })
 
   it('reports empty tiles for a session with no calls and no consults', () => {
