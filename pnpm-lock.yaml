@@ -4294,6 +4294,9 @@ importers:
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../system-prompt
 
   packages/core/agent-loop:
     dependencies:

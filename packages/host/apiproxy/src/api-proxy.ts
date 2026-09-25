@@ -1188,6 +1188,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
   type WebModelSelectionRef = ModelSelectionRef & { current: ModelSelection }
   const selections = new WeakMap<Agent, WebModelSelectionRef>()
+  /** Early withdrawal of each selection this proxy provided, run when its agent is disposed. */
+  const selectionReleases = new WeakMap<Agent, () => void>()
+  // A disposed agent needs no selection: release its withdrawal effect now
+  // instead of holding it until this proxy's fiber unloads.
+  ctx.on('agent/disposed', ({ agent }) => { selectionReleases.get(agent)?.() }, { global: true })
   /**
    * Serializes `agentPreset.select` per session. Two concurrent selects both
    * pass the blank check, and the second `unmountPresetFor` then finds nothing
@@ -1214,7 +1219,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /**
    * Provide or return the session-local model selection the agent's
-   * model-selection hook applies, which prompt assembly snapshots.
+   * model-selection hook applies, which prompt assembly snapshots. A selection
+   * this proxy provides is withdrawn when its fiber is disposed.
    *
    * Explicit selections are durable even when no subsequent request runs.
    * Otherwise the session's manual route precedes the live default, which a
@@ -1239,7 +1245,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
       assembled: undefined,
     }
-    provideModelSelection(agent, selection)
+    const withdraw = provideModelSelection(agent, selection)
+    // The selection belongs to this proxy's fiber: a reload withdraws it, and
+    // the replacement proxy provides its own.
+    const release = ctx.effect(() => withdraw, 'apiProxy.selectionFor()')
+    selectionReleases.set(agent, () => {
+      selectionReleases.delete(agent)
+      // The withdrawal is synchronous; the disposer's promise settles with it.
+      void release()
+    })
     selections.set(agent, selection)
     return selection
   }

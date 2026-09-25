@@ -202,22 +202,30 @@ export function modelSelectionInstalled(agent: Agent): boolean {
 
 /**
  * Provide the manual selection an agent's model-selection hook applies. A
- * front end that owns the agent's selection calls this once per agent; the
- * hook reads the reference at every step, so the call may come before or
- * after the hook is installed. An agent the registry did not install the hook
- * for, such as a delegated child, gets it here.
+ * front end that owns the agent's selection calls this once per agent and
+ * registers the returned withdrawal as an effect of its own fiber, so a
+ * reloaded provider leaves the slot empty for its replacement. The hook reads
+ * the reference at every step, so the call may come before or after the hook
+ * is installed; while the slot is empty the hook uses the manual route of an
+ * agent with no provided selection. An agent the registry did not install the
+ * hook for, such as a delegated child, gets it here.
  * @param agent - the agent whose selection the caller owns.
  * @param selection - mutable selection owned by the calling entry point.
- * @throws Error when another selection was already provided for the agent:
+ * @returns Withdrawal that empties the slot while it still holds this
+ *   selection; it leaves the hook installed.
+ * @throws Error when another selection is currently provided for the agent:
  *   two owners of one agent's selection would disagree about its route.
  */
-export function provideModelSelection(agent: Agent, selection: ModelSelectionRef): void {
+export function provideModelSelection(agent: Agent, selection: ModelSelectionRef): () => void {
   const slot = slotOf(agent)
   if (slot.selection !== undefined && slot.selection !== selection) {
     throw new Error(`agent "${agent.id}" already has a model selection provider`)
   }
   slot.selection = selection
   if (slot.dispose === undefined) installModelSelection(agent)
+  return () => {
+    if (slot.selection === selection) slot.selection = undefined
+  }
 }
 
 /**

@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
-        description: 'Provide or return the session-local model selection the agent\'s model-selection hook applies, which prompt assembly snapshots.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
+        description: 'Provide or return the session-local model selection the agent\'s model-selection hook applies, which prompt assembly snapshots. The selection is withdrawn when this service\'s fiber is disposed, so a reloaded instance provides its own.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
         parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
         returns: 'the shared mutable selection for this Agent.',
       },

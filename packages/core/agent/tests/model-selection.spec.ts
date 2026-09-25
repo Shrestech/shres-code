@@ -64,6 +64,21 @@ describe('one model-selection hook per agent', () => {
     await ctx.fiber.dispose()
   })
 
+  it('lets a withdrawn provider clear only its own selection', async () => {
+    const ctx = new Context()
+    const agent = hookAgent(ctx)
+    const first: ModelSelectionRef = { current: undefined, assembled: undefined }
+    const second: ModelSelectionRef = { current: undefined, assembled: undefined }
+    const withdrawFirst = provideModelSelection(agent, first)
+    withdrawFirst()
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    provideModelSelection(agent, second)
+    // A stale withdrawal, such as a reloaded provider's late cleanup, leaves the successor in place.
+    withdrawFirst()
+    expect(() => { provideModelSelection(agent, first) }).toThrow(`agent "${agent.id}" already has a model selection provider`)
+    await ctx.fiber.dispose()
+  })
+
   it('passes the resolved request through while no selection is provided', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
