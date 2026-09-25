@@ -491,6 +491,227 @@ export interface ModelRoutingProjection {
   returnThinking?: 'present' | 'absent'
 }
 
+/**
+ * The group a decision's reason belongs to, for the reason chart and the
+ * verdict: the route switched or held, the judge kept the strong route, a
+ * precondition kept it without a judgment, or the engine or route failed.
+ */
+export type ModelRoutingReasonGroup = 'switched' | 'judge-no' | 'fail-closed' | 'engine'
+
+/**
+ * Why a cold call's prefix was re-written, first match wins: a routed switch
+ * onto a candidate, a routed return to the manual route, a manual model
+ * switch, idle past the model's cache lifetime, the session's first call, the
+ * first call after a compaction, or anything else on warm timing.
+ */
+export type ModelRoutingColdCause =
+  | 'routed-switch'
+  | 'routed-return'
+  | 'manual-switch'
+  | 'idle-expiry'
+  | 'session-start'
+  | 'post-compaction'
+  | 'other'
+
+/** Timeline marker kinds: a routed switch, a return, a manual switch, a failed route, or an idle gap past the cache lifetime. */
+export type ModelRoutingTimelineMark = 'down' | 'return' | 'manual' | 'failed' | 'idle'
+
+/**
+ * One model that served calls in the session, with its token classes. Input
+ * classes follow the usage presence contract: a call that reported cache
+ * counts contributes `uncached` (its `inputTokens`), `cacheRead`, and
+ * `cacheWrite`; a call that reported none contributes `unreported` (its
+ * whole `inputTokens`).
+ */
+export interface ModelRoutingStatsModel {
+  /** Provider route that served the calls. */
+  provider: string
+  /** Model id that served the calls. */
+  model: string
+  /** `strong` for the manual route, `candidate` for a pool candidate, `other` for earlier manual choices. */
+  role: 'strong' | 'candidate' | 'other'
+  /** Chart colour slot: the strong route, a pool series by pool order, or neutral beyond five. */
+  colorSlot: 'strong' | 1 | 2 | 3 | 4 | 5 | 'other'
+  /** Steps attributed to this model (the model of the step's last call). */
+  steps: number
+  /** Calls this model served. */
+  calls: number
+  /** Input tokens of cache-reporting calls that were neither read from nor written to cache. */
+  uncached: number
+  /** Input tokens of calls that reported no cache counts. */
+  unreported: number
+  /** Cache-read input tokens. */
+  cacheRead: number
+  /** Cache-write input tokens. */
+  cacheWrite: number
+  /** Output tokens. */
+  output: number
+  /** Calls that reported cache counts. */
+  reportedCalls: number
+}
+
+/**
+ * The `modelRoutingStats` projection's wire value: a pure fold of one
+ * session's log into the Routing view's counts, histograms, timeline, and
+ * recent decisions. Statistics follow the model-routing session view's stat
+ * definitions. Router configuration (thresholds, deadline, difficulty band)
+ * is not in the log, so it is not here; `modelRouting.gate()` reads it.
+ */
+export interface ModelRoutingStatsSnapshot {
+  /** Decision and step counts. */
+  counts: {
+    /** All `model-routing/decision` events. */
+    decisions: number
+    /** Decisions whose judgment answered (`route` present). */
+    consults: number
+    /** Steps whose calls a downgraded decision's selection served. */
+    downgradedSteps: number
+    /** Distinct steps with at least one call. */
+    steps: number
+    /** Downgraded decisions entered from an inactive sticky state. */
+    streaks: number
+    /** `kept-strong` decisions. */
+    keptStrong: number
+    /** Decisions with reason `route-failed`. */
+    routeFailed: number
+    /** Decisions with `engineFailure`, or reason `engine-unavailable` or `invalid-answer`. */
+    judgeFailed: number
+    /** Decisions whose `engineFailure.code` is `DEADLINE`. */
+    deadlineHits: number
+    /** Turns with at least one decision. */
+    turnsWithDecisions: number
+  }
+  /** Reason histogram over all decisions, largest first. */
+  reasons: { reason: string; group: ModelRoutingReasonGroup; count: number }[]
+  /** Kept-strong reason histogram, largest first. */
+  keptReasons: { reason: string; count: number }[]
+  /** `sticky.brokenBy` histogram over decisions, largest first. */
+  exits: { brokenBy: string; count: number }[]
+  /** Streak lengths in steps, entry to exit (an open streak runs to the end of the log). */
+  streakLengths: { median: number | null; max: number | null }
+  /** Best-candidate confidence per consult. */
+  confidence: {
+    /** Per-consult values in log order, the most recent 500. */
+    values: number[]
+    /** Top-two probability margin per consult in log order, the most recent 500. */
+    margins: number[]
+    /** Largest value over every consult, or null without consults. */
+    max: number | null
+    /** Consults counted, including any beyond the retained values. */
+    total: number
+  }
+  /**
+   * Judge latency histogram. Bucket `i` counts latencies at most
+   * `bucketsMs[i]` and above the previous bound; the last bound is 30 s.
+   * Percentiles are read from the histogram, within one bucket.
+   */
+  latency: {
+    bucketsMs: number[]
+    counts: number[]
+    /** Failed asks, shown apart from the histogram. */
+    failed: number
+    p50: number | null
+    p95: number | null
+    /** Whether the histogram includes failed asks (their latency is recorded from PR 8b). */
+    includesFailed: boolean
+  }
+  /** Models that served calls, strong first, then pool order, then first appearance. */
+  models: ModelRoutingStatsModel[]
+  /** Cold prefills by cause, every cause present, fixed order. */
+  cold: { cause: ModelRoutingColdCause; count: number; tokens: number }[]
+  /** The idle-expiry cache lifetime used, in milliseconds, and whether it is the 300 s fallback. */
+  coldTtl: { ms: number; fallback: boolean }
+  /** Share of calls with no reported cache counts, 0 to 1, or null without calls. */
+  unreportedCallShare: number | null
+  /** Strong-route tokens moved to candidates and re-written on return. */
+  moved: {
+    /** Input processed plus output over candidate-served calls. */
+    tokensOffStrong: number
+    /** Cache-write plus uncached input on the first strong call after each streak exit. */
+    returnReprefill: number
+    /** Billing objective of the matched `routeFrom` entry: the latest decision's, `mixed` when they differ. */
+    objective: ModelRoutingObjective | 'mixed' | null
+  }
+  /**
+   * Judge asks and state characters per engine name. `chars` is exact when
+   * every ask recorded its input size; otherwise it is the upper bound
+   * `stateProjection.maxChars` summed, and `bound` is `at-most`.
+   */
+  egress: { engine: string; asks: number; chars: number; bound: 'exact' | 'at-most' }[]
+  /** Engine names that answered, in first-appearance order, with their decision counts. */
+  engines: { name: string; decisions: number }[]
+  /**
+   * Step timeline for the model chart. `steps[i].model` indexes `models`;
+   * marks and decisions point at a step index. More than 400 steps are
+   * aggregated to one entry per turn (majority model).
+   */
+  timeline: {
+    steps: { turn: number; step: number; model: number; seq: number; t: number }[]
+    marks: { i: number; kind: ModelRoutingTimelineMark }[]
+    decisions: {
+      seq: number
+      i: number
+      outcome: ModelRoutingOutcome
+      reason: string
+      best: number | null
+      /** Index into `engines`, or null when no engine answered. */
+      engine: number | null
+    }[]
+    aggregated: boolean
+  }
+  /** The most recent decisions, newest first, at most 200. */
+  recent: {
+    seq: number
+    t: number
+    turn: number
+    step: number
+    outcome: ModelRoutingOutcome
+    reason: string
+    best: number | null
+    difficulty: number | null
+    engine: string | null
+    latencyMs: number | null
+  }[]
+}
+
+/**
+ * The router configuration a decision was gated by, as configured now:
+ * decisions do not record it. Thresholds are uncalibrated until an engine
+ * reports a calibration.
+ */
+export interface ModelRoutingGateView {
+  /** Route-confidence floor. */
+  downgradeThreshold: number
+  /** Top-two margin floor. */
+  downgradeMargin: number
+  /** Deadline of one judgment call, in milliseconds. */
+  judgmentDeadlineMs: number
+  /** Difficulty at or above which a streak is not entered. */
+  entryScoreCeiling: number
+  /** Difficulty at or above which a held streak escalates back. */
+  escalateBackScoreThreshold: number
+  /** Difficulty levels, lowest first; the score scale is 0 to `levels.length - 1`. */
+  difficultyLevels: string[]
+  /** Streak horizon and cap, in model steps. */
+  hold: { minSteps: number; maxSteps: number }
+}
+
+/** One logged decision with the position and config a drill-down renders. */
+export interface ModelRoutingDecisionDetail {
+  /** Seq of the `model-routing/decision` event. */
+  seq: number
+  /** Event time, epoch milliseconds. */
+  time: number
+  /** Turn the decision was logged in. */
+  turn: number
+  /** Step the decision was logged in. */
+  step: number
+  /** The logged decision, verbatim. */
+  decision: ModelRoutingDecision
+  /** Configuration in force now. */
+  gate: ModelRoutingGateView
+}
+
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
@@ -518,5 +739,7 @@ declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /** Routing mode, outstanding `/route` selection, last decision, and sticky state. */
     modelRouting: ModelRoutingProjection
+    /** Routing counts, histograms, timeline, and recent decisions for the Routing view. */
+    modelRoutingStats: ModelRoutingStatsSnapshot
   }
 }

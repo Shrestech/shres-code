@@ -75,7 +75,8 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
-    "@shres-code/shres-code-typert-registry": "workspace:^"
+    "@shres-code/shres-code-typert-registry": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/cordis": "workspace:^",
@@ -96,6 +97,7 @@
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-speech": "workspace:^",
-    "@shres-code/shres-code-typert-registry": "workspace:^"
+    "@shres-code/shres-code-typert-registry": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^"
   }
 }

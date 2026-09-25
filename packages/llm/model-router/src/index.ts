@@ -53,6 +53,7 @@ import type {
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
 import type {} from '@shres-code/shres-code-commands'
 import type {} from '@shres-code/shres-code-session-projection'
@@ -86,13 +87,24 @@ import {
   stickyState,
 } from './folds.ts'
 import { buildRoutingStateCandidates } from './state.ts'
+import {
+  applyStatsEvent,
+  createStatsState,
+  modelRoutingStatsSchema,
+  positionBefore,
+  routeMargin,
+  viewStats,
+} from './stats.ts'
+import type { ModelRoutingStatsState } from './stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
 import type {
   ModelRoutingCandidate,
   ModelRoutingDecision,
+  ModelRoutingDecisionDetail,
   ModelRoutingEngineFailure,
+  ModelRoutingGateView,
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
   ModelRoutingProjection,
@@ -127,6 +139,7 @@ export {
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
+export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
 /** Settings namespace carrying the deployment's routing configuration. */
@@ -354,25 +367,6 @@ function hasOpenTurn(events: readonly SessionEvent[]): boolean {
 }
 
 /**
- * The top-two probability margin of one choice answer.
- * @param probabilities - the answer's distribution.
- * @returns the margin between the two highest probabilities.
- */
-export function routeMargin(probabilities: Readonly<Record<string, number>>): number {
-  let top1 = 0
-  let top2 = 0
-  for (const value of Object.values(probabilities)) {
-    if (value > top1) {
-      top2 = top1
-      top1 = value
-    } else if (value > top2) {
-      top2 = value
-    }
-  }
-  return top1 - top2
-}
-
-/**
  * `ctx.modelRouting`: owns the logged routing mode, routing decisions, and
  * the consult `installModelSelection` reaches. No live mirror of the mode is
  * kept — the log is the state — and its configuration, mode, and decision events write no prompt, tool,
@@ -446,6 +440,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // which is what the config catalog walks.
   }) as z<ModelRouterConfig>
 
+  /** Binds `ctx.modelRouting` to the `modelRouting` Remote namespace. */
+  readonly typertRemote = bindTypertRemote(this, 'modelRouting')
   private source: () => ModelRouterConfig
   private lastRaw: ModelRouterConfig | undefined
   private lastGood: ResolvedModelRouterConfig | undefined
@@ -561,6 +557,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         // The unit state records whether the first manual-route reply after a streak carried thinking.
         stateVersion: 9,
       })
+      projectionCtx.sessionProjections.register<'modelRoutingStats', ModelRoutingStatsState>({
+        key: 'modelRoutingStats',
+        schema: modelRoutingStatsSchema,
+        init: createStatsState,
+        apply: applyStatsEvent,
+        view: viewStats,
+        stateVersion: 1,
+      })
     })
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
@@ -650,6 +654,44 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.lastRaw = raw
     this.lastGood = next
     return next
+  }
+
+  /**
+   * The gate configuration in force now. Decisions do not record it, so a
+   * drill-down reads the current values.
+   * @returns the thresholds, judgment deadline, difficulty band, and hold.
+   */
+  @Remote('gate')
+  gateView(): ModelRoutingGateView {
+    const config = this.config()
+    return {
+      downgradeThreshold: config.downgradeThreshold,
+      downgradeMargin: config.downgradeMargin,
+      judgmentDeadlineMs: config.judgmentDeadlineMs,
+      entryScoreCeiling: config.entryScoreCeiling,
+      escalateBackScoreThreshold: config.escalateBackScoreThreshold,
+      difficultyLevels: [...config.difficultyLevels],
+      hold: { minSteps: config.hold.minSteps, maxSteps: config.hold.maxSteps },
+    }
+  }
+
+  /**
+   * One logged decision, verbatim, with the turn and step it was logged in and
+   * the gate configuration in force now.
+   * @param agent - the session's Agent.
+   * @param seq - seq of a `model-routing/decision` event in that session's log.
+   * @returns the decision detail.
+   * @throws when the seq does not name a `model-routing/decision` event.
+   */
+  @Remote('decision')
+  decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail {
+    const events = agent.session.events
+    const index = events.findIndex(event => event.seq === seq)
+    const event = events[index]
+    if (event?.type !== 'model-routing/decision') {
+      throw new Error(`session "${agent.session.id}" logs no model-routing/decision at seq ${String(seq)}`)
+    }
+    return { seq, time: event.time, ...positionBefore(events, index), decision: event.data, gate: this.gateView() }
   }
 
   /**

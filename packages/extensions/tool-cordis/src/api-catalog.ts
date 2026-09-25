@@ -1300,6 +1300,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the resolved configuration.',
       },
       {
+        signature: '@Remote(\'gate\') gateView(): ModelRoutingGateView',
+        description: 'The gate configuration in force now. Decisions do not record it, so a drill-down reads the current values.',
+        parameters: [],
+        returns: 'the thresholds, judgment deadline, difficulty band, and hold.',
+      },
+      {
+        signature: '@Remote(\'decision\') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail',
+        description: 'One logged decision, verbatim, with the turn and step it was logged in and the gate configuration in force now.',
+        parameters: [{ name: 'agent', description: 'the session\'s Agent.' }, { name: 'seq', description: 'seq of a `model-routing/decision` event in that session\'s log.' }],
+        returns: 'the decision detail.',
+        throws: ['when the seq does not name a `model-routing/decision` event.'],
+      },
+      {
         signature: 'get(agent: Agent): { active: boolean; pending?: boolean }',
         description: 'Read the logged mode and any selection awaiting the next accepted pre-step.',
         parameters: [{ name: 'agent', description: 'the agent to read.' }],
@@ -4249,6 +4262,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface JudgmentEngineStatus {\n    readonly state: JudgmentEngineState;\n    readonly detail?: string;\n}',
   },
   {
+    name: 'JudgmentErrorCode',
+    declaration: 'export type JudgmentErrorCode = \'UNCONFIGURED\' | \'UNAVAILABLE\' | \'INPUT_TOO_LARGE\' | \'INVALID_ANSWER\' | \'ABORTED\';',
+  },
+  {
     name: 'JudgmentFittingEngine',
     declaration: 'export interface JudgmentFittingEngine {\n    ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>;\n}',
   },
@@ -4589,8 +4606,64 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
   },
   {
+    name: 'ModelRoutingActiveStickyView',
+    declaration: 'export interface ModelRoutingActiveStickyView {\n    active: true;\n    stepsElapsed: number;\n    enteredTurn?: number;\n    enteredStep?: number;\n    entryBase?: ModelRoutingEntryBaseView;\n    routeErrorLimit: number;\n}',
+  },
+  {
+    name: 'ModelRoutingBreakReason',
+    declaration: 'export type ModelRoutingBreakReason = \'gate-failed\' | \'current-preferred\' | \'unknown-candidate\' | \'candidate-ineligible\' | \'escalated\' | \'manual-deviation\' | \'mode-off\' | \'route-errors\' | \'route-failed\' | \'hold-cap\' | \'base-unlisted\';',
+  },
+  {
     name: 'ModelRoutingCandidate',
     declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description: string;\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateAssessment',
+    declaration: 'export interface ModelRoutingCandidateAssessment {\n    readonly id: string;\n    readonly provider: string;\n    readonly model: string;\n    readonly reasoningEffort?: string;\n    readonly difficultyReasoningEffort?: string;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly effectiveMaxTokens?: number;\n    readonly reason: ModelRoutingCandidateEligibilityReason;\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateEligibility',
+    declaration: 'export interface ModelRoutingCandidateEligibility {\n    readonly requirements: ModelRoutingCandidateRequirements;\n    readonly candidates: readonly ModelRoutingCandidate[];\n    readonly eligibleCandidates: readonly ModelRoutingCandidate[];\n    readonly assessments: readonly ModelRoutingCandidateAssessment[];\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateEligibilityReason',
+    declaration: 'export type ModelRoutingCandidateEligibilityReason = \'eligible\' | \'base-unavailable\' | \'base-context-unknown\' | \'equals-base\' | \'candidate-unavailable\' | \'candidate-invalid\' | \'difficulty-effort-invalid\' | \'image-capability-unknown\' | \'image-incompatible\' | \'context-unknown\' | \'context-too-small\' | \'max-tokens-exceeds-context\' | \'hosted-tools-incompatible\' | \'thinking-mode-incompatible\';',
+  },
+  {
+    name: 'ModelRoutingCandidateRequirements',
+    declaration: 'export interface ModelRoutingCandidateRequirements {\n    readonly requiresImage: boolean;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly thinkingMode?: LlmThinkingMode;\n}',
+  },
+  {
+    name: 'ModelRoutingDecision',
+    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n}',
+  },
+  {
+    name: 'ModelRoutingDecisionDetail',
+    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingDecision;\n    gate: ModelRoutingGateView;\n}',
+  },
+  {
+    name: 'ModelRoutingDifficultyAnswer',
+    declaration: 'export interface ModelRoutingDifficultyAnswer {\n    score: number;\n    confidence: number;\n}',
+  },
+  {
+    name: 'ModelRoutingEngineFailure',
+    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n}',
+  },
+  {
+    name: 'ModelRoutingEntryBaseView',
+    declaration: 'export interface ModelRoutingEntryBaseView {\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n}',
+  },
+  {
+    name: 'ModelRoutingFailure',
+    declaration: 'export interface ModelRoutingFailure {\n    code: string;\n    provider: string;\n    model: string;\n}',
+  },
+  {
+    name: 'ModelRoutingGateView',
+    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n}',
+  },
+  {
+    name: 'ModelRoutingInactiveStickyView',
+    declaration: 'export interface ModelRoutingInactiveStickyView {\n    active: false;\n    stepsElapsed: number;\n    brokenBy?: ModelRoutingBreakReason;\n    entryBase?: ModelRoutingEntryBaseView;\n}',
   },
   {
     name: 'ModelRoutingInitialMode',
@@ -4605,12 +4678,32 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
   },
   {
+    name: 'ModelRoutingOutcome',
+    declaration: 'export type ModelRoutingOutcome = \'downgraded\' | \'kept-strong\' | \'skipped\' | \'error\';',
+  },
+  {
+    name: 'ModelRoutingReason',
+    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
   },
   {
+    name: 'ModelRoutingRouteAnswer',
+    declaration: 'export interface ModelRoutingRouteAnswer {\n    choice: string;\n    confidence: number;\n    probabilities: Record<string, number>;\n}',
+  },
+  {
     name: 'ModelRoutingRouteFrom',
     declaration: 'export interface ModelRoutingRouteFrom {\n    readonly provider: string;\n    readonly model: string;\n    readonly objective: ModelRoutingObjective;\n    readonly allowEveryTurn: boolean;\n}',
+  },
+  {
+    name: 'ModelRoutingSelection',
+    declaration: 'export interface ModelRoutingSelection {\n    candidateId: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n}',
+  },
+  {
+    name: 'ModelRoutingStickyView',
+    declaration: 'export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView;',
   },
   {
     name: 'ModelRoutingUnavailablePolicy',

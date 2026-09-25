@@ -7,6 +7,7 @@ import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
 import remoteControlRemote from '@shres-code/shres-code-host-remote-control/remote'
 import messageFeedbackRemote from '@shres-code/shres-code-message-feedback/remote'
+import modelRoutingRemote from '@shres-code/shres-code-model-router/remote'
 import speechRemote from '@shres-code/shres-code-speech/remote'
 import shieldRemote from '@shres-code/shres-code-shield/remote'
 import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
@@ -30,6 +31,7 @@ export type {
   RemoteRegistrySnapshot, RemoteTarget, RemoveOutcome, TunnelStateView,
 } from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-message-feedback/remote'
+export type {} from '@shres-code/shres-code-model-router/remote'
 export type {} from '@shres-code/shres-code-speech/remote'
 export type {} from '@shres-code/shres-code-shield/remote'
 // The forwarded-event allowlist's selection seat: without it in the consumer's
@@ -127,7 +129,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, remoteControlRemote, messageFeedbackRemote,
-      speechRemote, shieldRemote,
+      modelRoutingRemote, speechRemote, shieldRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

@@ -1116,6 +1116,9 @@ importers:
       '@shres-code/shres-code-message-feedback':
         specifier: workspace:^
         version: link:../../feedback/message-feedback
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -7165,6 +7168,9 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/token-meter:
     dependencies:
