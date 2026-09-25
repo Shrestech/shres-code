@@ -124,6 +124,19 @@ describe('global destinations and settings', () => {
     void renderSlot
   })
 
+  it('returns focus to the trigger when Settings was opened from outside the shell', () => {
+    const navigate = vi.fn()
+    render(<SettingsRoot page="models" navigate={navigate}
+      t={key => (en as Record<string, string>)[key] ?? key}
+      useWorkspaces={() => { throw new Error('unused') }}
+      useSessions={((select: (state: unknown) => unknown) => select({ phase: 'ready', current: undefined, byId: {} })) as never}
+      useSections={select => select([{ id: 'models', order: 10, label: 'Models & providers' }])}
+      useOnboardingSteps={select => select([])}
+      renderSlot={(() => null) as never} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(navigate).toHaveBeenCalledWith(null)
+  })
+
   it('completes an onboarding step once even when its completion is repeated', () => {
     const { renderSlot } = mount({ onboardingActive: true })
     const owner = renderSlot.mock.calls.findLast(([key]) => key === 'settings.onboarding')?.[1] as { stepId: string; complete: () => void }
