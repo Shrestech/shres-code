@@ -802,10 +802,12 @@ export interface ModelRoutingStatsSnapshot {
   /**
    * Step timeline for the model chart. `steps[i].model` indexes `models`;
    * marks and decisions point at a step index. More than 400 steps are
-   * aggregated to one entry per turn (majority model).
+   * aggregated to at most 400 entries of one or more whole consecutive turns
+   * each (majority model), from `turn` to `lastTurn`; an entry's `seq` and
+   * `t` are its latest call's. A step's `lastTurn` is its `turn`.
    */
   timeline: {
-    steps: { turn: number; step: number; model: number; seq: number; t: number }[]
+    steps: { turn: number; step: number; lastTurn: number; model: number; seq: number; t: number }[]
     marks: { i: number; kind: ModelRoutingTimelineMark }[]
     decisions: {
       seq: number

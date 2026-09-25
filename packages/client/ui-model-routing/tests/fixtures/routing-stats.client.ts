@@ -71,6 +71,7 @@ export function liveStats(): ModelRoutingStatsSnapshot {
   const steps = Array.from({ length: 93 }, (_, index) => ({
     turn: Math.floor(index / 4) + 1,
     step: (index % 4) + 1,
+    lastTurn: Math.floor(index / 4) + 1,
     model: index < 3 ? 2 : index < 48 ? 1 : 0,
     seq: 100 + index * 10,
     t: index * 1_000,
@@ -180,9 +181,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     engines: [{ name: 'laya', decisions: 40 }],
     timeline: {
       steps: [
-        { turn: 1, step: 1, model: 0, seq: 10, t: 0 },
-        { turn: 1, step: 2, model: 1, seq: 20, t: 1 },
-        { turn: 2, step: 1, model: 9, seq: 30, t: 2 },
+        { turn: 1, step: 1, lastTurn: 3, model: 0, seq: 10, t: 0 },
+        { turn: 4, step: 1, lastTurn: 4, model: 1, seq: 20, t: 1 },
+        { turn: 5, step: 1, lastTurn: 6, model: 9, seq: 30, t: 2 },
       ],
       marks: [{ i: 1, kind: 'down' }, { i: 2, kind: 'return' }, { i: 2, kind: 'failed' }],
       decisions: [

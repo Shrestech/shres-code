@@ -204,7 +204,7 @@ export function ModelTimeline({ stats, gate, t, onStep, onDecision }: GraphProps
       <tbody>
         {steps.map((step, index) => (
           <tr key={`${step.turn}.${step.step}.${index}`}>
-            <td>{`${step.turn}.${step.step}`}</td>
+            <td>{step.lastTurn > step.turn ? `${step.turn}–${step.lastTurn}` : `${step.turn}.${step.step}`}</td>
             <td>{modelLabel(stats.models[step.model])}</td>
             <td>{marks.filter(mark => mark.i === index).map(mark => t(`mark.${mark.kind}`)).join(', ')}</td>
           </tr>
@@ -228,7 +228,10 @@ export function ModelTimeline({ stats, gate, t, onStep, onDecision }: GraphProps
             <text className={css.axisText} x={0} y={88}>{t('g1.lane.confidence')}</text>
             {steps.map((step, index) => {
               const model = stats.models[step.model]
-              const label = t('g1.step', { turn: step.turn, step: step.step, model: model?.model ?? '?' })
+              const name = model?.model ?? '?'
+              const label = step.lastTurn > step.turn
+                ? t('g1.span', { turn: step.turn, lastTurn: step.lastTurn, model: name })
+                : t('g1.step', { turn: step.turn, step: step.step, model: name })
               return (
                 <Mark key={`s${index}`} label={label} onDetail={setDetail} onActivate={onStep === undefined ? undefined : () => { onStep(step.seq) }}>
                   <rect className={slotClass(model)} x={x(index)} y={24} width={Math.max(width - 1, 1)} height={16} />

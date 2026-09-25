@@ -16,6 +16,7 @@ import {
   RETAINED_CONSULTS,
   RETAINED_RECENT_DECISIONS,
   RETAINED_TIMELINE_EVENTS,
+  RETAINED_TURN_SPANS,
   TIMELINE_STEP_LIMIT,
   applyStatsEvent,
   createStatsState,
@@ -408,7 +409,7 @@ describe('modelRoutingStats fold', () => {
     expect(stats.timeline.steps).toEqual([
       [1, 1, 2], [2, 1, 1], [2, 2, 1], [3, 1, 2], [3, 2, 2], [4, 1, 2],
       [5, 1, 0], [6, 1, 0], [7, 1, 0], [8, 1, 0], [9, 1, 0], [10, 1, 0],
-    ].map(([turn, step, model], at) => ({ turn, step, model, seq: lastCallOfStep[at]!.seq, t: lastCallOfStep[at]!.time })))
+    ].map(([turn, step, model], at) => ({ turn, step, lastTurn: turn, model, seq: lastCallOfStep[at]!.seq, t: lastCallOfStep[at]!.time })))
     expect(stats.timeline.marks).toEqual([
       { i: 1, kind: 'down' },
       { i: 3, kind: 'return' },
@@ -545,7 +546,7 @@ describe('modelRoutingStats fold', () => {
     expect(viewStats({ ...createStatsState(), streakLengths: { '1': 1, '4': 1 } }).streakLengths).toEqual({ median: 2.5, max: 4 })
   })
 
-  it('caps retained values and aggregates a long timeline to one point per turn', () => {
+  it('caps retained values and aggregates a long timeline to at most 400 points of whole turns', () => {
     const log = new Log()
     const decisions: SessionEvent[] = []
     for (let turn = 1; turn <= 501; turn += 1) {
@@ -579,15 +580,59 @@ describe('modelRoutingStats fold', () => {
     expect(state.steps).toEqual([])
     expect(stats.counts.steps).toBeGreaterThan(TIMELINE_STEP_LIMIT)
     expect(stats.timeline.aggregated).toBe(true)
-    expect(stats.timeline.steps).toHaveLength(501)
+    expect(stats.timeline.steps).toHaveLength(TIMELINE_STEP_LIMIT)
+    // 501 turns over 400 points: each point covers one or two whole turns, in order.
+    expect(stats.timeline.steps[0]).toMatchObject({ turn: 1, lastTurn: 1 })
+    expect(stats.timeline.steps.at(-1)).toMatchObject({ lastTurn: 501, seq: log.events.at(-1)!.seq })
+    for (const [at, point] of stats.timeline.steps.entries()) {
+      if (at > 0) expect(point.turn).toBe(stats.timeline.steps[at - 1]!.lastTurn + 1)
+      expect(point.lastTurn - point.turn).toBeLessThanOrEqual(1)
+    }
     expect(stats.timeline.decisions).toHaveLength(RETAINED_TIMELINE_EVENTS)
     expect(stats.timeline.decisions[0]?.seq).toBe(decisions[501 - RETAINED_TIMELINE_EVENTS]?.seq)
-    expect(stats.timeline.decisions.at(-1)?.i).toBe(500)
+    expect(stats.timeline.decisions.at(-1)?.i).toBe(TIMELINE_STEP_LIMIT - 1)
     expect(stats.timeline.marks).toHaveLength(RETAINED_TIMELINE_EVENTS)
     // FLASH served first in the session, so it wins turn 2's tie.
     const flashIndex = stats.models.findIndex(model => model.model === FLASH.model)
-    expect(stats.timeline.steps[1]).toMatchObject({ turn: 2, step: 1, model: flashIndex })
+    expect(stats.timeline.steps[1]).toMatchObject({ turn: 2, step: 1, lastTurn: 2, model: flashIndex })
     expect(stats.streakLengths).toEqual({ median: 1, max: 1 })
+  })
+
+  it('shows 401 one-step turns as 400 points, one of them two turns wide', () => {
+    const log = new Log()
+    for (let turn = 1; turn <= 401; turn += 1) {
+      log.step(turn * 10, turn, 1)
+      log.call(turn * 10 + 1, turn, 1, turn === 401 ? FLASH : STRONG, reported(100, 0, 0, 1))
+    }
+    const stats = fold(log)
+    expect(stats.timeline.aggregated).toBe(true)
+    expect(stats.timeline.steps).toHaveLength(TIMELINE_STEP_LIMIT)
+    expect(stats.timeline.steps.filter(point => point.lastTurn > point.turn)).toHaveLength(1)
+    expect(stats.timeline.steps.at(-1)).toMatchObject({ lastTurn: 401 })
+  })
+
+  it('keeps the unit state to bounded spans of whole turns however long the log is', () => {
+    const log = new Log()
+    const turns = 2 * RETAINED_TURN_SPANS + 5
+    for (let turn = 1; turn <= turns; turn += 1) {
+      log.step(turn * 10, turn, 1)
+      // The last 3 turns of every 4 run on the candidate.
+      log.call(turn * 10 + 1, turn, 1, turn % 4 === 1 ? STRONG : FLASH, reported(100, 0, 0, 1))
+    }
+    const state = log.events.reduce(applyStatsEvent, createStatsState())
+    expect(state.turns.length).toBeLessThanOrEqual(RETAINED_TURN_SPANS)
+    expect(state.turnWidth).toBe(4)
+    expect(state.turns.reduce((sum, span) => sum + span.turns, 0)).toBe(turns)
+    for (const [at, span] of state.turns.entries()) {
+      if (at > 0) expect(span.turn).toBe(state.turns[at - 1]!.lastTurn + 1)
+    }
+    const stats = viewStats(state)
+    expect(stats.timeline.steps).toHaveLength(TIMELINE_STEP_LIMIT)
+    expect(stats.timeline.steps[0]).toMatchObject({ turn: 1 })
+    expect(stats.timeline.steps.at(-1)).toMatchObject({ lastTurn: turns })
+    // The first point is one span of four turns, three of them on the candidate.
+    const flashIndex = stats.models.findIndex(model => model.model === FLASH.model)
+    expect(stats.timeline.steps[0]).toMatchObject({ lastTurn: 4, model: flashIndex })
   })
 
   it('returns the same state for events it does not read and keeps its state plain JSON', () => {

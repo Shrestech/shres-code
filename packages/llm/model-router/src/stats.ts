@@ -27,9 +27,9 @@
  * reports that fallback.
  *
  * The unit state is plain JSON. Retained lists are capped as the snapshot
- * documents; the unbounded parts are one entry per turn (the aggregated
- * timeline's points), per served model, per engine name, and per distinct
- * streak length.
+ * documents, and turns are kept as at most {@link RETAINED_TURN_SPANS} spans
+ * of consecutive turns; the unbounded parts are one entry per served model,
+ * per engine name, and per distinct streak length.
  *
  * @module
  */
@@ -64,8 +64,17 @@ export const RETAINED_CONSULTS = 500
 /** Most recent decisions retained for the decisions table. */
 export const RETAINED_RECENT_DECISIONS = 200
 
-/** Steps the timeline shows one by one; a longer log shows one point per turn. */
+/**
+ * Steps the timeline shows one by one, and the most points it shows; a longer
+ * log shows each point as one or more whole consecutive turns.
+ */
 export const TIMELINE_STEP_LIMIT = 400
+
+/**
+ * Turn spans the unit state keeps. Past this, adjacent spans merge in pairs
+ * and each later span covers twice as many turns.
+ */
+export const RETAINED_TURN_SPANS = 800
 
 /** Most recent timeline marks, and most recent timeline decisions, retained. */
 export const RETAINED_TIMELINE_EVENTS = 400
@@ -160,16 +169,21 @@ interface StepPoint {
   t: number
 }
 
-/** One turn's steps: the timeline's point when the log is aggregated. */
-interface TurnPoint {
+/** Consecutive turns' steps: the timeline's points are built from these when the log is aggregated. */
+interface TurnSpan {
+  /** The span's first turn. */
   turn: number
-  /** The turn's first step. */
+  /** The first turn's first step. */
   step: number
-  /** Global index of the turn's first step. */
+  /** Global index of the span's first step. */
   first: number
-  /** Seq of the turn's latest call. */
+  /** The span's latest turn. */
+  lastTurn: number
+  /** Turns the span covers. */
+  turns: number
+  /** Seq of the span's latest call. */
   seq: number
-  /** Time of the turn's latest call. */
+  /** Time of the span's latest call. */
   t: number
   /** Steps per model tally, keyed by the tally's index. */
   models: Record<string, number>
@@ -250,7 +264,10 @@ export interface ModelRoutingStatsState {
   current: { key: string; index: number; model: number; downgraded: boolean } | null
   /** Steps one by one while the log has at most {@link TIMELINE_STEP_LIMIT}; empty beyond it. */
   steps: StepPoint[]
-  turns: TurnPoint[]
+  /** Consecutive turns, at most {@link RETAINED_TURN_SPANS} spans. */
+  turns: TurnSpan[]
+  /** Turns a full span covers. */
+  turnWidth: number
   marks: { i: number; kind: ModelRoutingTimelineMark }[]
   decisions: TimelineDecision[]
   /** Oldest first. */
@@ -308,6 +325,7 @@ export function createStatsState(): ModelRoutingStatsState {
     current: null,
     steps: [],
     turns: [],
+    turnWidth: 1,
     marks: [],
     decisions: [],
     recent: [],
@@ -571,7 +589,7 @@ function applyCall(
     steps: stepsSeen > TIMELINE_STEP_LIMIT
       ? []
       : newStep ? [...state.steps, point] : [...state.steps.slice(0, -1), point],
-    turns: advanceTurns(state.turns, turn, step, index, previousModel, modelIndex, seq, time),
+    ...advanceTurns(state, turn, step, index, previousModel, modelIndex, seq, time),
     marks: idle ? retain([...state.marks, { i: index, kind: 'idle' }], RETAINED_TIMELINE_EVENTS) : state.marks,
   }
 }
@@ -626,9 +644,15 @@ function coldCause(
   return 'other'
 }
 
-/** Record one step in its turn's point, starting a point on the turn's first step. */
+/**
+ * Record one step in its turn's span: a later step of the latest turn updates
+ * its span, a new turn joins the latest span until that span covers
+ * `turnWidth` turns, and otherwise starts a span. Past
+ * {@link RETAINED_TURN_SPANS} spans, adjacent spans merge in pairs and the
+ * width doubles, so the spans stay consecutive and bounded.
+ */
 function advanceTurns(
-  turns: readonly TurnPoint[],
+  state: Pick<ModelRoutingStatsState, 'turns' | 'turnWidth'>,
   turn: number,
   step: number,
   index: number,
@@ -636,17 +660,57 @@ function advanceTurns(
   model: number,
   seq: number,
   time: number,
-): TurnPoint[] {
-  const last = turns.at(-1)
-  if (last === undefined || last.turn !== turn) {
-    return [...turns, { turn, step, first: index, seq, t: time, models: { [String(model)]: 1 } }]
+): Pick<ModelRoutingStatsState, 'turns' | 'turnWidth'> {
+  const spans = state.turns
+  const last = spans.at(-1)
+  if (last !== undefined && (last.lastTurn === turn || last.turns < state.turnWidth)) {
+    const models = { ...last.models }
+    const sameTurn = last.lastTurn === turn
+    if (!sameTurn || previousModel !== model) {
+      if (sameTurn && previousModel !== undefined) models[String(previousModel)] = (models[String(previousModel)] as number) - 1
+      models[String(model)] = (models[String(model)] ?? 0) + 1
+    }
+    const span = { ...last, lastTurn: turn, turns: last.turns + (sameTurn ? 0 : 1), seq, t: time, models }
+    return { turns: [...spans.slice(0, -1), span], turnWidth: state.turnWidth }
   }
-  const models = { ...last.models }
-  if (previousModel !== model) {
-    if (previousModel !== undefined) models[String(previousModel)] = (models[String(previousModel)] as number) - 1
-    models[String(model)] = (models[String(model)] ?? 0) + 1
+  const next = [...spans, { turn, step, first: index, lastTurn: turn, turns: 1, seq, t: time, models: { [String(model)]: 1 } }]
+  return next.length > RETAINED_TURN_SPANS
+    ? { turns: pairSpans(next), turnWidth: state.turnWidth * 2 }
+    : { turns: next, turnWidth: state.turnWidth }
+}
+
+/**
+ * Merge adjacent spans in pairs from the first, so every merged span before
+ * the last covers twice the width.
+ */
+function pairSpans(spans: readonly TurnSpan[]): TurnSpan[] {
+  return Array.from({ length: Math.ceil(spans.length / 2) }, (_, pair) => mergeSpan(spans.slice(pair * 2, pair * 2 + 2)))
+}
+
+/** Merge consecutive spans into `count` groups of near-equal length, in order. */
+function groupSpans(spans: readonly TurnSpan[], count: number): TurnSpan[] {
+  return Array.from({ length: count }, (_, group) =>
+    mergeSpan(spans.slice(Math.floor(group * spans.length / count), Math.floor((group + 1) * spans.length / count))))
+}
+
+/** One span covering consecutive non-empty `members`. */
+function mergeSpan(members: readonly TurnSpan[]): TurnSpan {
+  const first = members[0] as TurnSpan
+  const latest = members.at(-1) as TurnSpan
+  const models: Record<string, number> = {}
+  for (const member of members) {
+    for (const [tally, steps] of Object.entries(member.models)) models[tally] = (models[tally] ?? 0) + steps
   }
-  return [...turns.slice(0, -1), { ...last, seq, t: time, models }]
+  return {
+    turn: first.turn,
+    step: first.step,
+    first: first.first,
+    lastTurn: latest.lastTurn,
+    turns: members.reduce((sum, member) => sum + member.turns, 0),
+    seq: latest.seq,
+    t: latest.t,
+    models,
+  }
 }
 
 /**
@@ -968,8 +1032,9 @@ function ranked(histogram: Readonly<Record<string, number>>): { key: string; cou
 }
 
 /**
- * The timeline: one point per step, or one per turn when the log has more
- * than {@link TIMELINE_STEP_LIMIT} steps. A turn's point shows the model that
+ * The timeline: one point per step, or, when the log has more than
+ * {@link TIMELINE_STEP_LIMIT} steps, at most that many points of one or more
+ * whole consecutive turns each. An aggregated point shows the model that
  * served most of its steps; a tie shows the one that first served in the
  * session. A mark or decision positioned after the last step points at the
  * last point; none is kept without a point.
@@ -979,18 +1044,20 @@ function timeline(
   indexOf: (tally: number) => number,
 ): ModelRoutingStatsSnapshot['timeline'] {
   const aggregated = state.counts.steps > TIMELINE_STEP_LIMIT
+  const spans = aggregated ? groupSpans(state.turns, Math.min(state.turns.length, TIMELINE_STEP_LIMIT)) : []
   const steps = aggregated
-    ? state.turns.map(turn => ({
-      turn: turn.turn,
-      step: turn.step,
-      model: indexOf(majority(turn.models)),
-      seq: turn.seq,
-      t: turn.t,
+    ? spans.map(span => ({
+      turn: span.turn,
+      step: span.step,
+      lastTurn: span.lastTurn,
+      model: indexOf(majority(span.models)),
+      seq: span.seq,
+      t: span.t,
     }))
-    : state.steps.map(point => ({ ...point, model: indexOf(point.model) }))
+    : state.steps.map(point => ({ ...point, lastTurn: point.turn, model: indexOf(point.model) }))
   if (steps.length === 0) return { steps, marks: [], decisions: [], aggregated }
   const pointOf = (stepIndex: number): number =>
-    Math.min(aggregated ? state.turns.findLastIndex(turn => turn.first <= stepIndex) : stepIndex, steps.length - 1)
+    Math.min(aggregated ? spans.findLastIndex(span => span.first <= stepIndex) : stepIndex, steps.length - 1)
   return {
     steps,
     marks: state.marks.map(mark => ({ i: pointOf(mark.i), kind: mark.kind })),
@@ -999,7 +1066,7 @@ function timeline(
   }
 }
 
-/** The model tally with the most steps in one turn; a tie keeps the lowest tally index. */
+/** The model tally with the most steps in one span; a tie keeps the lowest tally index. */
 function majority(models: Readonly<Record<string, number>>): number {
   let best = 0
   let bestSteps = -1
@@ -1133,6 +1200,7 @@ export const modelRoutingStatsSchema = zod.object({
     steps: zod.array(zod.object({
       turn: zod.number(),
       step: zod.number(),
+      lastTurn: zod.number(),
       model: zod.number(),
       seq: zod.number(),
       t: zod.number(),
