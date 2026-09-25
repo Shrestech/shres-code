@@ -9,12 +9,16 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  decisionThresholds, engineTroubleRecorded, gatePath, thresholdSourceLabel, thresholdValueLabel,
+  decisionThresholds, egressWarning, engineTroubleRecorded, gatePath, judgeSegment, judgeTrouble, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
 } from '../src/client/view/derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from '../src/client/view/format.ts'
-import { activeStats, decisionDetail, emptyStats, GATE, liveStats } from './fixtures/routing-stats.ts'
+import type { RoutingJudge } from '../src/client/engine-source.ts'
+import { LOCAL, REMOTE } from './fixtures/engines.client.ts'
+import { activeStats, decisionDetail, emptyStats, GATE, liveStats } from './fixtures/routing-stats.client.ts'
+
+const JUDGE: RoutingJudge = { kind: 'engine', engine: LOCAL }
 
 const t = makeTranslate(en, commonEn) as RoutingTranslate
 
@@ -34,21 +38,21 @@ describe('formats', () => {
 
 describe('routingViewState', () => {
   it('is never-used when routing is off and nothing was decided', () => {
-    expect(routingViewState(emptyStats(), false)).toBe('never-used')
+    expect(routingViewState(emptyStats(), false, JUDGE)).toBe('never-used')
   })
 
   it('is normal when routing is off with history', () => {
-    expect(routingViewState(liveStats(), false)).toBe('normal')
+    expect(routingViewState(liveStats(), false, JUDGE)).toBe('normal')
   })
 
   it('reports a missing engine and an unlisted base from the latest decision', () => {
     const stats = liveStats()
     const withLatest = (reason: string) => ({ ...stats, recent: [{ ...stats.recent[0]!, reason }] })
-    expect(routingViewState(withLatest('engine-absent'), true)).toBe('no-engine')
-    expect(routingViewState(withLatest('engine-disabled'), true)).toBe('no-engine')
-    expect(routingViewState(withLatest('base-unlisted'), true)).toBe('base-unlisted')
-    expect(routingViewState(stats, true)).toBe('normal')
-    expect(routingViewState(emptyStats(), true)).toBe('normal')
+    expect(routingViewState(withLatest('engine-absent'), true, JUDGE)).toBe('no-engine')
+    expect(routingViewState(withLatest('engine-disabled'), true, JUDGE)).toBe('no-engine')
+    expect(routingViewState(withLatest('base-unlisted'), true, JUDGE)).toBe('base-unlisted')
+    expect(routingViewState(stats, true, JUDGE)).toBe('normal')
+    expect(routingViewState(emptyStats(), true, JUDGE)).toBe('normal')
   })
 
   it('reports recorded engine trouble and the strong route', () => {
@@ -198,5 +202,43 @@ describe('decision thresholds', () => {
     expect(thresholdSourceLabel({ ...recorded, calibrated: true }, t)).toBe('Threshold at the time')
     expect(thresholdValueLabel(recorded, 0.8, t)).toBe('threshold at the time 0.80')
     expect(thresholdValueLabel(decisionThresholds(decisionDetail()), 0.8, t)).toBe('threshold now 0.80')
+  })
+})
+
+describe('judge facts', () => {
+  it('reads no-engine from a missing judge while routing is on', () => {
+    expect(routingViewState(liveStats(), true, { kind: 'none', reason: 'disabled' })).toBe('no-engine')
+    expect(routingViewState(liveStats(), false, { kind: 'none', reason: 'disabled' })).toBe('normal')
+  })
+
+  it('describes every engine state with a tone', () => {
+    const states = ['ready', 'starting', 'unavailable', 'unconfigured', 'not-installed', 'unsupported-host'] as const
+    expect(states.map((state) => {
+      const segment = judgeSegment({ kind: 'engine', engine: { ...LOCAL, state } }, t)
+      return [segment.state, segment.tone]
+    })).toEqual([
+      ['Ready', 'done'], ['Starting', 'ongoing'], ['Unavailable', 'error'],
+      ['Not configured', 'warning'], ['Not installed', 'warning'], ['Not supported on this machine', 'error'],
+    ])
+    expect(judgeSegment({ kind: 'engine', engine: REMOTE }, t)).toEqual({
+      name: 'Jev (TypeSafe)', state: 'Ready', tone: 'done', egress: 'remote', uncalibrated: false,
+    })
+    expect(judgeSegment({ kind: 'none', reason: 'unregistered' }, t)).toEqual({ name: 'the selected engine is not registered' })
+  })
+
+  it('reports trouble only for a selected judge that is not ready', () => {
+    expect(judgeTrouble({ kind: 'engine', engine: LOCAL }, t)).toBeUndefined()
+    expect(judgeTrouble({ kind: 'none', reason: 'no-dispatcher' }, t)).toBeUndefined()
+    expect(judgeTrouble({ kind: 'engine', engine: { ...REMOTE, state: 'unconfigured' } }, t))
+      .toBe('The judge, Jev (TypeSafe), is Not configured; steps keep the strong model until it is ready.')
+  })
+
+  it('warns about egress only for a remote judge while routing is on', () => {
+    const remote: RoutingJudge = { kind: 'engine', engine: REMOTE }
+    expect(egressWarning(remote, true, GATE, t)).toBe('Conversation excerpts leave this machine while Auto routing is on: each consult sends up to 12,000 characters of this session to api.typesafe.ai.')
+    expect(egressWarning(remote, true, null, t)).toBe('Conversation excerpts leave this machine while Auto routing is on: each consult sends part of this session to api.typesafe.ai.')
+    expect(egressWarning(remote, false, GATE, t)).toBeUndefined()
+    expect(egressWarning(JUDGE, true, GATE, t)).toBeUndefined()
+    expect(egressWarning({ kind: 'loading' }, true, GATE, t)).toBeUndefined()
   })
 })

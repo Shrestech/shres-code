@@ -11,7 +11,9 @@ import { useEffect, useState } from 'react'
 import type {
   ModelRoutingDecisionDetail, ModelRoutingGateView,
 } from '@shres-code/shres-code-model-router/client'
+import { StateDot } from '@shres-code/shres-code-client-ui-primitives'
 import type { SettingsScope } from '@shres-code/shres-code-client-runtime/client'
+import { engineEgress, routingJudge, type RoutingEngineSource } from '../engine-source.ts'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type { ConvViewOwnerProps, ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting`/`modelRoutingStats` SessionProjectionMap merges for useProjection.
@@ -21,7 +23,7 @@ import {
 } from './charts.tsx'
 import { DecisionDrawer } from './DecisionDrawer.tsx'
 import {
-  engineTroubleRecorded, routingKpis, routingVerdict, routingViewState, strongRoute,
+  egressWarning, engineTroubleRecorded, judgeSegment, judgeTrouble, routingKpis, routingVerdict, routingViewState, strongRoute,
 } from './derive.ts'
 import { RecentDecisions } from './RecentDecisions.tsx'
 import css from './RoutingView.module.css'
@@ -51,6 +53,8 @@ export interface RoutingViewInjected {
    */
   hooks: {
     routerSettings: SettingsScope<Record<string, unknown>>
+    /** The judgment engine facts: the router's judge, its status, and its egress. */
+    routingEngine: RoutingEngineSource
   }
 }
 
@@ -66,12 +70,14 @@ type GateLoad = { kind: 'loading' } | { kind: 'loaded'; gate: ModelRoutingGateVi
  * @returns the view, or a notice when routing is unavailable for this session.
  */
 export function RoutingView({
-  useProjection, useSession, useRouterSettings, available, loadDecision, loadGate, inspect, onInspectDone, reveal, canReveal, t,
+  useProjection, useSession, useRouterSettings, useRoutingEngine, available, loadDecision, loadGate,
+  inspect, onInspectDone, reveal, canReveal, t,
 }: RoutingViewProps) {
   const stats = useProjection('modelRoutingStats')
   const routing = useProjection('modelRouting')
   const routerStatus = useRouterSettings(scope => scope.status)
   const openState = useSession(snapshot => snapshot.openState)
+  const engineState = useRoutingEngine(state => state)
   const [gateLoad, setGateLoad] = useState<GateLoad>({ kind: 'loading' })
   const [gateAttempt, setGateAttempt] = useState(0)
   const [openSeq, setOpenSeq] = useState<number | null>(null)
@@ -116,9 +122,13 @@ export function RoutingView({
   }
 
   const gate = gateLoad.kind === 'loaded' ? gateLoad.gate : null
-  const state = routingViewState(stats, routing.active)
+  const judge = routingJudge(engineState)
+  const state = routingViewState(stats, routing.active, judge)
   const verdict = routingVerdict(stats, gate, routing.active, t)
-  const kpis = routingKpis(stats, gate, undefined, t)
+  const kpis = routingKpis(stats, gate, engineEgress(engineState), t)
+  const segment = judgeSegment(judge, t)
+  const trouble = judgeTrouble(judge, t)
+  const egress = egressWarning(judge, routing.active, gate, t)
   const trajectory = reveal !== undefined && canReveal?.('trajectory') === true
     ? (seq: number) => { reveal({ view: 'trajectory', target: { kind: 'event', seq } }) }
     : undefined
@@ -133,7 +143,18 @@ export function RoutingView({
       <p className={css.status}>
         {t('status.mode')} <strong>{routing.active ? t('status.on') : t('status.off')}</strong>
         {' · '}{t('status.switch.before')} <span className={css.autoPill} aria-hidden="true">{routing.active ? 'auto' : 'Auto'}</span> {t('status.switch.after')}
+        {' · '}{t('status.judge')} <strong>{segment.name}</strong>
+        {segment.state !== undefined && segment.tone !== undefined && (
+          <span className={css.judgeState}><StateDot state={segment.tone} size={8} /> {segment.state}</span>
+        )}
+        {segment.egress !== undefined && (
+          <span className={css.egressPill} data-egress={segment.egress}>{t(`judge.egress.${segment.egress}`)}</span>
+        )}
+        {segment.uncalibrated === true && <span className={css.scopePill}>{t('judge.uncalibrated')}</span>}
+        {' · '}{t('status.settings')}
       </p>
+      {egress !== undefined && <p className={css.notice} role="status">{egress}</p>}
+      {trouble !== undefined && <p className={css.notice} role="status">{trouble}</p>}
       {gateLoad.kind === 'failed' && (
         <p className={css.notice} role="alert">
           {t('gate.failed', { message: gateLoad.message })}{' '}

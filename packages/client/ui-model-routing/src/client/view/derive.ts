@@ -7,6 +7,8 @@
 import type {
   ModelRoutingDecision, ModelRoutingDecisionDetail, ModelRoutingGateView, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
+import type { JudgmentEngineView } from '@shres-code/shres-code-api-remotes/client'
+import type { RoutingJudge } from '../engine-source.ts'
 import type { RoutingKey } from '../locales.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from './format.ts'
 
@@ -22,14 +24,16 @@ export type RoutingTranslate = (key: RoutingKey, params?: Record<string, unknown
 export type RoutingViewState = 'never-used' | 'no-engine' | 'base-unlisted' | 'normal'
 
 /**
- * Classify the view state from the mode and the latest decision.
+ * Classify the view state from the mode, the router's judge, and the latest decision.
  * @param stats - the session's statistics.
  * @param active - whether routing is in force for the session.
+ * @param judge - the judge the router's asks go to.
  * @returns the view state.
  */
-export function routingViewState(stats: ModelRoutingStatsSnapshot, active: boolean): RoutingViewState {
+export function routingViewState(stats: ModelRoutingStatsSnapshot, active: boolean, judge: RoutingJudge): RoutingViewState {
   if (!active && stats.counts.decisions === 0) return 'never-used'
   if (!active) return 'normal'
+  if (judge.kind === 'none') return 'no-engine'
   const reason = stats.recent[0]?.reason
   if (reason === 'engine-absent' || reason === 'engine-disabled') return 'no-engine'
   if (reason === 'base-unlisted') return 'base-unlisted'
@@ -424,4 +428,88 @@ export function thresholdSourceLabel(thresholds: DecisionThresholds, t: RoutingT
  */
 export function thresholdValueLabel(thresholds: DecisionThresholds, value: number, t: RoutingTranslate): string {
   return t(thresholds.source === 'now' ? 'drill.threshold.now' : 'drill.threshold.recorded', { value: formatScore(value) })
+}
+
+
+/** Dot tone of a judge's lifecycle state. */
+export type JudgeTone = 'done' | 'warning' | 'ongoing' | 'error'
+
+/** The status line's judge segment. */
+export interface JudgeSegment {
+  /** The judge's label, or the reason there is none. */
+  name: string
+  /** The lifecycle state as text, when an engine is selected. */
+  state?: string
+  /** The state's dot tone, when an engine is selected. */
+  tone?: JudgeTone
+  /** Where the engine sends the state it judges, when an engine is selected. */
+  egress?: JudgmentEngineView['egress']
+  /** Whether the engine's answers are uncalibrated, when an engine is selected. */
+  uncalibrated?: boolean
+}
+
+const STATE_TONE: Readonly<Record<JudgmentEngineView['state'], JudgeTone>> = {
+  'ready': 'done',
+  'starting': 'ongoing',
+  'unavailable': 'error',
+  'unconfigured': 'warning',
+  'not-installed': 'warning',
+  'unsupported-host': 'error',
+}
+
+/**
+ * The status line's judge segment for the router's judge.
+ * @param judge - the resolved judge.
+ * @param t - the view's translate.
+ * @returns the segment.
+ */
+export function judgeSegment(judge: RoutingJudge, t: RoutingTranslate): JudgeSegment {
+  switch (judge.kind) {
+    case 'loading': return { name: t('judge.loading') }
+    case 'failed': return { name: t('judge.failed', { message: judge.message }) }
+    case 'none': return { name: t(`judge.none.${judge.reason}`) }
+    case 'engine': return {
+      name: judge.engine.label,
+      state: t(`judge.state.${judge.engine.state}`),
+      tone: STATE_TONE[judge.engine.state],
+      egress: judge.engine.egress,
+      uncalibrated: judge.engine.calibration !== 'calibrated',
+    }
+  }
+}
+
+/**
+ * The notice for a selected judge that cannot answer now.
+ * @param judge - the resolved judge.
+ * @param t - the view's translate.
+ * @returns the notice, or undefined when the judge is ready or none is selected.
+ */
+export function judgeTrouble(judge: RoutingJudge, t: RoutingTranslate): string | undefined {
+  if (judge.kind !== 'engine' || judge.engine.state === 'ready') return undefined
+  const state = t(`judge.state.${judge.engine.state}`)
+  return judge.engine.detail === undefined
+    ? t('judge.trouble', { name: judge.engine.label, state })
+    : t('judge.trouble.detail', { name: judge.engine.label, state, detail: judge.engine.detail })
+}
+
+/**
+ * The warning shown while routing is on and the judge sends conversation
+ * state off this machine.
+ * @param judge - the resolved judge.
+ * @param active - whether routing is in force for the session.
+ * @param gate - the configured gate, whose `stateMaxChars` caps each consult, or null while it loads.
+ * @param t - the view's translate.
+ * @returns the warning, or undefined when nothing leaves the machine.
+ */
+export function egressWarning(
+  judge: RoutingJudge,
+  active: boolean,
+  gate: ModelRoutingGateView | null,
+  t: RoutingTranslate,
+): string | undefined {
+  if (!active || judge.kind !== 'engine' || judge.engine.egress !== 'remote') return undefined
+  const destination = judge.engine.destination ?? judge.engine.label
+  return gate === null
+    ? t('egress.warning', { destination })
+    : t('egress.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
 }

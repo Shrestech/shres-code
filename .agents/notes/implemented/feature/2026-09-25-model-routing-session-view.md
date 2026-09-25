@@ -44,7 +44,9 @@ Model routing logs every decision, but nothing in the GUI said what routing did 
 
 - A session's routing activity is readable where the session is, and two open sessions render independent views from their own projections.
 - Charts draw the threshold in force now, and the drill-down labels its comparison "threshold now", because decisions do not record the thresholds that gated them; one derivation resolves a decision's thresholds and their source, so recorded values replace the configured ones there when decisions carry them.
-- Judge identity, status, and egress (the status line's judge segment, the remote-egress confirm on the Auto chip, the Sent off-machine split, and Settings links) come from the host judgment-engine registry read, which lands separately; until then the egress tile reports the egress as unknown.
+- Judge identity, status, and egress come from the `judgmentEngines` Remote, read into one plugin-wide source refreshed on `judgment/engines-updated`. The judge is resolved by the dispatcher's own rule (a declared consumer's override, else the deployment engine), so the view names the engine that actually answers the router. Turning routing on asks first while that judge is remote or not yet known, because that gesture starts the egress.
+- The status line names Settings › Model routing as text, because no client service lets a plugin open a Settings page.
+- Sent off-machine counts characters sent to remote judges only, matching each decision's recorded engine name against registry ids and then labels.
 
 ## Verification
 

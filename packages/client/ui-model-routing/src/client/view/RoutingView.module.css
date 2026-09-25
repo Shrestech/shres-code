@@ -283,3 +283,25 @@
 .skeletonChart {
   height: 180px;
 }
+
+.judgeState {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.egressPill {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Remote egress uses the warning surface (fill with a warn-secondary border). */
+.egressPill[data-egress='remote'] {
+  border-color: var(--dsw-alias-state-warn-secondary);
+  background: var(--dsw-alias-fill-tsp-secondary);
+}

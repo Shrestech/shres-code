@@ -11,6 +11,7 @@
  * thresholds are unary reads on the `modelRouting` Remote namespace.
  */
 import type { ModelSelection } from '@shres-code/shres-code-api-remotes/client'
+import type { ModelRoutingGateView } from '@shres-code/shres-code-model-router/client'
 import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.modelRouting seat).
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
@@ -20,12 +21,14 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 import type {} from '@shres-code/shres-code-model-router/client'
 // Type-only: pulls the settings plugin's Context merge (ctx.settingsScope).
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
+import { createRoutingEngineSource, type RoutingEngineSource } from './engine-source.ts'
 import { RoutingChip } from './RoutingChip.tsx'
 import { en, type RoutingKey } from './locales.ts'
 import { RoutingView, type RoutingViewInjected } from './view/RoutingView.tsx'
 
 export type { RoutingKey } from './locales.ts'
 export type { RoutingViewInjected } from './view/RoutingView.tsx'
+export type { RoutingEngineSource, RoutingEngineState, RoutingJudge } from './engine-source.ts'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -93,6 +96,19 @@ export interface RoutingChipInjected {
    * @returns null on an accepted selection; a user-visible failure line otherwise.
    */
   restoreStrong: (selection: ModelSelection) => Promise<string | null>
+  /**
+   * Fetch the configured gate, whose `stateMaxChars` the remote-judge confirm
+   * states as the per-consult character cap.
+   * @returns the gate; rejects when the host cannot read it.
+   */
+  loadGate: () => Promise<ModelRoutingGateView>
+  /**
+   * Framework-bound sources. `routingEngine` is the judgment engine facts,
+   * which decide whether turning routing on asks for confirmation first.
+   */
+  hooks: {
+    routingEngine: RoutingEngineSource
+  }
 }
 
 /**
@@ -108,10 +124,13 @@ function remoteValue<T>(result: { ok: true; value: T } | { ok: false; error: { c
 }
 
 /**
- * Required services: the slot registry, session binding lookup, the commands
- * and modelRouting Remotes, the locale registry, and settings scopes.
+ * Required services: the slot registry, session binding lookup, the commands,
+ * modelRouting, and judgmentEngines Remotes, the locale registry, and settings
+ * scopes.
  */
-export const inject = ['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale', 'settingsScope']
+export const inject = [
+  'slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'remote.judgmentEngines', 'locale', 'settingsScope',
+]
 
 /**
  * Client plugin body: register the routing chip over the command channel and the
@@ -132,6 +151,19 @@ export function apply(ctx: ClientContext): void {
   // unlists it; a namespace that returns (a settings change, a host reload)
   // lists it again. The shell resolves an unlisted selection to Chat at read
   // time without writing the store, so the selection returns with the view.
+  // One engine-facts source for every view and chip: read once on load and
+  // again on each engine, status, or selection change the host announces.
+  const routingEngine = createRoutingEngineSource(() => ctx.remote.judgmentEngines.snapshot())
+  ctx.effect(() => {
+    routingEngine.refresh()
+    const unlisten = ctx.remote.$on('judgment/engines-updated', () => { routingEngine.refresh() })
+    return () => {
+      unlisten()
+      routingEngine.dispose()
+    }
+  }, 'ui-model-routing: judgment engine facts')
+  const loadGate = async (): Promise<ModelRoutingGateView> => remoteValue(await ctx.remote.modelRouting.gate())
+
   const routerScope = ctx.settingsScope.bind<Record<string, unknown>>({
     namespace: MODEL_ROUTER_SETTINGS_NAMESPACE,
   })
@@ -149,8 +181,8 @@ export function apply(ctx: ClientContext): void {
           inject: (sessionId: SessionId): RoutingViewInjected => ({
             available: ctx.sessions.subagentAddress(sessionId) === undefined,
             loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
-            loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
-            hooks: { routerSettings: routerScope },
+            loadGate,
+            hooks: { routerSettings: routerScope, routingEngine },
           }),
         }, RoutingView))
       } else if (!listed && unlist !== undefined) {
@@ -179,6 +211,8 @@ export function apply(ctx: ClientContext): void {
         if (result.value === undefined) return `unknown command: ${line}`
         return null
       },
+      loadGate,
+      hooks: { routingEngine },
       restoreStrong: async (selection) => {
         // Optional service: a deployment composing no selection surface keeps the
         // chip, and the restore is the one gesture that reports the absence.

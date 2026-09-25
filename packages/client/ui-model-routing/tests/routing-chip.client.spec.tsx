@@ -10,7 +10,7 @@
  * surfaces as its own inline error line.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { ModelRoutingProjection } from '@shres-code/shres-code-model-router/client'
@@ -18,6 +18,9 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { RoutingChip, type RoutingChipProps } from '../src/client/RoutingChip.tsx'
 import { en } from '../src/client/locales.ts'
+import type { RoutingEngineState } from '../src/client/engine-source.ts'
+import { engines, LOCAL, REMOTE } from './fixtures/engines.client.ts'
+import { GATE } from './fixtures/routing-stats.client.ts'
 
 afterEach(cleanup)
 
@@ -75,6 +78,8 @@ function setup(options: {
   locked?: boolean
   available?: boolean
   reveal?: RoutingChipProps['reveal']
+  engine?: RoutingEngineState
+  loadGate?: RoutingChipProps['loadGate']
 } = {}) {
   const store = createSnapshotStore<{ value: ModelRoutingProjection | undefined }>({ value: options.routing })
   const useProjection = (_key: string, selector?: (v: unknown) => unknown) =>
@@ -85,6 +90,9 @@ function setup(options: {
     useProjection,
     locked: options.locked ?? false,
     reveal: options.reveal,
+    useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) =>
+      selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
+    loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
     available: options.available ?? true,
     setRouting,
     restoreStrong,
@@ -313,5 +321,80 @@ describe('RoutingChip', () => {
     fireEvent.click(restoreChip())
     failing.view.unmount()
     expect(() => { reject(new Error('late')) }).not.toThrow()
+  })
+})
+
+describe('RoutingChip remote-judge confirm', () => {
+  const REMOTE_JUDGE: RoutingEngineState = { kind: 'ready', snapshot: engines('typesafe') }
+
+  it('asks before turning routing on with a remote judge, naming the destination and the cap', async () => {
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE })
+    fireEvent.click(offChip())
+    const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
+    expect(dialog.textContent).toContain(en['confirm.body'])
+    await screen.findByText('This judge runs off this machine: each consult sends up to 12,000 characters of this session to api.typesafe.ai.')
+    expect(setRouting).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.turnOn'] }))
+    expect(setRouting).toHaveBeenCalledWith(true)
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+  })
+
+  it('names the destination alone while the cap loads or when it cannot be read', async () => {
+    setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => Promise.reject(new Error('gone')) })
+    fireEvent.click(offChip())
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+  })
+
+  it('cancels or closes without switching', () => {
+    const { setRouting } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}) })
+    for (const label of [en['confirm.cancel'], en['confirm.close']]) {
+      fireEvent.click(offChip())
+      fireEvent.click(screen.getByRole('button', { name: label }))
+      expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    }
+    expect(setRouting).not.toHaveBeenCalled()
+  })
+
+  it('names the engine when it reports no destination host', () => {
+    const { destination: _dropped, ...unnamedRemote } = REMOTE
+    const unnamed = engines('typesafe', { engines: [LOCAL, unnamedRemote] })
+    setup({ routing: OFF, engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
+    fireEvent.click(offChip())
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to Jev (TypeSafe).')).toBeTruthy()
+  })
+
+  it('asks when the judge is not known yet', () => {
+    for (const engine of [{ kind: 'loading' }, { kind: 'failed', message: 'x' }] as RoutingEngineState[]) {
+      const { setRouting } = setup({ routing: OFF, engine, loadGate: () => new Promise(() => {}) })
+      fireEvent.click(offChip())
+      expect(screen.getByText(en['confirm.unknown'])).toBeTruthy()
+      expect(setRouting).not.toHaveBeenCalled()
+      cleanup()
+    }
+  })
+
+  it('turns on directly with a local judge or none, and never asks when turning off', () => {
+    for (const engine of [{ kind: 'ready', snapshot: engines('laya') }, { kind: 'no-dispatcher' }] as RoutingEngineState[]) {
+      const { setRouting } = setup({ routing: OFF, engine })
+      fireEvent.click(offChip())
+      expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+      expect(setRouting).toHaveBeenCalledWith(true)
+      cleanup()
+    }
+    const { setRouting } = setup({ routing: running(), engine: REMOTE_JUDGE })
+    fireEvent.click(onChip())
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+    expect(setRouting).toHaveBeenCalledWith(false)
+  })
+
+  it('drops a cap that arrives after the chip unmounted', async () => {
+    let resolve!: (value: typeof GATE) => void
+    const { view } = setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise((res) => { resolve = res }) })
+    fireEvent.click(offChip())
+    view.unmount()
+    await act(async () => { resolve(GATE) })
+    expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
   })
 })

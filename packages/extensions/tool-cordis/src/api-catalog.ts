@@ -4673,7 +4673,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingGateView',
-    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n}',
+    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
   },
   {
     name: 'ModelRoutingInactiveStickyView',

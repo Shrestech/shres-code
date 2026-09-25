@@ -57,7 +57,8 @@
     "@shres-code/shres-code-model-router": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "clsx": "^2.1.1",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/shres-code-api-remotes": "workspace:^",
@@ -73,7 +74,8 @@
     "@shres-code/cordis": "workspace:^",
     "clsx": "^2.1.1",
     "react": "^19.2.8",
-    "@shres-code/shres-code-client-ui-settings": "workspace:^"
+    "@shres-code/shres-code-client-ui-settings": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^"
   },
   "files": [
     "lib/index.js",

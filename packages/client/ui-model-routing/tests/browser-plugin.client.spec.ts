@@ -10,7 +10,10 @@
  * `model-router` settings scope is loading or ready, unlists it when the scope
  * reports the namespace unavailable, and lists it again when it returns; the
  * view's face reads the `modelRouting` decision and gate Remotes for its own
- * session. Teardown empties the seat and the view list (HMR safety).
+ * session. One judgment engine source, read from the `judgmentEngines`
+ * Remote and refreshed on each `judgment/engines-updated` announcement, feeds
+ * both surfaces. Teardown empties the seat and the view list and stops the
+ * source (HMR safety).
  */
 import { Context } from '@shres-code/cordis'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
@@ -22,6 +25,7 @@ import { RoutingChip } from '../src/client/RoutingChip.tsx'
 import type { RoutingChipInjected, RoutingViewInjected } from '../src/client/index.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { RoutingView } from '../src/client/view/RoutingView.tsx'
+import { engines } from './fixtures/engines.client.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 const SID = 's-routing' as SessionId
@@ -59,9 +63,17 @@ async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {
     decision: vi.fn((_sessionId: SessionId, seq: number) => Promise.resolve<unknown>({ ok: true, value: { seq } })),
     gate: vi.fn(() => Promise.resolve<unknown>({ ok: true, value: { downgradeThreshold: 0.8 } })),
   }
-  ctx.provide('remote', { commands: commandsRemote, modelRouting: routingRemote })
+  const enginesRemote = { snapshot: vi.fn(() => Promise.resolve<unknown>({ ok: true, value: engines('laya') })) }
+  const listeners = new Map<string, () => void>()
+  const off = vi.fn()
+  const $on = vi.fn((event: string, listener: () => void) => {
+    listeners.set(event, listener)
+    return off
+  })
+  ctx.provide('remote', { commands: commandsRemote, modelRouting: routingRemote, judgmentEngines: enginesRemote, $on })
   ctx.provide('remote.commands', commandsRemote)
   ctx.provide('remote.modelRouting', routingRemote)
+  ctx.provide('remote.judgmentEngines', enginesRemote)
   const scope = routerScope(options.scope ?? 'ready')
   ctx.provide('settingsScope', { bind: scope.bind })
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -78,12 +90,14 @@ async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {
       },
     })
   }
-  return { ctx, slots, execute, select, routingRemote, scope }
+  return { ctx, slots, execute, select, routingRemote, scope, enginesRemote, listeners, off }
 }
 
 describe('ui-model-routing browser apply', () => {
   it('declares every service it binds', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale', 'settingsScope'])
+    expect(inject).toEqual([
+      'slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'remote.judgmentEngines', 'locale', 'settingsScope',
+    ])
   })
 
   it('node-half apply is an intentional no-op', () => {
@@ -93,9 +107,11 @@ describe('ui-model-routing browser apply', () => {
   it('waits until conversation declares the routing seat', async () => {
     const ctx = new Context()
     await ctx.plugin(SlotRegistry).await()
-    ctx.provide('remote', { commands: {}, modelRouting: {} })
+    const enginesRemote = { snapshot: () => new Promise(() => {}) }
+    ctx.provide('remote', { commands: {}, modelRouting: {}, judgmentEngines: enginesRemote, $on: () => () => {} })
     ctx.provide('remote.commands', {})
     ctx.provide('remote.modelRouting', {})
+    ctx.provide('remote.judgmentEngines', enginesRemote)
     ctx.provide('settingsScope', { bind: routerScope('ready').bind })
     ctx.provide('locale', new LocaleRuntime(ctx))
     ctx.provide('sessions', { subagentAddress: () => undefined })
@@ -204,6 +220,25 @@ describe('ui-model-routing browser apply', () => {
     // A scope change after unload lists nothing.
     b.scope.set('loading')
     expect(b.slots.entries('conversation.view')).toHaveLength(0)
+  })
+
+  it('feeds both surfaces one engine source, refreshed on each announcement and stopped on unload', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const view = (b.slots.entries('conversation.view')[0]!.inject as unknown as (id: SessionId) => RoutingViewInjected)(SID)
+    const chip = (b.slots.entries('conversation.input.modelRouting')[0]!.inject as unknown as (id: SessionId) => RoutingChipInjected)(SID)
+    expect(view.hooks.routingEngine).toBe(chip.hooks.routingEngine)
+    await vi.waitFor(() => { expect(chip.hooks.routingEngine.getSnapshot()).toEqual({ kind: 'ready', snapshot: engines('laya') }) })
+    expect(b.enginesRemote.snapshot).toHaveBeenCalledTimes(1)
+
+    b.enginesRemote.snapshot.mockResolvedValueOnce({ ok: true, value: engines('typesafe') })
+    b.listeners.get('judgment/engines-updated')!()
+    await vi.waitFor(() => { expect(chip.hooks.routingEngine.getSnapshot()).toEqual({ kind: 'ready', snapshot: engines('typesafe') }) })
+    await expect(chip.loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })
+
+    await fiber.dispose()
+    expect(b.off).toHaveBeenCalledTimes(1)
   })
 
   it('restores the strong route through the session model-selection directory', async () => {

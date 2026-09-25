@@ -20,6 +20,7 @@ export const GATE: ModelRoutingGateView = {
   escalateBackScoreThreshold: 3,
   difficultyLevels: ['trivial', 'easy', 'moderate', 'hard', 'expert'],
   hold: { minSteps: 3, maxSteps: 20 },
+  stateMaxChars: 12_000,
 }
 
 /** An empty snapshot: no calls and no decisions. */

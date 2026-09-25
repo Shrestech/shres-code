@@ -18,7 +18,9 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import { RoutingView, type RoutingViewProps } from '../src/client/view/RoutingView.tsx'
-import { activeStats, decisionDetail, emptyStats, GATE, liveStats, OFF, ON } from './fixtures/routing-stats.ts'
+import type { RoutingEngineState } from '../src/client/engine-source.ts'
+import { engines, LOCAL, REMOTE } from './fixtures/engines.client.ts'
+import { activeStats, decisionDetail, emptyStats, GATE, liveStats, OFF, ON } from './fixtures/routing-stats.client.ts'
 
 afterEach(cleanup)
 
@@ -43,6 +45,7 @@ interface Setup {
   inspect?: unknown
   onInspectDone?: () => void
   routerStatus?: 'loading' | 'ready' | 'unavailable'
+  engine?: RoutingEngineState
   openState?: 'cold' | 'loading' | 'open' | 'error'
 }
 
@@ -58,6 +61,8 @@ function props(options: Setup): RoutingViewProps {
     useProjection,
     useRouterSettings: (selector: (value: typeof scope) => unknown) => selector(scope),
     useSession: (selector: (value: typeof session) => unknown) => selector(session),
+    useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) =>
+      selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
     available: options.available ?? true,
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
     loadDecision: options.loadDecision ?? ((seq: number) => Promise.resolve({ ...decisionDetail(), seq })),
@@ -392,5 +397,87 @@ describe('RoutingView handoffs', () => {
     fireEvent.click(within(one).getByRole('button', { name: 'Open the reasoning of turn 22.1' }))
     expect(await within(one).findByRole('dialog')).toBeTruthy()
     expect(within(two).queryByRole('dialog')).toBeNull()
+  })
+})
+
+/** The read-only status line: the paragraph that states the mode and the judge. */
+function statusLine(): HTMLElement {
+  const line = [...document.querySelectorAll('p')].find(node => (node.textContent ?? '').includes('Judge (all sessions):'))
+  if (line === undefined) throw new Error('no status line')
+  return line
+}
+
+describe('RoutingView judge facts', () => {
+  it('names the judge, its state, its egress, and its calibration in the status line', async () => {
+    setup()
+    await gateLoaded()
+    const status = statusLine()
+    expect(status.textContent).toContain('Laya (local, MLX)')
+    expect(status.textContent).toContain('Ready')
+    expect(status.textContent).toContain('Local')
+    expect(status.textContent).toContain('Uncalibrated')
+    expect(status.textContent).toContain('change it in Settings › Model routing')
+    cleanup()
+    setup({ engine: { kind: 'ready', snapshot: engines('typesafe') } })
+    const remote = statusLine()
+    expect(remote.textContent).toContain('Jev (TypeSafe)')
+    expect(remote.textContent).toContain('Remote · egress')
+    expect(remote.textContent).not.toContain('Uncalibrated')
+  })
+
+  it('names why there is no judge, and a judge that is still being read', () => {
+    const cases: [RoutingEngineState, string][] = [
+      [{ kind: 'loading' }, 'checking…'],
+      [{ kind: 'failed', message: 'socket closed' }, 'not known (socket closed)'],
+      [{ kind: 'no-dispatcher' }, 'none composed on this host'],
+    ]
+    for (const [engine, text] of cases) {
+      setup({ engine })
+      expect(statusLine().textContent).toContain(text)
+      cleanup()
+    }
+  })
+
+  it('warns that excerpts leave the machine while routing is on with a remote judge', async () => {
+    setup({ engine: { kind: 'ready', snapshot: engines('typesafe') } })
+    expect(screen.getByText(/each consult sends part of this session to api\.typesafe\.ai/)).toBeTruthy()
+    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    cleanup()
+    const { destination: _dropped, ...noDestination } = REMOTE
+    const unnamed = engines('typesafe', { engines: [LOCAL, noDestination] })
+    setup({ engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
+    expect(screen.getByText(/each consult sends part of this session to Jev \(TypeSafe\)/)).toBeTruthy()
+    cleanup()
+    setup({ engine: { kind: 'ready', snapshot: engines('typesafe') }, routing: OFF })
+    expect(screen.queryByText(/leave this machine/)).toBeNull()
+    cleanup()
+    setup()
+    expect(screen.queryByText(/leave this machine/)).toBeNull()
+  })
+
+  it('reports a selected judge that cannot answer now', () => {
+    const starting = engines('laya', { engines: [{ ...LOCAL, state: 'starting' }, REMOTE] })
+    setup({ engine: { kind: 'ready', snapshot: starting } })
+    expect(screen.getByText('The judge, Laya (local, MLX), is Starting; steps keep the strong model until it is ready.')).toBeTruthy()
+    cleanup()
+    const missing = engines('laya', { engines: [{ ...LOCAL, state: 'not-installed', detail: 'run /laya install' }, REMOTE] })
+    setup({ engine: { kind: 'ready', snapshot: missing } })
+    expect(screen.getByText('The judge, Laya (local, MLX), is Not installed (run /laya install); steps keep the strong model until it is ready.')).toBeTruthy()
+  })
+
+  it('shows the no-engine state when routing is on and no judge is composed', () => {
+    setup({ engine: { kind: 'no-dispatcher' } })
+    expect(screen.getByText(en['state.noEngine'])).toBeTruthy()
+  })
+
+  it('counts off-machine characters only for remote judges', async () => {
+    const byRemote = { ...liveStats(), egress: [{ engine: 'typesafe', asks: 22, chars: 264_000, bound: 'at-most' as const }] }
+    setup({ stats: byRemote })
+    await gateLoaded()
+    expect(document.querySelector('[data-kpi="egress"]')!.textContent).toContain('≤ 264k')
+    cleanup()
+    const byLocal = { ...liveStats(), egress: [{ engine: 'laya', asks: 22, chars: 264_000, bound: 'exact' as const }] }
+    setup({ stats: byLocal })
+    expect(document.querySelector('[data-kpi="egress"]')!.textContent).toContain('local engine only')
   })
 })

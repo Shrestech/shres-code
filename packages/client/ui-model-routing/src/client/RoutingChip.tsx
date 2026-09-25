@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.modelRouting
 // seat and its {locked} owner share).
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting` SessionProjectionMap merge for useProjection.
 import type {} from '@shres-code/shres-code-model-router/client'
+import { routingJudge, type RoutingJudge } from './engine-source.ts'
 import type { RoutingChipInjected } from './index.ts'
 import css from './RoutingChip.module.css'
 
@@ -39,8 +41,13 @@ const FAILURE_LABEL: Record<ChipAction, string> = {
  * @param props - runtime share, injected face, and the locale seat.
  * @returns the chip, or null while routing is unavailable for this session.
  */
-export function RoutingChip({ useProjection, locked, reveal, available, setRouting, restoreStrong, t }: RoutingChipProps) {
+export function RoutingChip({
+  useProjection, useRoutingEngine, locked, reveal, available, setRouting, restoreStrong, loadGate, t,
+}: RoutingChipProps) {
   const routing = useProjection('modelRouting')
+  const engineState = useRoutingEngine(state => state)
+  const [confirm, setConfirm] = useState<Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }> | null>(null)
+  const [stateMaxChars, setStateMaxChars] = useState<number | null>(null)
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
@@ -86,7 +93,30 @@ export function RoutingChip({ useProjection, locked, reveal, available, setRouti
         title={on ? t('chip.on.title') : t('chip.off.title')}
         aria-busy={pending === 'mode'}
         disabled={locked || pending !== null}
-        onClick={() => { run('mode', () => setRouting(!on)) }}
+        onClick={() => {
+          if (on) {
+            run('mode', () => setRouting(false))
+            return
+          }
+          // Turning routing on is the gesture that starts sending conversation
+          // state to the judge, so a judge that sends it off this machine, or
+          // one not known yet, asks first; a local judge or none does not.
+          const judge = routingJudge(engineState)
+          const asks = judge.kind === 'loading' || judge.kind === 'failed'
+            || (judge.kind === 'engine' && judge.engine.egress === 'remote')
+          if (!asks) {
+            run('mode', () => setRouting(true))
+            return
+          }
+          setConfirm(judge)
+          setStateMaxChars(null)
+          loadGate().then((gate) => {
+            if (aliveRef.current) setStateMaxChars(gate.stateMaxChars)
+          }, () => {
+            // Without the cap the confirm names the destination alone; the
+            // gesture stays available, so nothing else needs the failure.
+          })
+        }}
       >
         {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
         {on ? 'auto' : 'Auto'}
@@ -120,10 +150,55 @@ export function RoutingChip({ useProjection, locked, reveal, available, setRouti
           {t('idle.restore')}
         </button>
       )}
+      {confirm !== null && (
+        <Modal
+          open
+          onClose={() => { setConfirm(null) }}
+          title={t('confirm.title')}
+          description={t('confirm.body')}
+          closeLabel={t('confirm.close')}
+          footer={(
+            <span className={css.confirmActions}>
+              <Button variant="outline" onClick={() => { setConfirm(null) }}>{t('confirm.cancel')}</Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setConfirm(null)
+                  run('mode', () => setRouting(true))
+                }}
+              >
+                {t('confirm.turnOn')}
+              </Button>
+            </span>
+          )}
+        >
+          <p className={css.confirmWarning}>{confirmWarning(confirm, stateMaxChars, t)}</p>
+        </Modal>
+      )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
       {failure !== null && (
         <span className={css.error} role="status" title={failure.detail}>{FAILURE_LABEL[failure.action]}</span>
       )}
     </span>
   )
+}
+
+/**
+ * The confirm's warning: where the judge sends conversation state, with the
+ * per-consult character cap once the gate has loaded.
+ * @param judge - the judge the confirm was opened for.
+ * @param stateMaxChars - the per-consult cap, or null until it loads.
+ * @param t - the chip's translate.
+ * @returns the warning sentence.
+ */
+function confirmWarning(
+  judge: Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }>,
+  stateMaxChars: number | null,
+  t: RoutingChipProps['t'],
+): string {
+  if (judge.kind !== 'engine') return t('confirm.unknown')
+  const destination = judge.engine.destination ?? judge.engine.label
+  return stateMaxChars === null
+    ? t('confirm.warning', { destination })
+    : t('confirm.warning.chars', { destination, chars: stateMaxChars.toLocaleString('en-US') })
 }
