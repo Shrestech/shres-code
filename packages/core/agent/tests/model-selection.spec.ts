@@ -251,6 +251,14 @@ describe('installModelSelection() with a composed router', () => {
     )).resolves.toEqual({ provider: 'alpha', model: 'a1', temperature: 0.1 })
     expect(routed.calls.at(-1)?.base).toEqual({ provider: 'alpha', model: 'a1' })
 
+    // Provider, model, and effort are compared: an entry base that recorded no
+    // effort clears the effort the routed header carried, as applySelection does.
+    routed.sticky = { provider: 'cheap', model: 'c1' }
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toEqual({ provider: 'cheap', model: 'c1', temperature: 0.1 })
+    expect(routed.calls.at(-1)?.base).toEqual({ provider: 'cheap', model: 'c1' })
+
     // A request already on the reported route is passed through untouched.
     routed.sticky = { provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low') }
     await expect(agentEvents(ctx, agent).waterfall(

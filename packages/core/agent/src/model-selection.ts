@@ -234,9 +234,11 @@ export function provideModelSelection(agent: Agent, selection: ModelSelectionRef
  * Without a provided selection the manual route is the one a composed
  * `ctx.modelRouting` reports beneath a routed header
  * ({@link ModelRoutingConsult.stickySelection}), else the request's resolved
- * route; the hook rewrites the request only when the two differ. The loop
- * seeds each request from the last logged header, so this is what returns a
- * downgraded agent to its manual route. With no router composed nothing is
+ * route; the hook rewrites the request only when the two differ in provider,
+ * model, or effort, and applies the manual route as a selection does, so an
+ * absent effort clears the one the header carried. After its first request a
+ * loop instance seeds each request from the last logged header, so this is
+ * what returns a downgraded agent to its manual route. With no router composed nothing is
  * rewritten, and a header a router left on a candidate before it was removed
  * stays in force until a front end provides a selection.
  *
