@@ -1521,7 +1521,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` is the one shell affordance a section receives, for flows\n * that leave settings altogether (starting a session from a section) — the\n * onboarding coordinator\'s `openSection`/`complete` precedent, inverted.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
+      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` and `openSection` are the shell affordances a section\n * receives: `close` for flows that leave settings altogether (starting a\n * session from a section), `openSection` for a link to another page, as the\n * onboarding coordinator\'s owner share offers.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Navigate to another registered section by id; the Settings shell always supplies it. */\n  openSection?: (id: string) => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1536,6 +1536,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-jspace JSpaceSection id \'jspace\'',
+      'client-ui-settings-model-routing ModelRoutingSection id \'model-routing\'',
       'client-ui-settings-models ModelsSection id \'models\'',
       'client-ui-settings-models TeamSection id \'teams\'',
       'client-ui-settings-models AudioSection id \'audio\'',

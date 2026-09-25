@@ -1403,6 +1403,8 @@ export interface ShieldJudgmentConfig {
   maxResponseBytes?: number
   /** Maximum complete serialized UTF-8 request body size; align with the gateway's body limit. */
   maxRequestBytes?: number
+  /** Interval between readiness probes (a TCP connection to the endpoint), in milliseconds. */
+  readinessIntervalMs?: number
 }
 
 /** The two pinned model artifacts a judgment tier resolves to. */
@@ -5300,6 +5302,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-jspace` ([`packages/client/ui-settings-jspace/src/index.ts`](../packages/client/ui-settings-jspace/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-model-routing` ([`packages/client/ui-settings-model-routing/src/index.ts`](../packages/client/ui-settings-model-routing/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
 import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
-import { LAYA_ENGINE_DESCRIPTOR, LAYA_ENGINE_ID, LayaJudgmentEngine, layaEngineStatus } from '../src/index.ts'
+import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
+import { LAYA_ENGINE_DESCRIPTOR, LAYA_ENGINE_ID, LayaGatewayRemote, LayaJudgmentEngine, layaEngineStatus } from '../src/index.ts'
 import { alive, cleanup, fakeInstallation, MODEL_ID, REPO, REVISION, tempRuntime, until, writeBehavior } from './helpers.ts'
 import type { FakeInstallation } from './helpers.ts'
 
@@ -85,10 +86,10 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
   it('reports not-installed, installs on request, then serves ctx.judgment', async () => {
     const { ctx: mounted, engine } = await mount()
     const entry = mounted.judgmentEngines.get(LAYA_ENGINE_ID)
-    expect(entry?.descriptor).toBe(LAYA_ENGINE_DESCRIPTOR)
     expect(LAYA_ENGINE_DESCRIPTOR).toEqual({
       id: 'laya', label: 'Laya (local MLX)', egress: 'none', calibration: 'calibrated', supportsFitting: true, host: 'darwin-arm64',
     })
+    expect(entry?.descriptor).toEqual({ ...LAYA_ENGINE_DESCRIPTOR, models: { fast: MODEL_ID, accurate: MODEL_ID } })
     await until(() => engine.status().state === 'not-installed')
     expect(engine.status().detail).toBe('Laya is not installed; run /laya install')
     expect(entry?.status()).toEqual({ state: 'not-installed', detail: 'Laya is not installed; run /laya install' })
@@ -207,6 +208,58 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256 })
     await engine.restart()
     await until(() => engine.status().state === 'ready')
+  })
+})
+
+describe('the laya Remote', { timeout: PROCESS_TIMEOUT_MS }, () => {
+  /** The Remote service the engine mounted. */
+  function remote(mounted: Context): LayaGatewayRemote {
+    const service: unknown = mounted.get('layaGatewayRemote')
+    if (!(service instanceof LayaGatewayRemote)) throw new Error('the laya Remote is not mounted')
+    return service
+  }
+
+  it('publishes status, install, and restart under the laya namespace', async () => {
+    const { ctx: mounted } = await mount()
+    const service = remote(mounted)
+    expect(service.typertRemote).toMatchObject({ serviceKey: 'layaGatewayRemote', namespace: 'laya' })
+    expect(remoteMethods(service).map(method => method.method).sort()).toEqual(['gatewayStatus', 'installGateway', 'restartGateway'])
+  })
+
+  it('reports the pin and state, installs, and restarts through the Remote', async () => {
+    const { ctx: mounted, engine } = await mount()
+    const service = remote(mounted)
+    await until(() => engine.status().state === 'not-installed')
+    expect(service.gatewayStatus()).toEqual({
+      state: 'not-installed',
+      detail: 'Laya is not installed; run /laya install',
+      modelId: MODEL_ID,
+      checkpointContext: 1024,
+      dtype: 'float16',
+      installing: false,
+    })
+
+    const installed = service.installGateway()
+    expect(service.gatewayStatus().installing).toBe(true)
+    await expect(installed).resolves.toMatchObject({ modelDir: engine.config.modelDir, manifestSha256: fake.manifestSha256 })
+    await until(() => engine.status().state === 'ready')
+    expect(service.gatewayStatus()).toEqual({ state: 'ready', modelId: MODEL_ID, checkpointContext: 1024, dtype: 'float16', installing: false })
+
+    const restarted = await service.restartGateway()
+    expect(restarted).toMatchObject({ modelId: MODEL_ID, installing: false })
+    await until(() => engine.status().state === 'ready')
+  })
+
+  it('names the last exit while the gateway is not ready', async () => {
+    await writeBehavior(runtimeDir, { manifestSha256: fake.manifestSha256, exitBeforeReady: 3 })
+    const { ctx: mounted, engine } = await mount()
+    await engine.install().catch(() => undefined)
+    await until(() => engine.status().state === 'unavailable' && engine.lastExit() !== undefined, 20_000)
+
+    expect(remote(mounted).gatewayStatus()).toMatchObject({
+      state: 'unavailable',
+      lastExit: { exitCode: 3, signal: null, timedOut: false },
+    })
   })
 })
 

@@ -46,7 +46,8 @@ import {
 import type { ResolvedLayaJudgmentConfig } from './config.ts'
 import { currentHost, installLaya, preflightLaunch, subprocessRunner } from './installation.ts'
 import { describeError, LayaGatewaySupervisor } from './supervisor.ts'
-import type { LayaGatewayExit, LayaGatewayStatus, LayaInstallResult, LayaJudgmentConfig } from './types.ts'
+import { LayaGatewayRemote } from './remote.ts'
+import type { LayaGatewayExit, LayaGatewayStatus, LayaGatewayView, LayaInstallResult, LayaJudgmentConfig } from './types.ts'
 
 export {
   DEFAULT_BATCH_SIZE,
@@ -79,10 +80,14 @@ export {
 export type { CommandRunner, HostFacts, InstallDependencies } from './installation.ts'
 export { describeError, LayaGatewaySupervisor, SMOKE_QUESTION_ID, STDERR_TAIL_BYTES } from './supervisor.ts'
 export type { LaunchPlan, LaunchPreflight, LayaSupervisorOptions, SupervisorLogger } from './supervisor.ts'
+export { LayaGatewayRemote } from './remote.ts'
+export type { LayaGatewayControl } from './remote.ts'
 export type {
   LayaGatewayExit,
+  LayaGatewayExitView,
   LayaGatewayState,
   LayaGatewayStatus,
+  LayaGatewayView,
   LayaInstallResult,
   LayaJudgmentConfig,
   LayaJudgmentModel,
@@ -198,8 +203,16 @@ export class LayaJudgmentEngine implements JudgmentEngine {
     this.fitting = { ask: input => this.supervisor.askFitted(input) }
     const announce = registerJudgmentEngine(ctx, {
       engine: this,
-      descriptor: LAYA_ENGINE_DESCRIPTOR,
+      descriptor: Object.freeze({
+        ...LAYA_ENGINE_DESCRIPTOR,
+        models: Object.freeze({ fast: this.config.modelId, accurate: this.config.modelId }),
+      }),
       status: () => layaEngineStatus(this.supervisor.status()),
+    })
+    new LayaGatewayRemote(ctx, {
+      view: () => this.view(),
+      install: () => this.install(),
+      restart: () => this.restart(),
     })
     ctx.effect(() => this.supervisor.onStatus(() => {
       announce()
@@ -292,6 +305,27 @@ export class LayaJudgmentEngine implements JudgmentEngine {
   /** Stop the gateway, reset its restart budget, and launch it again. */
   async restart(): Promise<void> {
     await this.supervisor.restart()
+  }
+
+  /**
+   * Describe the gateway for configuration surfaces, as `/laya status` does.
+   * @returns the state, pin, whether an install is running, and the last exit
+   *   while the gateway is not ready.
+   */
+  view(): LayaGatewayView {
+    const { state, detail } = this.supervisor.status()
+    const exit = this.supervisor.exit()
+    return {
+      state,
+      ...detail === undefined ? {} : { detail },
+      modelId: this.config.modelId,
+      checkpointContext: this.config.checkpointContext,
+      dtype: this.config.dtype,
+      installing: this.installation !== undefined,
+      ...exit === undefined || state === 'ready'
+        ? {}
+        : { lastExit: { exitCode: exit.exitCode, signal: exit.signal, timedOut: exit.timedOut } },
+    }
   }
 
   /** Run one `/laya` subcommand. */

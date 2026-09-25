@@ -1110,6 +1110,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the descriptors, in registration order.',
       },
       {
+        signature: 'entryList(): readonly JudgmentEngineEntry[]',
+        description: 'Read every registered engine with its status reader.',
+        parameters: [],
+        returns: 'the entries, in registration order.',
+      },
+      {
         signature: 'get(id: JudgmentEngineId): JudgmentEngineEntry | undefined',
         description: 'Look up one registered engine.',
         parameters: [{ name: 'id', description: 'the registry id.' }],
@@ -3157,6 +3163,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.change - fresh current projection or clear tombstone.' }],
   },
   {
+    name: 'judgment/engines-updated',
+    mode: 'emit',
+    signature: '\'judgment/engines-updated\'(): void',
+    summary: 'The judgment engine view changed: an engine registered, unregistered, or announced a status change, a consumer id became declared or stopped being declared, or the `judgment` settings selection committed a new value.',
+    description: 'The judgment engine view changed: an engine registered, unregistered, or announced a status change, a consumer id became declared or stopped being declared, or the `judgment` settings selection committed a new value. This payload-free notification comes from the service mounted as `ctx.judgment`; listeners re-read the engine list and selection.',
+    parameters: [],
+  },
+  {
     name: 'llm/adapters-updated',
     mode: 'emit',
     signature: '\'llm/adapters-updated\'(): void',
@@ -4230,7 +4244,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentEngineDescriptor',
-    declaration: 'export interface JudgmentEngineDescriptor {\n    readonly id: JudgmentEngineId;\n    readonly label: string;\n    readonly egress: JudgmentEngineEgress;\n    readonly calibration: JudgmentEngineCalibration;\n    readonly supportsFitting: boolean;\n    readonly host?: JudgmentEngineHost;\n    readonly terms?: string;\n}',
+    declaration: 'export interface JudgmentEngineDescriptor {\n    readonly id: JudgmentEngineId;\n    readonly label: string;\n    readonly egress: JudgmentEngineEgress;\n    readonly calibration: JudgmentEngineCalibration;\n    readonly supportsFitting: boolean;\n    readonly host?: JudgmentEngineHost;\n    readonly terms?: string;\n    readonly models?: Readonly<Record<JudgmentTier, string>>;\n    readonly destination?: string;\n}',
   },
   {
     name: 'JudgmentEngineEgress',

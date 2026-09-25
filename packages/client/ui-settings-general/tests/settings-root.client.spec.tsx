@@ -105,6 +105,64 @@ describe('global destinations and settings', () => {
     expect(screen.getByTestId('section-models')).toBeTruthy()
   })
 
+  it('gives every shipped section an icon and returns home from the wordmark and the workspace button', () => {
+    const { renderSlot } = mount({ rows: [
+      { id: 'general', order: 0, label: 'Preferences' },
+      { id: 'audio', order: 14, label: 'Voice & audio' },
+      { id: 'jspace', order: 13, label: 'J-Space' },
+      { id: 'shield', order: 12, label: 'Shield' },
+    ] })
+    openSettings()
+    for (const name of ['Voice & audio', 'J-Space', 'Shield']) {
+      expect(screen.getByRole('button', { name }).querySelector('svg')).not.toBeNull()
+    }
+    fireEvent.click(screen.getByRole('button', { name: en['navigation.home'] }))
+    expect(screen.queryByRole('region', { name: 'Settings' })).toBeNull()
+    openSettings()
+    fireEvent.click(screen.getByTitle('/work/shres-code'))
+    expect(screen.queryByRole('region', { name: 'Settings' })).toBeNull()
+    void renderSlot
+  })
+
+  it('returns focus to the trigger when Settings was opened from outside the shell', () => {
+    const navigate = vi.fn()
+    render(<SettingsRoot page="models" navigate={navigate}
+      t={key => (en as Record<string, string>)[key] ?? key}
+      useWorkspaces={() => { throw new Error('unused') }}
+      useSessions={((select: (state: unknown) => unknown) => select({ phase: 'ready', current: undefined, byId: {} })) as never}
+      useSections={select => select([{ id: 'models', order: 10, label: 'Models & providers' }])}
+      useOnboardingSteps={select => select([])}
+      renderSlot={(() => null) as never} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(navigate).toHaveBeenCalledWith(null)
+  })
+
+  it('completes an onboarding step once even when its completion is repeated', () => {
+    const { renderSlot } = mount({ onboardingActive: true })
+    const owner = renderSlot.mock.calls.findLast(([key]) => key === 'settings.onboarding')?.[1] as { stepId: string; complete: () => void }
+    expect(owner.stepId).toBe('welcome')
+    act(() => { owner.complete() })
+    act(() => { owner.complete() })
+    const next = renderSlot.mock.calls.findLast(([key]) => key === 'settings.onboarding')?.[1] as { stepId: string }
+    expect(next.stepId).toBe('credentials')
+  })
+
+  it('lets a section open another section, which lists with its own icon', () => {
+    const { renderSlot } = mount({ rows: [
+      { id: 'general', order: 0, label: 'Preferences' },
+      { id: 'models', order: 10, label: 'Models & providers' },
+      { id: 'model-routing', order: 10.5, label: 'Model routing' },
+    ] })
+    openSettings()
+    fireEvent.click(screen.getByRole('button', { name: 'Models & providers' }))
+    const call = renderSlot.mock.calls.findLast(([key]) => key === 'settings.section')
+    const owner = call?.[1] as { openSection: (id: string) => void }
+    act(() => { owner.openSection('model-routing') })
+    expect(screen.getByTestId('section-model-routing')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Model routing' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Model routing' }).querySelector('svg')).not.toBeNull()
+  })
+
   it('targets the appearance preference without duplicating its plugin', () => {
     const { renderSlot } = mount()
     openSettings()

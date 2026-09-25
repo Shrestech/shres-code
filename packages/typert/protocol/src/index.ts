@@ -19,6 +19,22 @@ export function isTypertRemoteSegment(value: string): boolean {
 }
 
 /**
+ * Names a generated Remote method cannot take, because the Client gateway
+ * mounts each namespace as a Cordis Service that already owns them: the
+ * namespace Service's fields (`ctx`, `invokeRemote`, `methods`, `name`,
+ * `namespace`), its methods (`assertMethodAvailable`, `empty`, `has`, `install`,
+ * `installDirect`, `installScoped`, `remove`), and every `Object.prototype`
+ * member. The generator rejects a Remote exported under one of these names,
+ * and the Client gateway refuses to mount one.
+ */
+export const TYPERT_RESERVED_REMOTE_METHODS: ReadonlySet<string> = new Set([
+  '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__', '__proto__',
+  'assertMethodAvailable', 'constructor', 'ctx', 'empty', 'has', 'hasOwnProperty', 'install',
+  'installDirect', 'installScoped', 'invokeRemote', 'isPrototypeOf', 'methods', 'name', 'namespace',
+  'propertyIsEnumerable', 'remove', 'toLocaleString', 'toString', 'valueOf',
+])
+
+/**
  * A lookup policy rejection whose typed payload belongs to the active boundary adapter.
  * Gateway adapters preserve this payload instead of collapsing it into an infrastructure failure.
  */

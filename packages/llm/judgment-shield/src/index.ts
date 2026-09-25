@@ -13,10 +13,11 @@
  * @module @shres-code/shres-code-judgment-shield
  */
 
+import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
-import { judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
+import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentEngine,
   JudgmentEngineDescriptor,
@@ -31,18 +32,23 @@ import type { ShieldWireEngine } from './client.ts'
 import {
   DEFAULT_MAX_REQUEST_BYTES,
   DEFAULT_MAX_RESPONSE_BYTES,
+  DEFAULT_READINESS_INTERVAL_MS,
   DEFAULT_TIMEOUT_MS,
   MAX_RESPONSE_BYTES,
   resolveConfig,
 } from './config.ts'
 import type { ResolvedShieldJudgmentConfig } from './config.ts'
+import { probeGateway, probeTarget } from './readiness.ts'
 import type { ShieldJudgmentConfig } from './types.ts'
 
 export { createShieldWireEngine } from './client.ts'
 export type { ShieldWireEngine, ShieldWireEngineOptions } from './client.ts'
+export { probeGateway, probeTarget } from './readiness.ts'
+export type { ShieldProbeTarget } from './readiness.ts'
 export {
   DEFAULT_MAX_REQUEST_BYTES,
   DEFAULT_MAX_RESPONSE_BYTES,
+  DEFAULT_READINESS_INTERVAL_MS,
   DEFAULT_TIMEOUT_MS,
   DISTRIBUTION_TOLERANCE,
   MAX_RESPONSE_BYTES,
@@ -85,16 +91,24 @@ export const SHIELD_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freeze(
   supportsFitting: true,
 })
 
-/**
- * Status of an engine whose gateway availability is owned by the deployment:
- * an unreachable gateway surfaces per ask as `UNAVAILABLE`.
- */
+/** Status once the gateway accepted a connection or answered an ask. */
 const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
 
 /**
  * Local Shield judgment engine. One instance registers in
- * `ctx.judgmentEngines` as {@link SHIELD_ENGINE_ID} and sends no request unless
- * its explicit loopback endpoint is configured.
+ * `ctx.judgmentEngines` as {@link SHIELD_ENGINE_ID} and sends no judgment
+ * request unless its explicit loopback endpoint is configured.
+ *
+ * Its status reports whether the deployment-run gateway is reachable:
+ * `starting` until the first probe settles, then `ready` or `unavailable` with
+ * the connection failure. A probe opens one TCP connection to the endpoint at
+ * registration, every `readinessIntervalMs`, whenever the status is read
+ * while not `ready`, and after an ask fails with `UNAVAILABLE`; an answered
+ * ask reports `ready`. A failed ask never sets the status itself, because an
+ * HTTP or answer failure comes from a gateway that is reachable; the probe it
+ * starts decides. The plugin finishes loading only once the first
+ * probe settles, so a Loader composition never routes an ask while the status
+ * is still `starting`.
  */
 export class ShieldJudgmentEngine implements JudgmentEngine {
   /** The engine registry provided by `judgment-dispatch`. */
@@ -114,6 +128,7 @@ export class ShieldJudgmentEngine implements JudgmentEngine {
     timeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_TIMEOUT_MS),
     maxRequestBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_BYTES),
     maxResponseBytes: z.number().step(1).min(1).max(MAX_RESPONSE_BYTES).default(DEFAULT_MAX_RESPONSE_BYTES),
+    readinessIntervalMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_READINESS_INTERVAL_MS),
   })
 
   /** Resolved endpoint, artifact pins, deadline, and request/response body caps. */
@@ -124,6 +139,12 @@ export class ShieldJudgmentEngine implements JudgmentEngine {
   private readonly wire: ShieldWireEngine
   /** The provider's context, read for the redaction hook on each ask. */
   private readonly ctx: Context
+  /** The last gateway readiness observed. */
+  private readiness: JudgmentEngineStatus
+  /** The readiness probe in flight. */
+  private inFlight: Promise<void> | undefined
+  /** Announce a status change to the registry. */
+  private readonly announce: () => void
 
   /**
    * @param ctx - the provider context whose fiber owns the registration.
@@ -138,8 +159,33 @@ export class ShieldJudgmentEngine implements JudgmentEngine {
       redact: state => this.redactState(state),
       label: 'judgment-shield',
     })
-    this.fitting = this.wire.fitting
-    registerJudgmentEngine(ctx, { engine: this, descriptor: SHIELD_ENGINE_DESCRIPTOR, status: () => READY })
+    this.fitting = { ask: input => this.observeAnswered(this.wire.fitting.ask(input)) }
+    const destination = new URL(this.config.endpoint).host
+    this.readiness = Object.freeze({ state: 'starting', detail: `connecting to ${destination}` })
+    this.announce = registerJudgmentEngine(ctx, {
+      engine: this,
+      descriptor: Object.freeze({
+        ...SHIELD_ENGINE_DESCRIPTOR,
+        models: Object.freeze({ fast: this.config.models.fast, accurate: this.config.models.accurate }),
+        destination,
+      }),
+      status: () => this.status(),
+    })
+    ctx.effect(() => {
+      const timer = setInterval(() => {
+        void this.probe()
+      }, this.config.readinessIntervalMs)
+      timer.unref()
+      return () => {
+        clearInterval(timer)
+      }
+    }, 'judgment-shield: periodic readiness probe')
+    void this.probe()
+  }
+
+  /** Finish loading once the first readiness probe settles. */
+  protected async [Service.init](): Promise<void> {
+    await this.inFlight
   }
 
   /**
@@ -159,7 +205,62 @@ export class ShieldJudgmentEngine implements JudgmentEngine {
    *   and `ABORTED` when the caller cancels the ask.
    */
   ask(input: JudgmentInput): Promise<JudgmentResult> {
-    return this.wire.ask(input)
+    return this.observeAnswered(this.wire.ask(input))
+  }
+
+  /**
+   * The registry's status reader. A read while not `ready` also starts a
+   * probe, so a gateway that came up is seen without waiting for the interval.
+   * @returns the last observed readiness.
+   */
+  private status(): JudgmentEngineStatus {
+    if (this.readiness.state !== 'ready') void this.probe()
+    return this.readiness
+  }
+
+  /**
+   * Probe the gateway once; a probe already in flight covers the request.
+   * @returns the probe in flight, settled once it recorded its outcome.
+   */
+  private probe(): Promise<void> {
+    if (this.inFlight !== undefined) return this.inFlight
+    const probe = probeGateway(probeTarget(this.config.endpoint), this.config.timeoutMs).then((failure) => {
+      this.inFlight = undefined
+      this.observe(failure === undefined
+        ? READY
+        : { state: 'unavailable', detail: `judgment-shield: the gateway at ${new URL(this.config.endpoint).host} is not accepting connections: ${failure}` })
+    })
+    this.inFlight = probe
+    return probe
+  }
+
+  /**
+   * Report `ready` once an ask or fitted ask answered. A failure passes through
+   * unchanged; an `UNAVAILABLE` one also starts a probe, so a gateway that went
+   * away is reported without waiting for the interval.
+   * @param answer - the pending answer.
+   * @returns the same answer.
+   */
+  private async observeAnswered<T>(answer: Promise<T>): Promise<T> {
+    let value: T
+    try {
+      value = await answer
+    } catch (error) {
+      if (error instanceof JudgmentError && error.code === 'UNAVAILABLE') void this.probe()
+      throw error
+    }
+    this.observe(READY)
+    return value
+  }
+
+  /**
+   * Record one readiness observation, announcing it when it differs.
+   * @param next - the observed status.
+   */
+  private observe(next: JudgmentEngineStatus): void {
+    if (next.state === this.readiness.state && next.detail === this.readiness.detail) return
+    this.readiness = Object.freeze({ ...next })
+    this.announce()
   }
 
   /** Consult the optional deployment redactor exactly once. */

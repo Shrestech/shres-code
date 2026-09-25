@@ -47,6 +47,7 @@
   "devDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-tool-cordis": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
     "@shres-code/shres-code-typert-registry": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "zod": "^4.4.3"

@@ -48,6 +48,12 @@ judgment:
 
 An override key must be a consumer id that a mounted consumer declared in the registry with `declareJudgmentConsumer`; a write adding or changing any other key is rejected with `judgment: consumer "<key>" does not name itself in judgment asks; this override would have no effect` at `['overrides', <key>]`, and asks ignore a stored override for an undeclared consumer. `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves. The model router declares `model-router` once its asks carry that consumer id.
 
+## Configuration surfaces
+
+The dispatcher serves the `judgmentEngines` Remote (Host service key `judgmentEnginesRemote`). `judgmentEngines.snapshot()` returns `JudgmentEnginesSnapshot` from `@shres-code/shres-code-judgment-dispatch/types`: every registered engine as a `JudgmentEngineView` — id, label, egress, calibration, fitting support, required host and whether it admits this machine, terms URL, per-tier model ids, destination host, and current state with its detail — in registration order, then the resolved selection `{ enabled, engine, overrides }`, the declared consumer ids, and this machine's platform-architecture pair. The Remote only reads; a configuration surface writes `judgment.engine` through the settings seam, where the write rules above apply.
+
+The dispatcher emits the payload-free `judgment/engines-updated` Host event whenever a new snapshot would differ: an engine registers, unregisters, or announces a status change, a consumer declaration begins or ends, or the `judgment` section commits a new value. The Web assembly forwards the event, so a Client subscribes with `ctx.remote.$on('judgment/engines-updated', …)` and re-reads the snapshot.
+
 ## Model Experience
 
 ### Routed judgment ask

@@ -27,6 +27,7 @@
  * @module @shres-code/shres-code-judgment-typesafe
  */
 
+import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
@@ -96,7 +97,7 @@ export const TYPESAFE_ENGINE_DESCRIPTOR: JudgmentEngineDescriptor = Object.freez
   terms: 'https://typesafe.ai/legal/terms',
 })
 
-/** Status of an engine that resolves its credential and endpoint on each ask. */
+/** Status once the credential reference resolved to a value. */
 const READY: JudgmentEngineStatus = Object.freeze({ state: 'ready' })
 
 /** Diagnostic of every caller cancellation this engine reports. */
@@ -129,9 +130,17 @@ interface AskCancellation {
  * TypeSafe AI judgment engine: one HTTP request per attempt, one validated
  * answer per question, no session event and no prompt text of its own.
  *
- * Registered in `ctx.judgmentEngines` as {@link TYPESAFE_ENGINE_ID}; it is
- * always `ready`, because a missing credential surfaces per ask as
- * `UNCONFIGURED`. Nothing is cached
+ * Registered in `ctx.judgmentEngines` as {@link TYPESAFE_ENGINE_ID}. Its status
+ * reports whether the credential reference currently resolves: `starting` until
+ * the first check settles, `unconfigured` while no credentials service is
+ * mounted or the reference holds no value, `unavailable` when the credentials
+ * service fails, and `ready` otherwise. The check runs at registration, on
+ * every `credentials/updated` for the reference, whenever the status is read
+ * while not `ready`, and after each ask's own resolution, so a stored key
+ * reaches the status without a restart. The plugin finishes loading only once
+ * the first check settles, so a Loader composition never routes an ask while
+ * the status is still `starting`. The status says nothing about the
+ * vendor endpoint, whose failures still surface per ask. Nothing is cached
  * across asks — the credential reference is re-resolved and the deadline is
  * restarted on every call — so a rotated key reaches the next ask without a
  * restart. A refused attempt adds nothing to that list: the same ask is sent
@@ -165,6 +174,13 @@ export class TypesafeJudgmentEngine implements JudgmentEngine {
   readonly config: ResolvedTypesafeJudgmentConfig
   /** The provider's context, read for the credentials service and the redaction hook on each ask. */
   private readonly ctx: Context
+  /** The last credential readiness observed. */
+  private readiness: JudgmentEngineStatus
+  /** The readiness check in flight, and whether another must follow it. */
+  private inFlight: Promise<void> | undefined
+  private recheck = false
+  /** Announce a status change to the registry. */
+  private readonly announce: () => void
 
   /**
    * @param ctx - the provider context whose fiber owns the registration.
@@ -174,7 +190,71 @@ export class TypesafeJudgmentEngine implements JudgmentEngine {
   constructor(ctx: Context, config: TypesafeJudgmentConfig = NO_CONFIG) {
     this.ctx = ctx
     this.config = resolveConfig(config)
-    registerJudgmentEngine(ctx, { engine: this, descriptor: TYPESAFE_ENGINE_DESCRIPTOR, status: () => READY })
+    this.readiness = Object.freeze({ state: 'starting', detail: `checking ${this.config.apiKeyRef}` })
+    this.announce = registerJudgmentEngine(ctx, {
+      engine: this,
+      descriptor: Object.freeze({
+        ...TYPESAFE_ENGINE_DESCRIPTOR,
+        models: Object.freeze({ fast: this.config.models.fast, accurate: this.config.models.accurate }),
+        destination: new URL(this.config.endpoint).host,
+      }),
+      status: () => this.status(),
+    })
+    ctx.effect(() => ctx.on('credentials/updated', (ref) => {
+      if (ref === this.config.apiKeyRef) void this.checkReadiness()
+    }), 'judgment-typesafe: re-check the credential on change')
+    void this.checkReadiness()
+  }
+
+  /**
+   * The registry's status reader. A read while not `ready` also starts a
+   * re-check, so a credential stored without an event still reaches the status.
+   * @returns the last observed readiness.
+   */
+  private status(): JudgmentEngineStatus {
+    if (this.readiness.state !== 'ready') void this.checkReadiness()
+    return this.readiness
+  }
+
+  /** Finish loading once the first readiness check settles. */
+  protected async [Service.init](): Promise<void> {
+    await this.inFlight
+  }
+
+  /**
+   * Resolve the reference once and record the outcome; requests made while a
+   * check is in flight coalesce into one follow-up check.
+   * @returns the check in flight, settled once it and any follow-up recorded their outcome.
+   */
+  private checkReadiness(): Promise<void> {
+    if (this.inFlight !== undefined) {
+      this.recheck = true
+      return this.inFlight
+    }
+    const check = this.resolveApiKey().then(
+      () => READY,
+      (error: unknown): JudgmentEngineStatus => error instanceof JudgmentError
+        ? { state: 'unconfigured', detail: error.message }
+        : { state: 'unavailable', detail: `judgment-typesafe: ${this.config.apiKeyRef} could not be read: ${error instanceof Error ? error.message : String(error)}` },
+    ).then((next): Promise<void> | undefined => {
+      this.inFlight = undefined
+      this.observe(next)
+      if (!this.recheck) return undefined
+      this.recheck = false
+      return this.checkReadiness()
+    })
+    this.inFlight = check
+    return check
+  }
+
+  /**
+   * Record one readiness observation, announcing it when it differs.
+   * @param next - the observed status.
+   */
+  private observe(next: JudgmentEngineStatus): void {
+    if (next.state === this.readiness.state && next.detail === this.readiness.detail) return
+    this.readiness = Object.freeze({ ...next })
+    this.announce()
   }
 
   /**
@@ -197,7 +277,13 @@ export class TypesafeJudgmentEngine implements JudgmentEngine {
     const config = this.config
     const signal = input.signal
     throwIfJudgmentAborted(signal, CANCELLED)
-    const apiKey = await abortableJudgmentStep(() => this.resolveApiKey(), signal, CANCELLED)
+    const apiKey = await abortableJudgmentStep(() => this.resolveApiKey(), signal, CANCELLED).then((key) => {
+      this.observe(READY)
+      return key
+    }, (error: unknown) => {
+      if (error instanceof JudgmentError && error.code === 'UNCONFIGURED') this.observe({ state: 'unconfigured', detail: error.message })
+      throw error
+    })
     throwIfJudgmentAborted(signal, CANCELLED)
     const state = await abortableJudgmentStep(() => this.redactState(input.state), signal, CANCELLED)
     throwIfJudgmentAborted(signal, CANCELLED)

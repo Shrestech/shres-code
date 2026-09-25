@@ -1092,6 +1092,12 @@ importers:
       '@shres-code/shres-code-api-gateway':
         specifier: workspace:^
         version: link:../gateway
+      '@shres-code/shres-code-client-connection':
+        specifier: workspace:^
+        version: link:../../client/connection
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
       '@shres-code/shres-code-commands':
         specifier: workspace:^
         version: link:../../interaction/commands
@@ -1113,6 +1119,15 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../../llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-laya':
+        specifier: workspace:^
+        version: link:../../llm/judgment-laya
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
@@ -1137,6 +1152,12 @@ importers:
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/attachment/attachment:
     devDependencies:
@@ -1717,6 +1738,9 @@ importers:
       '@shres-code/shres-code-client-ui-settings-jspace':
         specifier: workspace:^
         version: link:../../client/ui-settings-jspace
+      '@shres-code/shres-code-client-ui-settings-model-routing':
+        specifier: workspace:^
+        version: link:../../client/ui-settings-model-routing
       '@shres-code/shres-code-client-ui-settings-models':
         specifier: workspace:^
         version: link:../../client/ui-settings-models
@@ -3069,6 +3093,52 @@ importers:
         version: 19.2.8
 
   packages/client/ui-settings-jspace:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
+      '@shres-code/shres-code-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@shres-code/shres-code-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@shres-code/shres-code-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@shres-code/shres-code-client-web-react':
+        specifier: workspace:^
+        version: link:../web-react
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ~19.2.18
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+
+  packages/client/ui-settings-model-routing:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6495,6 +6565,9 @@ importers:
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6517,6 +6590,9 @@ importers:
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/judgment-guardrails:
     dependencies:
@@ -6560,6 +6636,9 @@ importers:
       '@shres-code/shres-code-home-paths':
         specifier: workspace:^
         version: link:../../util/home-paths
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6627,6 +6706,9 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/judgment-llm:
     dependencies:
@@ -10259,6 +10341,9 @@ importers:
       '@shres-code/shres-code-tool-cordis':
         specifier: workspace:^
         version: link:../../extensions/tool-cordis
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../protocol
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../registry
