@@ -13,7 +13,7 @@ import type {
 } from '@shres-code/shres-code-model-router/client'
 import { StateDot } from '@shres-code/shres-code-client-ui-primitives'
 import type { SettingsScope } from '@shres-code/shres-code-client-runtime/client'
-import { engineEgress, routingJudge, type RoutingEngineSource } from '../engine-source.ts'
+import { engineEgress, routingJudge, routingSettingsPage, type RoutingEngineSource } from '../engine-source.ts'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type { ConvViewOwnerProps, ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting`/`modelRoutingStats` SessionProjectionMap merges for useProjection.
@@ -49,7 +49,9 @@ export interface RoutingViewInjected {
   loadGate: () => Promise<ModelRoutingGateView>
   /**
    * Open Settings › Model routing, where the judge and the routing defaults
-   * are configured for every session. Absent, the view names the section as text.
+   * are configured for every session. The view links through it only while
+   * the engine registry has been read, which is when that page exists;
+   * otherwise, or without it, the view names the section as text.
    */
   openRoutingSettings?: () => void
   /**
@@ -131,6 +133,8 @@ export function RoutingView({
   }
 
   const judge = routingJudge(engineState)
+  // A link only while the page exists: opening a section that is not registered rejects.
+  const openSettings = routingSettingsPage(engineState) ? openRoutingSettings : undefined
   // The floors the current judge is gated by now: its operating point, else the global defaults.
   const gate = gateLoad.kind === 'loaded'
     ? gateFor(gateLoad.gate, judge.kind === 'engine' ? String(judge.engine.id) : undefined)
@@ -166,13 +170,13 @@ export function RoutingView({
         {segment.uncalibrated === true && <span className={css.scopePill}>{t('judge.uncalibrated')}</span>}
         {notUsed !== undefined && <span className={css.egressPill} data-egress="remote">{t('judge.notUsed.pill')}</span>}
         {' · '}{t('status.settings.before')}{' '}
-        <SettingsLink open={openRoutingSettings} label={t('status.settings.link')} />
+        <SettingsLink open={openSettings} label={t('status.settings.link')} />
       </p>
       {egress !== undefined && <p className={css.notice} role="status">{egress}</p>}
       {trouble !== undefined && (
         <p className={css.notice} role="status">
           {trouble}{' '}
-          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
+          <SettingsLink open={openSettings} label={t('notice.settings')} />
         </p>
       )}
       {gateLoad.kind === 'failed' && (
@@ -184,14 +188,14 @@ export function RoutingView({
       {state === 'no-engine' && (
         <p className={css.notice} role="status">
           {t('state.noEngine')}{' '}
-          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
+          <SettingsLink open={openSettings} label={t('notice.settings')} />
         </p>
       )}
       {state === 'base-unlisted' && <p className={css.notice} role="status">{t('state.baseUnlisted', { model: base ?? t('state.thisModel') })}</p>}
       {notUsed !== undefined && (
         <p className={css.notice} role="status">
           {notUsed}{' '}
-          <SettingsLink open={openRoutingSettings} label={t('notice.settings')} />
+          <SettingsLink open={openSettings} label={t('notice.settings')} />
         </p>
       )}
       {notUsed === undefined && engineUncalibratedRecorded(stats, routing.active) && (

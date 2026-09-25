@@ -511,6 +511,16 @@ describe('RoutingView judge facts', () => {
     expect(statusLine().textContent).not.toContain('Not used for routing')
   })
 
+  it('names Settings › Model routing as text while that page does not exist or is not known to', () => {
+    // The page registers only while the engine registry is served.
+    for (const engine of [{ kind: 'no-dispatcher' }, { kind: 'loading' }, { kind: 'failed', message: 'down' }] as RoutingEngineState[]) {
+      setup({ engine, openRoutingSettings: vi.fn() })
+      expect(statusLine().textContent).toContain('change it in Settings › Model routing')
+      expect(screen.queryByRole('button', { name: 'Settings › Model routing' })).toBeNull()
+      cleanup()
+    }
+  })
+
   it('names Settings › Model routing as text when the view cannot open it', () => {
     setup({ engine: { kind: 'no-dispatcher' } })
     expect(statusLine().textContent).toContain('change it in Settings › Model routing')
@@ -525,7 +535,9 @@ describe('RoutingView judge facts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
     expect(openRoutingSettings).toHaveBeenCalledTimes(1)
     cleanup()
-    setup({ openRoutingSettings, engine: { kind: 'no-dispatcher' } })
+    // Judgment switched off: no judge, but the page exists.
+    const disabled = engines('laya', { selection: { enabled: false, engine: 'laya', overrides: {} } })
+    setup({ openRoutingSettings, engine: { kind: 'ready', snapshot: disabled } })
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
     cleanup()
     const starting = engines('laya', { engines: [{ ...LOCAL, state: 'starting' }, REMOTE] })

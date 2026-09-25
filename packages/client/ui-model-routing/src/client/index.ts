@@ -104,7 +104,9 @@ export interface RoutingChipInjected {
   loadGate: () => Promise<ModelRoutingGateView>
   /**
    * Open Settings › Model routing, where the judge is chosen for every
-   * session. Absent, the confirm names the section as text.
+   * session. The confirm offers it only while the engine registry has been
+   * read, which is when that page exists; otherwise, or without it, the
+   * confirm names the section as text.
    */
   openRoutingSettings?: () => void
   /**

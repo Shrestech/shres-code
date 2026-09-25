@@ -125,6 +125,17 @@ export function routingJudge(state: RoutingEngineState): RoutingJudge {
 }
 
 /**
+ * Whether Settings › Model routing exists to open: that page registers only
+ * while the Host serves the judgment engine registry, which a read of it
+ * confirms.
+ * @param state - the engine facts.
+ * @returns true once the registry has been read.
+ */
+export function routingSettingsPage(state: RoutingEngineState): boolean {
+  return state.kind === 'ready'
+}
+
+/**
  * The egress class of the engine a decision names, when the registry knows
  * it. Decisions record the name the provider reported, so the name is matched
  * against registry ids and then labels.

@@ -375,6 +375,13 @@ describe('RoutingChip remote-judge confirm', () => {
     await screen.findByText(en['confirm.refused'])
   })
 
+  it('names the section instead of offering Open Settings while the registry is not read', () => {
+    setup({ routing: OFF, engine: { kind: 'loading' }, openRoutingSettings: vi.fn() })
+    fireEvent.click(offChip())
+    expect(screen.getByRole('dialog', { name: en['confirm.title'] }).textContent).toContain(en['confirm.settings'])
+    expect(screen.queryByRole('button', { name: en['confirm.openSettings'] })).toBeNull()
+  })
+
   it('offers Open Settings beside Cancel and Turn on, or names the section when it cannot open it', () => {
     setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => new Promise(() => {}) })
     fireEvent.click(offChip())

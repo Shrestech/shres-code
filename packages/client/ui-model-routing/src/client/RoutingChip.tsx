@@ -7,7 +7,7 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-co
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the `modelRouting` SessionProjectionMap merge for useProjection.
 import type { ModelRoutingGateView } from '@shres-code/shres-code-model-router/client'
-import { routingJudge, type RoutingJudge } from './engine-source.ts'
+import { routingJudge, routingSettingsPage, type RoutingJudge } from './engine-source.ts'
 import { judgeRefused } from './view/derive.ts'
 import type { RoutingChipInjected } from './index.ts'
 import css from './RoutingChip.module.css'
@@ -47,6 +47,8 @@ export function RoutingChip({
 }: RoutingChipProps) {
   const routing = useProjection('modelRouting')
   const engineState = useRoutingEngine(state => state)
+  // Offered only while the page exists: opening a section that is not registered rejects.
+  const openSettings = routingSettingsPage(engineState) ? openRoutingSettings : undefined
   const [confirm, setConfirm] = useState<ConfirmedJudge | null>(null)
   const [confirmGate, setConfirmGate] = useState<ModelRoutingGateView | null>(null)
   const [pending, setPending] = useState<ChipAction | null>(null)
@@ -161,12 +163,12 @@ export function RoutingChip({
           closeLabel={t('confirm.close')}
           footer={(
             <span className={css.confirmActions}>
-              {openRoutingSettings !== undefined && (
+              {openSettings !== undefined && (
                 <Button
                   variant="outline"
                   onClick={() => {
                     setConfirm(null)
-                    openRoutingSettings()
+                    openSettings()
                   }}
                 >
                   {t('confirm.openSettings')}
@@ -187,7 +189,7 @@ export function RoutingChip({
         >
           <p className={css.confirmWarning}>{confirmWarning(confirm, confirmGate, t)}</p>
           {/* Without a way to open Settings, the confirm names where the judge is changed. */}
-          {openRoutingSettings === undefined && <p className={css.confirmSettings}>{t('confirm.settings')}</p>}
+          {openSettings === undefined && <p className={css.confirmSettings}>{t('confirm.settings')}</p>}
         </Modal>
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
