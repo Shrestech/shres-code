@@ -5,7 +5,7 @@
  * these values and compute nothing themselves.
  */
 import type {
-  ModelRoutingDecision, ModelRoutingGateView, ModelRoutingStatsSnapshot,
+  ModelRoutingDecision, ModelRoutingDecisionDetail, ModelRoutingGateView, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
 import type { RoutingKey } from '../locales.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from './format.ts'
@@ -362,4 +362,66 @@ export function routeMargin(decision: ModelRoutingDecision): number | undefined 
   if (decision.route === undefined) return undefined
   const sorted = Object.values(decision.route.probabilities).sort((left, right) => right - left)
   return (sorted[0] ?? 0) - (sorted[1] ?? 0)
+}
+
+/**
+ * The thresholds one drill-down compares a decision with, and where they come
+ * from: `recorded` values are the ones in force when the decision was made;
+ * `now` values are the configuration in force when the view read it, which
+ * can differ from the decision's own when the configuration or the engine's
+ * operating point changed since.
+ */
+export interface DecisionThresholds {
+  /** Whether the values were recorded on the decision or read from the configuration now. */
+  source: 'recorded' | 'now'
+  /** Whether the values come from a calibration rather than configuration defaults. */
+  calibrated: boolean
+  /** Route-confidence floor. */
+  downgradeThreshold: number
+  /** Top-two margin floor. */
+  downgradeMargin: number
+  /** Difficulty at or above which a streak is not entered. */
+  entryScoreCeiling: number
+  /** Difficulty at or above which a held streak escalates back. */
+  escalateBackScoreThreshold: number
+}
+
+/**
+ * Resolve the thresholds a drill-down compares one decision with. The logged
+ * decision records no thresholds, so they are the configuration in force now,
+ * uncalibrated, from the `modelRouting.decision` read's gate.
+ * @param detail - the decision detail.
+ * @returns the thresholds and their source.
+ */
+export function decisionThresholds(detail: ModelRoutingDecisionDetail): DecisionThresholds {
+  return {
+    source: 'now',
+    calibrated: false,
+    downgradeThreshold: detail.gate.downgradeThreshold,
+    downgradeMargin: detail.gate.downgradeMargin,
+    entryScoreCeiling: detail.gate.entryScoreCeiling,
+    escalateBackScoreThreshold: detail.gate.escalateBackScoreThreshold,
+  }
+}
+
+/**
+ * The drill-down's label for where its thresholds come from.
+ * @param thresholds - the resolved thresholds.
+ * @param t - the view's translate.
+ * @returns the source pill text.
+ */
+export function thresholdSourceLabel(thresholds: DecisionThresholds, t: RoutingTranslate): string {
+  if (thresholds.source === 'now') return t('drill.source.now')
+  return t(thresholds.calibrated ? 'drill.source.recorded' : 'drill.source.recordedUncalibrated')
+}
+
+/**
+ * The drill-down's tick label for one threshold value, naming its source.
+ * @param thresholds - the resolved thresholds.
+ * @param value - the threshold value to label.
+ * @param t - the view's translate.
+ * @returns e.g. `threshold now 0.80` or `threshold at the time 0.80`.
+ */
+export function thresholdValueLabel(thresholds: DecisionThresholds, value: number, t: RoutingTranslate): string {
+  return t(thresholds.source === 'now' ? 'drill.threshold.now' : 'drill.threshold.recorded', { value: formatScore(value) })
 }

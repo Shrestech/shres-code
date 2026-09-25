@@ -37,7 +37,7 @@ Model routing logs every decision, but nothing in the GUI said what routing did 
 ## Consequences
 
 - A session's routing activity is readable where the session is, and two open sessions render independent views from their own projections.
-- Charts compare every decision with the configuration in force when the view loads, because decisions do not record their thresholds.
+- Charts draw the threshold in force now, and the drill-down labels its comparison "threshold now", because decisions do not record the thresholds that gated them; one derivation resolves a decision's thresholds and their source, so recorded values replace the configured ones there when decisions carry them.
 - Judge identity, status, and egress (the status line's judge segment, the remote-egress confirm on the Auto chip, the Sent off-machine split, and Settings links) come from the host judgment-engine registry read, which lands separately; until then the egress tile reports the egress as unknown.
 
 ## Verification

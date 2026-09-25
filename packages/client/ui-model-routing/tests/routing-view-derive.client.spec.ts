@@ -9,7 +9,8 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  engineTroubleRecorded, gatePath, routeMargin, routeOptions, routeQuestion, routingKpis,
+  decisionThresholds, engineTroubleRecorded, gatePath, thresholdSourceLabel, thresholdValueLabel,
+  routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
 } from '../src/client/view/derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from '../src/client/view/format.ts'
@@ -179,5 +180,23 @@ describe('route question, options, and margin', () => {
     expect(routeOptions(decision)).toEqual([{ option: 'flash', probability: 0.9, chosen: true }])
     expect(routeMargin(decision)).toBe(0.9)
     expect(routeMargin(decisionDetail({ route: { choice: 'flash', confidence: 0, probabilities: {} } }).decision)).toBe(0)
+  })
+})
+
+describe('decision thresholds', () => {
+  it('compares a decision with the configuration now, uncalibrated', () => {
+    const thresholds = decisionThresholds(decisionDetail())
+    expect(thresholds).toEqual({
+      source: 'now', calibrated: false, downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+    })
+    expect(thresholdSourceLabel(thresholds, t)).toBe('Threshold now · uncalibrated')
+  })
+
+  it('labels thresholds recorded at the time, calibrated or not', () => {
+    const recorded = { ...decisionThresholds(decisionDetail()), source: 'recorded' as const }
+    expect(thresholdSourceLabel(recorded, t)).toBe('Threshold at the time · uncalibrated')
+    expect(thresholdSourceLabel({ ...recorded, calibrated: true }, t)).toBe('Threshold at the time')
+    expect(thresholdValueLabel(recorded, 0.8, t)).toBe('threshold at the time 0.80')
+    expect(thresholdValueLabel(decisionThresholds(decisionDetail()), 0.8, t)).toBe('threshold now 0.80')
   })
 })

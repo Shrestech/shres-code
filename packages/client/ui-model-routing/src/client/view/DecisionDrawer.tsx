@@ -9,7 +9,10 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import type { ModelRoutingDecisionDetail } from '@shres-code/shres-code-model-router/client'
-import { gatePath, routeMargin, routeOptions, routeQuestion, type RoutingTranslate } from './derive.ts'
+import {
+  decisionThresholds, gatePath, routeMargin, routeOptions, routeQuestion, thresholdSourceLabel, thresholdValueLabel,
+  type RoutingTranslate,
+} from './derive.ts'
 import { formatMs, formatScore } from './format.ts'
 import css from './DecisionDrawer.module.css'
 
@@ -91,6 +94,8 @@ function DecisionBody({ detail, showState, onShowState, t }: {
   t: RoutingTranslate
 }) {
   const { decision, gate } = detail
+  const thresholds = decisionThresholds(detail)
+  const thresholdLabel = (value: number): string => thresholdValueLabel(thresholds, value, t)
   const path = gatePath(decision.reason)
   const first = path.find(check => check.first)
   const options = routeOptions(decision)
@@ -153,18 +158,32 @@ function DecisionBody({ detail, showState, onShowState, t }: {
         </>
       )}
 
-      <h3 className={css.section}>{t('drill.gate')} <span className={css.warnPill}>{t('drill.uncalibrated')}</span></h3>
+      <h3 className={css.section}>{t('drill.gate')} <span className={css.warnPill}>{thresholdSourceLabel(thresholds, t)}</span></h3>
       <div className={css.scales}>
-        <Scale label={t('drill.confidence')} value={confidence} threshold={gate.downgradeThreshold} max={1} t={t} />
-        <Scale label={t('drill.margin')} value={margin} threshold={gate.downgradeMargin} max={1} t={t} />
+        <Scale
+          label={t('drill.confidence')}
+          value={confidence}
+          threshold={thresholds.downgradeThreshold}
+          thresholdLabel={thresholdLabel(thresholds.downgradeThreshold)}
+          max={1}
+          t={t}
+        />
+        <Scale
+          label={t('drill.margin')}
+          value={margin}
+          threshold={thresholds.downgradeMargin}
+          thresholdLabel={thresholdLabel(thresholds.downgradeMargin)}
+          max={1}
+          t={t}
+        />
       </div>
       <Scale
         label={t('drill.difficulty', { max: levels })}
         value={decision.difficulty?.score}
-        threshold={gate.entryScoreCeiling}
-        second={gate.escalateBackScoreThreshold}
-        thresholdLabel={t('drill.difficulty.enter', { value: gate.entryScoreCeiling })}
-        secondLabel={t('drill.difficulty.exit', { value: gate.escalateBackScoreThreshold })}
+        threshold={thresholds.entryScoreCeiling}
+        second={thresholds.escalateBackScoreThreshold}
+        thresholdLabel={t('drill.difficulty.enter', { value: thresholds.entryScoreCeiling })}
+        secondLabel={t('drill.difficulty.exit', { value: thresholds.escalateBackScoreThreshold })}
         max={levels}
         t={t}
       />
@@ -227,7 +246,7 @@ interface ScaleProps {
   value: number | undefined
   threshold: number
   second?: number
-  thresholdLabel?: string
+  thresholdLabel: string
   secondLabel?: string
   max: number
   t: RoutingTranslate
@@ -246,7 +265,7 @@ function Scale({ label, value, threshold, second, thresholdLabel, secondLabel, m
         {second !== undefined && <span className={css.scaleTick} style={{ left: at(second) }} />}
       </span>
       <span className={css.scaleTicks}>
-        {thresholdLabel ?? t('drill.threshold', { value: formatScore(threshold) })}
+        {thresholdLabel}
         {secondLabel !== undefined && ` · ${secondLabel}`}
       </span>
     </div>

@@ -242,6 +242,10 @@ describe('RoutingView decisions and drill-down', () => {
     expect(within(drawer).getByText('3 included · 1 omitted')).toBeTruthy()
     expect(within(drawer).getByText('gate-failed')).toBeTruthy()
     expect(within(drawer).getByText('enter below 2 · exit at 3')).toBeTruthy()
+    // Decisions record no thresholds, so the gate compares with the configuration now.
+    expect(within(drawer).getByText('Threshold now · uncalibrated')).toBeTruthy()
+    expect(within(drawer).getByText('threshold now 0.80')).toBeTruthy()
+    expect(within(drawer).getByText('threshold now 0.10')).toBeTruthy()
     expect(within(drawer).queryByText('USER: fix the typo')).toBeNull()
     fireEvent.click(within(drawer).getByRole('button', { name: 'Show state text' }))
     expect(within(drawer).getByText('USER: fix the typo')).toBeTruthy()
