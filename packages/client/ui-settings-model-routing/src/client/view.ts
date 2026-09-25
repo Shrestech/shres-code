@@ -122,3 +122,24 @@ export function classifierEnabled(judgment: SettingsNamespaceView): boolean {
   const value = judgment.value
   return !(typeof value === 'object' && value !== null && (value as { enabled?: unknown }).enabled === false)
 }
+
+/**
+ * Who evaluated the routing thresholds for one engine: the `calibratedBy` of
+ * the `model-router.operatingPoints` entry for that engine. An engine with no
+ * such entry, or an entry without `calibratedBy`, routes on configured
+ * defaults and is shown as uncalibrated.
+ * @param router - the resolved `model-router` section, when the Host exposes it.
+ * @param engine - the engine's registry id.
+ * @returns the non-empty `calibratedBy`, or undefined.
+ */
+export function calibratedBy(router: SettingsNamespaceView | null, engine: string): string | undefined {
+  const value = router?.value
+  const points = typeof value === 'object' && value !== null ? (value as { operatingPoints?: unknown }).operatingPoints : undefined
+  if (!Array.isArray(points)) return undefined
+  for (const point of points) {
+    if (typeof point !== 'object' || point === null) continue
+    const { engine: id, calibratedBy: by } = point as { engine?: unknown; calibratedBy?: unknown }
+    if (id === engine && typeof by === 'string' && by.length > 0) return by
+  }
+  return undefined
+}
