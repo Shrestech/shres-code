@@ -4677,7 +4677,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingEngineFailure',
-    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n}',
+    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n    refusedBeforeDispatch?: true;\n}',
   },
   {
     name: 'ModelRoutingEntryBaseView',

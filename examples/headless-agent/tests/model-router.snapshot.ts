@@ -6,6 +6,8 @@ import { normalizeSessionLog, scrubRequestHeaders } from '@shres-code/shres-code
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
+import { foldModelRoutingStats } from '@shres-code/shres-code-model-router'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /**
  * Keyless model-routing snapshot pair. Both arms boot the shipping headless
@@ -382,6 +384,34 @@ describe('headless model-routing snapshots', () => {
       expect(judgeBody.model).toBe('deepseek-v4-flash')
       expect(judgeBody.tools?.map(tool => tool.function?.name)).toEqual(['judgment_answer'])
       expect(requestedModel(server, 1)).toBe('deepseek-v4-flash')
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('counts a dispatcher refusal of an engine that is not ready as a failure and opens the breaker', async () => {
+    // Only the agent's own requests reach the stub: the dispatcher refuses every judge ask.
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-engine-refused.cordis.snapshot.yml'),
+        promptFixture: 'model-router-engine-refused',
+      }, server)
+      await expectArmFixtures('model-router-engine-refused', output)
+
+      const events = eventRecords(output.stream).map(eventOf)
+      const decisions = events.filter(event => event['type'] === 'model-routing/decision').map(event => event['data'])
+      expect(decisions).toMatchObject([
+        { outcome: 'kept-strong', reason: 'engine-unavailable', engineId: 'typesafe', engineFailure: { code: 'UNAVAILABLE', refusedBeforeDispatch: true } },
+        { outcome: 'kept-strong', reason: 'engine-unavailable', engineId: 'typesafe', engineFailure: { code: 'UNAVAILABLE', refusedBeforeDispatch: true } },
+        { outcome: 'kept-strong', reason: 'breaker-open' },
+      ])
+      // Nothing was sent to the judge; both refusals still count as failed judgments.
+      const stats = foldModelRoutingStats(events as unknown as SessionEvent[])
+      expect(stats.egress).toEqual([])
+      expect(stats.counts.judgeFailed).toBe(2)
+      expect(server.requests).toHaveLength(3)
+      expect([0, 1, 2].map(index => requestedModel(server, index))).toEqual(['deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-v4-pro'])
     } finally {
       await server.close()
     }

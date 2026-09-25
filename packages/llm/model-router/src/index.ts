@@ -636,8 +636,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         init: createStatsState,
         apply: applyStatsEvent,
         view: viewStats,
-        // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency.
-        stateVersion: 4,
+        // The unit state counts nothing sent for a call the dispatcher refused before dispatching it.
+        stateVersion: 5,
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
@@ -1350,10 +1350,17 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       failures: ModelRoutingJudgmentFailures | undefined,
       code?: ModelRoutingEngineFailure['code'],
       engineState?: ModelRoutingEngineFailure['engineState'],
+      refusedBeforeDispatch?: true,
     ): ModelRoutingDecision => {
       const engineFailure = code === undefined
         ? {}
-        : { engineFailure: { code, ...engineState === undefined ? {} : { engineState } } }
+        : {
+          engineFailure: {
+            code,
+            ...engineState === undefined ? {} : { engineState },
+            ...refusedBeforeDispatch === undefined ? {} : { refusedBeforeDispatch },
+          },
+        }
       // A warming engine has not failed: it holds a streak without spending the tolerance.
       if (held !== undefined && (engineState !== undefined
         || (failures?.count ?? 0) < config.judgmentFailures.holdTolerance)) {
@@ -1452,7 +1459,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       if (code === 'INPUT_TOO_LARGE') return keep('judgment-input-too-large')
       if (code === 'INVALID_ANSWER') return judgmentFailed('invalid-answer', true, failed.failures, code)
       if (code === 'UNAVAILABLE' || code === 'UNCONFIGURED') {
-        return judgmentFailed('engine-unavailable', true, failed.failures, code, failed.warming)
+        // A dispatcher's refusal sent nothing, and still counts as a failure.
+        // Only a JudgmentError carries a code.
+        const refused = (error as JudgmentError).refusedBeforeDispatch
+        return judgmentFailed('engine-unavailable', true, failed.failures, code, failed.warming, refused)
       }
       if (deadline.aborted) return judgmentFailed('engine-unavailable', true, failed.failures, 'DEADLINE', failed.warming)
       if (code === 'ABORTED') throw error

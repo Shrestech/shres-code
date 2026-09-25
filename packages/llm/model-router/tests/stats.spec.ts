@@ -742,6 +742,28 @@ describe('decisions recording judgment-call facts', () => {
     expect(fold(log).egress).toEqual([{ engine: 'typesafe', asks: 1, chars: 12_000, bound: 'at-most' }])
   })
 
+  it('counts nothing sent for a call the dispatcher refused before dispatching it, and still counts the failure', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    // TypeSafe registered without a key reports `unconfigured`; the dispatcher refuses it UNAVAILABLE.
+    log.decide(1, {
+      reason: 'engine-unavailable',
+      engineFailure: { code: 'UNAVAILABLE', refusedBeforeDispatch: true },
+      engineId: 'typesafe',
+      inputChars: 12_000,
+      latencyMs: 1,
+    })
+    const refused = fold(log)
+    expect(refused.egress).toEqual([])
+    expect(refused.counts.judgeFailed).toBe(1)
+    expect(refused.counts.warmUps).toBe(0)
+    expect(refused.latency.counts.every(count => count === 0)).toBe(true)
+    // The same failure from the engine itself may have left the machine.
+    log.decide(2, { reason: 'engine-unavailable', engineFailure: { code: 'UNAVAILABLE' }, engineId: 'typesafe', inputChars: 12_000, latencyMs: 40 })
+    expect(fold(log).egress).toEqual([{ engine: 'typesafe', asks: 1, chars: 12_000, bound: 'at-most' }])
+    expect(fold(log).counts.judgeFailed).toBe(2)
+  })
+
   it('counts a rejected fit as an upper bound', () => {
     const log = new Log()
     log.step(0, 1, 1)

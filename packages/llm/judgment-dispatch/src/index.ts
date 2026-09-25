@@ -215,7 +215,7 @@ export class JudgmentDispatch extends JudgmentService {
       throw new JudgmentError(
         'UNAVAILABLE',
         `judgment engine "${id}" selected for consumer "${input.consumer ?? '(none)'}" does not support fitting`,
-        { engineId: id },
+        { engineId: id, refusedBeforeDispatch: true },
       )
     }
     let result: JudgmentFittingResult
@@ -234,12 +234,15 @@ export class JudgmentDispatch extends JudgmentService {
     const entry = this.registry.get(id)
     if (entry === undefined) {
       this.reportUnresolved(id)
-      throw new JudgmentError('UNCONFIGURED', `judgment engine "${id}" is not composed`, { engineId: id })
+      throw new JudgmentError('UNCONFIGURED', `judgment engine "${id}" is not composed`, { engineId: id, refusedBeforeDispatch: true })
     }
     const status = entry.status()
     if (status.state !== 'ready') {
       const detail = status.detail === undefined ? '' : `: ${status.detail}`
-      throw new JudgmentError('UNAVAILABLE', `judgment engine "${id}" is ${status.state}${detail}`, { engineId: id })
+      throw new JudgmentError('UNAVAILABLE', `judgment engine "${id}" is ${status.state}${detail}`, {
+        engineId: id,
+        refusedBeforeDispatch: true,
+      })
     }
     return entry
   }
@@ -290,8 +293,10 @@ export class JudgmentDispatch extends JudgmentService {
 /**
  * Attach the routed engine's registry id to one engine failure, as every
  * answer carries it. A `JudgmentError` is re-created with the same code,
- * message, and cause plus `engineId`; anything else an engine throws breaks
- * the provider contract and propagates unchanged.
+ * message, and cause plus `engineId`, and never `refusedBeforeDispatch`: the
+ * engine had the ask. An error already carrying an `engineId`, as a nested
+ * dispatcher's does, is kept whole. Anything else an engine throws breaks the
+ * provider contract and propagates unchanged.
  * @param error - what the engine threw.
  * @param id - the registry id the ask was routed to.
  * @returns the value to rethrow.

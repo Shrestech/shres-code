@@ -146,6 +146,7 @@ describe('routing', () => {
 
     expect(failed.code).toBe('UNAVAILABLE')
     expect(failed.message).toBe('judgment engine "local" is not-installed: run the install action')
+    expect(failed.refusedBeforeDispatch).toBe(true)
     expect(local.asks).toHaveLength(0)
     expect(remote.asks).toHaveLength(0)
 
@@ -168,19 +169,31 @@ describe('routing', () => {
     const failed = await failure(() => ctx.judgment.ask(ASK))
     expect(failed).toMatchObject({ code: 'INVALID_ANSWER', message: 'alpha answered garbage', engineId: 'alpha' })
     expect(failed.cause).toBe(cause)
+    // The engine had the ask, so the failure is not a refusal before dispatch.
+    expect(failed).not.toHaveProperty('refusedBeforeDispatch')
     expect(beta.asks).toHaveLength(0)
   })
 
   it('stamps its own routing failures and leaves an already-stamped or non-judgment failure unchanged', async () => {
     const ctx = root()
     await ctx.plugin(JudgmentDispatch, { defaultEngine: 'missing' })
-    expect(await failure(() => ctx.judgment.ask(ASK))).toMatchObject({ code: 'UNCONFIGURED', engineId: 'missing' })
+    expect(await failure(() => ctx.judgment.ask(ASK)))
+      .toMatchObject({ code: 'UNCONFIGURED', engineId: 'missing', refusedBeforeDispatch: true })
 
     const stamped = new JudgmentError('UNAVAILABLE', 'nested dispatch', { engineId: judgmentEngineId('inner') })
     const nested = root()
     await nested.plugin(JudgmentDispatch, { defaultEngine: 'outer' })
     await engine(nested, { id: 'outer', failWith: stamped })
     await expect(nested.judgment.ask(ASK)).rejects.toBe(stamped)
+
+    // An engine cannot claim a refusal before dispatch: its failure is re-created without it.
+    const claimed = new JudgmentError('UNAVAILABLE', 'claims a refusal', { refusedBeforeDispatch: true })
+    const claiming = root()
+    await claiming.plugin(JudgmentDispatch, { defaultEngine: 'claimer' })
+    await engine(claiming, { id: 'claimer', failWith: claimed })
+    const recreated = await failure(() => claiming.judgment.ask(ASK))
+    expect(recreated).toMatchObject({ code: 'UNAVAILABLE', engineId: 'claimer' })
+    expect(recreated).not.toHaveProperty('refusedBeforeDispatch')
 
     const foreign = new TypeError('engine broke its contract')
     const broken = root()
@@ -249,6 +262,7 @@ describe('fitting', () => {
     expect(ctx.judgment.fitting).toBeUndefined()
     expect(failed.code).toBe('UNAVAILABLE')
     expect(failed.message).toBe('judgment engine "plain" selected for consumer "(none)" does not support fitting')
+    expect(failed.refusedBeforeDispatch).toBe(true)
     expect(fitter.fittedAsks).toHaveLength(0)
     expect(plain.asks).toHaveLength(0)
   })

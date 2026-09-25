@@ -28,6 +28,7 @@ import type { Session } from '@shres-code/shres-code-session'
 import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
 import ModelRoutingController, { routingCalibration } from '../src/index.ts'
 import { stickyState } from '../src/folds.ts'
+import { foldModelRoutingStats } from '../src/stats.ts'
 import type { ModelRoutingDecision } from '../src/types.ts'
 
 /**
@@ -330,6 +331,26 @@ describe('real Loader composition: router, judgment-dispatch, and registered eng
       source: 'operating-point',
       calibratedBy: 'prereg-pt',
     })
+  })
+
+  it('records a refusal before dispatch, counts nothing sent, and still opens the breaker', { timeout: 30_000 }, async () => {
+    // TypeSafe registered without a key reports `unconfigured`: a persistent misconfiguration.
+    const { consult, decisions, engines, session } = await boot([{ id: 'typesafe', status: { state: 'unconfigured', detail: 'no API key' } }], 'typesafe')
+    expect(await consult(1)).toBeUndefined()
+    expect(await consult(2)).toBeUndefined()
+    expect(await consult(3)).toBeUndefined()
+    expect(engines['typesafe']!.asks).toHaveLength(0)
+    expect(decisions().map(decision => decision.reason)).toEqual(['engine-unavailable', 'engine-unavailable', 'breaker-open'])
+    expect(decisions()[0]).toMatchObject({
+      engineId: 'typesafe',
+      engineFailure: { code: 'UNAVAILABLE', refusedBeforeDispatch: true },
+    })
+    expect(decisions()[0]?.engineFailure).not.toHaveProperty('engineState')
+    expect(stickyState(session.events).judgmentFailures).toMatchObject({ count: 2, engineId: 'typesafe' })
+    const stats = foldModelRoutingStats(session.events)
+    expect(stats.egress).toEqual([])
+    expect(stats.counts.judgeFailed).toBe(2)
+    expect(stats.latency.counts.every(count => count === 0)).toBe(true)
   })
 
   it('treats an engine that starts warming while candidates are assessed as warm-up, not failure', { timeout: 30_000 }, async () => {
