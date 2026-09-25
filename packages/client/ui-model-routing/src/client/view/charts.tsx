@@ -514,7 +514,9 @@ export function ColdChart({ stats, t }: GraphProps) {
     </table>
   )
   const description = t('g5.desc', { causes: rows.filter(row => row.count > 0).map(row => `${t(`cold.${row.cause}`)} ${formatTokens(row.tokens)}`).join(', ') || t('g5.none') })
-  const ttl = stats.coldTtl.fallback ? t('g5.ttl.fallback', { ttl: formatMs(stats.coldTtl.ms) }) : t('g5.ttl', { ttl: formatMs(stats.coldTtl.ms) })
+  const ttl = stats.coldTtl.fallback
+    ? t('g5.ttl.fallback', { minutes: Math.round(stats.coldTtl.ms / 60_000) })
+    : t('g5.ttl', { ttl: formatMs(stats.coldTtl.ms) })
   return (
     <ChartCard title={t('g5.title')} subtitle={t('g5.subtitle')} table={table} detail={detail} t={t}>
       <ChartSvg title={t('g5.title')} description={description} width={BAR_WIDTH} height={rows.length * 20 + 8}>

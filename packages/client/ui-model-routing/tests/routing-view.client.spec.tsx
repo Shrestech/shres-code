@@ -212,7 +212,7 @@ describe('RoutingView charts', () => {
     for (const key of ['g1.empty', 'g2.empty', 'g3.empty', 'g4.empty', 'g6.empty', 'exits.empty'] as const) {
       expect(screen.getByText(en[key])).toBeTruthy()
     }
-    expect(screen.getByText('Idle expiry uses 300 s: this provider does not declare a cache lifetime.')).toBeTruthy()
+    expect(screen.getByText('Idle expiry uses an assumed 5-minute cache lifetime: the log does not record the lifetime in force.')).toBeTruthy()
     expect(screen.getByText('Routing kept the strong model on all 1 decisions.')).toBeTruthy()
   })
 

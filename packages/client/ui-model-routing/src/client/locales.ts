@@ -175,7 +175,7 @@ export const en = {
   'g5.none': 'none',
   'g5.desc': 'Cold prefill tokens by cause: {causes}.',
   'g5.ttl': 'Idle expiry uses the model cache lifetime of {ttl}.',
-  'g5.ttl.fallback': 'Idle expiry uses {ttl}: this provider does not declare a cache lifetime.',
+  'g5.ttl.fallback': 'Idle expiry uses an assumed {minutes}-minute cache lifetime: the log does not record the lifetime in force.',
   'g6.title': 'Judge latency',
   'g6.subtitle': 'Time each consult added before the step could start.',
   'g6.empty': 'No judge asks yet.',
