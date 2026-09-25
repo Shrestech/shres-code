@@ -39,6 +39,7 @@ describe('an engine switch', () => {
         useRouterSettings: (selector: (value: { status: string }) => unknown) => selector({ status: 'ready' }),
         useSession: (selector: (value: { openState: string }) => unknown) => selector({ openState: 'open' }),
         available: true,
+        openSettings: () => {},
         loadDecision: () => Promise.resolve(decisionDetail()),
         inspect: null,
       } as unknown as RoutingViewProps

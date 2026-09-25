@@ -7,7 +7,11 @@
 // drill-down through the modelRouting.decision read, hands off with Show in
 // Trajectory, lands on that decision's ROUTING row, hands back with Explain,
 // and keeps the Routing selection across a reload. A host composing no
-// router lists no Routing view in the same popover.
+// router lists no Routing view in the same popover. A host with a local and a
+// remote judge switches between them through a real settings write: the
+// status line follows each switch without a reload, and the Auto chip asks
+// before turning routing on only while the remote judge is selected, and its
+// Settings link opens Settings › Model routing.
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,11 +19,17 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { JUDGMENT_SETTINGS_NAMESPACE } from '@shres-code/shres-code-judgment'
 import { launchWebScaffold, seedSession, watchConsole, type WebScaffold } from './scaffold.ts'
 import { newEnglishPage, openSessionActivity, saveFailureShot, selectSessionView } from './support.ts'
 
 const SEED = fileURLToPath(new URL('../../../examples/headless-agent/tests/snapshots/model-router-step/session.jsonl', import.meta.url))
 const ROUTER = fileURLToPath(new URL('../../../packages/llm/model-router/lib/index.js', import.meta.url))
+const DISPATCH = fileURLToPath(new URL('../../../packages/llm/judgment-dispatch/lib/index.js', import.meta.url))
+const LLM_JUDGE = fileURLToPath(new URL('../../../packages/llm/judgment-llm/lib/index.js', import.meta.url))
+/** Registry ids judgment-llm gives its two rows: `llm:<provider>/<model>`. */
+const LOCAL_JUDGE = 'llm:deepseek-official/deepseek-v4-flash'
+const REMOTE_JUDGE = 'llm:deepseek-official/deepseek-v4-pro'
 const SEED_ID = 'routing-view-web-e2e'
 const PROMPT = 'Inspect the supplied evidence with the bash tool, then answer briefly.'
 
@@ -48,6 +58,30 @@ const OVERLAY = (router: string) => `- insert:
           minSteps: 3
         routeInstructions: Pick the cheapest route that can finish this turn.
         difficultyInstructions: Rate how much reasoning this turn needs.
+`
+
+/**
+ * The dispatcher and two LLM judges on one route family: one declared local,
+ * one declared remote. No ask runs; the scenario reads their facts only.
+ */
+const JUDGES = `    - id: judgment-dispatch
+      name: '${DISPATCH}'
+      config:
+        defaultEngine: ${LOCAL_JUDGE}
+    - id: judge-local
+      name: '${LLM_JUDGE}'
+      config:
+        provider: deepseek-official
+        model: deepseek-v4-flash
+        egress: local
+        maxStateTokens: 4096
+    - id: judge-remote
+      name: '${LLM_JUDGE}'
+      config:
+        provider: deepseek-official
+        model: deepseek-v4-pro
+        egress: remote
+        maxStateTokens: 4096
 `
 
 /** Open the seeded session from the sidebar search. */
@@ -145,5 +179,66 @@ describe('web e2e: no Routing view on a host without the router', () => {
     const panel = await openSessionActivity(page)
     await panel.getByRole('button', { name: 'Trajectory', exact: true }).waitFor()
     await expect.poll(() => panel.getByRole('button', { name: 'Routing', exact: true }).count(), { timeout: 10_000 }).toBe(0)
+  }, 180_000)
+})
+
+describe('web e2e: the Routing view follows a judge switch', () => {
+  let overlayDir: string
+  let scaffold: WebScaffold
+  let browser: Browser
+  let page: Page
+
+  beforeAll(async () => {
+    overlayDir = await mkdtemp(join(tmpdir(), 'shres-routing-judges-'))
+    const overlay = join(overlayDir, 'routing-judges.overlay.yml')
+    await writeFile(overlay, OVERLAY(ROUTER) + JUDGES)
+    scaffold = await launchWebScaffold({ extraOverlayPath: overlay })
+    await seedSession(scaffold, await readFile(SEED, 'utf8'), SEED_ID)
+    browser = await chromium.launch()
+    page = await newEnglishPage(browser, 1000)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+  }, 120_000)
+
+  afterAll(async () => {
+    await browser?.close()
+    await scaffold?.close()
+    if (overlayDir !== undefined) await rm(overlayDir, { recursive: true, force: true })
+  })
+
+  it('names the selected judge and confirms turn-on only for the remote one', async () => {
+    onTestFailed(() => saveFailureShot(page, 'routing-view-judges'))
+    await openSeed(page)
+    await selectSessionView(page, 'Routing')
+    const status = page.locator('p', { hasText: 'Judge (all sessions):' })
+    await expect.poll(() => status.textContent(), { timeout: 30_000 }).toContain('deepseek-official/deepseek-v4-flash')
+    expect(await status.textContent()).toContain('Local')
+
+    // The recorded session runs with routing on; turning it off never asks.
+    await page.getByRole('button', { name: 'Automatic model routing on, press to turn off' }).click()
+    const offChip = page.getByRole('button', { name: 'Automatic model routing off, press to turn on' })
+    await offChip.waitFor({ timeout: 30_000 })
+
+    // A real host settings write selects the remote judge; no reload.
+    await scaffold.ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: REMOTE_JUDGE })
+    await expect.poll(() => status.textContent(), { timeout: 30_000 }).toContain('deepseek-official/deepseek-v4-pro')
+    expect(await status.textContent()).toContain('Remote · egress')
+    await offChip.click()
+    const confirm = page.getByRole('dialog', { name: 'Turn on Auto routing for this session?' })
+    await confirm.waitFor()
+    expect(await confirm.textContent()).toContain('This judge runs off this machine')
+    await confirm.getByRole('button', { name: 'Cancel', exact: true }).click()
+    expect(await confirm.count()).toBe(0)
+    expect(await offChip.count()).toBe(1)
+
+    // Switching back to the local judge turns routing on directly.
+    await scaffold.ctx.settings.update(JUDGMENT_SETTINGS_NAMESPACE, { engine: LOCAL_JUDGE })
+    await expect.poll(() => status.textContent(), { timeout: 30_000 }).toContain('deepseek-official/deepseek-v4-flash')
+    await offChip.click()
+    await page.getByRole('button', { name: 'Automatic model routing on, press to turn off' }).waitFor({ timeout: 30_000 })
+    expect(await confirm.count()).toBe(0)
+
+    // The status line's link opens the Settings section that configures the judge.
+    await status.getByRole('button', { name: 'Settings › Model routing', exact: true }).click()
+    await page.locator('section[aria-label="Model routing"]').getByRole('combobox', { name: 'Engine' }).waitFor({ timeout: 30_000 })
   }, 180_000)
 })

@@ -74,6 +74,8 @@ async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {
   ctx.provide('remote.commands', commandsRemote)
   ctx.provide('remote.modelRouting', routingRemote)
   ctx.provide('remote.judgmentEngines', enginesRemote)
+  const layout = { navigate: vi.fn() }
+  ctx.provide('layout', layout)
   const scope = routerScope(options.scope ?? 'ready')
   ctx.provide('settingsScope', { bind: scope.bind })
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -90,13 +92,14 @@ async function bench(options: { directories?: boolean; scope?: ScopeStatus } = {
       },
     })
   }
-  return { ctx, slots, execute, select, routingRemote, scope, enginesRemote, listeners, off }
+  return { ctx, slots, execute, select, routingRemote, scope, enginesRemote, listeners, off, layout }
 }
 
 describe('ui-model-routing browser apply', () => {
   it('declares every service it binds', () => {
     expect(inject).toEqual([
       'slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'remote.judgmentEngines', 'locale', 'settingsScope',
+      'layout',
     ])
   })
 
@@ -112,6 +115,7 @@ describe('ui-model-routing browser apply', () => {
     ctx.provide('remote.commands', {})
     ctx.provide('remote.modelRouting', {})
     ctx.provide('remote.judgmentEngines', enginesRemote)
+    ctx.provide('layout', { navigate: vi.fn() })
     ctx.provide('settingsScope', { bind: routerScope('ready').bind })
     ctx.provide('locale', new LocaleRuntime(ctx))
     ctx.provide('sessions', { subagentAddress: () => undefined })
@@ -178,6 +182,8 @@ describe('ui-model-routing browser apply', () => {
     await expect(face(SID).loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })
     expect(b.routingRemote.gate).toHaveBeenCalledTimes(1)
     expect(face(SID).hooks.routerSettings.getSnapshot().status).toBe('ready')
+    face(SID).openSettings()
+    expect(b.layout.navigate).toHaveBeenCalledWith('model-routing')
     // A host failure reaches the view as a rejection naming its message and code.
     b.routingRemote.decision.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'seq 9 is not a routing decision', details: {} } })
     await expect(face(SID).loadDecision(9)).rejects.toThrow('seq 9 is not a routing decision (internal)')

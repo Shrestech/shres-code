@@ -45,6 +45,7 @@ interface Setup {
   inspect?: unknown
   onInspectDone?: () => void
   routerStatus?: 'loading' | 'ready' | 'unavailable'
+  openSettings?: () => void
   engine?: RoutingEngineState
   openState?: 'cold' | 'loading' | 'open' | 'error'
 }
@@ -65,6 +66,7 @@ function props(options: Setup): RoutingViewProps {
       selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
     available: options.available ?? true,
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
+    openSettings: options.openSettings ?? (() => {}),
     loadDecision: options.loadDecision ?? ((seq: number) => Promise.resolve({ ...decisionDetail(), seq })),
     reveal: options.reveal,
     canReveal: options.canReveal,
@@ -465,6 +467,21 @@ describe('RoutingView judge facts', () => {
     expect(remote.textContent).toContain('Jev (TypeSafe)')
     expect(remote.textContent).toContain('Remote · egress')
     expect(remote.textContent).not.toContain('Uncalibrated')
+  })
+
+  it('opens Settings › Model routing from the status line and the judge notices', () => {
+    const openSettings = vi.fn()
+    setup({ openSettings })
+    fireEvent.click(screen.getByRole('button', { name: 'Settings › Model routing' }))
+    expect(openSettings).toHaveBeenCalledTimes(1)
+    cleanup()
+    setup({ openSettings, engine: { kind: 'no-dispatcher' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
+    cleanup()
+    const starting = engines('laya', { engines: [{ ...LOCAL, state: 'starting' }, REMOTE] })
+    setup({ openSettings, engine: { kind: 'ready', snapshot: starting } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings › Model routing' }))
+    expect(openSettings).toHaveBeenCalledTimes(3)
   })
 
   it('names why there is no judge, and a judge that is still being read', () => {

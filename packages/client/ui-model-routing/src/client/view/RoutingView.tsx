@@ -47,6 +47,8 @@ export interface RoutingViewInjected {
    * @returns the gate; rejects when the host cannot read it.
    */
   loadGate: () => Promise<ModelRoutingGateView>
+  /** Open Settings › Model routing, where the judge and the routing defaults are configured for every session. */
+  openSettings: () => void
   /**
    * Framework-bound sources. `routerSettings` is the `model-router` settings
    * scope; its status is `loading` until the host answers whether it composes
@@ -71,7 +73,7 @@ type GateLoad = { kind: 'loading' } | { kind: 'loaded'; gate: ModelRoutingGateVi
  * @returns the view, or a notice when routing is unavailable for this session.
  */
 export function RoutingView({
-  useProjection, useSession, useRouterSettings, useRoutingEngine, available, loadDecision, loadGate,
+  useProjection, useSession, useRouterSettings, useRoutingEngine, available, loadDecision, loadGate, openSettings,
   inspect, onInspectDone, reveal, canReveal, t,
 }: RoutingViewProps) {
   const stats = useProjection('modelRoutingStats')
@@ -155,17 +157,28 @@ export function RoutingView({
           <span className={css.egressPill} data-egress={segment.egress}>{t(`judge.egress.${segment.egress}`)}</span>
         )}
         {segment.uncalibrated === true && <span className={css.scopePill}>{t('judge.uncalibrated')}</span>}
-        {' · '}{t('status.settings')}
+        {' · '}{t('status.settings.before')}{' '}
+        <button type="button" className={css.link} onClick={openSettings}>{t('status.settings.link')}</button>
       </p>
       {egress !== undefined && <p className={css.notice} role="status">{egress}</p>}
-      {trouble !== undefined && <p className={css.notice} role="status">{trouble}</p>}
+      {trouble !== undefined && (
+        <p className={css.notice} role="status">
+          {trouble}{' '}
+          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+        </p>
+      )}
       {gateLoad.kind === 'failed' && (
         <p className={css.notice} role="alert">
           {t('gate.failed', { message: gateLoad.message })}{' '}
           <button type="button" className={css.link} onClick={() => { setGateAttempt(gateAttempt + 1) }}>{t('gate.retry')}</button>
         </p>
       )}
-      {state === 'no-engine' && <p className={css.notice} role="status">{t('state.noEngine')}</p>}
+      {state === 'no-engine' && (
+        <p className={css.notice} role="status">
+          {t('state.noEngine')}{' '}
+          <button type="button" className={css.link} onClick={openSettings}>{t('notice.settings')}</button>
+        </p>
+      )}
       {state === 'base-unlisted' && <p className={css.notice} role="status">{t('state.baseUnlisted', { model: base ?? t('state.thisModel') })}</p>}
       {engineUncalibratedRecorded(stats, routing.active) && <p className={css.notice} role="status">{t('state.engineUncalibrated')}</p>}
       {engineTroubleRecorded(stats) && <p className={css.notice} role="status">{t('state.engineTrouble')}</p>}
