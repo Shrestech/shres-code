@@ -161,6 +161,17 @@ export function RoutingChip({
           closeLabel={t('confirm.close')}
           footer={(
             <span className={css.confirmActions}>
+              {openRoutingSettings !== undefined && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfirm(null)
+                    openRoutingSettings()
+                  }}
+                >
+                  {t('confirm.openSettings')}
+                </Button>
+              )}
               <Button variant="outline" onClick={() => { setConfirm(null) }}>{t('confirm.cancel')}</Button>
               <Button
                 variant="primary"
@@ -175,23 +186,8 @@ export function RoutingChip({
           )}
         >
           <p className={css.confirmWarning}>{confirmWarning(confirm, confirmGate, t)}</p>
-          <p className={css.confirmSettings}>
-            {t('confirm.settings.before')}{' '}
-            {openRoutingSettings === undefined
-              ? t('status.settings.link')
-              : (
-                <button
-                  type="button"
-                  className={css.confirmLink}
-                  onClick={() => {
-                    setConfirm(null)
-                    openRoutingSettings()
-                  }}
-                >
-                  {t('status.settings.link')}
-                </button>
-              )}
-          </p>
+          {/* Without a way to open Settings, the confirm names where the judge is changed. */}
+          {openRoutingSettings === undefined && <p className={css.confirmSettings}>{t('confirm.settings')}</p>}
         </Modal>
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
