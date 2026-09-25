@@ -1,6 +1,6 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useMemo, useRef, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { indexSubagentDescendants } from '@shres-code/shres-code-client-runtime/client'
 import type { SessionId, SessionListState, SessionSummary } from '@shres-code/shres-code-client-runtime/client'
@@ -8,6 +8,8 @@ import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
 } from '../contract/slots.ts'
 import type { ViewTab } from '../contract/views.ts'
+import { readInspectRequest } from '../inspect.ts'
+import { readActivityOpen } from '../stores.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -86,36 +88,40 @@ export function ConversationSessionHeader({
     [sessionId, summaries],
   )
   const activityRunningId = useId()
-  const [activityOpen, setActivityOpen] = useState(false)
+  // Open state lives in the session's chat store so a view's reveal closes the popover.
+  const activityOpen = useStore(s => readActivityOpen(s.activityOpen))
   const activityRef = useRef<HTMLDivElement | null>(null)
   const activityPanelRef = useRef<HTMLDivElement | null>(null)
   const activityTriggerRef = useRef<HTMLButtonElement | null>(null)
+  // Set by the trigger only, so focus moves into the panel on a user open and
+  // never for a store value, such as a persisted open state, rendered at mount.
+  const focusPanelOnOpen = useRef(false)
 
-  const closeActivity = (restoreFocus = false): void => {
-    setActivityOpen(false)
-    if (restoreFocus) {
-      queueMicrotask(() => { activityTriggerRef.current?.focus() })
-    }
+  /** Close from a gesture inside the header, returning focus to the trigger. */
+  const closeActivity = (): void => {
+    actions.setActivityOpen(false)
+    queueMicrotask(() => { activityTriggerRef.current?.focus() })
   }
 
   useEffect(() => {
-    setActivityOpen(false)
-  }, [sessionId])
+    actions.setActivityOpen(false)
+  }, [actions, sessionId])
 
   useEffect(() => {
     if (!activityOpen) return
     const onPointerDown = (event: PointerEvent): void => {
       const target = event.target
       if (!(target instanceof Node) || activityRef.current?.contains(target) !== true) {
-        setActivityOpen(false)
+        actions.setActivityOpen(false)
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => { document.removeEventListener('pointerdown', onPointerDown) }
-  }, [activityOpen])
+  }, [actions, activityOpen])
 
   useEffect(() => {
-    if (!activityOpen) return
+    if (!activityOpen || !focusPanelOnOpen.current) return
+    focusPanelOnOpen.current = false
     activityPanelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
   }, [activityOpen])
 
@@ -171,8 +177,11 @@ export function ConversationSessionHeader({
                 aria-haspopup="dialog"
                 aria-controls="shres-session-activity"
                 onClick={() => {
-                  if (activityOpen) closeActivity(true)
-                  else setActivityOpen(true)
+                  if (activityOpen) closeActivity()
+                  else {
+                    focusPanelOnOpen.current = true
+                    actions.setActivityOpen(true)
+                  }
                 }}
               >
                 <span className={css.activityMark} aria-hidden="true">+</span>
@@ -202,7 +211,7 @@ export function ConversationSessionHeader({
                   if (!(target instanceof Node) || activityPanelRef.current?.contains(target) !== true) return
                   if (event.defaultPrevented || event.key !== 'Escape') return
                   event.preventDefault()
-                  closeActivity(true)
+                  closeActivity()
                 }}
               >
                 <div className={css.activityHeading}>
@@ -221,7 +230,7 @@ export function ConversationSessionHeader({
                           aria-current={view.id === active?.id ? 'page' : undefined}
                           onClick={() => {
                             actions.setView(view.id)
-                            closeActivity(true)
+                            closeActivity()
                           }}
                         >
                           <span>{view.label}</span>
@@ -254,7 +263,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, reveal, canReveal,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -264,8 +273,11 @@ export function ConversationSession({
   const blank = useSession(s => s.blank)
   const inputState = useInput(s => s)
   const storedDraft = useStore(s => s.draft)
-  // `?? null`: persisted snapshots from before the inspect field rehydrate without it.
-  const inspect = useStore(s => s.inspect ?? null)
+  const storedInspect = useStore(s => s.inspect)
+  const inspect = useMemo(() => readInspectRequest(storedInspect), [storedInspect])
+  // Only the addressed view receives the request; any other active view sees
+  // none, and the request waits for its view to become the active one.
+  const addressed = inspect !== null && inspect.view === active?.id ? inspect : null
 
   useEffect(() => {
     if (inputState.draft === '' && storedDraft !== '') inputActions.setDraft(storedDraft)
@@ -283,8 +295,10 @@ export function ConversationSession({
   return (
     <div className={css.viewArea}>
       {active !== undefined && renderSlot('conversation.view', {
-        inspect,
+        inspect: addressed,
         onInspectDone: () => { actions.setInspect(null) },
+        reveal,
+        canReveal,
       }, { only: active.id })}
     </div>
   )

@@ -19,6 +19,7 @@ import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import type {
   AssistantRequestConfig, ConversationPromptSnapshot,
 } from '@shres-code/shres-code-client-runtime/client'
+import type { InspectTarget } from '@shres-code/shres-code-client-ui-conversation/client'
 import type { NS } from './locales.ts'
 import { ROUTING_BREAK_KEYS, ROUTING_OUTCOME_KEYS, ROUTING_REASON_KEYS } from './locales.ts'
 import type {
@@ -31,6 +32,7 @@ import {
 } from './trajectory-virtual-rows.ts'
 import type { TrajectoryVirtualRow } from './trajectory-virtual-rows.ts'
 import type { TrajectoryTurnModel } from './layout.ts'
+import { resolveInspectRecord } from './trajectory-inspect.ts'
 import { trajectoryPreviewText } from './trajectory-preview.ts'
 import css from './TrajectoryTable.module.css'
 
@@ -391,10 +393,18 @@ export interface TrajectoryTableProps {
   collapsedAssistants: ReadonlySet<string>
   /** Toggle tool calls under one assistant record. */
   onToggleAssistant: (id: string) => void
-  /** One-shot cross-view inspect: open and scroll to this call's record. */
-  inspectCallId?: string | null
-  /** Acknowledge a consumed (or unresolvable) inspect request. */
+  /**
+   * One-shot cross-view inspect: open and scroll to the record the target
+   * resolves to (`resolveInspectRecord`); a pending target retries as records load.
+   */
+  inspectTarget?: InspectTarget | null
+  /** Acknowledge an applied inspect target, or an event target no record precedes. */
   onInspectApplied?: (() => void) | undefined
+  /**
+   * Reveal one routing decision, by its event seq, in the routing view. Absent
+   * hides the Explain control on ROUTING rows.
+   */
+  onExplainRouting?: ((seq: number) => void) | undefined
   /** Translate a trajectory dictionary key. */
   t: TranslateNS<typeof NS>
 }
@@ -1119,6 +1129,35 @@ function RoutingRecord({ row, t }: { row: TrajectoryRoutingRow; t: TranslateNS<t
       <span className={css.routingLine}>{routingRowText(row, t)}</span>
       {row.quiet ? null : <RoutingDetail row={row} t={t} />}
     </span>
+  )
+}
+
+/**
+ * The ROUTING row's Explain link: a native button, so Tab reaches it and Enter
+ * or Space activates it. It keeps its click and activation keys from the row,
+ * whose own handlers select the record.
+ */
+function RoutingExplain({ seq, onExplain, t }: {
+  seq: number
+  onExplain: (seq: number) => void
+  t: TranslateNS<typeof NS>
+}) {
+  return (
+    <button
+      type="button"
+      className={css.routingExplain}
+      aria-label={t('routing.explain.label')}
+      onClick={(event) => {
+        event.stopPropagation()
+        onExplain(seq)
+      }}
+      onDoubleClick={(event) => { event.stopPropagation() }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+      }}
+    >
+      {t('routing.explain')}
+    </button>
   )
 }
 
@@ -1880,8 +1919,9 @@ export function TrajectoryTable({
   onToggleTurn,
   collapsedAssistants,
   onToggleAssistant,
-  inspectCallId = null,
+  inspectTarget = null,
   onInspectApplied,
+  onExplainRouting,
   t,
 }: TrajectoryTableProps) {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -2199,20 +2239,25 @@ export function TrajectoryTable({
     if (target !== undefined) openRecordSummary(target)
   }
 
-  // Cross-view inspect handoff: resolve the requested call to its record,
-  // open its summary, and remember the row to scroll once the un-collapsed
-  // ledger has rendered. Not-found leaves the request pending (`turns` in the
-  // deps retries as history pages in); the ack clears the store field.
+  // Cross-view inspect handoff: resolve the target to its record, open its
+  // summary, and remember the row to scroll once the un-collapsed ledger has
+  // rendered. A pending target retries as `turns` and the history window
+  // change; the ack clears the store field.
   const openRecordSummaryRef = useRef(openRecordSummary)
   openRecordSummaryRef.current = openRecordSummary
   useEffect(() => {
-    if (inspectCallId === null) return
-    const target = flattenRecords(turns).find(record => record.cell.callId === inspectCallId)
-    if (target === undefined) return
-    openRecordSummaryRef.current(target)
-    pendingScrollRecordId.current = trajectoryRecordId(target.cell)
+    if (inspectTarget === null) return
+    const resolved = resolveInspectRecord(flattenRecords(turns), inspectTarget, {
+      startSeq: historyStartSeq,
+      hasOlder: hasOlderRecords,
+    })
+    if (resolved === 'pending') return
+    if (resolved !== 'absent') {
+      openRecordSummaryRef.current(resolved)
+      pendingScrollRecordId.current = trajectoryRecordId(resolved.cell)
+    }
     onInspectApplied?.()
-  }, [inspectCallId, turns, onInspectApplied])
+  }, [inspectTarget, turns, historyStartSeq, hasOlderRecords, onInspectApplied])
   useEffect(() => {
     const id = pendingScrollRecordId.current
     if (id === null) return
@@ -2649,7 +2694,14 @@ export function TrajectoryTable({
                       </td>
                       <td className={css.content}>
                         {record.cell.routing !== undefined
-                          ? <RoutingRecord row={record.cell.routing} t={t} />
+                          ? (
+                            <>
+                              <RoutingRecord row={record.cell.routing} t={t} />
+                              {onExplainRouting !== undefined && record.cell.sourceSeq !== undefined && (
+                                <RoutingExplain seq={record.cell.sourceSeq} onExplain={onExplainRouting} t={t} />
+                              )}
+                            </>
+                          )
                           : isRequestOnly
                             ? null
                             : record.collapsedSummary !== undefined

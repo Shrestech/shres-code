@@ -20,6 +20,7 @@ import {
   appendTrajectoryPartialLayout, deriveTrajectoryLayout,
   type TrajectoryTurnModel,
 } from './layout.ts'
+import { ROUTING_VIEW_ID } from './trajectory-inspect.ts'
 import { trajectoryRequestRoute } from './trajectory-routing.ts'
 import {
   trajectoryTimelineFocusIndexes,
@@ -124,7 +125,7 @@ function addUsage(
 
 export function TrajectoryView({
   useSession, useDuration, loadOlder, setActualDuration,
-  inspect, onInspectDone, t,
+  inspect, onInspectDone, reveal, canReveal, t,
 }: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
   const [collapsedAssistants, setCollapsedAssistants] =
@@ -466,6 +467,16 @@ export function TrajectoryView({
     return loadOlder()
   }, [loadOlder])
 
+  // Explain renders only while a routing view is registered to receive the
+  // reveal; canReveal reads the view ledger, so this follows registrations.
+  const canExplain = reveal !== undefined && canReveal?.(ROUTING_VIEW_ID) === true
+  const explainRouting = useMemo(
+    () => canExplain
+      ? (seq: number) => { reveal({ view: ROUTING_VIEW_ID, target: { kind: 'event', seq } }) }
+      : undefined,
+    [canExplain, reveal],
+  )
+
   return (
     <div className={css.root} data-conversation-composer-overlay="">
       <TrajectoryToolbar
@@ -520,8 +531,9 @@ export function TrajectoryView({
           onToggleTurn={toggleTurn}
           collapsedAssistants={collapsedAssistants}
           onToggleAssistant={toggleAssistant}
-          inspectCallId={inspect?.callId ?? null}
+          inspectTarget={inspect?.target ?? null}
           onInspectApplied={onInspectDone}
+          onExplainRouting={explainRouting}
           t={t}
         />
       </div>

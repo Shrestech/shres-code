@@ -1893,6 +1893,25 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+.routingExplain {
+  flex: none;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font: var(--dsw-font-xxs-12);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.routingExplain:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* The request boundary row carries the effective route the request used; the
    badge appears only when routing moved that route off the session selection. */
 .requestRoute {

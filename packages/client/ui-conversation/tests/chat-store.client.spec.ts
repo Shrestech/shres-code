@@ -10,9 +10,11 @@ beforeEach(() => {
 })
 
 describe('createChatStore', () => {
-  it('init shape: empty selection/draft/view', () => {
+  it('init shape: empty selection/draft/view, no inspect request, Activity closed', () => {
     const store = createChatStore().create()
-    expect(store.store.getSnapshot()).toEqual({ selection: null, draft: '', view: null, inspect: null })
+    expect(store.store.getSnapshot()).toEqual({
+      selection: null, draft: '', view: null, inspect: null, activityOpen: false,
+    })
   })
 
   it('actions cover the declared write set', () => {
@@ -32,10 +34,16 @@ describe('createChatStore', () => {
     store.actions.setView('chat')
     expect(store.store.getSnapshot().view).toBe('chat')
 
-    store.actions.setInspect({ callId: 'c1' })
-    expect(store.store.getSnapshot().inspect).toEqual({ callId: 'c1' })
+    const request = { view: 'trajectory', target: { kind: 'call', callId: 'c1' } } as const
+    store.actions.setInspect(request)
+    expect(store.store.getSnapshot().inspect).toEqual(request)
     store.actions.setInspect(null)
     expect(store.store.getSnapshot().inspect).toBeNull()
+
+    store.actions.setActivityOpen(true)
+    expect(store.store.getSnapshot().activityOpen).toBe(true)
+    store.actions.setActivityOpen(false)
+    expect(store.store.getSnapshot().activityOpen).toBe(false)
   })
 
   it('persists per scope key and rehydrates a fresh instance', () => {

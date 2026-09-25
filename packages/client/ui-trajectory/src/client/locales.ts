@@ -63,6 +63,8 @@ export type TrajectoryKey =
   | 'routing.streak.entered'
   | 'routing.streak.exited'
   | 'routing.badge.routed'
+  | 'routing.explain'
+  | 'routing.explain.label'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -127,6 +129,8 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.streak.entered': 'streak entered · turn {turn}',
   'routing.streak.exited': 'streak ended · {reason}',
   'routing.badge.routed': 'Routed',
+  'routing.explain': 'Explain',
+  'routing.explain.label': 'Explain this routing decision in the Routing view',
 }
 
 /** Dictionary key per logged outcome. */
