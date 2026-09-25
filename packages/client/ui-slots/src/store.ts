@@ -46,8 +46,11 @@ export interface StoreSpec<T, A extends ActionsDecl<T>> {
   persist?: string
   /**
    * Top-level fields of an object state kept out of persistence: never
-   * written, and taken from `init` when a persisted value is restored, so a
-   * page load starts them fresh.
+   * written, and taken from `init` when a persisted value is restored
+   * (including a value written before the field was transient), so a page
+   * load starts them fresh. Only top-level fields: a nested path cannot be
+   * named. Declaring it fails loud, naming the field, when `persist` is
+   * absent or `init()` does not produce a listed field.
    */
   transient?: readonly (keyof T & string)[]
   actions: A

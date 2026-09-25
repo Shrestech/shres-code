@@ -85,11 +85,13 @@ function rafBatch(notify: () => void): () => void {
  */
 export function createSnapshotStore<T>(
   init: T, opts?: { flush?: 'raf' | 'sync'; persist?: { name: string; transient?: readonly string[] } }): SnapshotStore<T> {
+  const transient = opts?.persist?.transient ?? []
+  if (opts?.persist !== undefined) assertTransientFields(opts.persist.name, init, transient)
   // Immer enters through produce() in update() below (identical semantics to
   // the immer middleware without its setState-signature mutator generics).
   const withSelector = subscribeWithSelector(() => init)
   const api: StoreApi<T> = createStore<T>()(withSelector)
-  if (opts?.persist) attachPersistence(api, opts.persist.name, init, opts.persist.transient ?? [])
+  if (opts?.persist) attachPersistence(api, opts.persist.name, init, transient)
 
   let subscribe = (fn: () => void) => api.subscribe(fn)
   if (opts?.flush === 'raf') {
@@ -148,11 +150,28 @@ function attachPersistence<T>(api: StoreApi<T>, name: string, init: T, transient
   })
 }
 
+/**
+ * Fail loud when a transient field is not a top-level field the initial
+ * state produces: the name is a typo, a nested path, or a field of a
+ * primitive state, and would otherwise be persisted after all.
+ * @param name - the persistence key, for the message.
+ * @param init - the initial state.
+ * @param fields - the transient fields.
+ * @throws Error naming the first field the initial state lacks.
+ */
+function assertTransientFields(name: string, init: unknown, fields: readonly string[]): void {
+  for (const field of fields) {
+    if (!isRecord(init) || !Object.hasOwn(init, field)) {
+      throw new Error(`snapshot store '${name}': transient field '${field}' is not a top-level field of the initial state`)
+    }
+  }
+}
+
 /** A restored object state with its transient fields taken from `init`. */
 function withFields<T>(restored: T, init: T, fields: readonly string[]): T {
-  if (fields.length === 0 || !isRecord(restored) || !isRecord(init)) return restored
+  if (fields.length === 0 || !isRecord(restored)) return restored
   const next: Record<string, unknown> = { ...restored }
-  for (const field of fields) next[field] = init[field]
+  for (const field of fields) next[field] = (init as Record<string, unknown>)[field]
   return next as T
 }
 
@@ -224,11 +243,18 @@ export interface EngineStoreHandle<T, A extends ActionsDecl<T>> extends StoreHan
  * so call sites write `(d, x: X) => { ... }` with no draft annotation. If a
  * future TS version breaks this single-literal inference, the design's
  * documented fallback is currying (`defineStore(init).actions({...})`).
- * @param decl - init lambda (fresh state per instance), optional persist key, actions table.
+ * @param decl - init lambda (fresh state per instance), optional persist key and its transient top-level fields, actions table.
  * @returns the store handle.
+ * @throws Error when `transient` is declared without `persist`, or names a field `init()` does not produce.
  */
 export function defineStore<T, A extends ActionsDecl<T>>(
   decl: StoreSpec<T, A> & { actions: A & ActionsDecl<T> }): EngineStoreHandle<T, A> {
+  if (decl.transient !== undefined) {
+    if (decl.persist === undefined) {
+      throw new Error(`defineStore: transient fields [${decl.transient.join(', ')}] need a persist key; a store without one keeps nothing across page loads`)
+    }
+    assertTransientFields(decl.persist, decl.init(), decl.transient)
+  }
   return {
     spec: decl,
     create(scopeKey?: string): EngineStoreInstance<T, A> {

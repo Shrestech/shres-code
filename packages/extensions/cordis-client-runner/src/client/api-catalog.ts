@@ -809,7 +809,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StoreSpec',
-    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    actions: A;\n}',
+    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    transient?: readonly (keyof T & string)[];\n    actions: A;\n}',
   },
   {
     name: 'ThemeDefinition',
