@@ -2396,6 +2396,141 @@
       "source": "packages/host/plugin-admin/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserInstanceId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BskSessionId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "ExtensionId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillToken",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillOperationId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "SessionOwner",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillState",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillRefusal",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillConsentDownload",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillConsent",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillVerb",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillOperation",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStatus",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartOptions",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartResult",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillControl",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillCommandFailure",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillCommandResult",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BskOutput",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserAction",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillGestureVerb",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillGestureGrant",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillBeginRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillFlowRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillUninstallRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartOutcome",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillErrorCode",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/skills.md",
       "symbol": "SkillInstallRoots",
       "source": "packages/skill/skill-filesystem/src/install.ts"

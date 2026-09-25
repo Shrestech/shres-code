@@ -1,6 +1,7 @@
 /** Platform-neutral assembly of generated Host Remote contributions. */
 
 import type { Context } from '@shres-code/cordis'
+import browserSkillRemote from '@shres-code/shres-code-browserskill/remote'
 import commandsRemote from '@shres-code/shres-code-commands/remote'
 import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
@@ -14,6 +15,10 @@ import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
 
 export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
+export type {
+  BrowserSkillConsent, BrowserSkillConsentDownload, BrowserSkillOperation, BrowserSkillOperationId,
+  BrowserSkillRefusal, BrowserSkillState, BrowserSkillStatus, BrowserSkillToken,
+} from '@shres-code/shres-code-browserskill/types'
 // The pluginAdmin namespaces' payload vocabulary rides the same rule: the
 // Client contribution names what it sends and receives through this
 // assembly, never through a Host package import.
@@ -27,6 +32,7 @@ export type {
   ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
   ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from '@shres-code/shres-code-shield/types'
+export type {} from '@shres-code/shres-code-browserskill/remote'
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
 export type {} from '@shres-code/shres-code-host-plugin-admin/remote'
@@ -136,7 +142,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote, remoteControlRemote,
+      browserSkillRemote, commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote, remoteControlRemote,
       messageFeedbackRemote, speechRemote, shieldRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))

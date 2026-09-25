@@ -148,6 +148,14 @@ const PRIVILEGED_METHODS = new Set([
   'pluginAdmin/removePlugin',
   'pluginAdmin/skillAdd',
   'pluginAdmin/skillRemove',
+  // BrowserSkill provisions host executables and controls an owned local browser.
+  'browserSkill/status',
+  'browserSkill/begin',
+  'browserSkill/provision',
+  'browserSkill/open',
+  'browserSkill/close',
+  'browserSkill/reset',
+  'browserSkill/uninstall',
 ])
 
 /**

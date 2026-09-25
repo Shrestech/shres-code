@@ -18,7 +18,7 @@ The `shres` command is the product launcher for profiles: ordered stacks of plug
 
 The invoking directory is the default workspace root. The `web` and `headless` profiles auto-initialize on first use from shipped templates; any other profile must be created through `shres plugin`.
 
-For an external browser-automation runtime, follow the [BrowserSkill setup tutorial](../../docs/cookbook/browserskill.md). Installing its skill does not install the CLI or browser extension.
+For managed browser control, follow the [BrowserSkill Web installation tutorial](../../docs/cookbook/browserskill.md). If you manage the upstream CLI and extension yourself, use the [external CLI tutorial](../../docs/cookbook/browserskill-manual.md); installing its skill alone does not provision a browser.
 
 ## App arguments
 

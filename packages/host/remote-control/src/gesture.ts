@@ -1,10 +1,9 @@
 /**
- * The gesture-token ledger for the remoteAdmin and pluginAdmin gateways:
- * one-shot, verb(+alias)-scoped nonces proving a local user gesture stood
- * behind one mutation. Tokens live only in the serving process's memory —
- * never persisted, never logged — so a token minted by one daemon is
- * meaningless on another, and a replayed or re-fired request cannot cause a
- * second mutation.
+ * One-shot, verb-and-scope-bound nonces for gesture-gated gateways.
+ * They establish a matching mint/consume sequence, not human presence;
+ * callers enforce peer access. Unspent records are process-local and not
+ * persisted. Delete-first consumption prevents replay from authorizing
+ * another mutation.
  * @module @shres-code/shres-code-host-remote-control/gesture
  */
 
@@ -39,7 +38,7 @@ export class GestureLedger<V extends string = AdminGestureVerb> {
   /**
    * Mint one token bound to the (verb, alias) mutation it authorizes.
    * @param verb - the mutation verb the token authorizes.
-   * @param alias - the alias (or install spec, or skill path/name) it is scoped to; null only for registry-add.
+   * @param alias - the request-specific key; null when the verb has no keyed target.
    * @param now - epoch milliseconds of the minting instant.
    * @returns the token and its deadline.
    */
@@ -61,7 +60,7 @@ export class GestureLedger<V extends string = AdminGestureVerb> {
    * before the verdict either way.
    * @param token - the presented nonce.
    * @param verb - the verb the caller is about to perform.
-   * @param alias - the alias (or install spec, or skill path/name) that verb targets; null only for registry-add.
+   * @param alias - the request-specific key; null when the verb has no keyed target.
    * @param now - epoch milliseconds of the consumption instant.
    * @returns true when the token authorizes this exact mutation.
    */

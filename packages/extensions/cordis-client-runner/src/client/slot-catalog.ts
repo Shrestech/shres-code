@@ -1504,6 +1504,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'shell.navigation\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
+      'client-ui-browserskill BrowserSkillSettingsSection id \'browserSkill\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-jspace JSpaceSection id \'jspace\'',
       'client-ui-settings-models ModelsSection id \'models\'',

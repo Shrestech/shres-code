@@ -1,0 +1,26 @@
+# Only the external model is scripted; BrowserSkill mounts through its shipping entry.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ../../../cordis.yml
+    patches:
+      - id: llm-deepseek
+        disabled: true
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: browserskill-native-snapshot
+              model: fixture
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          skills:
+            filesystem:
+              watch: false
+          persona: Use the browserskill guide and native tools for this browser task.
+      - insert:
+          - id: browserskill-native-model
+            name: ./tests/fixtures/browserskill-native/model.ts
+          - id: browserskill
+            name: '@shres-code/shres-code-browserskill'

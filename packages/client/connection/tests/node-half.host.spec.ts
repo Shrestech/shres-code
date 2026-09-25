@@ -237,6 +237,8 @@ describe('connection node half', () => {
       // gate stays inside the namespace.
       'pluginAdmin/status', 'pluginAdmin/begin', 'pluginAdmin/stageInstall', 'pluginAdmin/confirm',
       'pluginAdmin/cancel', 'pluginAdmin/removePlugin', 'pluginAdmin/skillAdd', 'pluginAdmin/skillRemove',
+      'browserSkill/status', 'browserSkill/begin', 'browserSkill/provision', 'browserSkill/open',
+      'browserSkill/close', 'browserSkill/reset', 'browserSkill/uninstall',
     ]) {
       const denied = fakeResponse()
       await routes[0]!.handler(
@@ -531,6 +533,8 @@ describe('connection node half over a real HTTP server', () => {
         // URL the caller picked: an anonymous LAN caller must not reach it.
         'llm.discoverModels',
         'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
+        'browserSkill/status', 'browserSkill/begin', 'browserSkill/provision', 'browserSkill/open',
+        'browserSkill/close', 'browserSkill/reset', 'browserSkill/uninstall',
       ]) {
         expect([method, await call(port, method, 'harness.example')]).toEqual([method, 403])
       }
@@ -546,7 +550,9 @@ describe('connection node half over a real HTTP server', () => {
         expect([method, await call(port, method, 'harness.example')]).toEqual([method, 404])
       }
       // Loopback reaches everything, configuration included.
-      expect(await call(port, 'settings.describe', `127.0.0.1:${String(port)}`)).toBe(404)
+      for (const method of ['settings.describe', 'browserSkill/status', 'browserSkill/begin']) {
+        expect(await call(port, method, `127.0.0.1:${String(port)}`)).toBe(404)
+      }
     } finally {
       await close()
       await dispose()

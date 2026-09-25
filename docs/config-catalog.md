@@ -465,6 +465,54 @@ Depends on: [`LocalConfig`](#shres-codeshres-code-bash-local)
 
 Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
+<a id="shres-codeshres-code-browserskill"></a>
+
+## `@shres-code/shres-code-browserskill`
+
+Requires: `tools` · `skills`
+
+```ts config-catalog
+/** Deployment values resolved before the runtime is constructed. */
+export type Config = BrowserSkillConfigSpec
+
+/** Caller-supplied spec; every field is optional and validated on resolve. */
+export interface BrowserSkillConfigSpec {
+  /**
+   * Base URL that replaces the pinned release host for BOTH artifacts, so a
+   * test or air-gapped deployment can serve byte-identical assets locally.
+   * When unset the pinned absolute release URLs are used.
+   */
+  artifactBaseUrl?: string
+  /**
+   * Update-manifest URL passed to the daemon as `BSK_UPDATE_MANIFEST_URL`.
+   * When unset the daemon uses its upstream default and still fetches update
+   * metadata periodically; the pinned binary's default is recorded in the
+   * manifest constants. Point this at a controlled endpoint in tests.
+   */
+  updateManifestUrl?: string
+  /** Interval between owned-instance health probes while ready. */
+  healthIntervalMs?: number
+  /** Consecutive missed probes of our instance before the runtime closes. */
+  healthMissLimit?: number
+  /**
+   * Deadline for one bounded bsk CLI invocation. Must cover a `status` call
+   * with no connected browser, which waits five seconds for a browser plus a
+   * two-second IPC slack before answering.
+   */
+  commandTimeoutMs?: number
+  /** Deadline for the daemon to reach readiness after spawn. */
+  daemonReadyTimeoutMs?: number
+  /** Deadline for the owned Chrome launch, extension load, and instance pairing. */
+  browserConnectTimeoutMs?: number
+  /** Deadline for one artifact download. */
+  downloadTimeoutMs?: number
+  /** Upper bound on one downloaded artifact's bytes. */
+  maxDownloadBytes?: number
+}
+```
+
+Source: [`packages/browser/browserskill/src/index.ts:21`](../packages/browser/browserskill/src/index.ts)
+
 <a id="shres-codeshres-code-client-connection"></a>
 
 ## `@shres-code/shres-code-client-connection`
@@ -4408,6 +4456,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
 - `@shres-code/shres-code-client-ui-agent-preset` ([`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts))
 - `@shres-code/shres-code-client-ui-agent-team` ([`packages/client/ui-agent-team/src/index.ts`](../packages/client/ui-agent-team/src/index.ts))
+- `@shres-code/shres-code-client-ui-browserskill` ([`packages/client/ui-browserskill/src/index.ts`](../packages/client/ui-browserskill/src/index.ts))
 - `@shres-code/shres-code-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
 - `@shres-code/shres-code-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
 - `@shres-code/shres-code-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
