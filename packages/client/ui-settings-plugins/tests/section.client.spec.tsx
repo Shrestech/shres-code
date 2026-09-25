@@ -469,7 +469,7 @@ describe('WebSearchCard', () => {
     fireEvent.click(screen.getByText(en.webSearchTitle))
     expect(screen.getByText('First in the default web_search order when enabled and a key is configured; other methods are fallbacks.')).toBeTruthy()
     expect(screen.getByText('Powers deep_research, not routine web_search. Requires a Perplexity API key.')).toBeTruthy()
-    expect(screen.getByText('Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.')).toBeTruthy()
+    expect(screen.getByText('Web results using XAI_API_KEY. For subscription-backed X tools and sharing with other agents, open Settings → Models & providers → Grok (subscription).')).toBeTruthy()
   })
 
   it('stages Brave credentials and endpoint independently', () => {
