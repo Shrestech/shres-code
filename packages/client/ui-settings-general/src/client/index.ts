@@ -39,7 +39,6 @@ export type {
 export type { SettingsDocumentActionInjected, SettingsDocumentActionProps } from './SettingsDocumentAction.tsx'
 export type { SettingsDocumentState } from './settings-document-store.ts'
 export { SettingsDocumentStore } from './settings-document-store.ts'
-export { SettingsPages } from './settings-pages.ts'
 export type { SettingsPageLedger } from './settings-pages.ts'
 export type { SettingsKey } from './locales.ts'
 
@@ -84,10 +83,10 @@ export function apply(ctx: ClientContext): void {
         void withdraw()
       }
     }, 'ui-settings-general: settingsPages')
-    // Sections register inside the declaring register() call, so the check
-    // waits one microtask for every registration of that declaration.
+    // A released call resumes after the declaring register() returned, with
+    // every section registered in that declaration on the ledger.
     pagesCtx.slots.inject('settings.section', () => {
-      queueMicrotask(() => { pages.flush() })
+      pages.flush()
       return () => {}
     })
   })

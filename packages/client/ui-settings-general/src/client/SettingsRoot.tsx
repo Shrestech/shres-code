@@ -48,7 +48,8 @@ export function SettingsRoot({
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const heading = useRef<HTMLHeadingElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
-  const opener = useRef<HTMLButtonElement | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const shownPage = useRef(page)
   const search = useRef<HTMLInputElement>(null)
   const titleId = useId()
   const open = page !== null
@@ -68,6 +69,26 @@ export function SettingsRoot({
   const sectionId = active?.id === 'appearance' ? 'general' : active?.id
   const title = activeDestination === 'settings' ? t('title') : t(`navigation.${activeDestination}`)
   const general = active?.id === 'general'
+
+  // A destination another plugin opened (ctx.settingsPages) gets what the
+  // shell's own links give: opening Settings records the control that had
+  // focus for the return on close and clears a stale nav filter, and a filter
+  // that would hide the shown section is cleared. Runs before the heading
+  // takes focus.
+  useEffect(() => {
+    const previous = shownPage.current
+    shownPage.current = page
+    if (page === previous) return
+    if (page === null) {
+      opener.current = null
+      return
+    }
+    if (previous === null && opener.current === null) {
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement && focused !== document.body) opener.current = focused
+    }
+    if (previous === null || !filtered.some(row => row.id === page)) setQuery('')
+  }, [page, filtered])
 
   useEffect(() => {
     if (!open) return

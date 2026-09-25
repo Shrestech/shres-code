@@ -25,8 +25,10 @@ function mount({ rows = [
     if (key === 'settings.action') return 'Open configuration file'
     return null
   }) as SettingsRootComponentProps['renderSlot'])
+  let external: ((page: string | null) => void) | undefined
   function Harness() {
     const [page, navigate] = useState<string | null>(null)
+    external = navigate
     return <SettingsRoot page={page} navigate={navigate}
       t={key => (en as Record<string, string>)[key] ?? key}
       useWorkspaces={() => { throw new Error('unused') }}
@@ -46,6 +48,9 @@ function mount({ rows = [
   const view = render(<Harness />)
   return { view, renderSlot, listeners, bump: (next: SettingsSectionRow[]) => {
     act(() => { current = next; for (const listener of listeners) listener() })
+  }, go: (page: string | null) => {
+    // Another plugin moving the frame's destination (ctx.settingsPages → ctx.layout.navigate).
+    act(() => { external?.(page) })
   } }
 }
 const openSettings = () => { fireEvent.click(screen.getByRole('button', { name: 'Settings' })) }
@@ -145,6 +150,47 @@ describe('global destinations and settings', () => {
     act(() => { owner.complete() })
     const next = renderSlot.mock.calls.findLast(([key]) => key === 'settings.onboarding')?.[1] as { stepId: string }
     expect(next.stepId).toBe('credentials')
+  })
+
+  it('returns focus on close to the control that had it when another plugin opened a section', () => {
+    const { go } = mount()
+    const outside = document.createElement('button')
+    outside.textContent = 'Routing view link'
+    document.body.append(outside)
+    outside.focus()
+    go('models')
+    expect(screen.getByTestId('section-models')).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('region')).toBeNull()
+    expect(document.activeElement).toBe(outside)
+    go('models')
+    go(null)
+    outside.remove()
+
+    // Nothing focused: close falls back to the Settings trigger.
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    go('models')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Settings' }))
+  })
+
+  it('clears a nav filter that hides a section another plugin opened, and keeps it for its own rows', () => {
+    const { go } = mount({ rows: [
+      { id: 'general', order: 0, label: 'Preferences' },
+      { id: 'models', order: 10, label: 'Models & providers' },
+      { id: 'model-routing', order: 10.5, label: 'Model routing' },
+    ] })
+    openSettings()
+    const search = screen.getByRole('searchbox')
+    fireEvent.change(search, { target: { value: 'model' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Model routing' }))
+    expect((search as HTMLInputElement).value).toBe('model')
+    go('models')
+    expect((search as HTMLInputElement).value).toBe('model')
+    fireEvent.change(search, { target: { value: 'providers' } })
+    go('model-routing')
+    expect((search as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: 'Model routing' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('gives a section only the close affordance, and lists Model routing with its own icon', () => {

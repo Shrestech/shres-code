@@ -37,8 +37,8 @@ export interface ModelsSectionInjected {
   api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
   /** Section copy. */
   t: (key: keyof typeof en) => string
-  /** Open Settings at another registered section, through `ctx.settingsPages`. */
-  openSettings: (sectionId: string) => void
+  /** Open Settings at another registered section, through `ctx.settingsPages`; absent while no Settings pages face exists. */
+  openSettings?: (sectionId: string) => void
 }
 
 /**
@@ -49,9 +49,6 @@ export type ModelsSectionComponentProps = InjectFace<ModelsSectionInjected>
 
 /** Partial component face used to exercise the pre-injection render path. */
 export type ModelsSectionProps = Partial<ModelsSectionComponentProps>
-
-/** The loaded page's face: every injected member, the Settings pages callback when injected. */
-type LoadedFace = Omit<ModelsSectionComponentProps, 'openSettings'> & Partial<Pick<ModelsSectionComponentProps, 'openSettings'>>
 
 /** Provider identity shared by row actions and confirmation copy. */
 export interface ProviderIdentity {
@@ -189,7 +186,7 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
   return <Loaded injected={{ controller, useSnapshot, api, t, ...openSettings === undefined ? {} : { openSettings } }} />
 }
 
-function Loaded({ injected }: { injected: LoadedFace }): ReactNode {
+function Loaded({ injected }: { injected: ModelsSectionComponentProps }): ReactNode {
   const { controller, api, t } = injected
   const state = injected.useSnapshot(snapshot => snapshot)
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
@@ -602,7 +599,7 @@ function Loaded({ injected }: { injected: LoadedFace }): ReactNode {
  * The one-line pointer to Settings › Model routing, which owns the classifier
  * switch and the judgment engine; plain text where no Settings pages face is injected.
  */
-function RoutingLink({ openSettings, t }: { openSettings: LoadedFace['openSettings']; t: ModelsSectionComponentProps['t'] }): ReactNode {
+function RoutingLink({ openSettings, t }: { openSettings: ModelsSectionComponentProps['openSettings']; t: ModelsSectionComponentProps['t'] }): ReactNode {
   return (
     <p className={styles['advancedHint']}>
       {t('routingLinkLead')}

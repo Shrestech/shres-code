@@ -14,8 +14,9 @@ export interface ISettingsPages {
    * Open Settings at one registered `settings.section` entry, keeping the
    * workspace and its session mounted underneath. While the settings shell
    * has not declared `settings.section` yet, the call waits for that
-   * declaration, and then for the sections that register in the same
-   * declaration, before it checks the id.
+   * declaration and resumes after it committed, with the sections registered
+   * in the same declaration on the ledger, before it checks the id. The frame
+   * applies a destination requested before it first renders once it renders.
    * @param sectionId - the section's registration id, such as `model-routing`.
    * @returns settles once the frame shows the section.
    * @throws Error naming the id, as a rejection, when no section with it is

@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
-import { apply, inject, SettingsPages } from '@shres-code/shres-code-client-ui-settings-general/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-settings-general/client'
+import { LayoutController } from '@shres-code/shres-code-client-ui-layout/client'
+import { createLayoutStore } from '@shres-code/shres-code-client-ui-layout/src/client/stores.ts'
+import { SettingsPages } from '../src/client/settings-pages.ts'
 
 usePinnedBrowserLanguages('en-US')
 
@@ -37,17 +40,31 @@ describe('SettingsPages', () => {
     expect(setup.navigate).toHaveBeenCalledExactlyOnceWith('models')
   })
 
-  it('rejects the waiting calls when the face is withdrawn', async () => {
+  it('rejects the waiting calls and every later call once the face is withdrawn', async () => {
     const { face, navigate } = pages(false, [])
     const waiting = face.open('models')
     face.dispose()
     await expect(waiting).rejects.toThrow('settings: the Settings pages face was withdrawn before section "models" opened')
     face.flush()
+    await expect(face.open('general')).rejects.toThrow('withdrawn before section "general" opened')
     expect(navigate).not.toHaveBeenCalled()
   })
 })
 
 const contexts: Context[] = []
+
+/**
+ * Register the frame's root entry with its shell.navigation seat, as ui-layout
+ * does; the settings shell occupies it and declares settings.section under it.
+ * @param slots - the client slot registry.
+ * @returns the registration's disposer.
+ */
+function registerFrame(slots: SlotRegistry): () => void {
+  return slots.register({
+    name: 'root',
+    children: { 'shell.navigation': { kind: 'single', scope: 'root' } },
+  } as never, () => null)
+}
 afterEach(async () => {
   while (contexts.length > 0) await contexts.pop()!.fiber.dispose()
 })
@@ -62,11 +79,7 @@ async function bench() {
   const layout = { navigate: vi.fn(), toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn() }
   ctx.provide('layout', layout)
   const slots = ctx.get('slots') as SlotRegistry
-  /** Declare the frame's shell.navigation seat, which the settings shell occupies and under which it declares settings.section. */
-  const declareFrame = (): (() => void) => slots.register({
-    name: 'root',
-    children: { 'shell.navigation': { kind: 'single', scope: 'root' } },
-  } as never, () => null)
+  const declareFrame = (): (() => void) => registerFrame(slots)
   /** A feature plugin registering one section once settings.section is declared. */
   const section = (id: string) => ctx.plugin({
     inject: ['slots'],
@@ -141,5 +154,54 @@ describe('ctx.settingsPages from the settings shell', () => {
     b.declareFrame()
     await b.ctx.settingsPages.open('general')
     expect(b.layout.navigate).toHaveBeenCalledExactlyOnceWith('general')
+  })
+})
+
+describe('ctx.settingsPages with the real frame navigation', () => {
+  /**
+   * A client root whose ctx.layout is the real LayoutController, before the
+   * frame's first render attached its store actions.
+   */
+  async function frameBench() {
+    const ctx = new Context()
+    contexts.push(ctx)
+    await ctx.plugin(SlotRegistry).await()
+    ctx.provide('locale', new LocaleRuntime(ctx))
+    ctx.provide('connection', { api: {}, isLoopback: false } as never)
+    const layout = new LayoutController()
+    ctx.provide('layout', layout)
+    const slots = ctx.get('slots') as SlotRegistry
+
+    /** The frame's first render: the root store instance hands its actions to ctx.layout. */
+    const renderFrame = () => {
+      const frame = createLayoutStore().create()
+      layout.attachPanels(frame.actions)
+      return frame.store
+    }
+    return { ctx, registerFrame: () => registerFrame(slots), renderFrame }
+  }
+
+  it('resolves an open made before the frame rendered, and the frame lands on the section once it renders', async () => {
+    const b = await frameBench()
+    b.registerFrame()
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+
+    await b.ctx.settingsPages.open('general')
+    const store = b.renderFrame()
+    expect(store.getSnapshot().page).toBeNull()
+    await Promise.resolve()
+    expect(store.getSnapshot().page).toBe('general')
+  })
+
+  it('resolves an open that waited for settings.section while the frame had not rendered', async () => {
+    const b = await frameBench()
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const opening = b.ctx.settingsPages.open('general')
+
+    b.registerFrame()
+    await opening
+    const store = b.renderFrame()
+    await Promise.resolve()
+    expect(store.getSnapshot().page).toBe('general')
   })
 })

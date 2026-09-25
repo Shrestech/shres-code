@@ -23,15 +23,18 @@ interface Waiter {
 
 /**
  * Opens Settings at a registered section through the frame's navigation. A
- * call made before the declaration waits; {@link SettingsPages.flush} settles
- * the waiting calls once the declaration and the sections registered with it
- * are on the ledger, and {@link SettingsPages.dispose} rejects them when the
- * face is withdrawn.
+ * call made before the declaration waits; {@link SettingsPages.flush} releases
+ * the waiting calls when the declaration commits, and each resumes after the
+ * declaring `register()` call returned (a resumed `await` always runs later), so
+ * the sections registered in that declaration are on the ledger when it checks
+ * its id. {@link SettingsPages.dispose} rejects the waiting calls and every
+ * later one when the face is withdrawn.
  */
 export class SettingsPages implements ISettingsPages {
   readonly #ledger: SettingsPageLedger
   readonly #navigate: (page: string) => void
   #waiters: Waiter[] = []
+  #disposed = false
 
   /**
    * @param ledger - the live `settings.section` ledger.
@@ -48,6 +51,7 @@ export class SettingsPages implements ISettingsPages {
    * @returns settles once the frame shows the section.
    */
   async open(sectionId: string): Promise<void> {
+    if (this.#disposed) throw withdrawn(sectionId)
     if (!this.#ledger.declared()) {
       await new Promise<void>((resolve, reject) => { this.#waiters.push({ sectionId, resolve, reject }) })
     }
@@ -62,10 +66,18 @@ export class SettingsPages implements ISettingsPages {
     for (const waiter of this.#waiters.splice(0)) waiter.resolve()
   }
 
-  /** Reject every waiting call; the face is being withdrawn. */
+  /** Reject every waiting call and every later one; the face is being withdrawn. */
   dispose(): void {
-    for (const waiter of this.#waiters.splice(0)) {
-      waiter.reject(new Error(`settings: the Settings pages face was withdrawn before section "${waiter.sectionId}" opened`))
-    }
+    this.#disposed = true
+    for (const waiter of this.#waiters.splice(0)) waiter.reject(withdrawn(waiter.sectionId))
   }
+}
+
+/**
+ * The rejection of a call the withdrawn face cannot open.
+ * @param sectionId - the requested section.
+ * @returns the error naming it.
+ */
+function withdrawn(sectionId: string): Error {
+  return new Error(`settings: the Settings pages face was withdrawn before section "${sectionId}" opened`)
 }
