@@ -9,7 +9,6 @@ import type {
 } from '../contract/slots.ts'
 import type { ViewTab } from '../contract/views.ts'
 import { readInspectRequest } from '../inspect.ts'
-import { readActivityOpen } from '../stores.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -89,12 +88,11 @@ export function ConversationSessionHeader({
   )
   const activityRunningId = useId()
   // Open state lives in the session's chat store so a view's reveal closes the popover.
-  const activityOpen = useStore(s => readActivityOpen(s.activityOpen))
+  const activityOpen = useStore(s => s.activityOpen)
   const activityRef = useRef<HTMLDivElement | null>(null)
   const activityPanelRef = useRef<HTMLDivElement | null>(null)
   const activityTriggerRef = useRef<HTMLButtonElement | null>(null)
-  // Set by the trigger only, so focus moves into the panel on a user open and
-  // never for a store value, such as a persisted open state, rendered at mount.
+  // Set by the trigger only, so focus moves into the panel on a user open alone.
   const focusPanelOnOpen = useRef(false)
 
   /** Close from a gesture inside the header, returning focus to the trigger. */
@@ -103,9 +101,11 @@ export function ConversationSessionHeader({
     queueMicrotask(() => { activityTriggerRef.current?.focus() })
   }
 
-  useEffect(() => {
-    actions.setActivityOpen(false)
-  }, [actions, sessionId])
+  // A session switch closes the popover. The session-scoped header remounts
+  // per session, so leaving one closes it in that session's store and
+  // returning renders it closed. Nothing closes it at mount: the store never
+  // persists the field, so a reload restores it closed.
+  useEffect(() => () => { actions.setActivityOpen(false) }, [actions, sessionId])
 
   useEffect(() => {
     if (!activityOpen) return
