@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
-import AgentRegistry from '@shres-code/shres-code-agent'
+import AgentRegistry, { modelSelectionInstalled } from '@shres-code/shres-code-agent'
 import InvariantRegistry from '@shres-code/shres-code-invariants'
-import type { Agent } from '@shres-code/shres-code-agent'
+import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
 import AgentDefaultModel from '@shres-code/shres-code-agent-default-model'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import CommandRuntime from '@shres-code/shres-code-commands'
@@ -118,6 +118,8 @@ interface SpineOptions {
   readonly compaction?: { readonly summarizationRoute?: 'manual' | 'request' }
   /** Compose session persistence, the subagent runtime, spawn and fork, `tool-subagent`, and a child-route observer. */
   readonly subagents?: boolean
+  /** Router `hold` as a YAML flow mapping, replacing the default `{ minSteps: 3 }`. */
+  readonly hold?: string
 }
 
 /** `inherited` of every `subagent/child-route` dispatch the observer saw. */
@@ -162,7 +164,7 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     "- name: '@test/model-router-judgment'",
     "- name: '@shres-code/shres-code-model-router'",
     '  config:',
-    ...ROUTER_CONFIG,
+    ...ROUTER_CONFIG.map(line => options.hold !== undefined && line.startsWith('    hold:') ? `    hold: ${options.hold}` : line),
     ...options.inTurnFallback === undefined ? [] : [`    inTurnFallback: ${options.inTurnFallback}`],
     ...options.invariants === true
       ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
@@ -272,11 +274,9 @@ async function pinManualRoute(loaded: Context, agent: Agent): Promise<void> {
   expect(execution?.result.kind).toBe('success')
 }
 
-/** Create the one root agent on the manual route with its live model selection installed. */
+/** Create the one root agent on the manual route; the registry installs its model-selection hook. */
 function createAgent(loaded: Context, id: string, cwd?: string): Agent {
-  const agent = loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL }, cwd === undefined ? {} : { cwd })
-  loaded.agentDefaultModel.selectionFor(agent)
-  return agent
+  return loaded.agentLoop.create(SessionId(id), { provider: PROVIDER, model: MANUAL_MODEL }, cwd === undefined ? {} : { cwd })
 }
 
 /** Drive one user turn to whole-agent idle. */
@@ -656,6 +656,146 @@ describe('real Loader composition', () => {
     expect(loaded.sessionProjections.snapshot(agent.session).values['modelRouting']).toBeUndefined()
   })
 })
+
+describe('a root agent no front end provided a model selection for', () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  /** The manual base each consult received, in order, recorded on the real controller. */
+  function consultBases(): () => ModelSelection[] {
+    const spy = vi.spyOn(ModelRoutingController.prototype, 'resolveRequest')
+    spy.mockClear()
+    return () => spy.mock.calls.map(call => call[3])
+  }
+
+  const MANUAL = { provider: PROVIDER, model: MANUAL_MODEL }
+
+  it('hands the router its creation route after a downgrade, and runs it when the router keeps strong', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot()
+    const bases = consultBases()
+    const agent = createAgent(loaded, 'router-empty-source-kept')
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    await turn(agent, 'First easy turn.')
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+
+    // The next request is seeded from the routed header, but the manual route is
+    // still the creation route: an answer preferring it ends the streak and runs it.
+    scriptedEngine(loaded).scriptRoute(KEEP_CURRENT_OPTION_ID, 0.9)
+    await turn(agent, 'Second easy turn.')
+    expect(bases()).toEqual([MANUAL, MANUAL])
+    const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
+    expect(decisions.map(event => event.data.reason)).toEqual(['gate-passed', 'current-preferred'])
+    expect(decisions[1]?.data).toMatchObject({ outcome: 'kept-strong', sticky: { active: false, brokenBy: 'current-preferred' } })
+    expect(requestedModel(1)).toBe(MANUAL_MODEL)
+    expect(eventsOfType(agent.session.events, 'request/header').at(-1)?.data.header.config)
+      .toMatchObject(MANUAL)
+  })
+
+  it('returns to the manual route when a hold reaches its step cap, and stays there while the router keeps strong', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { hold: '{ minSteps: 0, maxSteps: 1 }' })
+    const bases = consultBases()
+    const agent = createAgent(loaded, 'router-empty-source-cap')
+    await turn(agent, 'First easy turn.')
+    await turn(agent, 'Second easy turn.')
+    scriptedEngine(loaded).scriptRoute(KEEP_CURRENT_OPTION_ID, 0.9)
+    await turn(agent, 'Third easy turn.')
+    const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
+    expect(decisions.map(event => event.data.reason)).toEqual(['gate-passed', 'hold-cap', 'current-preferred'])
+    expect([requestedModel(0), requestedModel(1), requestedModel(2)]).toEqual([CANDIDATE_MODEL, MANUAL_MODEL, MANUAL_MODEL])
+    const recordedBases = bases()
+
+    // The return keeps the creation route's effective effort, not merely its
+    // model: compare with an agent that never routed, whose first request runs
+    // the creation route as the adapter resolves it.
+    const returned = eventsOfType(agent.session.events, 'request/header')
+      .map(event => event.data.header.config)
+      .find(config => config.model === MANUAL_MODEL)
+    const control = createAgent(loaded, 'router-empty-source-cap-control')
+    const off = await loaded.commands.execute(control, `/${ROUTE_COMMAND} off`, new AbortController().signal)
+    expect(off?.result.kind).toBe('success')
+    await turn(control, 'Unrouted turn.')
+    const creation = eventsOfType(control.session.events, 'request/header').at(-1)?.data.header.config
+    expect(creation?.model).toBe(MANUAL_MODEL)
+    expect(creation?.reasoningEffort).toBeDefined()
+    expect(returned?.reasoningEffort).toBe(creation?.reasoningEffort)
+    expect(recordedBases).toEqual([MANUAL, MANUAL, MANUAL])
+  })
+
+  it('runs the creation route after /route off ends a streak, with the routed header still last', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot()
+    const bases = consultBases()
+    const agent = createAgent(loaded, 'router-empty-source-off')
+    await turn(agent, 'First easy turn.')
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+    const execution = await loaded.commands.execute(agent, `/${ROUTE_COMMAND} off`, new AbortController().signal)
+    expect(execution?.result).toEqual({ kind: 'success', text: 'Model routing off.' })
+    // With routing off the router still reports the manual route beneath the routed header.
+    expect(loaded.modelRouting.stickySelection(agent)).toEqual(MANUAL)
+    await turn(agent, 'Second easy turn.')
+    expect(requestedModel(1)).toBe(MANUAL_MODEL)
+    expect(bases()).toEqual([MANUAL, MANUAL])
+    expect(eventsOfType(agent.session.events, 'model-routing/decision')).toHaveLength(1)
+  })
+
+  it('recovers the entry base from the log on resume, before any new decision', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { subagents: true })
+    const bases = consultBases()
+    const sessionId = SessionId('router-empty-source-resume')
+    const handle = await loaded.agents.create({ sessionId, agentOptions: MANUAL })
+    await turn(handle.agent, 'First easy turn.')
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+    await loaded.sessions.flush(handle.agent.session)
+    await handle.dispose()
+
+    const resumed = (await loaded.agents.resume({ resumeSessionId: sessionId, agentOptions: MANUAL })).agent
+    expect(modelSelectionInstalled(resumed)).toBe(true)
+    // The resumed log's last header is the routed one; the fold reports the entry base.
+    expect(resumed.session.requestHeader()?.config).toMatchObject({ provider: PROVIDER, model: CANDIDATE_MODEL })
+    expect(loaded.modelRouting.stickySelection(resumed)).toEqual(MANUAL)
+    await turn(resumed, 'Second easy turn.')
+    // The resumed instance then seeds from the header it logged itself, the candidate.
+    await turn(resumed, 'Third easy turn.')
+    expect(bases()).toEqual([MANUAL, MANUAL, MANUAL])
+    expect(eventsOfType(resumed.session.events, 'model-routing/decision').at(-1)?.data).toMatchObject({
+      outcome: 'downgraded',
+      sticky: { active: true, enteredTurn: 1, entryBase: MANUAL },
+    })
+    expect([requestedModel(1), requestedModel(2)]).toEqual([CANDIDATE_MODEL, CANDIDATE_MODEL])
+  })
+
+  it('uses a selection a front end provides later, as /model does, with one consult per request', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot()
+    const bases = consultBases()
+    const agent = createAgent(loaded, 'router-empty-source-model')
+    await turn(agent, 'First easy turn.')
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+    const execution = await loaded.commands.execute(agent, `/model ${PROVIDER} ${SECOND_CANDIDATE_MODEL}`, new AbortController().signal)
+    expect(execution?.result.kind).toBe('success')
+    await turn(agent, 'Second easy turn.')
+    // One consult per request, and from now on the base is the explicit selection.
+    expect(bases()).toEqual([MANUAL, { provider: PROVIDER, model: SECOND_CANDIDATE_MODEL }])
+    expect(eventsOfType(agent.session.events, 'model-routing/decision').at(-1)?.data).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'manual-deviation',
+    })
+    expect(requestedModel(1)).toBe(SECOND_CANDIDATE_MODEL)
+  })
+
+  it('keeps a routed header in force after the router is removed, because nothing reports a manual route beneath it', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    // A known limitation shared with the Web front end: with no router and no
+    // explicit selection, the last logged header is the route in force.
+    const loaded = await boot()
+    const agent = createAgent(loaded, 'router-empty-source-removed')
+    await turn(agent, 'First easy turn.')
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+    const entry = [...loaded.loader.entries()]
+      .find(candidate => candidate.options.name === '@shres-code/shres-code-model-router')
+    await entry?.fiber?.dispose()
+    expect(loaded.get('modelRouting')).toBeUndefined()
+    await turn(agent, 'Second easy turn.')
+    expect(requestedModel(1)).toBe(CANDIDATE_MODEL)
+  })
+})
+
 
 describe('children of a parent on a held downgrade', () => {
   beforeEach(() => { childRouteInherited.length = 0 })
