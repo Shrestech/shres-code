@@ -7,7 +7,8 @@
  * engine, and installs the `judgment` settings section with the configured
  * `defaultEngine` as its composition layer. Every ask goes to the one engine the
  * section selects for the asking consumer — an `overrides` entry, else
- * `engine` — and every answer carries that engine's registry id. The dispatcher
+ * `engine` — and every answer and every failure carries that engine's registry
+ * id. A consumer reads its own fitting capability through `fittingFor`. The dispatcher
  * never answers with a different engine: an unregistered selection fails
  * `UNCONFIGURED` and a registered engine that is not `ready` fails
  * `UNAVAILABLE`, so consumers take their own fallback path instead of reading a
@@ -75,7 +76,7 @@ export class JudgmentDispatch extends JudgmentService {
   readonly config: ResolvedJudgmentDispatchConfig
   /** The registry this dispatcher provides as `ctx.judgmentEngines`. */
   readonly registry: JudgmentEngineRegistry
-  /** One fitting capability object, returned while the default selection supports fitting. */
+  /** One fitting capability object, returned while the selection it is read for supports fitting. */
   private readonly dispatchedFitting: JudgmentFittingEngine
   /** Unregistered selections currently reported, so each condition is reported once. */
   private readonly reportedUnresolved = new Set<string>()
@@ -113,7 +114,7 @@ export class JudgmentDispatch extends JudgmentService {
     Object.defineProperty(this, 'fitting', {
       configurable: true,
       enumerable: true,
-      get: (): JudgmentFittingEngine | undefined => this.defaultFitting(),
+      get: (): JudgmentFittingEngine | undefined => this.fittingFor(),
     })
     ctx.provide('judgmentEngines', registry)
     ctx.effect(() => {
@@ -158,8 +159,12 @@ export class JudgmentDispatch extends JudgmentService {
   override async ask(input: JudgmentInput): Promise<JudgmentResult> {
     const id = this.selectedEngine(input.consumer)
     const entry = this.readyEntry(id)
-    const result = await entry.engine.ask(input)
-    return { ...result, engineId: id }
+    try {
+      const result = await entry.engine.ask(input)
+      return { ...result, engineId: id }
+    } catch (error: unknown) {
+      throw stampEngine(error, id)
+    }
   }
 
   /**
@@ -168,7 +173,7 @@ export class JudgmentDispatch extends JudgmentService {
    *   declared its id, selects the deployment-wide engine.
    * @returns the registry id the settings select.
    */
-  selectedEngine(consumer?: JudgmentConsumerId): JudgmentEngineId {
+  override selectedEngine(consumer?: JudgmentConsumerId): JudgmentEngineId {
     const settings = this.selection()
     // An override applies only while its consumer declares itself, so a stored
     // override the settle-time report names as ignored is ignored for every ask.
@@ -176,9 +181,15 @@ export class JudgmentDispatch extends JudgmentService {
     return judgmentEngineId(override ?? settings.engine)
   }
 
-  /** The fitting capability while the deployment-wide selection supports it. */
-  private defaultFitting(): JudgmentFittingEngine | undefined {
-    const entry = this.registry.get(this.selectedEngine())
+  /**
+   * The fitting capability for the engine the settings select for one
+   * consumer. It is present exactly while that engine exposes fitting, and a
+   * fitted ask through it routes by the ask's own `consumer` at ask time.
+   * @param consumer - the asking consumer; omission reads the deployment-wide selection.
+   * @returns the dispatched fitting capability, or `undefined` when the selected engine has none or is not composed.
+   */
+  override fittingFor(consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined {
+    const entry = this.registry.get(this.selectedEngine(consumer))
     return entry?.engine.fitting === undefined ? undefined : this.dispatchedFitting
   }
 
@@ -190,9 +201,15 @@ export class JudgmentDispatch extends JudgmentService {
       throw new JudgmentError(
         'UNAVAILABLE',
         `judgment engine "${id}" selected for consumer "${input.consumer ?? '(none)'}" does not support fitting`,
+        { engineId: id },
       )
     }
-    const result = await fitting.ask(input)
+    let result: JudgmentFittingResult
+    try {
+      result = await fitting.ask(input)
+    } catch (error: unknown) {
+      throw stampEngine(error, id)
+    }
     return result.kind === 'answered'
       ? { ...result, result: { ...result.result, engineId: id } }
       : { ...result, engineId: id }
@@ -203,12 +220,12 @@ export class JudgmentDispatch extends JudgmentService {
     const entry = this.registry.get(id)
     if (entry === undefined) {
       this.reportUnresolved(id)
-      throw new JudgmentError('UNCONFIGURED', `judgment engine "${id}" is not composed`)
+      throw new JudgmentError('UNCONFIGURED', `judgment engine "${id}" is not composed`, { engineId: id })
     }
     const status = entry.status()
     if (status.state !== 'ready') {
       const detail = status.detail === undefined ? '' : `: ${status.detail}`
-      throw new JudgmentError('UNAVAILABLE', `judgment engine "${id}" is ${status.state}${detail}`)
+      throw new JudgmentError('UNAVAILABLE', `judgment engine "${id}" is ${status.state}${detail}`, { engineId: id })
     }
     return entry
   }
@@ -254,6 +271,20 @@ export class JudgmentDispatch extends JudgmentService {
     this.reportedUnresolved.add(id)
     this.ctx.logger.error('judgment-dispatch: judgment engine "%s" is selected but not composed; every ask routed to it fails UNCONFIGURED', id)
   }
+}
+
+/**
+ * Attach the routed engine's registry id to one engine failure, as every
+ * answer carries it. A `JudgmentError` is re-created with the same code,
+ * message, and cause plus `engineId`; anything else an engine throws breaks
+ * the provider contract and propagates unchanged.
+ * @param error - what the engine threw.
+ * @param id - the registry id the ask was routed to.
+ * @returns the value to rethrow.
+ */
+function stampEngine(error: unknown, id: JudgmentEngineId): unknown {
+  if (!(error instanceof JudgmentError) || error.engineId !== undefined) return error
+  return new JudgmentError(error.code, error.message, { cause: error.cause, engineId: id })
 }
 
 /** Every engine id one settings value selects: the deployment-wide engine, then each override. */

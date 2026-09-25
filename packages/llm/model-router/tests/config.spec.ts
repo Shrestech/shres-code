@@ -352,6 +352,30 @@ describe('resolveConfig bounds', () => {
       .toHaveLength(160)
   })
 
+  it('resolves operating points and rejects each invalid field by name', () => {
+    const point = { engine: 'laya', downgradeThreshold: 0.7, downgradeMargin: 0.15 }
+    const resolved = resolveConfig(valid({ operatingPoints: [{ ...point, calibratedBy: 'prereg-1' }, { ...point, engine: 'llm:x/y', acceptVerbalized: true }] }))
+    expect(resolved.operatingPoints).toEqual([
+      { ...point, calibratedBy: 'prereg-1', acceptVerbalized: false },
+      { ...point, engine: 'llm:x/y', acceptVerbalized: true },
+    ])
+    expect(Object.isFrozen(resolved.operatingPoints)).toBe(true)
+    expect(Object.isFrozen(resolved.operatingPoints[0])).toBe(true)
+    expect(resolveConfig(valid()).operatingPoints).toEqual([])
+    expect(() => resolveConfig(valid({ operatingPoints: [point, { ...point }] })))
+      .toThrow('ModelRouterConfig.operatingPoints lists engine "laya" more than once')
+    expect(() => resolveConfig(valid({ operatingPoints: [{ ...point, engine: ' ' }] })))
+      .toThrow('ModelRouterConfig.operatingPoints[0].engine must be a non-empty string')
+    expect(() => resolveConfig(valid({ operatingPoints: [{ ...point, downgradeThreshold: 1.2 }] })))
+      .toThrow('ModelRouterConfig.operatingPoints["laya"].downgradeThreshold')
+    expect(() => resolveConfig(valid({ operatingPoints: [{ ...point, downgradeMargin: -0.1 }] })))
+      .toThrow('ModelRouterConfig.operatingPoints["laya"].downgradeMargin')
+    expect(() => resolveConfig(valid({ operatingPoints: [{ ...point, calibratedBy: '' }] })))
+      .toThrow('ModelRouterConfig.operatingPoints["laya"].calibratedBy must be a non-empty string')
+    expect(() => resolveConfig(raw({ operatingPoints: [{ ...point, acceptVerbalized: 'yes' }] })))
+      .toThrow('ModelRouterConfig.operatingPoints["laya"].acceptVerbalized must be a boolean')
+  })
+
   it('routeFrom rejects duplicate and invalid objective', () => {
     expect(() => resolveConfig(valid({ routeFrom: [{ ...ROUTE_FROM }, { ...ROUTE_FROM, objective: 'latency' }] })))
       .toThrow('ModelRouterConfig.routeFrom lists "strong-provider/strong-model" more than once')
@@ -471,6 +495,7 @@ describe('the composition schema', () => {
     expect(normalized.reentryCooldownTurns).toBe(2)
     expect(normalized.judgmentDeadlineMs).toBe(1500)
     expect(normalized.routeFrom).toEqual([])
+    expect(normalized.operatingPoints).toEqual([])
     // The schema requires each pool description and bounds its length.
     expect(() => throughSchema({ ...bare(), candidates: [{ id: 'cheap', provider: 'p', model: 'm' }] })).toThrow()
     expect(() => throughSchema({ ...bare(), candidates: [{ ...CANDIDATE, description: 'x'.repeat(161) }] })).toThrow()

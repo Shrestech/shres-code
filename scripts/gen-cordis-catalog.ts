@@ -276,6 +276,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   JudgmentEngineEntry: 'judgment.md',
   JudgmentEngineId: 'judgment.md',
   JudgmentEngineRegistration: 'judgment.md',
+  JudgmentFittingEngine: 'judgment.md',
   MessageFeedbackDeleteRequest: 'feedback.md',
   MessageFeedbackDeleteResult: 'feedback.md',
   MessageFeedbackDeleteValue: 'feedback.md',

@@ -48,6 +48,7 @@ export type TrajectoryKey =
   | 'routing.reason.thinMargin'
   | 'routing.reason.candidateEqualsBase'
   | 'routing.reason.thinkingModeIncompatible'
+  | 'routing.reason.engineUncalibrated'
   | 'routing.reason.currentPreferred'
   | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
@@ -112,6 +113,7 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.thinMargin': 'thin top-two margin',
   'routing.reason.candidateEqualsBase': 'already on the routed model',
   'routing.reason.thinkingModeIncompatible': 'manual model thinks on a fixed budget, which a return would lose',
+  'routing.reason.engineUncalibrated': 'judge engine is not accepted for routing without an operating point',
   'routing.reason.currentPreferred': 'current model preferred',
   'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
@@ -158,6 +160,7 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'thin-margin': 'routing.reason.thinMargin',
   'candidate-equals-base': 'routing.reason.candidateEqualsBase',
   'thinking-mode-incompatible': 'routing.reason.thinkingModeIncompatible',
+  'engine-uncalibrated': 'routing.reason.engineUncalibrated',
   'current-preferred': 'routing.reason.currentPreferred',
   'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',
