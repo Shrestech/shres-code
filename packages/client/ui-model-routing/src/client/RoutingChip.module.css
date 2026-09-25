@@ -81,3 +81,30 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+/* Routing details: opens this session's Routing view. */
+.details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.details:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-button-tool-bar-fill);
+}
+
+.details:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}

@@ -39,7 +39,7 @@ const FAILURE_LABEL: Record<ChipAction, string> = {
  * @param props - runtime share, injected face, and the locale seat.
  * @returns the chip, or null while routing is unavailable for this session.
  */
-export function RoutingChip({ useProjection, locked, available, setRouting, restoreStrong, t }: RoutingChipProps) {
+export function RoutingChip({ useProjection, locked, reveal, available, setRouting, restoreStrong, t }: RoutingChipProps) {
   const routing = useProjection('modelRouting')
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
@@ -91,6 +91,19 @@ export function RoutingChip({ useProjection, locked, available, setRouting, rest
         {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
         {on ? 'auto' : 'Auto'}
       </button>
+      {reveal !== undefined && (
+        <button
+          type="button"
+          className={css.details}
+          aria-label={t('chip.details')}
+          title={t('chip.details')}
+          // Opening this session's Routing view changes no routing state, so a
+          // locked composer or a gesture in flight leaves it available.
+          onClick={() => { reveal({ view: 'routing', target: { kind: 'none' } }) }}
+        >
+          <span aria-hidden="true">⋯</span>
+        </button>
+      )}
       {idle && <span className={css.idle}>{t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}</span>}
       {strong !== undefined && (
         <button

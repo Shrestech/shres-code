@@ -74,6 +74,7 @@ function setup(options: {
   restoreStrong?: RoutingChipProps['restoreStrong']
   locked?: boolean
   available?: boolean
+  reveal?: RoutingChipProps['reveal']
 } = {}) {
   const store = createSnapshotStore<{ value: ModelRoutingProjection | undefined }>({ value: options.routing })
   const useProjection = (_key: string, selector?: (v: unknown) => unknown) =>
@@ -83,6 +84,7 @@ function setup(options: {
   const props = {
     useProjection,
     locked: options.locked ?? false,
+    reveal: options.reveal,
     available: options.available ?? true,
     setRouting,
     restoreStrong,
@@ -103,6 +105,18 @@ const restoreChip = () => screen.getByRole('button', { name: en['idle.restore.ti
 const idleWarning = () => screen.getByText(en['idle.warning'])
 
 describe('RoutingChip', () => {
+  it('opens this session\'s Routing view from Routing details, even while locked', () => {
+    const reveal = vi.fn()
+    setup({ routing: OFF, reveal, locked: true })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.details'] }))
+    expect(reveal).toHaveBeenCalledWith({ view: 'routing', target: { kind: 'none' } })
+  })
+
+  it('offers no Routing details without the session\'s reveal', () => {
+    setup({ routing: OFF })
+    expect(screen.queryByRole('button', { name: en['chip.details'] })).toBeNull()
+  })
+
   it('renders nothing while the host composes no routing projection', () => {
     const { view } = setup()
     expect(view.container.innerHTML).toBe('')

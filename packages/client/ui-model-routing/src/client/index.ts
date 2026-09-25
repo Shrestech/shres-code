@@ -1,12 +1,14 @@
 /**
- * Model-routing chip plugin, browser half: occupies the composer's named
- * `conversation.input.modelRouting` seat with the routing toggle. Reads ride
- * the generic projection pair through the standard-kit `useProjection`; the
- * mode is switched by executing /route on or /route off through
- * `command.execute`, so the host stays the single source of routing state and
- * the chip keeps no local copy of it. The routing-idle restore submits a
- * selection through the per-session model-selection directory instead, because
- * that gesture is a model selection rather than a routing mode.
+ * Model-routing plugin, browser half: occupies the composer's named
+ * `conversation.input.modelRouting` seat with the routing toggle, and lists the
+ * per-session Routing view in the `conversation.view` slot. Reads ride the
+ * generic projection pair through the standard-kit `useProjection`; the mode is
+ * switched by executing /route on or /route off through `command.execute`, so
+ * the host stays the single source of routing state and neither surface keeps
+ * a local copy of it. The routing-idle restore submits a selection through the
+ * per-session model-selection directory instead, because that gesture is a
+ * model selection rather than a routing mode. The view's drill-down and
+ * thresholds are unary reads on the `modelRouting` Remote namespace.
  */
 import type { ModelSelection } from '@shres-code/shres-code-api-remotes/client'
 import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
@@ -18,8 +20,10 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 import type {} from '@shres-code/shres-code-model-router/client'
 import { RoutingChip } from './RoutingChip.tsx'
 import { en, type RoutingKey } from './locales.ts'
+import { RoutingView, type RoutingViewInjected } from './view/RoutingView.tsx'
 
 export type { RoutingKey } from './locales.ts'
+export type { RoutingViewInjected } from './view/RoutingView.tsx'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -83,16 +87,44 @@ export interface RoutingChipInjected {
   restoreStrong: (selection: ModelSelection) => Promise<string | null>
 }
 
-/** Required services: the seat's slot registry, session binding lookup, commands Remote, and locale registry. */
-export const inject = ['slots', 'sessions', 'remote', 'remote.commands', 'locale']
+/**
+ * The value of one Remote read, or a rejection carrying the host's failure;
+ * the view reports a rejection inline with Retry.
+ * @param result - the generated method's result.
+ * @returns the value on success.
+ * @throws Error naming the failure message and code otherwise.
+ */
+function remoteValue<T>(result: { ok: true; value: T } | { ok: false; error: { code: string; message: string } }): T {
+  if (!result.ok) throw new Error(`${result.error.message} (${result.error.code})`)
+  return result.value
+}
+
+/** Required services: the slot registry, session binding lookup, the commands and modelRouting Remotes, and the locale registry. */
+export const inject = ['slots', 'sessions', 'remote', 'remote.commands', 'remote.modelRouting', 'locale']
 
 /**
  * Client plugin body: register the routing chip over the command channel and the
- * model-selection path.
+ * model-selection path, and the Routing view over the `modelRouting` reads.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-model-routing: dictionaries')
+  // Registration-time text (the view's label in the Activity popover) reads
+  // through the bound translate as a thunk, so it follows the active locale.
+  const t = ctx.locale.bind(NS)
+
+  ctx.slots.inject('conversation.view', () => ctx.slots.register({
+    name: 'conversation.view',
+    id: 'routing',
+    order: 20,
+    locale: NS,
+    label: () => t('view.routing'),
+    inject: (sessionId: SessionId): RoutingViewInjected => ({
+      available: ctx.sessions.subagentAddress(sessionId) === undefined,
+      loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
+      loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
+    }),
+  }, RoutingView))
 
   ctx.slots.inject('conversation.input.modelRouting', () => ctx.slots.register({
     name: 'conversation.input.modelRouting',
