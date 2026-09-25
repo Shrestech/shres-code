@@ -58,12 +58,13 @@ function props(options: Setup): RoutingViewProps {
     bindSnapshotSelector(store)(s => (selector ?? (value => value))(s.values[key]))
   const scope = { status: options.routerStatus ?? 'ready' }
   const session = { openState: options.openState ?? 'open' }
+  // One engine value per render tree, as the plugin's engine source delivers it.
+  const engine = options.engine ?? { kind: 'ready', snapshot: engines('laya') }
   return {
     useProjection,
     useRouterSettings: (selector: (value: typeof scope) => unknown) => selector(scope),
     useSession: (selector: (value: typeof session) => unknown) => selector(session),
-    useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) =>
-      selector(options.engine ?? { kind: 'ready', snapshot: engines('laya') }),
+    useRoutingEngine: (selector: (value: RoutingEngineState) => unknown) => selector(engine),
     available: options.available ?? true,
     loadGate: options.loadGate ?? (() => Promise.resolve(GATE)),
     ...options.openRoutingSettings === undefined ? {} : { openRoutingSettings: options.openRoutingSettings },
@@ -154,6 +155,21 @@ describe('RoutingView availability and states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     await gateLoaded()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('reads gate() again when the engine facts change, keeping the loaded gate meanwhile', async () => {
+    const later = deferred<ModelRoutingGateView>()
+    const loadGate = vi.fn().mockResolvedValueOnce(GATE).mockReturnValueOnce(later.promise)
+    const first = props({ loadGate })
+    const view = render(<RoutingView {...first} />)
+    await gateLoaded()
+    const snapshot = engines('typesafe')
+    view.rerender(<RoutingView {...first} useRoutingEngine={selector => selector({ kind: 'ready', snapshot })} />)
+    expect(loadGate).toHaveBeenCalledTimes(2)
+    expect(screen.getByText(/switching requires 0\.80/)).toBeTruthy()
+    const refused = { ...GATE, engines: [{ engine: 'typesafe', calibration: { kind: 'refused' as const } }] }
+    await act(async () => { later.resolve(refused) })
+    expect(statusLine().textContent).toContain('Not used for routing')
   })
 
   it('drops a gate that settles after the view unmounted', async () => {

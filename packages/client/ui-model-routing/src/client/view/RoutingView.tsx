@@ -88,15 +88,18 @@ export function RoutingView({
   const [gateAttempt, setGateAttempt] = useState(0)
   const [openSeq, setOpenSeq] = useState<number | null>(null)
 
+  // gate() reports how the router gates each registered engine, so it is read
+  // again when the engine facts change; the loaded gate stays shown meanwhile.
+  const engineFacts = engineState.kind === 'ready' ? engineState.snapshot : engineState.kind
   useEffect(() => {
     let live = true
-    setGateLoad({ kind: 'loading' })
+    setGateLoad(previous => (previous.kind === 'loaded' ? previous : { kind: 'loading' }))
     loadGate().then(
       (gate) => { if (live) setGateLoad({ kind: 'loaded', gate }) },
       (reason: unknown) => { if (live) setGateLoad({ kind: 'failed', message: reason instanceof Error ? reason.message : String(reason) }) },
     )
     return () => { live = false }
-  }, [loadGate, gateAttempt])
+  }, [loadGate, gateAttempt, engineFacts])
 
   // Cross-view handoff: an event target is a decision seq to open.
   useEffect(() => {
