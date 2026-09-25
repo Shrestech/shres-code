@@ -160,7 +160,10 @@ describe('web e2e: the composer model switch is the default for later sessions',
     expect(await seat.isEnabled()).toBe(true)
     await seat.click()
     await page.getByRole('menuitem', { name: /Model/ }).click()
-    await page.getByRole('menuitemradio').first().click()
+    // A route the scaffold serves by name: the picker also lists chat-gated
+    // routes such as cursor-session, whose selection the Host refuses, so the
+    // first entry is not necessarily a way out.
+    await page.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash', exact: true }).click()
     await expect.poll(async () => box.isEnabled(), { timeout: 15_000 }).toBe(true)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
