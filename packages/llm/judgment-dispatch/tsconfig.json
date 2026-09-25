@@ -24,6 +24,9 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
+      "path": "../../typert/protocol"
+    },
+    {
       "path": "../../settings/settings"
     }
   ]

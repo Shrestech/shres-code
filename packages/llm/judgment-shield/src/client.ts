@@ -38,8 +38,11 @@ const JUDGMENT_PATH = '/v1/judgments'
 /** Gateway path for one atomic fit-and-ask. */
 const FITTED_JUDGMENT_PATH = '/v1/judgments/fitted'
 
-/** Resolved wire facts plus the caller-owned redaction hook and diagnostic label. */
-export interface ShieldWireEngineOptions extends ResolvedShieldJudgmentConfig {
+/**
+ * Resolved wire facts (every resolved field but the provider's readiness
+ * interval) plus the caller-owned redaction hook and diagnostic label.
+ */
+export interface ShieldWireEngineOptions extends Omit<ResolvedShieldJudgmentConfig, 'readinessIntervalMs'> {
   /**
    * Replace one state before it is serialized. The client calls it exactly once
    * per state (once per candidate for a fitted ask) before arming the deadline.

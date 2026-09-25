@@ -8,7 +8,21 @@
  */
 
 import type { Branded } from '@shres-code/shres-code-brand'
-import type { TokenUsage } from '@shres-code/shres-code-llm'
+import type { TokenUsage } from '@shres-code/shres-code-llm/types'
+
+declare module '@shres-code/cordis' {
+  interface Events {
+    /**
+     * The judgment engine view changed: an engine registered, unregistered,
+     * or announced a status change, a consumer id became declared or stopped
+     * being declared, or the `judgment` settings selection committed a new
+     * value. This payload-free notification comes from the service mounted as
+     * `ctx.judgment`; listeners re-read the engine list and selection.
+     * @mode emit
+     */
+    'judgment/engines-updated'(): void
+  }
+}
 
 /** Nominal id correlating one question with the answer it produced inside a single ask. */
 export type JudgmentQuestionId = Branded<'JudgmentQuestionId'>
@@ -335,9 +349,10 @@ export type JudgmentErrorCode = 'UNCONFIGURED' | 'UNAVAILABLE' | 'INPUT_TOO_LARG
 
 /**
  * Where an engine sends the state it judges: `none` keeps it within the
- * harness process and processes the engine's provider supervises on this host,
- * `local` sends it to a service on this host that the deployment runs, and
- * `remote` sends it off the host to a third party.
+ * harness process and processes the engine's provider supervises on this
+ * machine, `local` sends it to a service on this machine that the deployment
+ * runs, and `remote` sends it off this machine — to a third party or to any
+ * other host, including one on the local network.
  */
 export type JudgmentEngineEgress = 'none' | 'local' | 'remote'
 
@@ -368,6 +383,17 @@ export interface JudgmentEngineDescriptor {
   readonly host?: JudgmentEngineHost
   /** URL of the terms that govern a remote engine's use. */
   readonly terms?: string
+  /**
+   * Model or pinned artifact id that answers each tier, for configuration
+   * surfaces; omission means the provider does not name one before an ask.
+   */
+  readonly models?: Readonly<Record<JudgmentTier, string>>
+  /**
+   * Host (and port) the engine sends state to, for configuration surfaces'
+   * egress notices; omission means the provider does not name one, and an
+   * engine with egress `none` names none.
+   */
+  readonly destination?: string
 }
 
 /**

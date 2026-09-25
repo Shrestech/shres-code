@@ -20,6 +20,9 @@ export const DEFAULT_MAX_REQUEST_BYTES = 256 * 1024
 /** Largest response limit accepted by the provider configuration. */
 export const MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 
+/** Default interval between gateway readiness probes. */
+export const DEFAULT_READINESS_INTERVAL_MS = 30_000
+
 /** Tolerance for four-decimal probability rounding and normalization. */
 export const DISTRIBUTION_TOLERANCE = 0.001
 
@@ -30,6 +33,7 @@ const SHIELD_CONFIG_KEYS = new Set([
   'timeoutMs',
   'maxResponseBytes',
   'maxRequestBytes',
+  'readinessIntervalMs',
 ])
 
 /** Keys accepted in the tier model map. */
@@ -47,6 +51,8 @@ export interface ResolvedShieldJudgmentConfig {
   readonly maxResponseBytes: number
   /** Complete serialized UTF-8 request byte limit. */
   readonly maxRequestBytes: number
+  /** Interval between readiness probes in milliseconds. */
+  readonly readinessIntervalMs: number
 }
 
 /**
@@ -81,7 +87,11 @@ export function resolveConfig(config: ShieldJudgmentConfig): ResolvedShieldJudgm
   if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes <= 0) {
     throw new Error('ShieldJudgmentConfig.maxRequestBytes must be a positive safe integer')
   }
-  return { endpoint, models, timeoutMs, maxResponseBytes, maxRequestBytes }
+  const readinessIntervalMs = config.readinessIntervalMs ?? DEFAULT_READINESS_INTERVAL_MS
+  if (!Number.isSafeInteger(readinessIntervalMs) || readinessIntervalMs <= 0 || readinessIntervalMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`ShieldJudgmentConfig.readinessIntervalMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
+  return { endpoint, models, timeoutMs, maxResponseBytes, maxRequestBytes, readinessIntervalMs }
 }
 
 /**

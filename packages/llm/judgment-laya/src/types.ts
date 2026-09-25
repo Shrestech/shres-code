@@ -94,6 +94,34 @@ export interface LayaGatewayExit {
   readonly stderrTail: string
 }
 
+/** Facts about the last gateway exit, as the `laya` Remote reports them (stderr stays on the host). */
+export interface LayaGatewayExitView {
+  /** Exit code; null when a signal ended the process. */
+  readonly exitCode: number | null
+  /** Terminating signal; null on a normal exit. */
+  readonly signal: string | null
+  /** Whether the supervisor stopped the process for missing its startup deadline. */
+  readonly timedOut: boolean
+}
+
+/** The local gateway as `laya.status` reports it to configuration surfaces. */
+export interface LayaGatewayView {
+  /** Current gateway lifecycle state. */
+  readonly state: LayaGatewayState
+  /** Human-readable reason, naming the next action where there is one. */
+  readonly detail?: string
+  /** Pinned artifact, `<repo>@<revision>`. */
+  readonly modelId: string
+  /** Checkpoint context size in tokens. */
+  readonly checkpointContext: 512 | 1024
+  /** laya-mlx precision. */
+  readonly dtype: 'float16' | 'float32'
+  /** Whether an install is running. */
+  readonly installing: boolean
+  /** The last exit, while the gateway is not ready and one was recorded. */
+  readonly lastExit?: LayaGatewayExitView
+}
+
 /** What one successful install produced. */
 export interface LayaInstallResult {
   /** Directory holding the verified checkpoint files. */

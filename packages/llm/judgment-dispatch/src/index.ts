@@ -22,6 +22,10 @@
  * no visible sign; the dispatcher applies it, reports each unregistered
  * selection and undeclared override once, and reports again when one resolves.
  *
+ * The dispatcher also serves the `judgmentEngines` Remote, a JSON snapshot of
+ * the registry and the selection for configuration surfaces, and emits
+ * `judgment/engines-updated` whenever that snapshot would change.
+ *
  * @module @shres-code/shres-code-judgment-dispatch
  */
 
@@ -48,9 +52,13 @@ import type {
 } from '@shres-code/shres-code-judgment'
 import { resolveConfig } from './config.ts'
 import type { JudgmentDispatchConfig, ResolvedJudgmentDispatchConfig } from './config.ts'
+import { JudgmentEnginesGateway } from './gateway.ts'
 
 export { resolveConfig } from './config.ts'
 export type { JudgmentDispatchConfig, ResolvedJudgmentDispatchConfig } from './config.ts'
+export { currentHost, JudgmentEnginesGateway } from './gateway.ts'
+export type { JudgmentEnginesSource } from './gateway.ts'
+export type * from './types.ts'
 
 /** Config omitted by a direct `ctx.plugin(JudgmentDispatch)` call; {@link resolveConfig} rejects it by name. */
 const NO_CONFIG = {} as JudgmentDispatchConfig
@@ -116,6 +124,7 @@ export class JudgmentDispatch extends JudgmentService {
       get: (): JudgmentFittingEngine | undefined => this.defaultFitting(),
     })
     ctx.provide('judgmentEngines', registry)
+    new JudgmentEnginesGateway(ctx, { registry, settings: () => this.selection() })
     ctx.effect(() => {
       let live = true
       // The Loader is read structurally so the dispatcher carries no Loader
@@ -135,13 +144,18 @@ export class JudgmentDispatch extends JudgmentService {
         live = false
       }
     }, 'judgment-dispatch: report unresolved selection')
-    // After the settle, a committed settings change (a write or a reload) and a
-    // registry change (an engine or consumer arriving or leaving) each
-    // re-reconcile the reports; before it, a provider may still be loading.
+    // A committed settings change (a write or a reload) and a registry change
+    // (an engine or consumer arriving or leaving, or a status announcement)
+    // each change the Remote snapshot, so both announce it. After the settle
+    // they also re-reconcile the reports; before it, a provider may still be
+    // loading.
     ctx.effect(() => ctx.on('settings/updated', (ns) => {
-      if (ns === JUDGMENT_SETTINGS_NAMESPACE && this.settled) this.reconcileReports()
+      if (ns !== JUDGMENT_SETTINGS_NAMESPACE) return
+      ctx.emit('judgment/engines-updated')
+      if (this.settled) this.reconcileReports()
     }), 'judgment-dispatch: reconcile reports on settings change')
     ctx.effect(() => registry.subscribe(() => {
+      ctx.emit('judgment/engines-updated')
       if (this.settled) this.reconcileReports()
     }), 'judgment-dispatch: reconcile reports on registry change')
   }

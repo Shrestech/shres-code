@@ -87,6 +87,14 @@ export class JudgmentEngineRegistry {
   }
 
   /**
+   * Read every registered engine with its status reader.
+   * @returns the entries, in registration order.
+   */
+  entryList(): readonly JudgmentEngineEntry[] {
+    return [...this.entries.values()]
+  }
+
+  /**
    * Look up one registered engine.
    * @param id - the registry id.
    * @returns the entry, or `undefined` when no provider registered the id.

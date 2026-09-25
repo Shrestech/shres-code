@@ -1261,23 +1261,175 @@ describe('retryWait', () => {
   })
 })
 describe('engine registration', () => {
-  it('registers as a ready remote engine and withdraws when its own fiber disposes', async () => {
+  it('registers as a remote engine naming its models and destination, and withdraws when its own fiber disposes', async () => {
     const ctx = engineContext()
     contexts.push(ctx)
+    await ctx.plugin(MemoryCredentials, { [API_KEY_REF]: 'key-one' })
     const provider = await ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, endpoint: 'http://127.0.0.1:9' })
 
     const entry = ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)
     expect(entry?.engine).toBeInstanceOf(TypesafeJudgmentEngine)
-    expect(entry?.descriptor).toBe(TYPESAFE_ENGINE_DESCRIPTOR)
-    expect(entry?.status()).toEqual({ state: 'ready' })
-    expect(ctx.judgmentEngines.list()).toEqual([
-      { id: 'typesafe', label: 'Jev (TypeSafe)', egress: 'remote', calibration: 'calibrated', supportsFitting: false, terms: 'https://typesafe.ai/legal/terms' },
-    ])
+    await vi.waitFor(() => {
+      expect(entry?.status()).toEqual({ state: 'ready' })
+    })
+    expect(ctx.judgmentEngines.list()).toEqual([{
+      ...TYPESAFE_ENGINE_DESCRIPTOR,
+      models: { fast: DEFAULT_MODELS.fast, accurate: DEFAULT_MODELS.accurate },
+      destination: '127.0.0.1:9',
+    }])
     expect(ctx.get('judgment')).toBeUndefined()
 
     await provider.dispose()
 
     expect(ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)).toBeUndefined()
     expect(ctx.judgmentEngines.list()).toEqual([])
+  })
+})
+
+describe('credential readiness', () => {
+  /** Mount the engine on a fresh registry, counting status announcements. */
+  async function mountEngine(seed?: Record<string, string>): Promise<{ ctx: Context; announcements: () => number }> {
+    const ctx = engineContext()
+    contexts.push(ctx)
+    if (seed !== undefined) await ctx.plugin(MemoryCredentials, seed)
+    let count = 0
+    ctx.judgmentEngines.subscribe(() => {
+      count += 1
+    })
+    await ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, endpoint: 'http://127.0.0.1:9' })
+    return { ctx, announcements: () => count }
+  }
+
+  /** The registry status of the TypeSafe engine. */
+  function statusOf(ctx: Context): unknown {
+    return ctx.judgmentEngines.get(TYPESAFE_ENGINE_ID)?.status()
+  }
+
+  it('reports starting until the first check settles, then ready', async () => {
+    const ctx = engineContext()
+    contexts.push(ctx)
+    await ctx.plugin(MemoryCredentials, { [API_KEY_REF]: 'key-one' })
+    let release: (() => void) | undefined
+    vi.spyOn(ctx.credentials, 'resolve').mockImplementationOnce(async () => {
+      await new Promise<void>((done) => {
+        release = done
+      })
+      return { value: 'key-one', source: 'memory' }
+    })
+    const fiber = ctx.plugin(TypesafeJudgmentEngine, { apiKeyRef: API_KEY_REF, endpoint: 'http://127.0.0.1:9' })
+    let loaded = false
+    void fiber.then(() => {
+      loaded = true
+    })
+
+    await vi.waitFor(() => {
+      expect(release).toBeDefined()
+    })
+    expect(statusOf(ctx)).toEqual({ state: 'starting', detail: 'checking TYPESAFE_API_KEY' })
+    expect(loaded).toBe(false)
+    release?.()
+    await fiber
+    expect(statusOf(ctx)).toEqual({ state: 'ready' })
+  })
+
+  it('reports unconfigured while no credentials service is mounted', async () => {
+    const { ctx } = await mountEngine()
+    await vi.waitFor(() => {
+      const status = statusOf(ctx) as { state: string; detail?: string }
+      expect(status.state).toBe('unconfigured')
+      expect(status.detail).toContain('no credentials service is mounted')
+    })
+  })
+
+  it('reports unconfigured for an empty reference and ready once a key is stored', async () => {
+    const { ctx, announcements } = await mountEngine({})
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({
+        state: 'unconfigured',
+        detail: 'judgment-typesafe: TYPESAFE_API_KEY holds no value; store TYPESAFE_API_KEY through the credentials service',
+      })
+    })
+    const before = announcements()
+
+    await ctx.credentials.set(credentialRef(API_KEY_REF), 'key-two')
+
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    })
+    expect(announcements()).toBeGreaterThan(before)
+  })
+
+  it('re-checks on a status read while not ready, so a key stored without an event still arrives', async () => {
+    const { ctx } = await mountEngine({})
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toMatchObject({ state: 'unconfigured' })
+    })
+    ;(ctx.credentials as unknown as { store: Map<string, string> }).store.set(API_KEY_REF, 'silent-key')
+
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    })
+  })
+
+  it('reports unconfigured when a later ask finds the key gone, and ignores other references', async () => {
+    const { ctx, server } = await harness([{ kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.5 } }) }])
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    })
+    ;(ctx.credentials as unknown as { store: Map<string, string> }).store.delete(API_KEY_REF)
+    ctx.emit('credentials/updated', credentialRef('OTHER_KEY'))
+
+    const failed = await askFailure(() => engine(ctx).ask({ state: 's', questions: [BINARY] }))
+
+    expect(failed.code).toBe('UNCONFIGURED')
+    expect(statusOf(ctx)).toMatchObject({ state: 'unconfigured' })
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it('reports unavailable when the credentials service fails', async () => {
+    const { ctx } = await mountEngine({ [API_KEY_REF]: 'key-one' })
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    })
+    const resolve = vi.spyOn(ctx.credentials, 'resolve').mockRejectedValue(new Error('keychain locked'))
+
+    ctx.emit('credentials/updated', credentialRef(API_KEY_REF))
+
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'unavailable', detail: 'judgment-typesafe: TYPESAFE_API_KEY could not be read: keychain locked' })
+    })
+    resolve.mockRejectedValue('locked')
+    ctx.emit('credentials/updated', credentialRef(API_KEY_REF))
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'unavailable', detail: 'judgment-typesafe: TYPESAFE_API_KEY could not be read: locked' })
+    })
+  })
+
+  it('runs one follow-up check when the key changes during a check', async () => {
+    const { ctx } = await mountEngine({})
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toMatchObject({ state: 'unconfigured' })
+    })
+    let release: (() => void) | undefined
+    const resolve = vi.spyOn(ctx.credentials, 'resolve').mockImplementationOnce(async () => {
+      await new Promise<void>((done) => {
+        release = done
+      })
+      return undefined
+    })
+
+    ctx.emit('credentials/updated', credentialRef(API_KEY_REF))
+    await vi.waitFor(() => {
+      expect(release).toBeDefined()
+    })
+    ;(ctx.credentials as unknown as { store: Map<string, string> }).store.set(API_KEY_REF, 'late-key')
+    ctx.emit('credentials/updated', credentialRef(API_KEY_REF))
+    ctx.emit('credentials/updated', credentialRef(API_KEY_REF))
+    release?.()
+
+    await vi.waitFor(() => {
+      expect(statusOf(ctx)).toEqual({ state: 'ready' })
+    })
+    expect(resolve.mock.calls.length).toBeLessThanOrEqual(3)
   })
 })

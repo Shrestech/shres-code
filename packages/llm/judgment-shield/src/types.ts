@@ -24,4 +24,6 @@ export interface ShieldJudgmentConfig {
   maxResponseBytes?: number
   /** Maximum complete serialized UTF-8 request body size; align with the gateway's body limit. */
   maxRequestBytes?: number
+  /** Interval between readiness probes (a TCP connection to the endpoint), in milliseconds. */
+  readinessIntervalMs?: number
 }

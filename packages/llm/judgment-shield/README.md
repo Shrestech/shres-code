@@ -15,6 +15,7 @@ Every composition field is validated at load. Unknown keys fail by name, and the
 | `models.accurate` | required | Artifact for an explicit `accurate` ask and an ask that omits its tier. |
 | `timeoutMs` | `30000` | Deadline for the gateway request and complete response body. |
 | `maxRequestBytes` | `262144` | Maximum complete serialized UTF-8 request body size. The provider measures the JSON sent on the wire and rejects a larger request before opening HTTP. |
+| `readinessIntervalMs` | `30000` | Interval between readiness probes, each one TCP connection to the endpoint bounded by `timeoutMs`. |
 | `maxResponseBytes` | `4194304` | Maximum response body size. The provider checks both the declared length and bytes actually received; the configured maximum is 64 MiB. |
 
 The `accurate` mapping is the default for an omitted tier because the cheap tier is an explicit optimization. The provider requires the gateway's exact `engine: 'shield'`, artifact `model`, and non-negative `latencyMs` fields, then reports its own wall-clock duration for the complete ask.
@@ -33,7 +34,7 @@ The `accurate` mapping is the default for an omitted tier because the cheap tier
       accurate: 'convaiinnovations/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982'
 ```
 
-The provider injects `judgmentEngines`, so it loads only where the dispatcher does. Its registry descriptor declares `egress: 'local'`, `calibration: 'calibrated'`, and fitting; its status is always `ready`, because an unreachable gateway surfaces per ask as `UNAVAILABLE`. The package has no credential seam and makes no external calls. The owned gateway is responsible for loading and validating its model artifacts before it serves a request.
+The provider injects `judgmentEngines`, so it loads only where the dispatcher does. Its registry descriptor declares `egress: 'local'`, `calibration: 'calibrated'`, and fitting; it also names both tier artifacts and the endpoint's host as its destination. Its status reports whether the gateway is reachable: `starting` until the first probe settles, then `ready` or `unavailable` with the connection failure. A probe opens one TCP connection to the endpoint — no judgment request — at load, every `readinessIntervalMs`, and whenever the status is read while not `ready`; an answered ask also reports `ready`, and a failed ask leaves the status to the next probe. The plugin finishes loading once the first probe settles, so a Loader composition does not route an ask while the status is `starting`. The package has no credential seam and makes no external calls. The owned gateway is responsible for loading and validating its model artifacts before it serves a request.
 
 ## Request and answer validation
 
