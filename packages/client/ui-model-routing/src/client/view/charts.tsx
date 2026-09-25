@@ -11,7 +11,7 @@ import clsx from 'clsx'
 import type {
   ModelRoutingGateView, ModelRoutingStatsModel, ModelRoutingStatsSnapshot,
 } from '@shres-code/shres-code-model-router/client'
-import type { RoutingTranslate } from './derive.ts'
+import { latencyScopeNote, recordedThresholdsNote, type RoutingTranslate } from './derive.ts'
 import { formatMs, formatPercent, formatScore, formatTokens } from './format.ts'
 import css from './charts.module.css'
 
@@ -62,16 +62,18 @@ interface ChartCardProps {
   children: ReactNode
   /** Detail of the focused or hovered mark, when any. */
   detail?: string | undefined
+  /** A qualifying sentence on what the graph shows, when one applies. */
+  note?: string | undefined
   /** The view's translate. */
   t: RoutingTranslate
 }
 
 /**
  * One graph card with its Table toggle.
- * @param props - title, subtitle, table, graph, detail, and translate.
+ * @param props - title, subtitle, table, graph, detail, note, and translate.
  * @returns the card.
  */
-export function ChartCard({ title, subtitle, table, children, detail, t }: ChartCardProps) {
+export function ChartCard({ title, subtitle, table, children, detail, note, t }: ChartCardProps) {
   const [showTable, setShowTable] = useState(false)
   const headingId = useId()
   return (
@@ -80,6 +82,7 @@ export function ChartCard({ title, subtitle, table, children, detail, t }: Chart
         <div className={css.cardTitles}>
           <h3 id={headingId} className={css.cardTitle}>{title}</h3>
           <p className={css.cardSubtitle}>{subtitle}</p>
+          {note !== undefined && <p className={css.note}>{note}</p>}
         </div>
         <button type="button" className={css.tableToggle} aria-pressed={showTable} onClick={() => { setShowTable(!showTable) }}>
           {t('chart.table')}
@@ -319,7 +322,7 @@ export function ConfidenceChart({ stats, gate, t }: GraphProps) {
     threshold: threshold === undefined ? t('kpi.none') : formatScore(threshold),
   })
   return (
-    <ChartCard title={t('g2.title')} subtitle={t('g2.subtitle')} table={table} detail={detail} t={t}>
+    <ChartCard title={t('g2.title')} subtitle={t('g2.subtitle')} table={table} detail={detail} note={recordedThresholdsNote(stats, gate, t)} t={t}>
       {values.length === 0
         ? <p className={css.empty}>{t('g2.empty')}</p>
         : (
@@ -584,7 +587,7 @@ export function LatencyChart({ stats, gate, t }: GraphProps) {
     failed,
   })
   return (
-    <ChartCard title={t('g6.title')} subtitle={t('g6.subtitle')} table={table} detail={detail} t={t}>
+    <ChartCard title={t('g6.title')} subtitle={t('g6.subtitle')} table={table} detail={detail} note={latencyScopeNote(stats, t)} t={t}>
       {answered + failed === 0
         ? <p className={css.empty}>{t('g6.empty')}</p>
         : (

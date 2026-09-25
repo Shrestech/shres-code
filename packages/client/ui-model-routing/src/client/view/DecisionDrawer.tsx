@@ -8,12 +8,13 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { promptTokens } from '@shres-code/shres-code-llm/usage'
 import type { ModelRoutingDecisionDetail } from '@shres-code/shres-code-model-router/client'
 import {
   decisionThresholds, gatePath, routeMargin, routeOptions, routeQuestion, thresholdSourceLabel, thresholdValueLabel,
   type RoutingTranslate,
 } from './derive.ts'
-import { formatMs, formatScore } from './format.ts'
+import { formatMs, formatScore, formatTokens } from './format.ts'
 import css from './DecisionDrawer.module.css'
 
 /** Props of the drill-down drawer. */
@@ -121,9 +122,26 @@ function DecisionBody({ detail, showState, onShowState, t }: {
       <h3 className={css.section}>{t('drill.engine')}</h3>
       <dl className={css.facts}>
         <dt>{t('drill.engine.name')}</dt><dd>{[decision.engine, decision.model].filter(Boolean).join(' · ') || t('drill.none')}</dd>
+        {decision.engineId !== undefined && (<><dt>{t('drill.engine.id')}</dt><dd className={css.mono}>{decision.engineId}</dd></>)}
         <dt>{t('drill.engine.latency')}</dt>
         <dd>{decision.latencyMs === undefined ? t('drill.none') : t('drill.engine.latencyValue', { latency: formatMs(decision.latencyMs), deadline: formatMs(gate.judgmentDeadlineMs) })}</dd>
-        {decision.engineFailure !== undefined && (<><dt>{t('drill.engine.failure')}</dt><dd>{decision.engineFailure.code}</dd></>)}
+        {decision.eligibilityMs !== undefined && (<><dt>{t('drill.engine.eligibility')}</dt><dd>{formatMs(decision.eligibilityMs)}</dd></>)}
+        {decision.judgeUsage !== undefined && (
+          <>
+            <dt>{t('drill.engine.usage')}</dt>
+            <dd>{t('drill.engine.usageValue', { input: formatTokens(promptTokens(decision.judgeUsage)), output: formatTokens(decision.judgeUsage.outputTokens) })}</dd>
+          </>
+        )}
+        {decision.engineFailure !== undefined && (
+          <>
+            <dt>{t('drill.engine.failure')}</dt>
+            <dd>
+              {decision.engineFailure.engineState === undefined
+                ? decision.engineFailure.code
+                : `${decision.engineFailure.code} · ${t('drill.engine.warmUp', { state: t(`drill.engine.state.${decision.engineFailure.engineState}`) })}`}
+            </dd>
+          </>
+        )}
         <dt>{t('drill.engine.seq')}</dt><dd className={css.mono}>{detail.seq}</dd>
       </dl>
 
@@ -187,6 +205,7 @@ function DecisionBody({ detail, showState, onShowState, t }: {
         max={levels}
         t={t}
       />
+      {thresholds.source === 'recorded' && <p className={css.muted}>{t('drill.difficulty.now')}</p>}
 
       <h3 className={css.section}>{t('drill.why')}</h3>
       <ol className={css.path}>
@@ -215,9 +234,14 @@ function DecisionBody({ detail, showState, onShowState, t }: {
       <h3 className={css.section}>{t('drill.state')}</h3>
       <dl className={css.facts}>
         <dt>{t('drill.state.size')}</dt>
-        <dd>{input === undefined
-          ? (projection === undefined ? t('drill.none') : t('drill.state.atMost', { chars: projection.maxChars }))
-          : t('drill.state.exact', { chars: input.state.length, tokens: input.stateTokens })}</dd>
+        <dd>{input !== undefined
+          ? t('drill.state.exact', { chars: input.state.length, tokens: input.stateTokens })
+          : decision.inputChars !== undefined
+            ? t('drill.state.sent', { chars: decision.inputChars })
+            : projection === undefined ? t('drill.none') : t('drill.state.atMost', { chars: projection.maxChars })}</dd>
+        {input !== undefined && decision.inputChars !== undefined && decision.inputChars !== input.state.length && (
+          <><dt>{t('drill.state.offered')}</dt><dd>{t('drill.state.offeredValue', { chars: decision.inputChars })}</dd></>
+        )}
         {projection !== undefined && (
           <>
             <dt>{t('drill.state.renderer')}</dt><dd className={css.mono}>{t('drill.state.rendererValue', { renderer: projection.renderer, turns: projection.contextTurns })}</dd>

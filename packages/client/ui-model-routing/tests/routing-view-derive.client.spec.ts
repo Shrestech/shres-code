@@ -9,7 +9,8 @@ import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  decisionThresholds, egressWarning, engineTroubleRecorded, gatePath, judgeSegment, judgeTrouble, thresholdSourceLabel, thresholdValueLabel,
+  decisionThresholds, egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, gatePath, judgeSegment, judgeTrouble,
+  latencyScopeNote, recordedThresholdsNote, thresholdSourceLabel, thresholdValueLabel,
   routeMargin, routeOptions, routeQuestion, routingKpis,
   routingVerdict, routingViewState, strongRoute, type RoutingTranslate,
 } from '../src/client/view/derive.ts'
@@ -99,7 +100,7 @@ describe('routingKpis', () => {
       ['pool-steps', '0.0%', '0 of 93 steps · 0 streaks'],
       ['kept-strong', '22', 'top: current-preferred (15)'],
       ['route-failed', '0', 'recovered in-turn on the strong model'],
-      ['latency', '1000', 'P95 1 s · deadline 1.5 s'],
+      ['latency', '1000', 'P95 1 s · judge call only · deadline 1.5 s'],
       ['moved', '0', '0 moved − 0 return re-prefill · quota'],
       ['switch-cost', '235k', 'cold prefills after model changes (routed + manual)'],
       ['egress', '≤ 264k', '22 asks to a remote engine · at most'],
@@ -138,9 +139,20 @@ describe('gatePath', () => {
 
   it('marks the first failing check and skips the rest', () => {
     const path = gatePath('low-confidence')
-    expect(path.map(check => check.status)).toEqual(['pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'fail', 'skip', 'skip'])
+    expect(path.map(check => check.status)).toEqual(['pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'fail', 'skip', 'skip'])
     expect(path.filter(check => check.first).map(check => check.id)).toEqual(['confidence'])
-    expect(gatePath('base-unlisted')[0]).toEqual({ id: 'base-listed', status: 'fail', first: true })
+    expect(gatePath('base-unlisted')[1]).toEqual({ id: 'base-listed', status: 'fail', first: true })
+  })
+
+  it('stops at the router\'s own order: the pool first, the engine before eligibility', () => {
+    const statusOf = (reason: string) => Object.fromEntries(gatePath(reason).map(check => [check.id, check.status]))
+    expect(statusOf('no-candidates')).toMatchObject({ pool: 'fail', 'base-listed': 'skip' })
+    expect(statusOf('state-too-large')).toMatchObject({ pool: 'fail', 'base-listed': 'skip' })
+    for (const reason of ['engine-absent', 'engine-disabled', 'breaker-open', 'engine-uncalibrated']) {
+      expect(statusOf(reason)).toMatchObject({ cooldown: 'pass', engine: 'fail', eligibility: 'skip', judge: 'skip' })
+    }
+    expect(statusOf('candidate-ineligible')).toMatchObject({ engine: 'pass', eligibility: 'fail' })
+    expect(statusOf('engine-unavailable')).toMatchObject({ eligibility: 'pass', judge: 'fail' })
   })
 
   it('marks a held streak without a failing check', () => {
@@ -188,20 +200,71 @@ describe('route question, options, and margin', () => {
 })
 
 describe('decision thresholds', () => {
-  it('compares a decision with the configuration now, uncalibrated', () => {
+  it('compares a decision that recorded none with the configuration now, uncalibrated', () => {
     const thresholds = decisionThresholds(decisionDetail())
     expect(thresholds).toEqual({
-      source: 'now', calibrated: false, downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+      source: 'now', downgradeThreshold: 0.8, downgradeMargin: 0.1, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
     })
     expect(thresholdSourceLabel(thresholds, t)).toBe('Threshold now · uncalibrated')
+    expect(thresholdValueLabel(thresholds, 0.8, t)).toBe('threshold now 0.80')
   })
 
-  it('labels thresholds recorded at the time, calibrated or not', () => {
-    const recorded = { ...decisionThresholds(decisionDetail()), source: 'recorded' as const }
-    expect(thresholdSourceLabel(recorded, t)).toBe('Threshold at the time · uncalibrated')
-    expect(thresholdSourceLabel({ ...recorded, calibrated: true }, t)).toBe('Threshold at the time')
-    expect(thresholdValueLabel(recorded, 0.8, t)).toBe('threshold at the time 0.80')
-    expect(thresholdValueLabel(decisionThresholds(decisionDetail()), 0.8, t)).toBe('threshold now 0.80')
+  it('prefers the floors a decision recorded, keeping the difficulty scores of now', () => {
+    const global = decisionThresholds(decisionDetail({ thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'global' } }))
+    expect(global).toEqual({
+      source: 'recorded', origin: 'global', downgradeThreshold: 0.7, downgradeMargin: 0.05, entryScoreCeiling: 2, escalateBackScoreThreshold: 3,
+    })
+    expect(thresholdSourceLabel(global, t)).toBe('Threshold at the time · global defaults · uncalibrated')
+    expect(thresholdValueLabel(global, 0.7, t)).toBe('threshold at the time 0.70')
+    const point = decisionThresholds(decisionDetail({
+      thresholds: { downgradeThreshold: 0.6, downgradeMargin: 0.1, source: 'operating-point', calibratedBy: 'prereg-7' },
+    }))
+    expect(point).toMatchObject({ origin: 'operating-point', calibratedBy: 'prereg-7' })
+    expect(thresholdSourceLabel(point, t)).toBe('Threshold at the time · the engine\'s operating point · calibrated by prereg-7')
+  })
+})
+
+describe('recorded facts in the statistics', () => {
+  it('names warm-ups and judge tokens in the tiles', () => {
+    const stats = {
+      ...liveStats(),
+      counts: { ...liveStats().counts, warmUps: 3 },
+      judge: { calls: 22, promptTokens: 40_000, outputTokens: 2_000 },
+      latency: { ...liveStats().latency, withEligibility: 22 },
+    }
+    const tiles = routingKpis(stats, GATE, () => 'remote', t)
+    expect(tiles.find(tile => tile.id === 'decisions')?.detail).toBe('22 judged · 0 failed · 3 while the judge was starting')
+    expect(tiles.find(tile => tile.id === 'latency')?.detail).toBe('P95 1 s · deadline 1.5 s · 42k judge tokens')
+  })
+
+  it('notes consults recorded at other floors than the threshold line draws', () => {
+    expect(recordedThresholdsNote(liveStats(), GATE, t)).toBeUndefined()
+    const at = (downgradeThreshold: number, downgradeMargin: number, consults: number) =>
+      ({ downgradeThreshold, downgradeMargin, source: 'global' as const, calibratedBy: null, consults })
+    const same = { ...liveStats(), thresholds: [at(0.8, 0.1, 5)] }
+    expect(recordedThresholdsNote(same, GATE, t)).toBeUndefined()
+    const other = { ...liveStats(), thresholds: [at(0.8, 0.1, 5), at(0.7, 0.1, 3), at(0.8, 0.2, 1)] }
+    expect(recordedThresholdsNote(other, null, t)).toBeUndefined()
+    expect(recordedThresholdsNote(other, GATE, t)).toBe(
+      'The line is the threshold now. 4 consults recorded other thresholds at the time: confidence ≥ 0.70, margin ≥ 0.10; confidence ≥ 0.80, margin ≥ 0.20.',
+    )
+  })
+
+  it('says what a latency covers', () => {
+    expect(latencyScopeNote(emptyStats(), t)).toBeUndefined()
+    expect(latencyScopeNote(liveStats(), t)).toBe('The judgment call only: this log does not record the eligibility assessment before it.')
+    const all = { ...liveStats(), latency: { ...liveStats().latency, withEligibility: 22 } }
+    expect(latencyScopeNote(all, t)).toBeUndefined()
+    const some = { ...liveStats(), latency: { ...liveStats().latency, withEligibility: 5 } }
+    expect(latencyScopeNote(some, t)).toBe('Includes the eligibility assessment on 5 of 22 asks; the rest are the judgment call only.')
+  })
+
+  it('reports an engine refused as uncalibrated only while routing is on', () => {
+    const recent = liveStats().recent
+    const refused = { ...liveStats(), recent: [{ ...recent[0]!, reason: 'engine-uncalibrated' }, ...recent.slice(1)] }
+    expect(engineUncalibratedRecorded(refused, true)).toBe(true)
+    expect(engineUncalibratedRecorded(refused, false)).toBe(false)
+    expect(engineUncalibratedRecorded(liveStats(), true)).toBe(false)
   })
 })
 

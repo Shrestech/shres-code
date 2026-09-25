@@ -41,6 +41,18 @@ export function routingViewState(stats: ModelRoutingStatsSnapshot, active: boole
 }
 
 /**
+ * Whether routing is on and the latest decision refused the selected engine
+ * because its calibration is only verbalized and no operating point accepts
+ * it, so every step keeps the strong model.
+ * @param stats - the session's statistics.
+ * @param active - whether routing is in force for the session.
+ * @returns true when the view reports the refusal.
+ */
+export function engineUncalibratedRecorded(stats: ModelRoutingStatsSnapshot, active: boolean): boolean {
+  return active && stats.recent[0]?.reason === 'engine-uncalibrated'
+}
+
+/**
  * Whether the recent decisions record an engine that could not answer, which
  * the view reports as a notice beside the statistics.
  * @param stats - the session's statistics.
@@ -145,14 +157,18 @@ export function routingKpis(
     .reduce((sum, row) => sum + row.tokens, 0)
   const latencyDetail = [
     latency.p95 === null ? undefined : t('kpi.latency.p95', { p95: formatMs(latency.p95) }),
+    latency.p50 === null || latency.withEligibility > 0 ? undefined : t('kpi.latency.judgeOnly'),
     gate === null ? undefined : t('kpi.latency.deadline', { deadline: formatMs(gate.judgmentDeadlineMs) }),
+    stats.judge.calls === 0 ? undefined : t('kpi.latency.tokens', { tokens: formatTokens(stats.judge.promptTokens + stats.judge.outputTokens) }),
   ].filter((part): part is string => part !== undefined)
   return [
     {
       id: 'decisions',
       label: t('kpi.decisions'),
       value: String(counts.decisions),
-      detail: t('kpi.decisions.detail', { consults: counts.consults, failed: counts.judgeFailed }),
+      detail: t(counts.warmUps === 0 ? 'kpi.decisions.detail' : 'kpi.decisions.detail.warmUps', {
+        consults: counts.consults, failed: counts.judgeFailed, warmUps: counts.warmUps,
+      }),
     },
     {
       id: 'pool-steps',
@@ -226,12 +242,17 @@ function egressKpi(
 
 /** One check of a decision's ordered gate path. */
 export type GateCheckId =
-  | 'base-listed' | 'cooldown' | 'eligibility' | 'judge' | 'difficulty'
+  | 'pool' | 'base-listed' | 'cooldown' | 'engine' | 'eligibility' | 'judge' | 'difficulty'
   | 'keep-current' | 'confidence' | 'margin' | 'hold'
 
-/** The gate path in the order the router applies it. */
+/**
+ * The gate path in the order the router applies it: the pool and the state
+ * size, the listed base, the re-entry cooldown, the engine (present, enabled,
+ * breaker closed, calibrated), candidate eligibility, the judgment call, and
+ * the answer's checks.
+ */
 export const GATE_CHECKS: readonly GateCheckId[] = [
-  'base-listed', 'cooldown', 'eligibility', 'judge', 'difficulty', 'keep-current', 'confidence', 'margin', 'hold',
+  'pool', 'base-listed', 'cooldown', 'engine', 'eligibility', 'judge', 'difficulty', 'keep-current', 'confidence', 'margin', 'hold',
 ]
 
 /**
@@ -241,21 +262,22 @@ export const GATE_CHECKS: readonly GateCheckId[] = [
  * is extensible through later router versions) marks no check.
  */
 const FAILING_CHECK: Readonly<Record<string, GateCheckId>> = {
+  'no-candidates': 'pool',
+  'state-too-large': 'pool',
   'base-unlisted': 'base-listed',
   'reentry-cooldown': 'cooldown',
-  'no-candidates': 'eligibility',
+  'engine-absent': 'engine',
+  'engine-disabled': 'engine',
+  'breaker-open': 'engine',
+  'engine-uncalibrated': 'engine',
   'candidate-ineligible': 'eligibility',
   'candidate-equals-base': 'eligibility',
   'thinking-mode-incompatible': 'eligibility',
   'model-unavailable': 'eligibility',
-  'engine-absent': 'judge',
-  'engine-disabled': 'judge',
   'engine-unavailable': 'judge',
-  'breaker-open': 'judge',
   'invalid-answer': 'judge',
   'judgment-error': 'judge',
   'unknown-candidate': 'judge',
-  'state-too-large': 'judge',
   'judgment-input-too-large': 'judge',
   'judgment-failure-held': 'judge',
   'difficulty-too-high': 'difficulty',
@@ -376,10 +398,16 @@ export function routeMargin(decision: ModelRoutingDecision): number | undefined 
  * operating point changed since.
  */
 export interface DecisionThresholds {
-  /** Whether the values were recorded on the decision or read from the configuration now. */
+  /**
+   * Whether the confidence and margin floors were recorded on the decision or
+   * read from the configuration now. The difficulty scores are always the
+   * configuration now: decisions do not record them.
+   */
   source: 'recorded' | 'now'
-  /** Whether the values come from a calibration rather than configuration defaults. */
-  calibrated: boolean
+  /** Where recorded floors came from: the engine's operating point or the global defaults. */
+  origin?: 'operating-point' | 'global'
+  /** The preregistration that set recorded floors; absent means they are uncalibrated. */
+  calibratedBy?: string
   /** Route-confidence floor. */
   downgradeThreshold: number
   /** Top-two margin floor. */
@@ -391,20 +419,34 @@ export interface DecisionThresholds {
 }
 
 /**
- * Resolve the thresholds a drill-down compares one decision with. The logged
- * decision records no thresholds, so they are the configuration in force now,
- * uncalibrated, from the `modelRouting.decision` read's gate.
+ * Resolve the thresholds a drill-down compares one decision with: the
+ * confidence and margin floors the decision recorded as applied, else the
+ * configuration in force now, uncalibrated, from the `modelRouting.decision`
+ * read's gate. The difficulty scores always come from the gate.
  * @param detail - the decision detail.
  * @returns the thresholds and their source.
  */
 export function decisionThresholds(detail: ModelRoutingDecisionDetail): DecisionThresholds {
-  return {
-    source: 'now',
-    calibrated: false,
-    downgradeThreshold: detail.gate.downgradeThreshold,
-    downgradeMargin: detail.gate.downgradeMargin,
+  const recorded = detail.decision.thresholds
+  const difficulty = {
     entryScoreCeiling: detail.gate.entryScoreCeiling,
     escalateBackScoreThreshold: detail.gate.escalateBackScoreThreshold,
+  }
+  if (recorded === undefined) {
+    return {
+      source: 'now',
+      downgradeThreshold: detail.gate.downgradeThreshold,
+      downgradeMargin: detail.gate.downgradeMargin,
+      ...difficulty,
+    }
+  }
+  return {
+    source: 'recorded',
+    origin: recorded.source,
+    ...recorded.calibratedBy === undefined ? {} : { calibratedBy: recorded.calibratedBy },
+    downgradeThreshold: recorded.downgradeThreshold,
+    downgradeMargin: recorded.downgradeMargin,
+    ...difficulty,
   }
 }
 
@@ -416,7 +458,10 @@ export function decisionThresholds(detail: ModelRoutingDecisionDetail): Decision
  */
 export function thresholdSourceLabel(thresholds: DecisionThresholds, t: RoutingTranslate): string {
   if (thresholds.source === 'now') return t('drill.source.now')
-  return t(thresholds.calibrated ? 'drill.source.recorded' : 'drill.source.recordedUncalibrated')
+  const origin = t(thresholds.origin === 'operating-point' ? 'drill.source.origin.point' : 'drill.source.origin.global')
+  return thresholds.calibratedBy === undefined
+    ? t('drill.source.recordedUncalibrated', { origin })
+    : t('drill.source.recorded', { origin, calibratedBy: thresholds.calibratedBy })
 }
 
 /**
@@ -512,4 +557,45 @@ export function egressWarning(
   return gate === null
     ? t('egress.warning', { destination })
     : t('egress.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
+}
+
+/**
+ * The G2 note when answered consults recorded confidence or margin floors
+ * other than the configuration now, which the chart's threshold line draws.
+ * @param stats - the session's statistics.
+ * @param gate - the configured gate, or null while it loads.
+ * @param t - the view's translate.
+ * @returns the note, or undefined when every recorded floor matches or none is recorded.
+ */
+export function recordedThresholdsNote(
+  stats: ModelRoutingStatsSnapshot,
+  gate: ModelRoutingGateView | null,
+  t: RoutingTranslate,
+): string | undefined {
+  if (gate === null) return undefined
+  const other = stats.thresholds.filter(entry => entry.downgradeThreshold !== gate.downgradeThreshold
+    || entry.downgradeMargin !== gate.downgradeMargin)
+  if (other.length === 0) return undefined
+  return t('g2.recorded', {
+    consults: other.reduce((sum, entry) => sum + entry.consults, 0),
+    values: other.map(entry => t('g2.recorded.value', {
+      threshold: formatScore(entry.downgradeThreshold),
+      margin: formatScore(entry.downgradeMargin),
+    })).join('; '),
+  })
+}
+
+/**
+ * The G6 note on what an ask's latency covers: the judgment call alone when
+ * no decision recorded its eligibility assessment, or which asks include it.
+ * @param stats - the session's statistics.
+ * @param t - the view's translate.
+ * @returns the note, or undefined when every ask includes the assessment or none is timed.
+ */
+export function latencyScopeNote(stats: ModelRoutingStatsSnapshot, t: RoutingTranslate): string | undefined {
+  const timed = stats.latency.counts.reduce((sum, count) => sum + count, 0)
+  if (timed === 0 || stats.latency.withEligibility === timed) return undefined
+  return stats.latency.withEligibility === 0
+    ? t('g6.judgeOnly')
+    : t('g6.eligibilityPartial', { with: stats.latency.withEligibility, total: timed })
 }

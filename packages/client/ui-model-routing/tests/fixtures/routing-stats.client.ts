@@ -28,14 +28,18 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
   return {
     counts: {
       decisions: 0, consults: 0, downgradedSteps: 0, steps: 0, streaks: 0,
-      keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, turnsWithDecisions: 0,
+      keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 0,
     },
     reasons: [],
     keptReasons: [],
     exits: [],
     streakLengths: { median: null, max: null },
     confidence: { values: [], margins: [], max: null, total: 0 },
-    latency: { bucketsMs: BUCKETS, counts: BUCKETS.map(() => 0), failed: 0, p50: null, p95: null, includesFailed: false },
+    latency: {
+      bucketsMs: BUCKETS, counts: BUCKETS.map(() => 0), failed: 0, p50: null, p95: null, includesFailed: false, withEligibility: 0,
+    },
+    judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
+    thresholds: [],
     models: [],
     cold: [
       { cause: 'routed-switch', count: 0, tokens: 0 },
@@ -79,7 +83,7 @@ export function liveStats(): ModelRoutingStatsSnapshot {
     ...base,
     counts: {
       decisions: 22, consults: 22, downgradedSteps: 0, steps: 93, streaks: 0,
-      keptStrong: 22, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, turnsWithDecisions: 22,
+      keptStrong: 22, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 22,
     },
     reasons: [
       { reason: 'current-preferred', group: 'judge-no', count: 15 },
@@ -93,7 +97,9 @@ export function liveStats(): ModelRoutingStatsSnapshot {
       max: 0.39,
       total: 21,
     },
-    latency: { bucketsMs: BUCKETS, counts, failed: 0, p50: 1000, p95: 1000, includesFailed: false },
+    latency: { bucketsMs: BUCKETS, counts, failed: 0, p50: 1000, p95: 1000, includesFailed: false, withEligibility: 0 },
+    judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
+    thresholds: [],
     models: [
       { provider: 'claude-session', model: 'claude-opus-5-5', role: 'strong', colorSlot: 'strong', steps: 45, calls: 60, uncached: 400_000, unreported: 0, cacheRead: 9_000_000, cacheWrite: 1_300_000, output: 60_000, reportedCalls: 60 },
       { provider: 'zai', model: 'glm-5.3', role: 'other', colorSlot: 1, steps: 45, calls: 50, uncached: 0, unreported: 3_500_000, cacheRead: 0, cacheWrite: 0, output: 30_000, reportedCalls: 0 },
@@ -135,7 +141,7 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     ...base,
     counts: {
       decisions: 60, consults: 40, downgradedSteps: 38, steps: 100, streaks: 6,
-      keptStrong: 20, routeFailed: 2, judgeFailed: 20, deadlineHits: 3, turnsWithDecisions: 60,
+      keptStrong: 20, routeFailed: 2, judgeFailed: 20, deadlineHits: 3, warmUps: 0, turnsWithDecisions: 60,
     },
     reasons: [
       { reason: 'gate-passed', group: 'switched', count: 20 },
@@ -147,7 +153,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     exits: [{ brokenBy: 'gate-failed', count: 4 }, { brokenBy: 'hold-cap', count: 2 }],
     streakLengths: { median: 5, max: 12 },
     confidence: { values: [0.85, 0.85, 0.9, 0.2], margins: [0.3, 0.3, 0.4, 0.05], max: 0.9, total: 40 },
-    latency: { bucketsMs: BUCKETS, counts, failed: 20, p50: 20, p95: 50, includesFailed: true },
+    latency: { bucketsMs: BUCKETS, counts, failed: 20, p50: 20, p95: 50, includesFailed: true, withEligibility: 40 },
+    judge: { calls: 0, promptTokens: 0, outputTokens: 0 },
+    thresholds: [],
     models: [
       { provider: 'claude-session', model: 'claude-opus-5-5', role: 'strong', colorSlot: 'strong', steps: 62, calls: 70, uncached: 100_000, unreported: 0, cacheRead: 2_000_000, cacheWrite: 300_000, output: 20_000, reportedCalls: 70 },
       { provider: 'ollama', model: 'deepseek-v4.1-flash', role: 'candidate', colorSlot: 1, steps: 30, calls: 32, uncached: 50_000, unreported: 0, cacheRead: 400_000, cacheWrite: 90_000, output: 9_000, reportedCalls: 32 },

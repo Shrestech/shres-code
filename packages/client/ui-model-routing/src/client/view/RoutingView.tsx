@@ -23,7 +23,8 @@ import {
 } from './charts.tsx'
 import { DecisionDrawer } from './DecisionDrawer.tsx'
 import {
-  egressWarning, engineTroubleRecorded, judgeSegment, judgeTrouble, routingKpis, routingVerdict, routingViewState, strongRoute,
+  egressWarning, engineTroubleRecorded, engineUncalibratedRecorded, judgeSegment, judgeTrouble, routingKpis, routingVerdict,
+  routingViewState, strongRoute,
 } from './derive.ts'
 import { RecentDecisions } from './RecentDecisions.tsx'
 import css from './RoutingView.module.css'
@@ -163,6 +164,7 @@ export function RoutingView({
       )}
       {state === 'no-engine' && <p className={css.notice} role="status">{t('state.noEngine')}</p>}
       {state === 'base-unlisted' && <p className={css.notice} role="status">{t('state.baseUnlisted', { model: base ?? t('state.thisModel') })}</p>}
+      {engineUncalibratedRecorded(stats, routing.active) && <p className={css.notice} role="status">{t('state.engineUncalibrated')}</p>}
       {engineTroubleRecorded(stats) && <p className={css.notice} role="status">{t('state.engineTrouble')}</p>}
       {state === 'never-used'
         ? <section className={css.card}><p>{t('state.neverUsed')}</p></section>

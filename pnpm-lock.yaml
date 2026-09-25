@@ -2678,6 +2678,10 @@ importers:
         version: 19.2.8(react@19.2.8)
 
   packages/client/ui-model-routing:
+    dependencies:
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^

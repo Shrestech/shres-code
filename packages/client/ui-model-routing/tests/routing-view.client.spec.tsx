@@ -137,7 +137,7 @@ describe('RoutingView availability and states', () => {
     expect(screen.getByText('Routing kept the strong model on all 22 decisions.')).toBeTruthy()
     expect(screen.getByText(/Routing is Off for this session now/)).toBeTruthy()
     const tile = document.querySelector('[data-kpi="latency"]')!
-    expect(tile.textContent).toBe('Judge latency1000 ms P50P95 1 s · deadline 1.5 s')
+    expect(tile.textContent).toBe('Judge latency1000 ms P50P95 1 s · judge call only · deadline 1.5 s')
   })
 
   it('reports a gate that failed to load and retries it', async () => {
@@ -317,6 +317,39 @@ describe('RoutingView decisions and drill-down', () => {
     expect(await within(await screen.findByRole('dialog')).findAllByText('0.91')).toHaveLength(2)
   })
 
+  it('shows the facts a decision recorded about its judgment call', async () => {
+    const recorded = decisionDetail({
+      engineId: 'typesafe',
+      eligibilityMs: 70,
+      judgeUsage: { inputTokens: 1_200, outputTokens: 30, cacheReadTokens: 300 },
+      inputChars: 9_000,
+      thresholds: { downgradeThreshold: 0.7, downgradeMargin: 0.05, source: 'operating-point', calibratedBy: 'prereg-7' },
+    })
+    setup({ loadDecision: () => Promise.resolve(recorded) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 22.1' }))
+    const drawer = await screen.findByRole('dialog')
+    await within(drawer).findByText('typesafe')
+    expect(within(drawer).getByText('70 ms')).toBeTruthy()
+    expect(within(drawer).getByText('1.5k in · 30 out')).toBeTruthy()
+    expect(within(drawer).getByText('9000 characters across the alternatives')).toBeTruthy()
+    expect(within(drawer).getByText('Threshold at the time · the engine\'s operating point · calibrated by prereg-7')).toBeTruthy()
+    expect(within(drawer).getByText('threshold at the time 0.70')).toBeTruthy()
+    expect(within(drawer).getByText(en['drill.difficulty.now'])).toBeTruthy()
+  })
+
+  it('reads a warm-up and a state size recorded without its text', async () => {
+    const warmUp = decisionDetail({
+      outcome: 'kept-strong', reason: 'engine-unavailable', route: undefined, judgmentInput: undefined,
+      engineFailure: { code: 'UNAVAILABLE', engineState: 'not-installed' }, inputChars: 4_000,
+    })
+    setup({ loadDecision: () => Promise.resolve(warmUp) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 22.1' }))
+    const drawer = await screen.findByRole('dialog')
+    await within(drawer).findByText('UNAVAILABLE · the judge was not installed, so it was not called')
+    expect(within(drawer).getByText('4000 characters')).toBeTruthy()
+    expect(within(drawer).queryByText(en['drill.state.offered'])).toBeNull()
+  })
+
   it('reports a decision that failed to load and retries it', async () => {
     const loadDecision = vi.fn()
       .mockRejectedValueOnce(new Error('gone'))
@@ -463,6 +496,21 @@ describe('RoutingView judge facts', () => {
     const missing = engines('laya', { engines: [{ ...LOCAL, state: 'not-installed', detail: 'run /laya install' }, REMOTE] })
     setup({ engine: { kind: 'ready', snapshot: missing } })
     expect(screen.getByText('The judge, Laya (local, MLX), is Not installed (run /laya install); steps keep the strong model until it is ready.')).toBeTruthy()
+  })
+
+  it('reports an engine refused as uncalibrated, and notes on the confidence and latency graphs', async () => {
+    const recent = activeStats().recent
+    const stats = {
+      ...activeStats(),
+      recent: [{ ...recent[0]!, reason: 'engine-uncalibrated' }, ...recent.slice(1)],
+      thresholds: [{ downgradeThreshold: 0.7, downgradeMargin: 0.1, source: 'operating-point' as const, calibratedBy: null, consults: 4 }],
+      latency: { ...activeStats().latency, withEligibility: 0 },
+    }
+    setup({ stats, routing: ON })
+    // The note compares with the gate, so it appears once the gate has loaded.
+    await screen.findByText('The line is the threshold now. 4 consults recorded other thresholds at the time: confidence ≥ 0.70, margin ≥ 0.10.')
+    expect(screen.getByText(en['state.engineUncalibrated'])).toBeTruthy()
+    expect(screen.getByText(en['g6.judgeOnly'])).toBeTruthy()
   })
 
   it('shows the no-engine state when routing is on and no judge is composed', () => {

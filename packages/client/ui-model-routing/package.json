@@ -82,5 +82,8 @@
     "lib/invariant.js",
     "lib/client.js",
     "lib/types/**/*.d.ts"
-  ]
+  ],
+  "dependencies": {
+    "@shres-code/shres-code-llm": "workspace:^"
+  }
 }
