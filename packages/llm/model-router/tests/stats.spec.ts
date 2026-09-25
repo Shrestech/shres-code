@@ -546,6 +546,12 @@ describe('modelRoutingStats fold', () => {
     expect(viewStats({ ...createStatsState(), streakLengths: { '1': 1, '4': 1 } }).streakLengths).toEqual({ median: 2.5, max: 4 })
   })
 
+  it('breaks count ties by code units, which a locale collation would order the other way', () => {
+    // 'Zulu' < 'alpha' in UTF-16 code units; an English collation puts 'alpha' first.
+    expect(viewStats({ ...createStatsState(), exits: { alpha: 2, Zulu: 2, beta: 3 } }).exits.map(entry => entry.brokenBy))
+      .toEqual(['beta', 'Zulu', 'alpha'])
+  })
+
   it('caps retained values and aggregates a long timeline to at most 400 points of whole turns', () => {
     const log = new Log()
     const decisions: SessionEvent[] = []

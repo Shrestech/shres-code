@@ -1028,7 +1028,8 @@ function percentile(counts: readonly number[], total: number, share: number): nu
 function ranked(histogram: Readonly<Record<string, number>>): { key: string; count: number }[] {
   return Object.entries(histogram)
     .map(([key, count]) => ({ key, count }))
-    .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key))
+    // Ties order by UTF-16 code units, not the host's locale, so every host ranks alike.
+    .sort((left, right) => right.count - left.count || (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
 }
 
 /**
