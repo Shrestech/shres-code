@@ -8,7 +8,7 @@ Model routing logs every decision, but nothing in the GUI said what routing did 
 
 ## Decision
 
-**Placement.** `ui-model-routing` registers a `conversation.view` entry, id `routing`, order 20, so the Activity popover lists `Routing →` after Chat and Trajectory and selecting it replaces the session body. The view shows the mode read-only; the Auto chip in the chat input stays the one control.
+**Placement.** `ui-model-routing` registers a `conversation.view` entry, id `routing`, order 20, so the Activity popover lists `Routing →` after Chat and Trajectory and selecting it replaces the session body. The view shows the mode read-only; the Auto chip in the chat input stays the one control. The web client composes this plugin whatever the host composes, and the popover lists a global ledger of view entries, so the entry is registered only after the host answers one `modelRouting.gate()` read: only a host that loaded the router claims that endpoint.
 
 **Data.** The host folds each session's log into the `modelRoutingStats` session projection, owned by `model-router` (`src/stats.ts`): decision and step counts, reason and exit histograms, best-candidate confidence and margins, a judge-latency histogram over fixed 1-2-5 buckets, tokens per model by class under the usage presence contract, cold prefills by cause, tokens moved off the strong model, judge asks and state characters per engine, the step timeline, and the 200 most recent decisions. The fold is pure and its state is plain JSON, as the projection contract requires, so the persisted projection cache serves it and the existing push channel delivers it with no polling. No session event is added. Router configuration is not in the log, so two unary Remote reads on the `modelRouting` service complete the view: `gate()` returns the thresholds, deadline, and difficulty scores in force, and `decision(sessionId, seq)` returns one logged decision for the drill-down.
 
@@ -27,6 +27,8 @@ Model routing logs every decision, but nothing in the GUI said what routing did 
 **Stats in the `modelRouting.stats` RPC for session scope.** The v1 contract computed session statistics on request. A pushed projection is incremental, cached across restarts, and reaches every open view without polling; the RPC variant remains for the workspace rollup only.
 
 **Thresholds inside the projection.** A projection's `apply` and `view` are pure functions of the log, and decisions do not record the thresholds that gated them. Reading live configuration there would make a cached value depend on state outside the log, so the gate is a separate unary read labelled as the configuration in force now.
+
+**A per-session availability field on list entries.** A list registration could declare a required projection key, with the Activity popover listing a view only for sessions whose projections carry that key. That adds a field to the slot framework's list options for one caller, while router composition is a host-wide fact the gate read already reports.
 
 **A mode toggle in the view.** Two controls for one mode invite disagreement about which one is authoritative; the view repeats the mode as a status line and names the chip.
 

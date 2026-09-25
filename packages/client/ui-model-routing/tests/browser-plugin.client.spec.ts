@@ -76,9 +76,10 @@ describe('ui-model-routing browser apply', () => {
   it('waits until conversation declares the routing seat', async () => {
     const ctx = new Context()
     await ctx.plugin(SlotRegistry).await()
-    ctx.provide('remote', { commands: {}, modelRouting: {} })
+    const pending = { gate: () => new Promise(() => {}) }
+    ctx.provide('remote', { commands: {}, modelRouting: pending })
     ctx.provide('remote.commands', {})
-    ctx.provide('remote.modelRouting', {})
+    ctx.provide('remote.modelRouting', pending)
     ctx.provide('locale', new LocaleRuntime(ctx))
     ctx.provide('sessions', { subagentAddress: () => undefined })
     const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -129,6 +130,7 @@ describe('ui-model-routing browser apply', () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
+    await vi.waitFor(() => { expect(b.slots.entries('conversation.view')).toHaveLength(1) })
     const entry = b.slots.entries('conversation.view')[0]!
     expect(entry.component).toBe(RoutingView)
     expect(entry.options.id).toBe('routing')
@@ -141,7 +143,8 @@ describe('ui-model-routing browser apply', () => {
     await expect(face(SID).loadDecision(1037)).resolves.toEqual({ seq: 1037 })
     expect(b.routingRemote.decision).toHaveBeenCalledWith(SID, 1037)
     await expect(face(SID).loadGate()).resolves.toEqual({ downgradeThreshold: 0.8 })
-    expect(b.routingRemote.gate).toHaveBeenCalledTimes(1)
+    // One gate read decided the listing; the view's own read is the second.
+    expect(b.routingRemote.gate).toHaveBeenCalledTimes(2)
     // A host failure reaches the view as a rejection naming its message and code.
     b.routingRemote.decision.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'seq 9 is not a routing decision', details: {} } })
     await expect(face(SID).loadDecision(9)).rejects.toThrow('seq 9 is not a routing decision (internal)')
@@ -149,6 +152,39 @@ describe('ui-model-routing browser apply', () => {
     await fiber.dispose()
     expect(b.slots.entries('conversation.view')).toHaveLength(0)
     expect(b.slots.entries('conversation.input.modelRouting')).toHaveLength(0)
+  })
+
+  it('leaves the Routing view unlisted on a host without the router or without an answer', async () => {
+    const refused = await bench()
+    refused.routingRemote.gate.mockResolvedValueOnce({ ok: false, error: { code: 'not-found', message: 'no such endpoint', details: {} } })
+    const first = refused.ctx.plugin({ inject: [...inject], apply })
+    await first.await()
+    await vi.waitFor(() => { expect(refused.routingRemote.gate).toHaveBeenCalledTimes(1) })
+    await Promise.resolve()
+    expect(refused.slots.entries('conversation.view')).toHaveLength(0)
+    await first.dispose()
+
+    const offline = await bench()
+    offline.routingRemote.gate.mockRejectedValueOnce(new Error('socket closed'))
+    const second = offline.ctx.plugin({ inject: [...inject], apply })
+    await second.await()
+    await vi.waitFor(() => { expect(offline.routingRemote.gate).toHaveBeenCalledTimes(1) })
+    await Promise.resolve()
+    expect(offline.slots.entries('conversation.view')).toHaveLength(0)
+    await second.dispose()
+  })
+
+  it('does not list the view when the plugin unloads before the host answers', async () => {
+    const b = await bench()
+    let answer!: (value: unknown) => void
+    b.routingRemote.gate.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    await fiber.dispose()
+    answer({ ok: true, value: { downgradeThreshold: 0.8 } })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(b.slots.entries('conversation.view')).toHaveLength(0)
   })
 
   it('restores the strong route through the session model-selection directory', async () => {

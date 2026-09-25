@@ -113,18 +113,37 @@ export function apply(ctx: ClientContext): void {
   // through the bound translate as a thunk, so it follows the active locale.
   const t = ctx.locale.bind(NS)
 
-  ctx.slots.inject('conversation.view', () => ctx.slots.register({
-    name: 'conversation.view',
-    id: 'routing',
-    order: 20,
-    locale: NS,
-    label: () => t('view.routing'),
-    inject: (sessionId: SessionId): RoutingViewInjected => ({
-      available: ctx.sessions.subagentAddress(sessionId) === undefined,
-      loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
-      loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
-    }),
-  }, RoutingView))
+  // The Routing view is listed only on a host that composes the model router.
+  // The client assembly mounts the modelRouting Remote whatever the host
+  // composes, but only a host that loaded the router claims its endpoints, so
+  // one gate read is the host's own answer. A refused or failed read leaves
+  // the view unlisted until the page reloads.
+  ctx.effect(() => {
+    let live = true
+    let unlist: (() => void) | undefined
+    ctx.remote.modelRouting.gate().then((result) => {
+      if (!live || !result.ok) return
+      unlist = ctx.slots.inject('conversation.view', () => ctx.slots.register({
+        name: 'conversation.view',
+        id: 'routing',
+        order: 20,
+        locale: NS,
+        label: () => t('view.routing'),
+        inject: (sessionId: SessionId): RoutingViewInjected => ({
+          available: ctx.sessions.subagentAddress(sessionId) === undefined,
+          loadDecision: async seq => remoteValue(await ctx.remote.modelRouting.decision(sessionId, seq)),
+          loadGate: async () => remoteValue(await ctx.remote.modelRouting.gate()),
+        }),
+      }, RoutingView))
+    }, () => {
+      // A transport failure is not an answer from the host; nothing else is
+      // listening for it, and the view stays unlisted.
+    })
+    return () => {
+      live = false
+      unlist?.()
+    }
+  }, 'ui-model-routing: routing view')
 
   ctx.slots.inject('conversation.input.modelRouting', () => ctx.slots.register({
     name: 'conversation.input.modelRouting',
