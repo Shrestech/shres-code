@@ -47,7 +47,7 @@ export function RoutingChip({
 }: RoutingChipProps) {
   const routing = useProjection('modelRouting')
   const engineState = useRoutingEngine(state => state)
-  const [confirm, setConfirm] = useState<Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }> | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmedJudge | null>(null)
   const [confirmGate, setConfirmGate] = useState<ModelRoutingGateView | null>(null)
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
@@ -101,11 +101,12 @@ export function RoutingChip({
           }
           // Turning routing on is the gesture that starts sending conversation
           // state to the judge, so a judge that sends it off this machine, or
-          // one not known yet, asks first; a local judge or none does not.
+          // one not known yet, asks first. An id no engine registers is not
+          // known: an engine registering under it later is asked with no
+          // further gesture. A local judge, judgment switched off, or no
+          // dispatcher does not ask.
           const judge = routingJudge(engineState)
-          const asks = judge.kind === 'loading' || judge.kind === 'failed'
-            || (judge.kind === 'engine' && judge.engine.egress === 'remote')
-          if (!asks) {
+          if (!confirms(judge)) {
             run('mode', () => setRouting(true))
             return
           }
@@ -211,14 +212,34 @@ export function RoutingChip({
  * @returns the warning sentence.
  */
 function confirmWarning(
-  judge: Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }>,
+  judge: ConfirmedJudge,
   gate: ModelRoutingGateView | null,
   t: RoutingChipProps['t'],
 ): string {
+  if (judge.kind === 'none') return t('confirm.unregistered')
   if (judge.kind !== 'engine') return t('confirm.unknown')
   if (judgeRefused(judge, gate) === true) return t('confirm.refused')
   const destination = judge.engine.destination ?? judge.engine.label
   return gate === null
     ? t('confirm.warning', { destination })
     : t('confirm.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
+}
+
+/** A judge whose turn-on asks first: a remote engine, or one not known yet. */
+type ConfirmedJudge =
+  | Extract<RoutingJudge, { kind: 'engine' | 'loading' | 'failed' }>
+  | { readonly kind: 'none'; readonly reason: 'unregistered' }
+
+/**
+ * Whether turning routing on asks first for this judge.
+ * @param judge - the router's judge.
+ * @returns true for a remote engine, a judge not known yet, or an id no engine registers.
+ */
+function confirms(judge: RoutingJudge): judge is ConfirmedJudge {
+  switch (judge.kind) {
+    case 'loading':
+    case 'failed': return true
+    case 'none': return judge.reason === 'unregistered'
+    case 'engine': return judge.engine.egress === 'remote'
+  }
 }

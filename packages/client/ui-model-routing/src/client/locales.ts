@@ -12,6 +12,7 @@ export const en = {
   'confirm.warning': 'This judge runs off this machine: each consult sends part of this session to {destination}.',
   'confirm.warning.chars': 'This judge runs off this machine: each consult sends up to {chars} characters of this session to {destination}.',
   'confirm.refused': 'This judge is not used for routing: it only verbalizes its confidence and no operating point accepts it, so nothing is sent and every step keeps the strong model.',
+  'confirm.unregistered': 'The selected judge is not registered on this host yet. Once an engine registers under its id, consults send this session\'s state to it with no further prompt, possibly off this machine.',
   'confirm.unknown': 'Where the judge runs is not known yet, so this session\'s conversation state may leave this machine.',
   'confirm.settings.before': 'Change the judge in',
   'confirm.cancel': 'Cancel',

@@ -10,7 +10,7 @@
  * surfaces as its own inline error line.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { ModelRoutingProjection } from '@shres-code/shres-code-model-router/client'
@@ -399,8 +399,19 @@ describe('RoutingChip remote-judge confirm', () => {
     }
   })
 
-  it('turns on directly with a local judge or none, and never asks when turning off', () => {
-    for (const engine of [{ kind: 'ready', snapshot: engines('laya') }, { kind: 'no-dispatcher' }] as RoutingEngineState[]) {
+  it('asks before turning on while the judge id names no registered engine, since one may register later', async () => {
+    const { setRouting } = setup({ routing: OFF, engine: { kind: 'ready', snapshot: engines('retired-engine') } })
+    fireEvent.click(offChip())
+    const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
+    expect(dialog.textContent).toContain(en['confirm.unregistered'])
+    expect(setRouting).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: en['confirm.turnOn'] }))
+    await waitFor(() => { expect(setRouting).toHaveBeenCalledWith(true) })
+  })
+
+  it('turns on directly with a local judge, judgment switched off, or no dispatcher, and never asks when turning off', () => {
+    const disabled = engines('laya', { selection: { enabled: false, engine: 'laya', overrides: {} } })
+    for (const engine of [{ kind: 'ready', snapshot: engines('laya') }, { kind: 'ready', snapshot: disabled }, { kind: 'no-dispatcher' }] as RoutingEngineState[]) {
       const { setRouting } = setup({ routing: OFF, engine })
       fireEvent.click(offChip())
       expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
