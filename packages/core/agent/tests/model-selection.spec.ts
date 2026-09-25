@@ -4,6 +4,7 @@ import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import {
   agentEvents,
   installModelSelection,
+  manualBaseOfLastHeader,
   modelSelectionInstalled,
   provideModelSelection,
   selectionInForce,
@@ -22,10 +23,32 @@ function requestContent(): AgentRequestContent {
 }
 
 let agentCount = 0
-/** The smallest agent the hook reads: an id and a scoped context. */
+/** The smallest agent the hook reads: an id, a scoped context, and the session it records into. */
 function hookAgent(ctx: Context): Agent {
   agentCount += 1
-  return { id: `agent-${String(agentCount)}`, ctx } as unknown as Agent
+  const id = `agent-${String(agentCount)}`
+  return { id, ctx, session: Session.create(SessionId(id)) } as unknown as Agent
+}
+
+/** The `agent/route-base` payloads in one session log, in order. */
+function routeBases(events: readonly SessionEvent[]): unknown[] {
+  return events.flatMap(event => event.type === 'agent/route-base' ? [event.data] : [])
+}
+
+let eventSeq = 0
+/** A detached `request/header` event on one route, as the loop logs it. */
+function headerEvent(config: LlmCallConfig, adapterDefaultEffort = false): SessionEvent {
+  return {
+    type: 'request/header',
+    seq: eventSeq++,
+    time: 0,
+    data: { header: { config, ...adapterDefaultEffort ? { adapterDefaults: { reasoningEffort: true } } : {} }, reason: 'change' },
+  } as unknown as SessionEvent
+}
+
+/** A detached `agent/route-base` event. */
+function routeBaseEvent(manual: ModelSelection, routed: ModelSelection): SessionEvent {
+  return { type: 'agent/route-base', seq: eventSeq++, time: 0, data: { manual, routed } } as unknown as SessionEvent
 }
 
 describe('one model-selection hook per agent', () => {
@@ -346,6 +369,222 @@ describe('installModelSelection() with a composed router', () => {
   })
 })
 
+describe('the agent/route-base record', () => {
+  const MANUAL: ModelSelection = { provider: 'alpha', model: 'a1' }
+  const CHEAP: ModelSelection = { provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low') }
+
+  /** An agent whose front end provides MANUAL, with a stub router answering through `answer`. */
+  async function routedAgent(
+    answer: (base: ModelSelection) => ModelSelection | undefined,
+  ): Promise<{ ctx: Context; agent: Agent; selection: ModelSelectionRef }> {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    const agent = hookAgent(ctx)
+    const selection: ModelSelectionRef = { current: MANUAL, assembled: undefined }
+    provideModelSelection(agent, selection)
+    await ctx.plugin(StubRouting, answer)
+    return { ctx, agent, selection }
+  }
+
+  /** Run one request through the hook, then log its header as the loop does after the waterfall. */
+  async function request(ctx: Context, agent: Agent, signal = new AbortController().signal): Promise<LlmCallConfig> {
+    await ctx.systemPrompt.assemble()
+    const config = await agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal }, () => Promise.resolve({ provider: 'alpha', model: 'a1' }),
+    )
+    agent.session.append('request/header', { header: { config }, reason: 'change' })
+    return config
+  }
+
+  it('records agent/route-base when routing rewrites the request', async () => {
+    const { ctx, agent } = await routedAgent(() => CHEAP)
+    await expect(request(ctx, agent)).resolves.toEqual(CHEAP)
+    expect(routeBases(agent.session.events)).toEqual([{ manual: MANUAL, routed: CHEAP }])
+    expect(manualBaseOfLastHeader(agent.session.events)).toEqual(MANUAL)
+    await ctx.fiber.dispose()
+  })
+
+  it('writes no agent/route-base when routing keeps the manual route or is absent', async () => {
+    const bare = new Context()
+    await bare.plugin(SystemPrompt)
+    const unrouted = hookAgent(bare)
+    provideModelSelection(unrouted, { current: MANUAL, assembled: undefined })
+    await expect(request(bare, unrouted)).resolves.toEqual(MANUAL)
+    const kept = await routedAgent(() => undefined)
+    await expect(request(kept.ctx, kept.agent)).resolves.toEqual(MANUAL)
+    const same = await routedAgent(base => ({ ...base }))
+    await expect(request(same.ctx, same.agent)).resolves.toEqual(MANUAL)
+    for (const agent of [unrouted, kept.agent, same.agent]) {
+      expect(routeBases(agent.session.events)).toEqual([])
+    }
+    for (const ctx of [bare, kept.ctx, same.ctx]) await ctx.fiber.dispose()
+  })
+
+  it('does not repeat an equal agent/route-base across held steps', async () => {
+    let answer: ModelSelection | undefined = CHEAP
+    const { ctx, agent, selection } = await routedAgent(() => answer)
+    await request(ctx, agent)
+    await request(ctx, agent)
+    await request(ctx, agent)
+    expect(routeBases(agent.session.events)).toEqual([{ manual: MANUAL, routed: CHEAP }])
+
+    // A header on the manual route ends the run the record describes, so the
+    // next streak records its own, even though it names the same two routes.
+    answer = undefined
+    await request(ctx, agent)
+    answer = CHEAP
+    await request(ctx, agent)
+    expect(routeBases(agent.session.events)).toEqual([{ manual: MANUAL, routed: CHEAP }, { manual: MANUAL, routed: CHEAP }])
+    expect(manualBaseOfLastHeader(agent.session.events)).toEqual(MANUAL)
+
+    // A new manual route beneath the same routed header is a new record.
+    const beta: ModelSelection = { provider: 'beta', model: 'b1' }
+    selection.current = beta
+    await request(ctx, agent)
+    expect(routeBases(agent.session.events).at(-1)).toEqual({ manual: beta, routed: CHEAP })
+    expect(manualBaseOfLastHeader(agent.session.events)).toEqual(beta)
+    await ctx.fiber.dispose()
+  })
+
+  it('appends before the request header', async () => {
+    const { ctx, agent } = await routedAgent(() => CHEAP)
+    await request(ctx, agent)
+    const [record, header] = agent.session.events
+    expect([record?.type, header?.type]).toEqual(['agent/route-base', 'request/header'])
+    expect(record!.seq).toBeLessThan(header!.seq)
+    await ctx.fiber.dispose()
+  })
+
+  it('an aborted request after the append leaves an orphan the reader ignores', async () => {
+    let answer: ModelSelection | undefined = CHEAP
+    const { ctx, agent } = await routedAgent(() => answer)
+    // The hook appended the record, then the request was aborted before its header was logged.
+    await ctx.systemPrompt.assemble()
+    await agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal: new AbortController().signal },
+      () => Promise.resolve({ provider: 'alpha', model: 'a1' }),
+    )
+    expect(routeBases(agent.session.events)).toHaveLength(1)
+    answer = undefined
+    await request(ctx, agent)
+    expect(manualBaseOfLastHeader(agent.session.events)).toBeUndefined()
+
+    // A request already aborted when routing answers records nothing.
+    const controller = new AbortController()
+    const aborted = await routedAgent(() => {
+      controller.abort()
+      return CHEAP
+    })
+    await expect(request(aborted.ctx, aborted.agent, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(routeBases(aborted.agent.session.events)).toEqual([])
+    await ctx.fiber.dispose()
+    await aborted.ctx.fiber.dispose()
+  })
+
+  it('returns an agent with no provided selection to the recorded manual route, before any router report', async () => {
+    const seededFromCandidate: LlmCallConfig = { ...CHEAP, temperature: 0.1 }
+    /** An agent with no front-end selection whose log ends on a routed header. */
+    const recordedAgent = (ctx: Context, id: string, events: SessionEvent[]): Agent =>
+      ({ id, ctx, session: Session.create(SessionId(id), events.map((event, seq) => ({ ...event, seq }))) }) as unknown as Agent
+    const signal = new AbortController().signal
+
+    // No router composed: the recorded route restores the manual route and
+    // clears the candidate's effort.
+    const bare = new Context()
+    await bare.plugin(SystemPrompt)
+    const restored = recordedAgent(bare, 'recorded-unrouted', [routeBaseEvent(MANUAL, CHEAP), headerEvent(CHEAP)])
+    installModelSelection(restored)
+    await expect(agentEvents(bare, restored).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toEqual({ ...MANUAL, temperature: 0.1 })
+
+    // A log written before the record existed keeps its routed header.
+    const legacy = recordedAgent(bare, 'recorded-legacy', [headerEvent(CHEAP)])
+    installModelSelection(legacy)
+    await expect(agentEvents(bare, legacy).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )).resolves.toBe(seededFromCandidate)
+
+    // A composed router's report comes first; the record is read only when it reports none.
+    const routedCtx = new Context()
+    await routedCtx.plugin(SystemPrompt)
+    await routedCtx.plugin(StubRouting, () => undefined)
+    const routing = routedCtx.get('modelRouting') as unknown as StubRouting
+    const reported = recordedAgent(routedCtx, 'recorded-routed', [routeBaseEvent(MANUAL, CHEAP), headerEvent(CHEAP)])
+    installModelSelection(reported)
+    routing.sticky = { provider: 'gamma', model: 'g1' }
+    await agentEvents(routedCtx, reported).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )
+    routing.sticky = undefined
+    await agentEvents(routedCtx, reported).waterfall(
+      'agent/request', { turn: 2, step: 1, content: requestContent(), signal }, () => Promise.resolve(seededFromCandidate),
+    )
+    expect(routing.calls.map(call => call.base)).toEqual([{ provider: 'gamma', model: 'g1' }, MANUAL])
+    await bare.fiber.dispose()
+    await routedCtx.fiber.dispose()
+  })
+})
+
+describe('manualBaseOfLastHeader()', () => {
+  const MANUAL: ModelSelection = { provider: 'alpha', model: 'a1', reasoningEffort: ReasoningEffortId('max') }
+  const CHEAP: ModelSelection = { provider: 'cheap', model: 'c1' }
+
+  it('reads the manual route recorded beneath a routed header', () => {
+    const events = [headerEvent(MANUAL), routeBaseEvent(MANUAL, CHEAP), headerEvent(CHEAP), headerEvent({ ...CHEAP, temperature: 0.3 })]
+    const base = manualBaseOfLastHeader(events)
+    expect(base).toEqual(MANUAL)
+    // The result is detached from the durable record.
+    expect(base).not.toBe((events[1]!.data as { manual: ModelSelection }).manual)
+  })
+
+  it('returns undefined when the last header runs the manual route, or when no header is logged', () => {
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, CHEAP), headerEvent(CHEAP), headerEvent(MANUAL)])).toBeUndefined()
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, CHEAP)])).toBeUndefined()
+    expect(manualBaseOfLastHeader([])).toBeUndefined()
+  })
+
+  it('ends the search at a header on another route', () => {
+    // The record precedes a manual header, so it describes an earlier streak, not this one.
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, CHEAP), headerEvent(CHEAP), headerEvent(MANUAL), headerEvent(CHEAP)]))
+      .toBeUndefined()
+  })
+
+  it('reads the latest matching record and skips a record for another route', () => {
+    const beta: ModelSelection = { provider: 'beta', model: 'b1' }
+    const other: ModelSelection = { provider: 'other', model: 'o1' }
+    const events = [
+      routeBaseEvent(MANUAL, CHEAP), routeBaseEvent(beta, CHEAP), routeBaseEvent(beta, other), headerEvent(CHEAP),
+    ]
+    expect(manualBaseOfLastHeader(events))
+      .toEqual(beta)
+  })
+
+  it('compares effort only when the record names one', () => {
+    // A header whose effort the adapter defaulted still runs a record that named none.
+    const defaulted = { ...CHEAP, reasoningEffort: ReasoningEffortId('high') }
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, CHEAP), headerEvent(defaulted, true)])).toEqual(MANUAL)
+    // A record that named an effort describes only a header with that effort.
+    const low = { ...CHEAP, reasoningEffort: ReasoningEffortId('low') }
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, low), headerEvent(defaulted, true)])).toBeUndefined()
+    expect(manualBaseOfLastHeader([routeBaseEvent(MANUAL, low), headerEvent(low)])).toEqual(MANUAL)
+  })
+
+  it('returns undefined for a log written before the record existed', () => {
+    expect(manualBaseOfLastHeader([headerEvent(MANUAL), headerEvent(CHEAP)])).toBeUndefined()
+  })
+
+  it.each([
+    ['null', null, 'agent/route-base data must be an object'],
+    ['unknown field', { manual: MANUAL, routed: CHEAP, extra: 1 }, 'agent/route-base has an unknown field: extra'],
+    ['missing manual', { routed: CHEAP }, 'agent/route-base manual data must be an object'],
+    ['blank routed model', { manual: MANUAL, routed: { provider: 'cheap', model: ' ' } }, 'agent/route-base routed model must be a nonempty string'],
+  ] as const)('rejects a corrupted record: %s', (_name, data, message) => {
+    const corrupted = { type: 'agent/route-base', seq: eventSeq++, time: 0, data } as unknown as SessionEvent
+    expect(() => manualBaseOfLastHeader([corrupted, headerEvent(CHEAP)])).toThrow(message)
+  })
+})
+
 describe('selectionInForce()', () => {
   /**
    * The Agent surface this suite scripts: a context to reach the routing
@@ -462,6 +701,25 @@ describe('selectionInForce()', () => {
       model: 'a1',
       reasoningEffort: ReasoningEffortId('high'),
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('reports the manual route recorded beneath a routed header when no router is composed', async () => {
+    const ctx = new Context()
+    const manual: ModelSelection = { provider: 'alpha', model: 'a1' }
+    const candidate: ModelSelection = { provider: 'cheap', model: 'c1', reasoningEffort: ReasoningEffortId('low') }
+    const events = [routeBaseEvent(manual, candidate), headerEvent(candidate)]
+    expect(selectionInForce(agentFor(ctx, { config: candidate }, events))).toEqual(manual)
+    // A log written before the record existed reports its last header.
+    expect(selectionInForce(agentFor(ctx, { config: candidate }, [headerEvent(candidate)]))).toEqual(candidate)
+
+    // A composed router's report comes before the record, and an explicit selection before both.
+    await ctx.plugin(StubRouting, () => undefined)
+    const routing = ctx.get('modelRouting') as unknown as StubRouting
+    routing.sticky = { provider: 'gamma', model: 'g1' }
+    expect(selectionInForce(agentFor(ctx, { config: candidate }, events))).toEqual({ provider: 'gamma', model: 'g1' })
+    const explicit = { type: 'agent/model-selection', seq: eventSeq++, time: 0, data: { provider: 'beta', model: 'b1' } } as unknown as SessionEvent
+    expect(selectionInForce(agentFor(ctx, { config: candidate }, [...events, explicit]))).toEqual({ provider: 'beta', model: 'b1' })
     await ctx.fiber.dispose()
   })
 

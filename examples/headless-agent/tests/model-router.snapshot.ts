@@ -39,10 +39,8 @@ interface Arm {
   readonly configPath: string
   /** Fixture holding the prompt both arms run. */
   readonly promptFixture: string
-  /** Driver that owns an explicit create/dispose/resume lifecycle. */
-  readonly resume?: boolean
-  /** Driver that selects the first turn's routed model on the live agent before the remaining prompts. */
-  readonly select?: boolean
+  /** Fixture driver that owns an explicit create/dispose/resume or select lifecycle, instead of the headless driver. */
+  readonly driver?: 'model-router-resume-driver' | 'model-router-unmount-driver' | 'model-router-select-driver'
 }
 
 /** One arm's harvested, normalized outputs. */
@@ -119,9 +117,7 @@ async function armPrompts(fixture: string): Promise<string[]> {
  */
 async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
   const prompts = await armPrompts(arm.promptFixture)
-  const driver = arm.resume === true
-    ? join(testsDir, 'fixtures', 'model-router-resume-driver.ts')
-    : arm.select === true ? join(testsDir, 'fixtures', 'model-router-select-driver.ts') : binScript
+  const driver = arm.driver === undefined ? binScript : join(testsDir, 'fixtures', `${arm.driver}.ts`)
   let runCwd = ''
   let rawSession: string | undefined
   const result = await runLoaderSmoke({
@@ -189,7 +185,7 @@ describe('headless model-routing snapshots', () => {
       const output = await runArm({
         configPath: join(exampleDir, 'model-router-resume.cordis.snapshot.yml'),
         promptFixture: 'model-router-resume',
-        resume: true,
+        driver: 'model-router-resume-driver',
       }, server)
       expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
         'deepseek-v4-flash', 'deepseek-v4-flash',
@@ -220,7 +216,11 @@ describe('headless model-routing snapshots', () => {
   ] as const)('reports routing idle on the selected route after a manual deviation (%s)', async (fixture, config, reason) => {
     const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
     try {
-      const output = await runArm({ configPath: join(exampleDir, config), promptFixture: fixture, select: true }, server)
+      const output = await runArm({
+        configPath: join(exampleDir, config),
+        promptFixture: fixture,
+        driver: 'model-router-select-driver',
+      }, server)
       // Every turn runs flash: the routed first turn, then the explicit selection. No judgment reaches the model.
       expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
         'deepseek-v4-flash', 'deepseek-v4-flash', 'deepseek-v4-flash',
@@ -232,6 +232,39 @@ describe('headless model-routing snapshots', () => {
         { outcome: 'kept-strong', reason, sticky: { active: false } },
       ])
       await expectArmFixtures(fixture, output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('returns a routed session to its manual route when it resumes in a tree without the router', async () => {
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-unmount.cordis.snapshot.yml'),
+        promptFixture: 'model-router-unmount',
+        driver: 'model-router-unmount-driver',
+      }, server)
+      // The first boot routes to the candidate; the resumed tree has no router and runs the manual model.
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-pro',
+      ])
+      const events = parseJsonl(output.session)
+      const recorded = events.filter(event => event['type'] === 'agent/route-base')
+      expect(recorded.map(event => event['data'])).toEqual([{
+        manual: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        routed: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      }])
+      const decisions = events.filter(event => event['type'] === 'model-routing/decision')
+      expect(decisions).toHaveLength(1)
+      expect(decisions[0]?.['data']).toMatchObject({ outcome: 'downgraded' })
+      // The restored selection is read from the log, not written as an explicit one.
+      expect(events.filter(event => event['type'] === 'agent/model-selection')).toEqual([])
+      const headers = events.filter(event => event['type'] === 'request/header')
+      const models = headers.map(event => (event['data'] as { header: { config: { model: string } } }).header.config.model)
+      expect(models.at(0)).toBe('deepseek-v4-flash')
+      expect(models.at(-1)).toBe('deepseek-v4-pro')
+      await expectArmFixtures('model-router-unmount', output)
     } finally {
       await server.close()
     }
@@ -356,8 +389,16 @@ describe('headless model-routing snapshots', () => {
         selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
         sticky: { active: true },
       })
-      // The record that follows the decision is the request header it was consumed under.
-      const header = eventOf(records[decisionIndex + 1]!) as {
+      // The decision is followed by the manual route recorded beneath it, then
+      // by the request header it was consumed under.
+      expect(eventOf(records[decisionIndex + 1]!)).toMatchObject({
+        type: 'agent/route-base',
+        data: {
+          manual: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+          routed: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        },
+      })
+      const header = eventOf(records[decisionIndex + 2]!) as {
         type: string
         data: { header: { config: Record<string, unknown> } }
       }
