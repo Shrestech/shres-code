@@ -26,6 +26,8 @@ async function bench(isLoopback = true) {
   // distinct inject key (the typert namespace the Audio card reads); the
   // double answers status so activation can resolve it.
   new TestRemote(ctx)
+  const settingsPages = { open: vi.fn((_sectionId: string) => Promise.resolve()) }
+  const withdrawPages = ctx.reflect.provide('settingsPages', settingsPages)
   ctx.provide('remote.speech', {
     status: () => Promise.resolve({
       ok: true as const,
@@ -39,7 +41,7 @@ async function bench(isLoopback = true) {
   // The apply path only captures the wire face; no call leaves this fake
   // until a section actually loads.
   ctx.provide('connection', { api: {}, isLoopback } as never)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, settingsPages, withdrawPages }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -83,6 +85,18 @@ describe('ui-settings-models apply', () => {
     expect(resolveSlotLabel(sections.find(section => section.options.id === 'audio')!.options.label)).toBe('Voice & audio')
     const injected = (entry.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected)()
     expect(injected.t('nav')).toBe('Models & providers')
+    // The page's link reaches Settings through the settings-owned face, read at click time.
+    injected.openSettings?.('model-routing')
+    expect(before.settingsPages.open).toHaveBeenCalledWith('model-routing')
+    const audio = sections.find(section => section.options.id === 'audio')!
+    expect(audio.inject?.()).not.toHaveProperty('speech')
+    const withSpeech = await bench()
+    const speech = { status: vi.fn() }
+    Object.assign(withSpeech.ctx.remote, { speech })
+    declare(withSpeech.slots)
+    await withSpeech.ctx.plugin({ inject: [...inject], apply }).await()
+    const audioWithSpeech = withSpeech.slots.entries('settings.section').find(section => section.options.id === 'audio')!
+    expect(audioWithSpeech.inject?.()).toHaveProperty('speech', speech)
     expect(injected.t('deleteTitle')).toBe('Delete {provider}?')
     expect(typeof injected.controller.load).toBe('function')
     expect(injected.hooks.snapshot).toBeDefined()
@@ -112,6 +126,22 @@ describe('ui-settings-models apply', () => {
     expect(after.slots.entries('settings.onboarding')).toHaveLength(2)
     // The self-inflicted ledger notifications hit the duplicate guard.
     expect(after.slots.entries('settings.section')).toHaveLength(3)
+  })
+
+  it('reads ctx.settingsPages at mount and at click: text without the face, a loud error when it left before the click', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const entry = () => b.slots.entries('settings.section').find(section => section.options.id === 'models')!
+    const face = () => entry().inject?.() as unknown as import('../src/client/ModelsSection.tsx').ModelsSectionInjected
+    const linked = face()
+    expect(linked.openSettings).toBeTypeOf('function')
+
+    await b.withdrawPages()
+    expect(b.ctx.get('settingsPages')).toBeUndefined()
+    expect(face()).not.toHaveProperty('openSettings')
+    expect(() => { linked.openSettings?.('model-routing') }).toThrow('settings-models: no Settings pages face to open "model-routing"')
+    expect(b.settingsPages.open).not.toHaveBeenCalled()
   })
 
   it('the label thunk follows the active locale without re-registration', async () => {

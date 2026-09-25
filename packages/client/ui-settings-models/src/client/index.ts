@@ -84,11 +84,22 @@ export function apply(ctx: ClientContext): void {
   // browser without the speech package) the Audio page degrades to the
   // stored section alone.
   const speech: SpeechStatusFace | undefined = (ctx.remote as { speech?: SpeechStatusFace }).speech
+  // ctx.settingsPages is read when the page mounts and again on each click, not
+  // injected: the settings shell and the frame come and go (HMR) without
+  // re-applying this plugin. Without the face the link renders as text.
+  const openSettings = (sectionId: string): void => {
+    const pages = ctx.get('settingsPages')
+    // The face left between the mount and the click: a stale link, reported loudly.
+    if (pages === undefined) throw new Error(`settings-models: no Settings pages face to open "${sectionId}"`)
+    // An unknown section id rejects loudly: the link names a section that must be composed.
+    void pages.open(sectionId)
+  }
   const sharedSettingsInjected = (): ModelsSectionInjected & TeamSectionInjected => ({
     controller,
     hooks: { snapshot: controller.store },
     api: connection.api,
     t,
+    ...ctx.get('settingsPages') === undefined ? {} : { openSettings },
   })
   const audioInjected = (): AudioSectionInjected => ({
     controller,

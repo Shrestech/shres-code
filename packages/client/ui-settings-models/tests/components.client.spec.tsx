@@ -226,8 +226,8 @@ async function mountDeepSeekCard(overrides: Parameters<typeof scriptedFace>[0] =
 }
 
 describe('ModelsSection routing link', () => {
-  /** Mount with a `judgment` namespace exposed, optionally with the shell's section navigation. */
-  async function mountWithJudgment(openSection?: (id: string) => void) {
+  /** Mount with a `judgment` namespace exposed, optionally with the injected Settings pages callback. */
+  async function mountWithJudgment(openSettings?: (sectionId: string) => void) {
     const scripted = scriptedFace()
     scripted.face.settings.describe.mockImplementation(() => Promise.resolve(ok({
       writable: true,
@@ -241,16 +241,16 @@ describe('ModelsSection routing link', () => {
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={scripted.face as never}
       t={t}
-      {...openSection === undefined ? {} : { openSection }}
+      {...openSettings === undefined ? {} : { openSettings }}
     />)
   }
 
   it('points the classifier and engine settings at Model routing, opening that section', async () => {
-    const openSection = vi.fn()
-    await mountWithJudgment(openSection)
+    const openSettings = vi.fn()
+    await mountWithJudgment(openSettings)
     expect(screen.getByText(en.routingLinkLead, { exact: false })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: en.routingLinkTarget }))
-    expect(openSection).toHaveBeenCalledWith('model-routing')
+    expect(openSettings).toHaveBeenCalledWith('model-routing')
     expect(screen.queryByRole('switch', { name: /classifier|judgment engine/i })).toBeNull()
   })
 

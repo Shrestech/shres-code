@@ -27,6 +27,7 @@ import type { GeneralSectionInjected } from './GeneralSection.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { refreshDocumentIfLoaded, SettingsDocumentStore } from './settings-document-store.ts'
+import { SettingsPages } from './settings-pages.ts'
 import { en, type SettingsKey } from './locales.ts'
 
 export type {
@@ -38,6 +39,7 @@ export type {
 export type { SettingsDocumentActionInjected, SettingsDocumentActionProps } from './SettingsDocumentAction.tsx'
 export type { SettingsDocumentState } from './settings-document-store.ts'
 export { SettingsDocumentStore } from './settings-document-store.ts'
+export type { SettingsPageLedger } from './settings-pages.ts'
 export type { SettingsKey } from './locales.ts'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
@@ -59,11 +61,35 @@ export const inject = ['slots', 'locale', 'connection']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
- * section, each once its slot declaration is on the ledger.
+ * section, each once its slot declaration is on the ledger, and provide
+ * `ctx.settingsPages` while the frame's `ctx.layout` exists.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-settings-general: dictionaries')
+
+  // The shell declares settings.section, so it answers which section ids a
+  // link may open; the frame primitive only moves the destination.
+  ctx.inject(['layout'], (pagesCtx) => {
+    const pages = new SettingsPages({
+      declared: () => pagesCtx.slots.spec('settings.section') !== undefined,
+      has: sectionId => pagesCtx.slots.entries('settings.section').some(entry => entry.options.id === sectionId),
+    }, (page) => { pagesCtx.layout.navigate(page) })
+    pagesCtx.effect(() => {
+      const withdraw = pagesCtx.reflect.provide('settingsPages', pages)
+      return () => {
+        pages.dispose()
+        // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
+        void withdraw()
+      }
+    }, 'ui-settings-general: settingsPages')
+    // A released call resumes after the declaring register() returned, with
+    // every section registered in that declaration on the ledger.
+    pagesCtx.slots.inject('settings.section', () => {
+      pages.flush()
+      return () => {}
+    })
+  })
 
   // Copy freshness is framework-owned: components read the standard `t`
   // seat, and the nav label is a thunk the owner resolves per render — no
