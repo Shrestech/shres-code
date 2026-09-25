@@ -28,7 +28,7 @@ export interface FakeEngineConfig {
   /** Initial status. */
   status?: JudgmentEngineStatus
   /** Failure every ask rejects with. */
-  failWith?: unknown
+  failWith?: Error
 }
 
 /** A registry-registered fake engine; plugin it once per id. */

@@ -228,6 +228,18 @@ class SettleGate extends Service {
   }
 }
 
+/**
+ * Mount a {@link SettleGate} as `ctx.loader`.
+ * @param ctx - the bench context.
+ * @returns the mounted gate.
+ */
+async function settleGate(ctx: Context): Promise<SettleGate> {
+  let gate: SettleGate | undefined
+  await ctx.plugin({ name: 'settle-gate', apply: (inner: Context) => { gate = new SettleGate(inner) } })
+  if (gate === undefined) throw new Error('the settle gate did not mount')
+  return gate
+}
+
 /** TEST DOUBLE: exact route metadata used by the controller's capability preflight. */
 class RoutingCapabilityAdapter extends LlmAdapter {
   private readonly overrides: Record<string, Partial<LlmResolvedModelInfo>>
@@ -1594,7 +1606,7 @@ describe('judgment failures', () => {
     })
     const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
     const info = vi.spyOn(b.ctx.logger, 'info').mockImplementation(() => b.ctx.logger)
-    const gate = (await b.ctx.plugin(SettleGate), b.ctx.get('loader' as never) as unknown as SettleGate)
+    const gate = await settleGate(b.ctx)
     await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
     await registeredEngine(b.ctx, 'laya', { state: 'ready' })
     const reports = (): string[] => error.mock.calls
@@ -1634,8 +1646,7 @@ describe('judgment failures', () => {
         config: { ...CONFIG, operatingPoints: [{ engine: 'layya', downgradeThreshold: 0.7, downgradeMargin: 0.1 }] },
       })
       const error = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => b.ctx.logger)
-      await b.ctx.plugin(SettleGate)
-      const gate = b.ctx.get('loader' as never) as unknown as SettleGate
+      const gate = await settleGate(b.ctx)
       await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'laya' })
       if (outcome === 'reject') gate.settle.reject(new Error('a fiber failed to load'))
       else {
