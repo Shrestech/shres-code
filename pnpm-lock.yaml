@@ -1092,6 +1092,12 @@ importers:
       '@shres-code/shres-code-api-gateway':
         specifier: workspace:^
         version: link:../gateway
+      '@shres-code/shres-code-client-connection':
+        specifier: workspace:^
+        version: link:../../client/connection
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
       '@shres-code/shres-code-commands':
         specifier: workspace:^
         version: link:../../interaction/commands
@@ -1149,6 +1155,12 @@ importers:
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/attachment/attachment:
     devDependencies:

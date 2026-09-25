@@ -103,6 +103,24 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByRole('note').textContent).toContain('each consult sends part of that conversation to a host off this machine.')
   })
 
+  it('shows Calibrated for an engine the router has an evaluated operating point for, and Uncalibrated otherwise', () => {
+    const router = namespace('model-router', {
+      initialMode: 'off',
+      operatingPoints: [
+        { engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' },
+        { engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1 },
+      ],
+    })
+    mount(double(ready({ router, engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never], 'laya') })))
+    expect(screen.getByText(en.calibrated).getAttribute('title'))
+      .toBe('Routing thresholds for this engine were evaluated by routing-eval-2026-09 (model-router operating point).')
+    expect(screen.queryByText(en.uncalibrated)).toBeNull()
+    cleanup()
+    mount(double(ready({ router })))
+    expect(screen.getByText(en.uncalibrated)).toBeTruthy()
+    expect(screen.queryByText(en.calibrated)).toBeNull()
+  })
+
   it('omits the model id of an engine whose provider names none', () => {
     const { models: _models, ...bare } = TYPESAFE
     mount(double(ready({ laya: null, engines: snapshot([bare]) })))

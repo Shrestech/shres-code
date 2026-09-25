@@ -73,10 +73,10 @@
     "@shres-code/shres-code-judgment-laya": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-message-feedback": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
-    "@shres-code/shres-code-model-router": "workspace:^",
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-speech": "workspace:^",
     "@shres-code/shres-code-typert-registry": "workspace:^"
@@ -86,6 +86,8 @@
     "@shres-code/shres-code-agent": "workspace:^",
     "@shres-code/shres-code-agent-presets": "workspace:^",
     "@shres-code/shres-code-api-gateway": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-commands": "workspace:^",
     "@shres-code/shres-code-cordis-host-runner": "workspace:^",
     "@shres-code/shres-code-credentials": "workspace:^",
@@ -98,12 +100,14 @@
     "@shres-code/shres-code-judgment-laya": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-message-feedback": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-speech": "workspace:^",
     "@shres-code/shres-code-typert-registry": "workspace:^",
-    "@shres-code/shres-code-model-router": "workspace:^"
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
   }
 }

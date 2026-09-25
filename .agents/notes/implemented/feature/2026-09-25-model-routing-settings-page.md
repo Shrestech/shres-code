@@ -20,7 +20,7 @@ A new client package, [`ui-settings-model-routing`](../../../../packages/client/
 
 **Classifier and Models.** The `judgment.enabled` switch moved here; Models keeps one line, a button that opens the section through a new optional `openSection` affordance in the `settings.section` owner props, which the Settings shell supplies.
 
-**Uncalibrated.** No engine has evaluated routing thresholds yet (the router has no per-engine operating points), so the selected engine always carries the "Uncalibrated" badge, with a title saying so.
+**Calibration badge.** The selected engine shows "Calibrated" when the resolved `model-router` section has an `operatingPoints` entry for that engine with `calibratedBy` set, and "Uncalibrated" otherwise, the state in which the router routes on its configured defaults. The page already reads that section, so no new Host read is needed; editing operating points and showing their thresholds belongs to PR 9b.
 
 ## Alternatives considered
 

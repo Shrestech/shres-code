@@ -10,7 +10,7 @@ import type { JudgmentEngineView, LayaGatewayState } from '@shres-code/shres-cod
 import clsx from 'clsx'
 import type { ModelRoutingController, ModelRoutingState, WriteFailure } from './model.ts'
 import { LAYA_ENGINE } from './model.ts'
-import { engineOption, isRemote, lastExitText, modelsText, numberAt, stateLabel } from './view.ts'
+import { calibratedBy, engineOption, isRemote, lastExitText, modelsText, numberAt, stateLabel } from './view.ts'
 import type { Translate } from './view.ts'
 import css from './ModelRoutingSection.module.css'
 
@@ -43,6 +43,7 @@ export function EngineCard({ state, controller, t }: EngineCardProps): ReactNode
 
   const selectedId = engines.selection.engine
   const selected = engines.engines.find(engine => engine.id === selectedId)
+  const evaluatedBy = selected === undefined ? undefined : calibratedBy(state.router, selected.id)
   const choose = (id: string): void => {
     setBusy(true)
     setFailure(undefined)
@@ -78,7 +79,7 @@ export function EngineCard({ state, controller, t }: EngineCardProps): ReactNode
                   </option>
                 ))}
               </select>
-              {selected === undefined ? null : <EngineFacts engine={selected} t={t} />}
+              {selected === undefined ? null : <EngineFacts engine={selected} evaluatedBy={evaluatedBy} t={t} />}
               {busy ? <span className={css['muted']} role="status">{t('engineSaving')}</span> : null}
             </div>
             {failure === undefined
@@ -102,8 +103,8 @@ export function EngineCard({ state, controller, t }: EngineCardProps): ReactNode
   )
 }
 
-/** The selected engine's state, egress, model ids, and calibration badge. */
-function EngineFacts({ engine, t }: { engine: JudgmentEngineView; t: Translate }): ReactNode {
+/** The selected engine's state, egress, model ids, and whether its routing thresholds were evaluated. */
+function EngineFacts({ engine, evaluatedBy, t }: { engine: JudgmentEngineView; evaluatedBy: string | undefined; t: Translate }): ReactNode {
   const remote = isRemote(engine)
   const models = modelsText(engine, t)
   return (
@@ -114,7 +115,9 @@ function EngineFacts({ engine, t }: { engine: JudgmentEngineView; t: Translate }
         {t(remote ? 'egressRemote' : 'egressLocal')}
       </span>
       {models === undefined ? null : <code className={css['modelId']}>{models}</code>}
-      <span className={css['uncalibrated']} title={t('uncalibratedTitle')}>{t('uncalibrated')}</span>
+      {evaluatedBy === undefined
+        ? <span className={css['uncalibrated']} title={t('uncalibratedTitle')}>{t('uncalibrated')}</span>
+        : <span className={css['pill']} title={t('calibratedTitle', { by: evaluatedBy })}>{t('calibrated')}</span>}
     </span>
   )
 }

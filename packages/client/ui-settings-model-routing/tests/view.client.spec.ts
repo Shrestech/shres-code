@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifierEnabled, engineOption, initialMode, isRemote, lastExitText, modelsText, numberAt, stateLabel } from '../src/client/view.ts'
+import { calibratedBy, classifierEnabled, engineOption, initialMode, isRemote, lastExitText, modelsText, numberAt, stateLabel } from '../src/client/view.ts'
 import { en } from '../src/client/locales.ts'
 import { LAYA, LAYA_VIEW, TYPESAFE, namespace } from './fixtures.client.ts'
 
@@ -48,5 +48,22 @@ describe('model routing view helpers', () => {
     expect(classifierEnabled(namespace('judgment', {}))).toBe(true)
     expect(classifierEnabled(namespace('judgment', null))).toBe(true)
     expect(classifierEnabled(namespace('judgment', { enabled: false }))).toBe(false)
+  })
+
+  it('reads who evaluated an engine\'s thresholds from the model-router operating points', () => {
+    const router = namespace('model-router', { operatingPoints: [
+      null,
+      'not a point',
+      { engine: 'shield', downgradeThreshold: 0.8, downgradeMargin: 0.1 },
+      { engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1, calibratedBy: '' },
+      { engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' },
+    ] })
+    expect(calibratedBy(router, 'laya')).toBe('routing-eval-2026-09')
+    expect(calibratedBy(router, 'shield')).toBeUndefined()
+    expect(calibratedBy(router, 'typesafe')).toBeUndefined()
+    expect(calibratedBy(router, 'gone')).toBeUndefined()
+    expect(calibratedBy(namespace('model-router', { operatingPoints: 'none' }), 'laya')).toBeUndefined()
+    expect(calibratedBy(namespace('model-router', null), 'laya')).toBeUndefined()
+    expect(calibratedBy(null, 'laya')).toBeUndefined()
   })
 })
