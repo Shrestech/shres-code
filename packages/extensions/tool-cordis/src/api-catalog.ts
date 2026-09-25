@@ -1337,6 +1337,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when the seq does not name a `model-routing/decision` event.'],
       },
       {
+        signature: '@Remote(\'stats\') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>',
+        description: 'Routing statistics across one workspace\'s unarchived sessions, for the Settings overview: each session\'s `modelRoutingStats` value, rolled up over the sessions whose latest decision falls in the range. An attached session\'s value is its live one and a cold session\'s is the persisted projection cache\'s; no session log is read, so a cold session without a cached value on the current unit version is counted as not summarized.',
+        parameters: [{ name: 'request', description: 'the workspace and the range.' }],
+        returns: 'the workspace statistics.',
+        throws: ['when this host composes no workspace registry or the workspace is unknown.'],
+      },
+      {
         signature: 'get(agent: Agent): { active: boolean; pending?: boolean }',
         description: 'Read the logged mode and any selection awaiting the next accepted pre-step.',
         parameters: [{ name: 'agent', description: 'the agent to read.' }],
@@ -4746,6 +4753,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\';',
   },
   {
+    name: 'ModelRoutingReasonGroup',
+    declaration: 'export type ModelRoutingReasonGroup = \'switched\' | \'judge-no\' | \'fail-closed\' | \'engine\';',
+  },
+  {
     name: 'ModelRoutingRequest',
     declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
   },
@@ -4762,6 +4773,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelRoutingSelection {\n    candidateId: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n}',
   },
   {
+    name: 'ModelRoutingStatsRange',
+    declaration: 'export type ModelRoutingStatsRange = \'24h\' | \'7d\' | \'all\';',
+  },
+  {
+    name: 'ModelRoutingStatsRequest',
+    declaration: 'export interface ModelRoutingStatsRequest {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n}',
+  },
+  {
+    name: 'ModelRoutingStatsSnapshot',
+    declaration: 'export interface ModelRoutingStatsSnapshot {\n    counts: {\n        decisions: number;\n        consults: number;\n        downgradedSteps: number;\n        steps: number;\n        streaks: number;\n        keptStrong: number;\n        routeFailed: number;\n        judgeFailed: number;\n        deadlineHits: number;\n        warmUps: number;\n        turnsWithDecisions: number;\n    };\n    reasons: {\n        reason: string;\n        group: ModelRoutingReasonGroup;\n        count: number;\n    }[];\n    keptReasons: {\n        reason: string;\n        count: number;\n    }[];\n    exits: {\n        brokenBy: string;\n        count: number;\n    }[];\n    streakLengths: {\n        median: number | null;\n        max: number | null;\n    };\n    confidence: {\n        values: number[];\n        margins: number[];\n        max: number | null;\n        total: number;\n    };\n    latency: {\n        bucketsMs: number[];\n        counts: number[];\n        failed: number;\n        p50: number | null;\n        p95: number | null;\n        includesFailed: boolean;\n    };\n    eligibility: {\n        counts: number[];\n        p50: number | null;\n        p95: number | null;\n    };\n    criticalPath: {\n        totalMs: number;\n        perTurnMs: number | null;\n        judgeOnly: number;\n    };\n    judge: {\n        calls: number;\n        promptTokens: number;\n        outputTokens: number;\n    };\n    thresholds: {\n        downgradeThreshold: number;\n        downgradeMargin: number;\n        source: \'operating-point\' | \'global\';\n    /* …truncated — full shape in source */',
+  },
+  {
     name: 'ModelRoutingStickyView',
     declaration: 'export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView;',
   },
@@ -4772,6 +4795,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelRoutingUnavailablePolicy',
     declaration: 'export type ModelRoutingUnavailablePolicy = \'fallback\' | \'error\';',
+  },
+  {
+    name: 'ModelRoutingWorkspaceSession',
+    declaration: 'export interface ModelRoutingWorkspaceSession {\n    sessionId: string;\n    lastDecisionAt: number;\n    decisions: number;\n    steps: number;\n    downgradedSteps: number;\n}',
+  },
+  {
+    name: 'ModelRoutingWorkspaceStats',
+    declaration: 'export interface ModelRoutingWorkspaceStats {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n    computedAt: number;\n    sessions: {\n        members: number;\n        summarized: number;\n        inRange: number;\n        included: number;\n        capped: boolean;\n    };\n    counts: ModelRoutingStatsSnapshot[\'counts\'];\n    reasons: ModelRoutingStatsSnapshot[\'reasons\'];\n    routedSwitches: {\n        count: number;\n        tokens: number;\n    };\n    rows: ModelRoutingWorkspaceSession[];\n}',
   },
   {
     name: 'NoteJspaceInput',

@@ -974,6 +974,69 @@ export interface ModelRoutingDecisionDetail {
   gate: ModelRoutingGateView
 }
 
+/**
+ * The window of a workspace statistics read: a session is in it when its
+ * latest decision falls within the last 24 hours, the last 7 days, or ever.
+ */
+export type ModelRoutingStatsRange = '24h' | '7d' | 'all'
+
+/** A `modelRouting/stats` request: one workspace's sessions over one window. */
+export interface ModelRoutingStatsRequest {
+  /** Registry id of the workspace whose sessions are rolled up. */
+  workspaceId: string
+  range: ModelRoutingStatsRange
+}
+
+/** One session's row in the workspace statistics. */
+export interface ModelRoutingWorkspaceSession {
+  sessionId: string
+  /** Time of the session's latest decision, epoch milliseconds. */
+  lastDecisionAt: number
+  /** The session's decisions. */
+  decisions: number
+  /** The session's steps with a call. */
+  steps: number
+  /** Of those, steps a pool model served. */
+  downgradedSteps: number
+}
+
+/**
+ * Routing statistics across one workspace's sessions, rolled up from each
+ * session's `modelRoutingStats` value. A session counts whole: its totals
+ * are included when its latest decision falls in the range, not only the
+ * decisions within it.
+ */
+export interface ModelRoutingWorkspaceStats {
+  workspaceId: string
+  range: ModelRoutingStatsRange
+  /** When the host rolled these up, epoch milliseconds. */
+  computedAt: number
+  sessions: {
+    /** Unarchived sessions the workspace accounts. */
+    members: number
+    /**
+     * Members whose statistics were read: live for an attached session, else
+     * the persisted projection cache's value on the current unit version.
+     * The rest have none until they are opened.
+     */
+    summarized: number
+    /** Summarized sessions whose latest decision falls in the range. */
+    inRange: number
+    /** In-range sessions rolled up, most recent decision first. */
+    included: number
+    /** Whether more sessions were in range than the cap includes. */
+    capped: boolean
+  }
+  /** Summed counts of the included sessions. */
+  counts: ModelRoutingStatsSnapshot['counts']
+  /** Decision reasons across the included sessions, largest count first, then by reason. */
+  reasons: ModelRoutingStatsSnapshot['reasons']
+  /** Cold prefills after routed switches and routed returns across the included sessions. */
+  routedSwitches: { count: number; tokens: number }
+  /** The included sessions, most recent decision first. */
+  rows: ModelRoutingWorkspaceSession[]
+}
+
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**

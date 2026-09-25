@@ -7421,18 +7421,33 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
       '@shres-code/shres-code-session-persistence-jsonl':
         specifier: workspace:^
         version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
+      '@shres-code/shres-code-session-projection-cache':
+        specifier: workspace:^
+        version: link:../../session/session-projection-cache
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-storage':
+        specifier: workspace:^
+        version: link:../../storage/storage
+      '@shres-code/shres-code-storage-domain':
+        specifier: workspace:^
+        version: link:../../storage/storage-domain
+      '@shres-code/shres-code-storage-json':
+        specifier: workspace:^
+        version: link:../../storage/storage-json
       '@shres-code/shres-code-subagent':
         specifier: workspace:^
         version: link:../../subagent/subagent
@@ -7457,6 +7472,9 @@ importers:
       '@shres-code/shres-code-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol
+      '@shres-code/shres-code-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/llm/token-meter:
     dependencies:

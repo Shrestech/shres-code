@@ -69,12 +69,16 @@ import type {
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
-import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
-// Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
+// Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children,
+// and the optional services the workspace statistics read reads through.
 import type {} from '@shres-code/shres-code-commands'
 import type {} from '@shres-code/shres-code-session-projection'
+import type {} from '@shres-code/shres-code-session-persistence'
+import type {} from '@shres-code/shres-code-session-projection-cache'
+import type { WorkspaceId } from '@shres-code/shres-code-workspace'
 import {
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
   DEFAULT_ENTRY_SCORE_CEILING,
@@ -115,6 +119,8 @@ import {
   viewStats,
 } from './stats.ts'
 import type { ModelRoutingStatsState } from './stats.ts'
+import { summarizeSession, workspaceStats } from './workspace-stats.ts'
+import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
@@ -137,6 +143,9 @@ import type {
   ModelRoutingThresholds,
   ModelRoutingSelection,
   ModelRoutingSelectionView,
+  ModelRoutingStatsRequest,
+  ModelRoutingStatsSnapshot,
+  ModelRoutingWorkspaceStats,
 } from './types.ts'
 // The `modelRouting` projection-key and session-event declarations live in
 // src/types.ts (their one home); this re-export keeps the module edge in the
@@ -997,6 +1006,78 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       throw new Error(`session "${agent.session.id}" logs no model-routing/decision at seq ${String(seq)}`)
     }
     return { seq, time: event.time, ...positionBefore(events, index), decision: event.data, gate: this.gateView() }
+  }
+
+  /**
+   * Routing statistics across one workspace's unarchived sessions, for the
+   * Settings overview: each session's `modelRoutingStats` value, rolled up
+   * over the sessions whose latest decision falls in the range. An attached
+   * session's value is its live one and a cold session's is the persisted
+   * projection cache's; no session log is read, so a cold session without a
+   * cached value on the current unit version is counted as not summarized.
+   * @param request - the workspace and the range.
+   * @returns the workspace statistics.
+   * @throws when this host composes no workspace registry or the workspace is unknown.
+   */
+  @Remote('stats')
+  async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats> {
+    const registry = this.ctx.get('workspaceRegistry')
+    if (registry === undefined) throw new Error('modelRouting.stats: this host composes no workspace registry')
+    // The wire carries the id as a plain string; the registry brands it.
+    const workspace = registry.get(request.workspaceId as WorkspaceId)
+    if (workspace === undefined) throw new Error(`modelRouting.stats: no workspace "${request.workspaceId}"`)
+    const archived = new Set(registry.archivedSessionIds)
+    const members = workspace.sessionIds.filter(id => !archived.has(id))
+    const values = await this.storedStats(members)
+    const summaries: SessionSummary[] = []
+    for (const [sessionId, stats] of values) {
+      const summary = summarizeSession(sessionId, stats)
+      if (summary !== undefined) summaries.push(summary)
+    }
+    return workspaceStats({
+      workspaceId: request.workspaceId,
+      range: request.range,
+      now: Date.now(),
+      members: members.length,
+      summarized: values.size,
+      summaries,
+    })
+  }
+
+  /**
+   * The `modelRoutingStats` value of each session that has one: the live
+   * value of an attached session, else the persisted projection cache's
+   * identity-checked value, which lists session headers without reading any
+   * log. A cached value that fails to view is logged and left out.
+   * @param ids - the sessions to read.
+   * @returns the values found, by session id.
+   */
+  private async storedStats(ids: readonly SessionId[]): Promise<Map<SessionId, ModelRoutingStatsSnapshot>> {
+    const values = new Map<SessionId, ModelRoutingStatsSnapshot>()
+    const projections = this.ctx.get('sessionProjections')
+    const cold = new Set<SessionId>()
+    for (const id of ids) {
+      const session = this.ctx.sessions.get(id)
+      if (session === undefined) {
+        cold.add(id)
+        continue
+      }
+      const value = projections?.snapshot(session).values.modelRoutingStats
+      if (value !== undefined) values.set(id, value)
+    }
+    const cache = this.ctx.get('sessionProjectionCache')
+    const persistence = this.ctx.get('sessionPersistence')
+    if (cold.size === 0 || cache === undefined || persistence === undefined) return values
+    for (const header of await persistence.list()) {
+      if (!cold.has(header.id)) continue
+      try {
+        const value = cache.cachedSnapshot(header)?.values.modelRoutingStats
+        if (value !== undefined) values.set(header.id, value)
+      } catch (error) {
+        this.ctx.logger.warn('modelRouting.stats: cached statistics of "%s" failed to view; the session is not summarized: %s', header.id, String(error))
+      }
+    }
+    return values
   }
 
   /**
