@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import { client as acpClient, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 import type { Stream } from '@agentclientprotocol/sdk'
 import { Context } from '@shres-code/cordis'
 import * as AcpServer from '@shres-code/shres-code-acp'
@@ -202,14 +202,17 @@ describe('front ends that provide no model selection reach the router', () => {
     const agentToClient = new TransformStream<Uint8Array, Uint8Array>()
     const clientToAgent = new TransformStream<Uint8Array, Uint8Array>()
     const ctx = await boot([], undefined, ndJsonStream(agentToClient.writable, clientToAgent.readable))
-    // oxlint-disable-next-line typescript/no-deprecated -- the client the ACP package's own test harness drives
-    const client = new ClientSideConnection(() => ({
-      sessionUpdate: () => Promise.resolve(),
-      requestPermission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
-    }), ndJsonStream(clientToAgent.writable, agentToClient.readable))
-    await client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
-    const { sessionId } = await client.newSession({ cwd: root ?? process.cwd(), mcpServers: [] })
-    const response = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'a small change' }] })
+    const { sessionId, response } = await acpClient({ name: 'model-router-front-end' })
+      .onRequest('session/request_permission', () => ({ outcome: { outcome: 'cancelled' } }))
+      .connectWith(ndJsonStream(clientToAgent.writable, agentToClient.readable), async (acp) => {
+        await acp.request('initialize', { protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+        const created = await acp.request('session/new', { cwd: root ?? process.cwd(), mcpServers: [] })
+        const prompted = await acp.request('session/prompt', {
+          sessionId: created.sessionId,
+          prompt: [{ type: 'text', text: 'a small change' }],
+        })
+        return { sessionId: created.sessionId, response: prompted }
+      })
     expect(response.stopReason).toBe('end_turn')
     const agent = ctx.agents.list().find(candidate => String(candidate.id) === sessionId)
     if (agent === undefined) throw new Error('the ACP session has no live agent')

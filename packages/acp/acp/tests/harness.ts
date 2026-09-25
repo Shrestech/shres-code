@@ -2,10 +2,18 @@
 
 import { Context } from '@shres-code/cordis'
 import {
-  ClientSideConnection,
+  client as acpClient,
   ndJsonStream,
-  type Agent as AcpAgent,
-  type Client,
+  type AuthenticateRequest,
+  type AuthenticateResponse,
+  type CancelNotification,
+  type ClientContext,
+  type InitializeRequest,
+  type InitializeResponse,
+  type NewSessionRequest,
+  type NewSessionResponse,
+  type PromptRequest,
+  type PromptResponse,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -89,9 +97,18 @@ export function errorResponse(message: string): StreamChunk[] {
 
 export type CapturedUpdate = SessionNotification['update']
 
+/** The agent-side ACP methods the bridge tests call, sent over the harness connection. */
+export interface AcpTestClient {
+  initialize(params: InitializeRequest): Promise<InitializeResponse>
+  authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse>
+  newSession(params: NewSessionRequest): Promise<NewSessionResponse>
+  prompt(params: PromptRequest): Promise<PromptResponse>
+  cancel(params: CancelNotification): Promise<void>
+}
+
 export interface BridgeHarness {
   ctx: Context
-  client: ClientSideConnection
+  client: AcpTestClient
   adapter: MockAdapter
   updates: CapturedUpdate[]
   sessionUpdates: { sessionId: string; update: CapturedUpdate }[]
@@ -140,26 +157,27 @@ export async function makeBridgeHarness(options: {
     permissionRequests,
     onPermission: () => ({ outcome: { outcome: 'cancelled' } }),
     onSessionUpdateError: undefined,
-    client: undefined as unknown as ClientSideConnection,
+    client: undefined as unknown as AcpTestClient,
     acpFiber: undefined as unknown as BridgeHarness['acpFiber'],
     loopFiber,
     closeClientTransport: async () => { await clientToAgentWriter.close() },
     abortClientTransport: async () => { await clientToAgentWriter.abort(new Error('client transport failed')) },
-    dispose: async () => { await ctx.fiber.dispose() },
+    dispose: async () => {
+      release()
+      await ctx.fiber.dispose()
+    },
   }
 
-  const makeClient = (_agent: AcpAgent): Client => ({
-    sessionUpdate(params: SessionNotification): Promise<void> {
+  const app = acpClient({ name: 'acp-bridge-harness' })
+    .onNotification('session/update', ({ params }) => {
       updates.push(params.update)
       sessionUpdates.push({ sessionId: params.sessionId, update: params.update })
-      if (harness.onSessionUpdateError !== undefined) return Promise.reject(new Error('client update rejected'))
-      return Promise.resolve()
-    },
-    requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+      if (harness.onSessionUpdateError !== undefined) throw new Error('client update rejected')
+    })
+    .onRequest('session/request_permission', ({ params }) => {
       permissionRequests.push(params)
-      return Promise.resolve(harness.onPermission(params))
-    },
-  })
+      return harness.onPermission(params)
+    })
 
   const config = { stream: agentStream, ...options.config } as AcpConfig
   if (!(options.config && 'provider' in options.config)) config.provider = 'mock'
@@ -169,6 +187,26 @@ export async function makeBridgeHarness(options: {
     inject: [...AcpPlugin.inject],
     apply: (inner: Context) => { AcpPlugin.apply(inner, config) },
   })
-  harness.client = new ClientSideConnection(makeClient, clientStream)
+  // The connection lives until the harness is disposed or the transport
+  // closes; a closed transport rejects the pending requests on its own.
+  const connected = Promise.withResolvers<ClientContext>()
+  const lifetime = Promise.withResolvers<undefined>()
+  const release = (): void => { lifetime.resolve(undefined) }
+  app.connectWith(clientStream, async (agent) => {
+    connected.resolve(agent)
+    await lifetime.promise
+  }).catch((error: unknown) => {
+    // A connection closed by a test's transport close or abort ends here;
+    // requests still pending were rejected with the same reason.
+    connected.reject(error)
+  })
+  const agent = await connected.promise
+  harness.client = {
+    initialize: params => agent.request('initialize', params),
+    authenticate: params => agent.request('authenticate', params),
+    newSession: params => agent.request('session/new', params),
+    prompt: params => agent.request('session/prompt', params),
+    cancel: params => agent.notify('session/cancel', params),
+  }
   return harness
 }
