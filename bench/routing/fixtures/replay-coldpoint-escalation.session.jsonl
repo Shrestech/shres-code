@@ -1,0 +1,17 @@
+{"type":"session","version":0,"id":"bench-replay-coldpoint-escalation","createdAt":1790410680300,"cwd":"/tmp/bench-replay-coldpoint","delegationDepth":1}
+{"type":"turn/start","seq":0,"time":1790410680300,"data":{"turn":1}}
+{"type":"step/start","seq":1,"time":1790410680301,"data":{"turn":1,"step":1}}
+{"type":"user/message","seq":2,"time":1790410680301,"data":{"content":[{"type":"text","text":"Run the failing parser check twice, then fix it."}],"source":{"kind":"team-message","form":"relay","teamId":"team-lead","messageId":"assignment-1","senderSessionId":"bench-lead","senderName":"lead"},"role":"user","id":"bench-replay-coldpoint-escalation"},"surfaceOp":"append"}
+{"type":"tool/call","seq":3,"time":1790410680301,"data":{"turn":1,"step":1,"callId":"call-1","name":"bash","arguments":"{\"command\":\"pnpm test -- parser\"}"}}
+{"type":"tool/result","seq":4,"time":1790410680301,"data":{"turn":1,"step":1,"message":{"source":{"kind":"tool","callId":"call-1"},"content":[{"type":"tool-result","toolCallId":"call-1","content":[{"type":"text","text":"boom"}],"isError":true}],"role":"user","id":"114fd3c2-6ebc-4a53-8771-c133bd6536e9"}},"surfaceOp":"append"}
+{"type":"step/end","seq":5,"time":1790410680301,"data":{"turn":1,"step":1}}
+{"type":"step/start","seq":6,"time":1790410680301,"data":{"turn":1,"step":2}}
+{"type":"tool/call","seq":7,"time":1790410680301,"data":{"turn":1,"step":1,"callId":"call-2","name":"bash","arguments":"{\"command\":\"pnpm test -- parser\"}"}}
+{"type":"tool/result","seq":8,"time":1790410680301,"data":{"turn":1,"step":1,"message":{"source":{"kind":"tool","callId":"call-2"},"content":[{"type":"tool-result","toolCallId":"call-2","content":[{"type":"text","text":"boom"}],"isError":true}],"role":"user","id":"ecf1b85b-4488-498b-a1fb-e185ac748b03"}},"surfaceOp":"append"}
+{"type":"step/end","seq":9,"time":1790410680301,"data":{"turn":1,"step":2}}
+{"type":"escalation/decision","seq":10,"time":1790410680302,"data":{"trigger":"errorBurst","triggerSeq":8,"choice":"continue","engine":"absent","reason":"engine-absent","aging":{"continues":1,"lastContinueSeq":10}},"ignorable":true}
+{"type":"step/start","seq":11,"time":1790410680302,"data":{"turn":1,"step":3}}
+{"type":"tool/call","seq":12,"time":1790410680302,"data":{"turn":1,"step":1,"callId":"call-3","name":"bash","arguments":"{\"command\":\"git diff --stat\"}"}}
+{"type":"tool/result","seq":13,"time":1790410680302,"data":{"turn":1,"step":1,"message":{"source":{"kind":"tool","callId":"call-3"},"content":[{"type":"tool-result","toolCallId":"call-3","content":[{"type":"text","text":"ok"}],"isError":false}],"role":"user","id":"7fa3a532-c8f1-4d99-a047-ac094f923814"}},"surfaceOp":"append"}
+{"type":"step/end","seq":14,"time":1790410680302,"data":{"turn":1,"step":3}}
+{"type":"turn/end","seq":15,"time":1790410680302,"data":{"turn":1,"reason":{"kind":"completed"}}}

@@ -1,86 +1,104 @@
 /**
  * Pure replay labeller of the routing measurement's offline judge replay: it
- * turns one arm-C session log into pinned labelled-scores rows, one per
- * replayed cold-point entry consult, with the §4 label. The consult half
- * (eligibility, answered, winner, confidence, margin, pCheap, difficulty,
- * fit) waits on the router's replayConsultInput handoff; until a row passes
- * through that half it carries `eligible: false, answered: false` and null
- * consult fields, so a premature metric run reads zero eligible rows instead
- * of a fabricated denominator. No model is called and no calibration data is
- * read: the log is a fixture the caller names.
+ * turns one decoded session log plus caller-supplied cold points into pinned
+ * labelled-scores rows, one per replayed cold-point consult, with the §4
+ * label. The consult half (eligibility, answered, winner, confidence, margin,
+ * pCheap, difficulty, fit) waits on the router's replayConsultInput handoff;
+ * until a row passes through that half it carries `eligible: false,
+ * answered: false` and null consult fields, so a premature metric run reads
+ * zero eligible rows instead of a fabricated denominator. No model is called
+ * and no calibration data is read.
  *
- * Label (prereg §4): a cold point is cheap-sufficient when C passed the task
- * and C's trajectory from that cold point reached the next cold point without
- * a worker-escalation trigger — through the end of the log for the last cold
- * point. The ALL-vs-ELIGIBLE denominators of `computeReplayMetrics` are
- * preserved downstream: this module only labels; it never decides eligibility.
+ * Inputs and what they must already be when they arrive:
+ *
+ * - `events` are decoded logical-log events of one arm trial — the actual
+ *   storage codec's output, with ignorable events retained (`escalation/decision`
+ *   is an ignorable event and is the worker-escalation trigger record this
+ *   module counts; a decode that drops ignorable events silently un-escapes
+ *   every row).
+ * - `coldPoints` are supplied by the caller: the stable
+ *   `turn:<turn>/step:<step>` ids and window seqs come from the router's
+ *   public replay handoff (`coldPointAt` at the opening step), never from
+ *   this module. S and C calibration arms carry no router decision events, so
+ *   cold points are not inferable from a log, and how an S trial is labelled
+ *   is an unresolved owner-method decision this module does not preempt: it
+ *   labels exactly the cold points it is given and leaves every metric
+ *   eligibility decision downstream.
+ *
+ * Label (prereg §4): a cold point is cheap-sufficient when the trial passed
+ * the task and its trajectory from that cold point reached the next cold
+ * point without a worker-escalation trigger — through the end of the log for
+ * the last cold point. The window position of a trigger is its
+ * `data.triggerSeq` (the event that satisfied the trigger), not the decision
+ * event's own seq, and any decision choice counts as fired. The
+ * ALL-vs-ELIGIBLE denominators of `computeReplayMetrics` are preserved
+ * downstream: this module only labels; it never decides eligibility.
  *
  * @module bench/routing/replay-rows
  */
 import { validateReplayRow } from '../analysis/replay-metrics.js'
 
-/** Default session-log event names counted as worker-escalation triggers. */
-export const ESCALATION_EVENT_NAMES = ['worker-escalation']
+/** Default session-log event types counted as worker-escalation triggers. */
+export const ESCALATION_EVENT_NAMES = ['escalation/decision']
 
 /**
- * The cold-point decisions of one session log, in log order: every
- * `model-routing/decision` that carries a non-null `coldPoint` marks one
- * replayed cold point, identified by its turn and step.
- * @param {readonly { seq?: number, event?: string, data?: Record<string, unknown> }[]} entries - parsed session-log entries.
- * @returns {{ coldPointId: string, seq: number }[]} the cold points in log order.
+ * The worker-escalation trigger window seqs of one decoded log, ascending.
+ * Every matching event counts as a fired trigger regardless of its choice;
+ * its position is the seq of the event that satisfied the trigger
+ * (`data.triggerSeq`), so a decision appended after the trigger's evidence
+ * still escapes the window that evidence opened.
+ * @param {readonly { type?: string, data?: Record<string, unknown> }[]} events - decoded session-log events.
+ * @param {readonly string[]} [eventTypes] - event types counted as triggers; defaults to the worker-escalation family.
+ * @returns {number[]} ascending trigger seqs.
+ * @throws {TypeError} when a matching event carries no safe-integer `data.triggerSeq`.
  */
-export function extractColdPoints(entries) {
-  const coldPoints = []
-  for (const entry of entries) {
-    if (entry.event !== 'model-routing/decision') continue
-    const coldPoint = entry.data?.coldPoint
-    if (coldPoint === null || coldPoint === undefined) continue
-    const seq = entry.seq ?? 0
-    const step = entry.data?.step
-    const turn = entry.data?.turn
-    coldPoints.push({
-      coldPointId: turn === undefined || step === undefined ? `seq:${seq}` : `turn:${turn}/step:${step}`,
-      seq,
-    })
+export function extractEscalationTriggerSeqs(events, eventTypes = ESCALATION_EVENT_NAMES) {
+  const names = new Set(eventTypes)
+  const triggerSeqs = []
+  for (const event of events) {
+    if (event.type === undefined || !names.has(event.type)) continue
+    const triggerSeq = event.data?.triggerSeq
+    if (typeof triggerSeq !== 'number' || !Number.isSafeInteger(triggerSeq)) {
+      throw new TypeError(`escalation event ${JSON.stringify(event.type)} carries no safe-integer data.triggerSeq, so its §4 window position is unknowable`)
+    }
+    triggerSeqs.push(triggerSeq)
   }
-  return coldPoints
+  return triggerSeqs.sort((a, b) => a - b)
 }
 
 /**
- * The seqs of one log's worker-escalation triggers, ascending.
- * @param {readonly { seq?: number, event?: string }[]} entries - parsed session-log entries.
- * @param {readonly string[]} [eventNames] - event names counted as triggers; defaults to the worker-escalation family.
- * @returns {number[]} ascending seqs.
- */
-export function extractEscalationSeqs(entries, eventNames = ESCALATION_EVENT_NAMES) {
-  const names = new Set(eventNames)
-  return entries
-    .filter(entry => entry.event !== undefined && names.has(entry.event))
-    .map(entry => entry.seq ?? 0)
-    .sort((a, b) => a - b)
-}
-
-/**
- * Label one arm-C log into pinned labelled-scores rows. Rows come back in log
- * order with the consult fields unset (`eligible: false, answered: false`,
- * every consult value null) — the consult half of the replay fills them.
+ * Label one arm trial into pinned labelled-scores rows. Rows come back in
+ * cold-point order with the consult fields unset (`eligible: false,
+ * answered: false`, every consult value null) — the consult half of the
+ * replay fills them.
  * @param {object} input
- * @param {string} input.task - the task id the log belongs to.
+ * @param {string} input.task - the task id the trial belongs to.
  * @param {'routine' | 'moderate' | 'hard'} input.stratum - the task's preregistered stratum.
- * @param {readonly { seq?: number, event?: string, data?: Record<string, unknown> }[]} input.entries - parsed session-log entries of the arm-C trial.
- * @param {boolean} input.taskPassed - whether C's final verifier passed.
- * @param {readonly string[]} [input.escalationEventNames] - event names counted as worker-escalation triggers.
- * @returns {{ rows: import('../analysis/replay-metrics.js').ReplayRow[], coldPoints: number, escalations: number }} the labelled rows and the raw counts.
- * @throws {TypeError} when the log marks no cold point.
+ * @param {readonly { type?: string, data?: Record<string, unknown> }[]} input.events - decoded session-log events of the arm trial.
+ * @param {readonly { coldPointId: string, seq: number }[]} input.coldPoints - the trial's cold points in the router's stable id form, from the caller's replay handoff.
+ * @param {boolean} input.taskPassed - whether the trial's final verifier passed.
+ * @param {readonly string[]} [input.escalationEventTypes] - event types counted as worker-escalation triggers.
+ * @returns {{ rows: import('../analysis/replay-metrics.js').ReplayRow[], coldPoints: number, triggers: number }} the labelled rows and the raw counts.
+ * @throws {TypeError} when the caller supplies no cold point or a malformed cold point.
  */
-export function labelReplayRows({ task, stratum, entries, taskPassed, escalationEventNames }) {
-  const coldPoints = extractColdPoints(entries)
-  if (coldPoints.length === 0) throw new TypeError(`task ${JSON.stringify(task)}: the log marks no cold point, so there is nothing to label`)
-  const escalations = extractEscalationSeqs(entries, escalationEventNames)
-  const lastSeq = entries.reduce((max, entry) => Math.max(max, entry.seq ?? 0), 0)
-  const rows = coldPoints.map((coldPoint, index) => {
-    const windowEnd = index + 1 < coldPoints.length ? coldPoints[index + 1].seq : lastSeq + 1
-    const escaped = escalations.some(seq => seq > coldPoint.seq && seq < windowEnd)
+export function labelReplayRows({ task, stratum, events, coldPoints, taskPassed, escalationEventTypes }) {
+  if (!Array.isArray(coldPoints) || coldPoints.length === 0) {
+    throw new TypeError(`task ${JSON.stringify(task)}: the caller supplied no cold point, so there is nothing to label`)
+  }
+  const points = coldPoints.map((coldPoint, index) => {
+    if (typeof coldPoint?.coldPointId !== 'string' || coldPoint.coldPointId === '') {
+      throw new TypeError(`task ${JSON.stringify(task)}: cold point ${index} carries no coldPointId`)
+    }
+    if (typeof coldPoint.seq !== 'number' || !Number.isSafeInteger(coldPoint.seq)) {
+      throw new TypeError(`cold point ${coldPoint.coldPointId} carries no safe-integer seq`)
+    }
+    return coldPoint
+  }).sort((a, b) => a.seq - b.seq)
+  const lastSeq = events.reduce((max, event) => Math.max(max, event.seq ?? 0), 0)
+  const triggers = extractEscalationTriggerSeqs(events, escalationEventTypes)
+  const rows = points.map((coldPoint, index) => {
+    const windowEnd = index + 1 < points.length ? points[index + 1].seq : lastSeq + 1
+    const escaped = triggers.some(seq => seq > coldPoint.seq && seq < windowEnd)
     return validateReplayRow({
       task, stratum, coldPointId: coldPoint.coldPointId,
       eligible: false, answered: false, truncated: null, headTokens: null,
@@ -88,22 +106,5 @@ export function labelReplayRows({ task, stratum, entries, taskPassed, escalation
       cheapSufficient: taskPassed && !escaped,
     }, `cold point ${coldPoint.coldPointId}`)
   })
-  return { rows, coldPoints: coldPoints.length, escalations: escalations.length }
-}
-
-/**
- * Parse a session-log JSONL document into entries, skipping blank lines and
- * keeping the raw objects; malformed lines throw with their line number.
- * @param {string} text - the JSONL document.
- * @returns {Record<string, unknown>[]} the parsed entries.
- */
-export function parseLog(text) {
-  return text.split('\n').flatMap((line, index) => {
-    if (line.trim() === '') return []
-    try {
-      return [JSON.parse(line)]
-    } catch (error) {
-      throw new SyntaxError(`session log line ${index + 1} is not valid JSON (${error.message})`)
-    }
-  })
+  return { rows, coldPoints: points.length, triggers: triggers.length }
 }
