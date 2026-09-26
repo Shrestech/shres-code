@@ -42,7 +42,8 @@ describe('consult', () => {
     const consults = 10_000
     for (let i = 0; i < consults; i += 1) {
       const { answers } = consult(CONFIG, corr(`session-${i}`, 'turn:0/step:0'), CHOICE_QUESTIONS)
-      if (answers[0].option === 'flash') downgrades += 1
+      const first = answers[0]
+      if (first?.kind === 'choice' && first.option === 'flash') downgrades += 1
     }
     const observed = downgrades / consults
     const se = Math.sqrt(0.3 * 0.7 / consults)
@@ -62,8 +63,12 @@ describe('consult', () => {
 
   it('keeps the current route when the draw exceeds the rate', () => {
     const { answers } = consult({ entryRate: 0, seed: 3 }, corr('s', 'turn:0/step:0'), CHOICE_QUESTIONS)
-    expect(answers[0].option).toBe(KEEP_CURRENT_OPTION)
-    expect(answers[0].probabilities[KEEP_CURRENT_OPTION]).toBe(1)
+    const first = answers[0]
+    expect(first?.kind).toBe('choice')
+    if (first?.kind === 'choice') {
+      expect(first.option).toBe(KEEP_CURRENT_OPTION)
+      expect(first.probabilities[KEEP_CURRENT_OPTION]).toBe(1)
+    }
   })
 
   it('replays identically for the same correlation without prior state', () => {
@@ -87,8 +92,8 @@ describe('consult', () => {
       { kind: 'choice', id: 'route', options: ROUTE_OPTIONS },
     ])
     expect(answers).toHaveLength(2)
-    expect(answers[0].kind).toBe('score')
-    expect(answers[1].kind).toBe('choice')
+    expect(answers[0]?.kind).toBe('score')
+    expect(answers[1]?.kind).toBe('choice')
   })
 
   it('refuses a choice question with no options', () => {
