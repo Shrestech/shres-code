@@ -886,7 +886,12 @@
     },
     "packages/bundle/headless": {
       "ignoreDependencies": [
-        "@shres-code/shres-code-code-runtime-worker-thread"
+        "@shres-code/shres-code-code-runtime-worker-thread",
+        "@shres-code/shres-code-judgment-dispatch",
+        "@shres-code/shres-code-judgment-laya",
+        "@shres-code/shres-code-judgment-shield",
+        "@shres-code/shres-code-judgment-typesafe",
+        "@shres-code/shres-code-model-router"
       ]
     },
     "packages/bundle/web-app": {

@@ -22,10 +22,10 @@ export const SCRIPTED_CANDIDATE = 'flash'
 export const SCRIPTED_OTHER_CANDIDATE = 'vision'
 
 /** Confidence the scripted route answer reports; above any gate the tests configure. */
-export const SCRIPTED_ROUTE_CONFIDENCE = 0.9
+const SCRIPTED_ROUTE_CONFIDENCE = 0.9
 
 /** Probability-weighted difficulty the scripted score answer reports; below the entry ceiling. */
-export const SCRIPTED_DIFFICULTY_SCORE = 1
+const SCRIPTED_DIFFICULTY_SCORE = 1
 
 /** Engine name the scripted answers report. */
 export const SCRIPTED_ENGINE = 'fake-judgment'
@@ -99,5 +99,3 @@ export class FakeJudgment extends JudgmentService {
     })
   }
 }
-
-export default FakeJudgment
