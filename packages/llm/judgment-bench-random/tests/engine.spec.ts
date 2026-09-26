@@ -100,6 +100,24 @@ describe('consult', () => {
     expect(() => consult(CONFIG, corr('s', 'turn:0/step:0'), [{ kind: 'choice', id: 'route' }])).toThrow(/no options/)
   })
 
+  it('keeps the only option when a downgrade draw meets an all-keep-current list', () => {
+    const { answers } = consult({ entryRate: 1, seed: 3 }, corr('s', 'turn:0/step:0'), [
+      { kind: 'choice', id: 'route', options: [{ option: KEEP_CURRENT_OPTION }] },
+    ])
+    const first = answers[0]
+    expect(first?.kind).toBe('choice')
+    if (first?.kind === 'choice') expect(first.option).toBe(KEEP_CURRENT_OPTION)
+  })
+
+  it('selects the last option when a keep draw meets a list without keep-current', () => {
+    const { answers } = consult({ entryRate: 0, seed: 3 }, corr('s', 'turn:0/step:0'), [
+      { kind: 'choice', id: 'route', options: [{ option: 'a' }, { option: 'b' }] },
+    ])
+    const first = answers[0]
+    expect(first?.kind).toBe('choice')
+    if (first?.kind === 'choice') expect(first.option).toBe('b')
+  })
+
   it('refuses an unsupported question kind', () => {
     expect(() => consult(CONFIG, corr('s', 'turn:0/step:0'), [{ kind: 'trinary', id: 'x' }])).toThrow(/unsupported question kind/)
   })
