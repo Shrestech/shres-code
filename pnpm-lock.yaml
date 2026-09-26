@@ -4239,6 +4239,9 @@ importers:
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
