@@ -130,7 +130,7 @@ async function spawnLauncher({ repoRoot, scratchDir, armOverlayPath, overlayPath
  */
 export async function hostReplayTrial({
   repoRoot, trial, path, arm, method, trialOwnRoute, env = process.env,
-  extraOverlay, judge = false,
+  extraOverlay, judge = false, fittingJudgePath, fittingJudgeConfig, judgmentEnabled = true,
 }) {
   const root = await mkdtemp(join(tmpdir(), 'bench-replay-host-'))
   const home = join(root, 'home')
@@ -138,6 +138,14 @@ export async function hostReplayTrial({
   const sessionLogRoot = dirname(dirname(dirname(path)))
   await mkdir(home)
   await mkdir(scratchDir)
+  if (judge === true) {
+    await writeFile(join(home, 'settings.yaml'), [
+      'judgment:',
+      '  enabled: ' + (judgmentEnabled === false ? 'false' : 'true'),
+      '  engine: scripted-fitting',
+      '',
+    ].join('\n'))
+  }
   const sink = await startRequestSink()
   const before = await snapshotSessionLogRoot(sessionLogRoot)
   try {
@@ -149,6 +157,9 @@ export async function hostReplayTrial({
     await writeFile(armPath, armOverlay)
     await writeFile(overlayPath, renderReplayFrontendOverlay({
       sinkUrl: sink.sinkUrl, sessionLogRoot, job: jobPath, out: outPath,
+      omitScriptedJudge: judge === true,
+      fittingJudgePath,
+      fittingJudgeConfig,
     }) + (extraOverlay ?? ''))
     const dumped = await spawnLauncher({
       repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
@@ -252,7 +263,7 @@ function prepareRows(hosted, { id, taskId, arm, stratum, trialIndex }) {
  */
 export async function hostReplayRun({
   repoRoot, method, tasks, trials, env = process.env, extraOverlay,
-  preRefused = [], discovered, judge = false,
+  preRefused = [], discovered, judge = false, fittingJudgePath, fittingJudgeConfig,
 }) {
   if (!Array.isArray(preRefused)) throw new TypeError('preRefused must be an array')
   if (!Array.isArray(trials)) throw new TypeError('hostReplayRun requires a trials array')
@@ -315,6 +326,8 @@ export async function hostReplayRun({
         env,
         extraOverlay,
         judge,
+        fittingJudgePath,
+        fittingJudgeConfig,
       })
     } catch (error) {
       if (error instanceof TrialInputIncompleteError) {

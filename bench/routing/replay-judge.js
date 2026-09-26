@@ -14,7 +14,6 @@ import {
   routingCalibration,
 } from '../../packages/llm/model-router/lib/index.js'
 import { UsageError } from '../runner/run.js'
-import { validateReplayRow } from '../analysis/replay-metrics.js'
 
 function unanswered(row) {
   return {
@@ -104,11 +103,12 @@ export async function judgeReplayRows({ rows, consults, engine, config, sessionI
   const asks = []
   const judged = []
   for (const row of rows) {
-    if (row.eligible !== true) {
-      judged.push(unanswered(row))
+    const consult = consults.find(entry => entry.turn === row.turn && entry.step === row.step)
+    const eligible = consult?.result?.kind === 'ask'
+    if (!eligible) {
+      judged.push({ ...unanswered(row), eligible: false })
       continue
     }
-    const consult = consults.find(entry => entry.turn === row.turn && entry.step === row.step)
     if (consult === undefined || consult.result?.kind !== 'ask') {
       throw new TypeError('eligible row ' + String(row.turn) + '/' + String(row.step) + ' has no ask consult')
     }
@@ -145,8 +145,7 @@ export async function judgeReplayRows({ rows, consults, engine, config, sessionI
       else throw error
     }
     asks.push({ turn: row.turn, step: row.step, outcome, latencyMs: Date.now() - started })
-    judged.push(next)
+    judged.push({ ...next, eligible: true })
   }
-  for (const [index, row] of judged.entries()) validateReplayRow(row, 'judge ' + String(index))
   return { rows: judged, asks }
 }

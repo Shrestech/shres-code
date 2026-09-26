@@ -156,6 +156,9 @@ export function apply(ctx, config) {
       counts,
       kinds,
       asks,
+      recordedAsks: job.judge === true
+        ? (await import('./replay-scripted-fitting-judge.mjs')).internals.asks.slice()
+        : [],
       http: internals.http,
     }
     structuredClone(result.consults)

@@ -1,9 +1,9 @@
 /**
- * Test-only fitting judgment engine. Answers fittingFor().ask from a
- * per-consultKey script. No HTTP. Inserted only in test overlays.
+ * Test-only fitting judgment engine. Registers through public
+ * registerJudgmentEngine (fiber effect). Does not mount ctx.judgment.
  * @module
  */
-import { JudgmentError, JudgmentService } from '../../packages/llm/judgment/lib/index.js'
+import { JudgmentError, judgmentEngineId, registerJudgmentEngine } from '../../packages/llm/judgment/lib/index.js'
 import {
   DIFFICULTY_QUESTION_ID,
   KEEP_CURRENT_OPTION_ID,
@@ -11,8 +11,10 @@ import {
 } from '../../packages/llm/model-router/lib/index.js'
 
 export const name = 'bench-replay-scripted-fitting-judge'
+export const inject = ['judgmentEngines']
 export const internals = { asks: [] }
 
+const ENGINE_ID = judgmentEngineId('scripted-fitting')
 const LIMITS = {
   maxSequenceTokens: 4096,
   maxHeadTokens: 512,
@@ -32,17 +34,30 @@ function choiceAnswer(option, probabilities, omit) {
   }
 }
 
-export class ScriptedFittingJudge extends JudgmentService {
+export class ScriptedFittingEngine {
+  static inject = ['judgmentEngines']
+
   constructor(ctx, config = {}) {
-    super(ctx)
     this.pluginConfig = config
     internals.asks = []
     this.recordedAsks = internals.asks
     this.fitting = { ask: (input) => this.askFitted(input) }
+    this.descriptor = {
+      id: ENGINE_ID,
+      label: 'scripted-fitting',
+      egress: 'none',
+      calibration: config.calibration ?? 'calibrated',
+      supportsFitting: true,
+    }
+    registerJudgmentEngine(ctx, {
+      engine: this,
+      descriptor: this.descriptor,
+      status: () => ({ state: 'ready' }),
+    })
   }
 
-  selectedEngine() {
-    return 'scripted-fitting'
+  ask() {
+    return Promise.resolve({ answers: [], engine: 'scripted-fitting', model: 'scripted-fitting-v1', latencyMs: 0 })
   }
 
   async askFitted(input) {
@@ -56,6 +71,7 @@ export class ScriptedFittingJudge extends JudgmentService {
       questions: input.questions,
       hasSignal: input.signal !== undefined,
     })
+    if (input.signal?.aborted) throw new JudgmentError('ABORTED', 'scripted-fitting aborted')
     if (script.delayMs) await new Promise(resolve => setTimeout(resolve, script.delayMs))
     if (script.kind === 'unfit') {
       return {
@@ -112,13 +128,5 @@ export class ScriptedFittingJudge extends JudgmentService {
 }
 
 export function apply(ctx, config = {}) {
-  if (ctx.get('judgmentEngines') === undefined) {
-    const calibration = config.calibration ?? 'calibrated'
-    ctx.set('judgmentEngines', {
-      get() {
-        return { descriptor: { id: 'scripted-fitting', calibration, supportsFitting: true, egress: 'none', label: 'scripted-fitting' } }
-      },
-    })
-  }
-  ctx.plugin(ScriptedFittingJudge, config)
+  ctx.plugin(ScriptedFittingEngine, config)
 }
