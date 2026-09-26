@@ -13,6 +13,11 @@
  * a failed gate is recorded, never calibrated, and the runner refuses the
  * confirmatory arms on it.
  *
+ * The registration must already contain a complete owner-selected method. Its
+ * canonical hash must match the metrics. This writer never assigns method
+ * fields; incomplete methods, mismatches and unevaluated gates write nothing.
+ * Both passed and failed evaluations retain their full metrics.
+ *
  * The two denominators stay distinct and are both preserved:
  * - the gate's coverage divides by every cold-point row of the replay set;
  * - `enforced.entryRate` and `enforced.realizedREntryRate` carry the chosen
@@ -32,6 +37,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { registrationPhase } from './registration-phase.js'
+import { ALL_METHOD_FIELDS, MethodProvenanceError, parseReplayMethod } from './replay-method.js'
 
 /** The committed registration this writer finalizes; the runner reads it by name. */
 export const REGISTRATION_SCHEMA = 'shres-code/routing-measurement@1'
@@ -87,9 +93,13 @@ export function writeRegistration({ registrationPath, metrics, seed, outDir }) {
   if (registrationPhase(registration) !== 'provisional') {
     throw new TypeError(`${registrationPath} is already finalized (replayGate is set); a registration is written once and never overwritten`)
   }
+  const registeredMethod = parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
+  if (registeredMethod.methodSha256 !== validated.methodSha256) {
+    throw new MethodProvenanceError('registration.method does not match replay metrics method')
+  }
   const next = { ...registration }
   next.replayGate = validated.passed ? 'passed' : 'failed'
-  next.method = { ...validated.method }
+  next.replayMetrics = metrics
   let enforced
   if (validated.passed) {
     enforced = {
@@ -101,8 +111,6 @@ export function writeRegistration({ registrationPath, metrics, seed, outDir }) {
       seed,
     }
     next.enforced = enforced
-  } else {
-    next.replayMetrics = metrics
   }
   // The built document must read back as one finished phase with the status
   // exactly as it came in: the writer adds the flag and the calibration, and
@@ -157,15 +165,14 @@ function readRegistration(registrationPath) {
 function validatedMetrics(metrics) {
   if (metrics === null || typeof metrics !== 'object') throw new TypeError('metrics must be the replay metrics result object')
   const { method, gate, operatingPoint } = metrics
-  if (method === null || typeof method !== 'object') throw new TypeError('metrics.method is required: the recorded preregistration method')
-  if (typeof method.version !== 'string' || method.version === '') throw new TypeError('metrics.method.version must be a non-empty string')
-  if (!Number.isSafeInteger(method.eceBins) || method.eceBins < 1) throw new TypeError(`metrics.method.eceBins must be a positive integer, got ${JSON.stringify(method.eceBins)}`)
-  if (!Array.isArray(method.tieBreak) || method.tieBreak.length === 0) throw new TypeError('metrics.method.tieBreak must be a non-empty array')
-  if (gate === null || typeof gate !== 'object' || typeof gate.passed !== 'boolean') {
-    throw new TypeError('metrics.gate.passed is required: the Laya replay gate verdict')
-  }
-  if (!gate.passed) return { passed: false, method, operatingPoint: null }
-  if (operatingPoint === null || typeof operatingPoint !== 'object') {
+  if (gate?.status !== 'evaluated') throw new TypeError('replay gate not evaluated; no registration is written')
+  if (method === null || typeof method !== 'object') throw new TypeError('metrics.method is required')
+  const { methodSha256, ...methodFields } = method
+  const parsed = parseReplayMethod(methodFields, { require: ALL_METHOD_FIELDS })
+  if (methodSha256 !== parsed.methodSha256) throw new MethodProvenanceError('metrics.method hash does not match its fields')
+  if (typeof gate.passed !== 'boolean') throw new TypeError('metrics.gate.passed is required')
+  if (!gate.passed) return { passed: false, methodSha256, operatingPoint: null }
+  if (operatingPoint === null || typeof operatingPoint !== 'object' || operatingPoint.status !== 'evaluated') {
     throw new TypeError('a passed replay gate requires metrics.operatingPoint, the chosen point')
   }
   for (const key of ['downgradeThreshold', 'downgradeMargin', 'coverage', 'entryRate']) {
@@ -174,7 +181,7 @@ function validatedMetrics(metrics) {
       throw new TypeError(`metrics.operatingPoint.${key} must be a number from 0 through 1, got ${JSON.stringify(value ?? null)}`)
     }
   }
-  return { passed: true, method, operatingPoint }
+  return { passed: true, methodSha256, operatingPoint }
 }
 
 /**

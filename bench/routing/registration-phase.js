@@ -2,6 +2,9 @@
  * The one reader of the routing measurement registration's lifecycle phase,
  * for reports and refusal messages.
  *
+ * Replay-qualified and replay-failed phases require a complete explicit method.
+ * Provisional registrations may omit it.
+ *
  * `replayGate` is the single authoritative calibration-phase flag of
  * `bench/routing/prereg-2026-10.registration.json`; the static `status`
  * field records only that the preregistration is frozen and never encodes
@@ -21,6 +24,8 @@
  *
  * @module bench/routing/registration-phase
  */
+
+import { ALL_METHOD_FIELDS, parseReplayMethod } from './replay-method.js'
 
 /** The static status value every registration carries; no tool changes it. */
 export const REGISTRATION_STATUS = 'preregistered'
@@ -49,12 +54,14 @@ export function registrationPhase(registration) {
   const { replayGate, enforced } = registration
   if (replayGate === undefined) {
     if (enforced !== undefined) throw new TypeError('enforced is present without replayGate; the enforced block exists only after the flag is set')
+    if (registration.method !== undefined) parseReplayMethod(registration.method, { require: [] })
     return 'provisional'
   }
   if (replayGate === 'failed') {
     if (enforced !== undefined) throw new TypeError("a failed replay gate records no enforced block")
     const calibrated = findCalibratedBy(registration)
     if (calibrated !== null) throw new TypeError(`a failed replay gate records no calibrated id; found one at ${calibrated}`)
+    parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
     return 'replay-failed'
   }
   if (replayGate === 'passed') {
@@ -76,6 +83,7 @@ export function registrationPhase(registration) {
     if (!Number.isSafeInteger(enforced.seed) || enforced.seed < 0) {
       throw new TypeError('a passed replay gate requires enforced.seed to be a non-negative integer')
     }
+    parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
     return 'replay-qualified'
   }
   throw new TypeError(`unknown replayGate value ${JSON.stringify(replayGate)}; expected it to be absent, "passed", or "failed"`)

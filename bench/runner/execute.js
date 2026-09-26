@@ -6,12 +6,14 @@
  * apps/cli/src/bin.ts`) but pins the child cwd to the scratch dir, which the
  * CLI takes as the workspace root. tsx resolves through the repo root's own
  * node_modules, so a worktree without `pnpm install` fails loud at launch
- * resolution rather than mid-run.
+ * resolution rather than mid-run. TSX_TSCONFIG_PATH pins the workspace source
+ * mappings independently of the trial cwd.
  *
  * @module bench/runner/execute
  */
 
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
@@ -60,13 +62,15 @@ export function killOnAbort(child, signal, graceMs = KILL_GRACE_MS) {
  * @typedef {object} HarnessLaunch
  * @property {string} command - the node executable.
  * @property {string[]} argsPrefix - `--import tsx/esm` plus the CLI entry, before CLI flags.
+ * @property {{ TSX_TSCONFIG_PATH: string }} env - source mappings required from every trial cwd.
  */
 
 /**
  * Resolve the source-launch argv for the harness CLI. Throws when the repo's
- * dependencies are not installed, naming the remedy.
+ * dependencies are not installed or its source tsconfig is missing, naming
+ * the remedy. The returned environment must override inherited values.
  * @param {string} repoRoot - absolute repository root (the dir with package.json).
- * @returns {HarnessLaunch} executable plus leading arguments.
+ * @returns {HarnessLaunch} executable, leading arguments and required environment.
  */
 export function resolveHarnessLaunch(repoRoot) {
   const repoRequire = createRequire(join(repoRoot, 'package.json'))
@@ -77,9 +81,14 @@ export function resolveHarnessLaunch(repoRoot) {
     // createRequire#resolve only fails here when node_modules is absent.
     throw new Error(`cannot resolve tsx/esm from ${repoRoot}; run \`pnpm install\` in the harness repo first`)
   }
+  const tsconfigPath = join(repoRoot, 'tsconfig.json')
+  if (!existsSync(tsconfigPath)) {
+    throw new Error(`source-launch tsconfig is missing: ${tsconfigPath}; use a complete harness checkout`)
+  }
   return {
     command: process.execPath,
     argsPrefix: ['--import', pathToFileURL(tsxEsmPath).href, join(repoRoot, 'apps/cli/src/bin.ts')],
+    env: { TSX_TSCONFIG_PATH: tsconfigPath },
   }
 }
 
@@ -237,7 +246,7 @@ export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = []
     return { exitCode: null, timedOut: false, budgetExceeded: false, stdout: '', stderr: '', durationMs: 0, sessionLogPath: null }
   }
 
-  const child = spawn(launch.command, argv, { cwd: scratchDir, env, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(launch.command, argv, { cwd: scratchDir, env: { ...env, ...launch.env }, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = ''
   let stderr = ''
   child.stdout.on('data', chunk => {

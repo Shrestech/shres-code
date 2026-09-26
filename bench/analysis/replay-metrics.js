@@ -1,44 +1,19 @@
 /**
- * Replay metrics of the PR 16 routing measurement's offline judge replay.
- *
- * Pure functions over the labelled-scores JSONL the replay front end produces:
- * one row per entry consult at one replayed cold point, with the values
- * exactly as the live model-router controller reads them (its `decide()` entry
- * path and `gate()`, and `routeMargin` from its stats fold). The module
- * computes the preregistered discrimination and calibration figures, the
- * coverage/false-downgrade curve over the router's actual gate quantities, the
- * operating point, and the Laya replay gate of
- * `bench/routing/prereg-2026-10.md` (AUROC >= 0.70; at the chosen point
- * false-downgrade <= 10% with coverage >= 15% of cold points; ECE is reported
- * against the preregistered 0.10 clause, whose second disjunct — thresholds
- * read only from the replay curve — always holds here, because the operating
- * point is selected on this curve and on nothing else).
- *
- * The ECE bin count and the operating-point tie-break are preregistered
- * method inputs: both are required arguments with no default, and both are
- * recorded verbatim in the returned `method` block that the registration
- * writer copies into `prereg-2026-10.registration.json`. A changed method is
- * a new experiment name.
- *
- * Denominators, both reported:
- * - **Coverage** (the gate's ">= 15% of cold points") divides by every
- *   cold-point row of the replay set, including points where the router would
- *   not ask.
- * - **Entry rate** (`enforced.entryRate`, arm N's matched rate) divides by the
- *   eligible rows: bench-random draws once per asked consult, and arm N asks
- *   exactly at eligible cold points, so its per-consult rate must use the
- *   asked denominator.
- *
- * @module bench/analysis/replay-metrics
+ * Replay arithmetic over cold-point rows and an explicit experiment method.
+ * Coverage divides routed rows by ALL cold points; entryRate divides by ELIGIBLE
+ * rows. AUROC and ECE use answered rows. False-downgrade divides insufficient
+ * labels by routed rows. Unlabelled rows remain in these denominators; an unknown
+ * label refuses the dependent metric, never the label-free counts or rates.
+ * Threshold search refuses if any candidate point has unknown false-downgrade.
+ * Numerical choices come from method fields without defaults. The method hash
+ * must match each row's producing method, source, trigger table and reason.
+ * No model, data collection or registration write occurs in this module.
+ * @module
  */
 import { percentile } from './routing-gate.js'
 
-/**
- * Version of the pinned row semantics this module implements. The
- * registration writer records it beside the method inputs, so a registration
- * names the exact row semantics its calibration was computed under.
- */
-export const REPLAY_ROW_SEMANTICS_VERSION = 'pr16-replay@1'
+import { parseReplayMethod, MethodProvenanceError, TIE_BREAK_KEYS } from '../routing/replay-method.js'
+export { REPLAY_ROW_SEMANTICS_VERSION, TIE_BREAK_KEYS } from '../routing/replay-method.js'
 
 /**
  * The route answer's option id for keeping the strong route. Restated from the
@@ -48,22 +23,13 @@ export const REPLAY_ROW_SEMANTICS_VERSION = 'pr16-replay@1'
 export const KEEP_CURRENT_OPTION_ID = 'keep-current'
 
 /**
- * The supported operating-point tie-break keys and their direction, applied in
- * caller order after the primary objective (maximum coverage): a lower value
- * wins for `falseDowngrade`, a higher value wins for the two gate quantities.
- */
-export const TIE_BREAK_KEYS = Object.freeze({
-  falseDowngrade: 'asc',
-  downgradeThreshold: 'desc',
-  downgradeMargin: 'desc',
-})
-
-/**
  * One entry consult at one replayed cold point (`held` undefined). Every cold
  * point in the replay set is one row, including points where the router would
  * not ask. The answered-row fields are read exactly as the router reads them.
  * @typedef {object} ReplayRow
  * @property {string} task - the task id.
+ * @property {'S' | 'C'} arm - source trial arm.
+ * @property {string} methodSha256 - canonical hash of the producing method.
  * @property {'routine' | 'moderate' | 'hard'} stratum - the task's preregistered stratum.
  * @property {string} coldPointId - the cold point within the task's replay.
  * @property {boolean} eligible - at least one pool candidate passes the router's deterministic
@@ -83,8 +49,7 @@ export const TIE_BREAK_KEYS = Object.freeze({
  *   the AUROC and ECE score; null unless answered.
  * @property {number | null} difficultyScore - the difficulty answer's score, which an answered row
  *   always carries when the composition sets difficulty instructions; null unless answered.
- * @property {boolean} cheapSufficient - the label: C passed the task, and C's trajectory from this
- *   cold point reached the next cold point without a worker-escalation trigger.
+ * @property {{ status: 'labelled', cheapSufficient: boolean, source: 'c-trajectory', triggerTableId: string } | { status: 'unlabelled', reason: 'no-label-source-for-arm' | 'final-window-unlabelled' }} label - the explicit trajectory label, or the reason no label source applies (an S trial, or the unlabelled final window); unlabelled rows are counted, never dropped.
  */
 
 /**
@@ -100,8 +65,28 @@ export function validateReplayRow(row, where) {
   for (const key of ['task', 'stratum', 'coldPointId']) {
     if (typeof row[key] !== 'string' || row[key] === '') throw new TypeError(`${where}: ${key} must be a non-empty string`)
   }
-  for (const key of ['eligible', 'answered', 'cheapSufficient']) {
+  if (Object.hasOwn(row, 'cheapSufficient')) throw new TypeError(`${where}: cheapSufficient must be represented by label`)
+  if (row.arm !== 'S' && row.arm !== 'C') throw new TypeError(`${where}: arm must be S or C`)
+  if (typeof row.methodSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.methodSha256)) throw new TypeError(`${where}: methodSha256 must be a SHA256 hex string`)
+  for (const key of ['eligible', 'answered']) {
     if (typeof row[key] !== 'boolean') throw new TypeError(`${where}: ${key} must be a boolean`)
+  }
+  const label = row.label
+  if (label === null || typeof label !== 'object' || Array.isArray(label)) {
+    throw new TypeError(`${where}: label must be the labelled/unlabelled union the labeller emits`)
+  }
+  const keys = label.status === 'labelled' ? ['status', 'cheapSufficient', 'source', 'triggerTableId'] : ['status', 'reason']
+  if (Object.keys(label).some(key => !keys.includes(key))) throw new TypeError(`${where}: unknown label field`)
+  if (label.status === 'labelled') {
+    if (typeof label.cheapSufficient !== 'boolean') throw new TypeError(`${where}: label.cheapSufficient must be a boolean on a labelled row`)
+    if (label.source !== 'c-trajectory') throw new TypeError(`${where}: label.source must be 'c-trajectory' on a labelled row`)
+    if (typeof label.triggerTableId !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(label.triggerTableId)) throw new TypeError(`${where}: label.triggerTableId must be a non-empty string on a labelled row`)
+  } else if (label.status === 'unlabelled') {
+    if (label.reason !== 'no-label-source-for-arm' && label.reason !== 'final-window-unlabelled') {
+      throw new TypeError(`${where}: label.reason must be 'no-label-source-for-arm' or 'final-window-unlabelled'`)
+    }
+  } else {
+    throw new TypeError(`${where}: label.status must be 'labelled' or 'unlabelled'`)
   }
   if (!row.answered) {
     for (const key of ['truncated', 'headTokens', 'winner', 'confidence', 'margin', 'pCheap', 'difficultyScore']) {
@@ -126,6 +111,61 @@ export function validateReplayRow(row, where) {
 }
 
 /**
+ * Raised when a label-dependent metric's own denominator contains unlabelled
+ * rows: the metric refuses rather than filter, rescale, or produce a partial
+ * figure, and the gate verdict reads `method-unpinned`.
+ */
+export class UnlabelledRowsError extends TypeError {
+  /**
+   * @param {string} metric - the refusing metric.
+   * @param {Record<string, number>} countsByReason - unlabelled-row counts by reason.
+   */
+  constructor(metric, countsByReason) {
+    super(`metric ${metric} refuses: ${Object.entries(countsByReason).map(([reason, count]) => `${count} unlabelled (${reason})`).join(', ')} in its denominator`)
+    this.name = 'UnlabelledRowsError'
+    this.metric = metric
+    this.countsByReason = countsByReason
+  }
+}
+
+/**
+ * The trajectory label of one row, for the label-dependent figures: `true`
+ * and `false` for labelled rows, `undefined` for unlabelled rows.
+ * @param {ReplayRow} row - the row to read.
+ * @returns {boolean | undefined} the cheap-sufficient label, or undefined when unlabelled.
+ */
+function labelOf(row) {
+  return row.label.status === 'labelled' ? row.label.cheapSufficient : undefined
+}
+
+/**
+ * Count the unlabelled rows in one denominator by reason.
+ * @param {readonly ReplayRow[]} rows - the denominator's rows.
+ * @returns {Record<string, number> | null} counts by reason, or null when every row is labelled.
+ */
+function unlabelledCounts(rows) {
+  const counts = {}
+  for (const row of rows) {
+    if (row.label.status !== 'unlabelled') continue
+    counts[row.label.reason] = (counts[row.label.reason] ?? 0) + 1
+  }
+  return Object.keys(counts).length === 0 ? null : counts
+}
+
+/** Check method identity before any metric consumes a row. */
+function verifyProvenance(row, method, methodSha256) {
+  if (row.methodSha256 !== methodSha256) throw new MethodProvenanceError('row method hash mismatch')
+  const source = method.labelSources?.[row.arm]
+  if (row.label.status === 'labelled') {
+    if (row.arm !== 'C' || row.label.source !== source || row.label.triggerTableId !== method.triggerTableId) throw new MethodProvenanceError('label source or trigger table does not match the method')
+  } else if (row.label.reason === 'no-label-source-for-arm') {
+    if (source !== 'unlabelled') throw new MethodProvenanceError('unlabelled source reason does not match the method')
+  } else if (source !== 'c-trajectory' || method.finalWindow !== 'unlabelled') {
+    throw new MethodProvenanceError('unlabelled final-window reason does not match the method')
+  }
+}
+
+/**
  * Parse the labelled-scores JSONL: one {@link ReplayRow} per line, blank lines
  * skipped. Rows must be unique per (task, coldPointId); the calibration run is
  * one repeat, so a repeat dimension would be a new row schema.
@@ -145,7 +185,7 @@ export function parseLabelledScores(text) {
       throw new SyntaxError(`${where}: not valid JSON (${error.message})`)
     }
     const row = validateReplayRow(parsed, where)
-    const key = `${row.task}\u0000${row.coldPointId}`
+    const key = JSON.stringify([row.task, row.arm, row.coldPointId])
     if (seen.has(key)) throw new TypeError(`${where}: duplicate cold-point row for task ${JSON.stringify(row.task)}`)
     seen.add(key)
     rows.push(row)
@@ -239,29 +279,34 @@ export function ece(samples, binCount) {
  * @property {string[]} candidateIds - the R overlay's pool candidate ids; only these winners route.
  */
 
-/** Required, defaulted-nowhere options of {@link computeReplayMetrics}.
+/** Explicit method and fixed conditions for replay arithmetic.
  * @typedef {object} ReplayMetricsOptions
- * @property {number} eceBins - the preregistered ECE bin count; required, no default.
- * @property {('falseDowngrade' | 'downgradeThreshold' | 'downgradeMargin')[]} tieBreak - the
- *   preregistered tie-break, applied in order after maximum coverage; required, no default.
- * @property {LayaGateBounds} gate - the gate bounds from the registration.
- * @property {FixedEntryConditions} entry - the fixed entry conditions from the R overlay.
+ * @property {object} method - validated replay method inputs, without defaults.
+ * @property {LayaGateBounds} gate - bounds from the registration.
+ * @property {FixedEntryConditions} entry - fixed conditions from the R overlay.
  */
 
 /**
- * The replay metrics result. `method` is the block the registration writer
- * records; `curve` lists every (threshold, margin) point of the search grid,
- * feasible or not; `operatingPoint` is the selected feasible point or null.
+ * Refusal of a label-dependent metric; unknown labels are never scored as zero.
+ * @typedef {object} LabelRefusal
+ * @property {'refused'} status
+ * @property {'unlabelled-rows'} reason
+ * @property {number} unlabelledInDenominator
+ */
+
+/**
+ * Replay results, with method provenance and explicit unevaluable states.
  * @typedef {object} ReplayMetricsResult
- * @property {{ version: string, eceBins: number, tieBreak: string[] }} method - the preregistered method inputs and the row-semantics version.
- * @property {{ entryScoreCeiling: number, candidateIds: string[] }} fixed - the fixed entry conditions used.
- * @property {{ rows: number, eligible: number, answered: number, unanswered: number, truncated: number, routed: number, falseDowngrades: number }} counts - row counts; `routed` and `falseDowngrades` are at the chosen point.
- * @property {{ auroc: number | null, positives: number, negatives: number }} discrimination - AUROC of `pCheap` against `cheapSufficient` over answered rows.
- * @property {{ ece: number | null, bins: object[] }} calibration - ECE of `pCheap` over answered rows with its bin table; null-scored when no answered row exists.
- * @property {{ headTokensMean: number | null, headTokensP95: number | null, truncationRate: number | null, unansweredRate: number }} tokens - truncation and token figures; the rates are over answered rows, the unanswered rate over all rows.
- * @property {{ downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number | null, falseDowngrades: number, falseDowngrade: number | null, feasible: boolean }[]} curve - every searched point, threshold descending then margin descending. `coverage` divides by every cold-point row; `entryRate` divides by the eligible rows and is null when none is eligible.
- * @property {{ downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number, falseDowngrades: number, falseDowngrade: number } | null} operatingPoint - the chosen point: maximum coverage subject to false-downgrade within the bound, tie-broken by the preregistered order. Its `entryRate` is the eligible-row rate arm N's draw matches.
- * @property {{ passed: boolean, legs: { auroc: boolean, feasiblePoint: boolean, coverage: boolean }, bounds: LayaGateBounds, reading: string }} gate - the Laya replay gate verdict, each leg separately.
+ * @property {object} method - method fields plus canonical methodSha256.
+ * @property {FixedEntryConditions} fixed
+ * @property {{ rows: number, eligible: number, answered: number, unanswered: number, truncated: number, routed: number | null, falseDowngrades: number | null }} counts - selected-point counts are null for a refused search.
+ * @property {{ status: 'evaluated', auroc: number | null, positives: number, negatives: number } | LabelRefusal} discrimination
+ * @property {{ status: 'evaluated', ece: number | null, bins: object[] } | LabelRefusal} calibration
+ * @property {{ total: number, byArm: {S: number, C: number}, byReason: Record<string, number> }} unlabelled
+ * @property {{ headTokensMean: number | null, headTokensP95: number | null, truncationRate: number | null, unansweredRate: number }} tokens
+ * @property {{ downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number | null, falseDowngrades: number | null, falseDowngrade: number | null, feasible: boolean | null, falseDowngradeStatus: 'evaluated' | 'refused-unlabelled' }[]} curve - all grid points, including label-free rates at refused points.
+ * @property {{ status: 'evaluated', downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number, falseDowngrades: number, falseDowngrade: number } | { status: 'refused', reason: 'unlabelled-rows' } | null} operatingPoint - null means no feasible point in an evaluated search.
+ * @property {{ status: 'evaluated' | 'method-unpinned', passed: boolean | null, legs: { auroc: boolean | null, feasiblePoint: boolean | null, coverage: boolean | null }, bounds: LayaGateBounds, reading: string }} gate - an unevaluable gate neither passes nor fails.
  */
 
 /**
@@ -279,93 +324,96 @@ export function ece(samples, binCount) {
  */
 export function computeReplayMetrics(rows, options) {
   if (!Array.isArray(rows) || rows.length === 0) throw new TypeError('computeReplayMetrics needs at least one row')
-  const { eceBins, tieBreak, gate: bounds, entry } = readOptions(options)
-  for (const [index, row] of rows.entries()) validateReplayRow(row, `row ${index}`)
+  const { method, methodSha256, gate: bounds, entry } = readOptions(options)
+  const { eceBins, tieBreak } = method
   const seen = new Set()
-  for (const row of rows) {
-    const key = `${row.task}\u0000${row.coldPointId}`
-    if (seen.has(key)) throw new TypeError(`duplicate cold-point row: task ${JSON.stringify(row.task)}, coldPointId ${JSON.stringify(row.coldPointId)}`)
+  for (const [index, row] of rows.entries()) {
+    validateReplayRow(row, 'row ' + index)
+    const key = JSON.stringify([row.task, row.arm, row.coldPointId])
+    if (seen.has(key)) throw new TypeError('duplicate cold-point row: ' + key)
     seen.add(key)
+    verifyProvenance(row, method, methodSha256)
   }
-
   const answeredRows = rows.filter(row => row.answered)
   const eligibleRows = rows.filter(row => row.eligible)
   const candidateIds = new Set(entry.candidateIds)
-  const candidates = rows.filter(row =>
-    row.eligible
-    && row.answered
+  const candidates = rows.filter(row => row.eligible && row.answered
     && row.difficultyScore < entry.entryScoreCeiling
-    && row.winner !== KEEP_CURRENT_OPTION_ID
-    && candidateIds.has(row.winner),
-  )
-
-  const answerSamples = answeredRows.map(row => ({ score: /** @type {number} */ (row.pCheap), positive: row.cheapSufficient }))
-  const discriminationValue = auroc(answerSamples)
-  const calibration = answeredRows.length > 0 ? ece(answerSamples, eceBins) : { ece: null, bins: [] }
-
-  const thresholds = [...new Set(candidates.map(row => /** @type {number} */ (row.confidence)))].sort((a, b) => b - a)
-  const margins = [...new Set(candidates.map(row => /** @type {number} */ (row.margin)))].sort((a, b) => b - a)
+    && row.winner !== KEEP_CURRENT_OPTION_ID && candidateIds.has(row.winner))
+  const unlabelledRows = rows.filter(row => row.label.status === 'unlabelled')
+  const unlabelled = { total: unlabelledRows.length, byArm: { S: 0, C: 0 }, byReason: {} }
+  for (const row of unlabelledRows) {
+    unlabelled.byArm[row.arm] += 1
+    const reason = row.label.reason
+    unlabelled.byReason[reason] = (unlabelled.byReason[reason] ?? 0) + 1
+  }
+  const missingAnswered = answeredRows.filter(row => row.label.status === 'unlabelled').length
+  const samples = missingAnswered === 0
+    ? answeredRows.map(row => ({ score: row.pCheap, positive: row.label.cheapSufficient })) : []
+  const refusal = { status: 'refused', reason: 'unlabelled-rows', unlabelledInDenominator: missingAnswered }
+  const discrimination = missingAnswered > 0 ? { ...refusal } : {
+    status: 'evaluated', auroc: auroc(samples),
+    positives: samples.filter(sample => sample.positive).length,
+    negatives: samples.filter(sample => !sample.positive).length,
+  }
+  const calibration = missingAnswered > 0 ? { ...refusal } : {
+    status: 'evaluated', ...(answeredRows.length > 0 ? ece(samples, eceBins) : { ece: null, bins: [] }),
+  }
+  const thresholds = [...new Set(candidates.map(row => row.confidence))].sort((a, b) => b - a)
+  const margins = [...new Set(candidates.map(row => row.margin))].sort((a, b) => b - a)
   const curve = []
   for (const downgradeThreshold of thresholds) {
     for (const downgradeMargin of margins) {
-      const routed = candidates.filter(row => /** @type {number} */ (row.confidence) >= downgradeThreshold && /** @type {number} */ (row.margin) >= downgradeMargin)
-      const falseDowngrades = routed.filter(row => !row.cheapSufficient).length
-      const falseDowngrade = routed.length === 0 ? null : falseDowngrades / routed.length
-      const feasible = routed.length > 0 && falseDowngrade !== null && falseDowngrade <= bounds.falseDowngradeMax
+      const routed = candidates.filter(row => row.confidence >= downgradeThreshold && row.margin >= downgradeMargin)
+      const missingLabels = routed.some(row => row.label.status === 'unlabelled')
+      const falseDowngrades = missingLabels ? null : routed.filter(row => !row.label.cheapSufficient).length
+      const falseDowngrade = missingLabels || routed.length === 0 ? null : falseDowngrades / routed.length
       curve.push({
-        downgradeThreshold,
-        downgradeMargin,
-        routes: routed.length,
+        downgradeThreshold, downgradeMargin, routes: routed.length,
         coverage: routed.length / rows.length,
         entryRate: eligibleRows.length === 0 ? null : routed.length / eligibleRows.length,
-        falseDowngrades,
-        falseDowngrade,
-        feasible,
+        falseDowngrades, falseDowngrade,
+        falseDowngradeStatus: missingLabels ? 'refused-unlabelled' : 'evaluated',
+        feasible: missingLabels ? null : routed.length > 0 && falseDowngrade !== null && falseDowngrade <= bounds.falseDowngradeMax,
       })
     }
   }
-
-  const operatingPoint = chooseOperatingPoint(curve, tieBreak)
-  const legs = {
-    auroc: discriminationValue !== null && discriminationValue >= bounds.aurocMin,
-    feasiblePoint: operatingPoint !== null,
-    coverage: operatingPoint !== null && operatingPoint.coverage >= bounds.coverageMin,
+  const searchRefused = curve.some(point => point.feasible === null)
+  const selected = searchRefused ? null : chooseOperatingPoint(curve, tieBreak)
+  const operatingPoint = searchRefused ? { status: 'refused', reason: 'unlabelled-rows' }
+    : selected === null ? null : { ...selected, status: 'evaluated' }
+  const gateRefused = searchRefused || missingAnswered > 0
+  const legs = gateRefused ? { auroc: null, feasiblePoint: null, coverage: null } : {
+    auroc: discrimination.auroc !== null && discrimination.auroc >= bounds.aurocMin,
+    feasiblePoint: selected !== null,
+    coverage: selected !== null && selected.coverage >= bounds.coverageMin,
   }
   const failed = Object.entries(legs).filter(([, ok]) => !ok).map(([leg]) => leg)
-  const headTokens = answeredRows.map(row => /** @type {number} */ (row.headTokens))
+  const headTokens = answeredRows.map(row => row.headTokens)
   const truncatedCount = answeredRows.filter(row => row.truncated).length
-
   return {
-    method: { version: REPLAY_ROW_SEMANTICS_VERSION, eceBins, tieBreak: [...tieBreak] },
+    method: { ...method, methodSha256 },
     fixed: { entryScoreCeiling: entry.entryScoreCeiling, candidateIds: [...entry.candidateIds] },
     counts: {
-      rows: rows.length,
-      eligible: eligibleRows.length,
-      answered: answeredRows.length,
-      unanswered: rows.length - answeredRows.length,
-      truncated: truncatedCount,
-      routed: operatingPoint?.routes ?? 0,
-      falseDowngrades: operatingPoint?.falseDowngrades ?? 0,
+      rows: rows.length, eligible: eligibleRows.length, answered: answeredRows.length,
+      unanswered: rows.length - answeredRows.length, truncated: truncatedCount,
+      routed: searchRefused ? null : selected?.routes ?? 0,
+      falseDowngrades: searchRefused ? null : selected?.falseDowngrades ?? 0,
     },
-    discrimination: {
-      auroc: discriminationValue,
-      positives: answerSamples.filter(sample => sample.positive).length,
-      negatives: answerSamples.filter(sample => !sample.positive).length,
-    },
-    calibration,
+    discrimination, calibration, unlabelled,
     tokens: {
       headTokensMean: headTokens.length === 0 ? null : headTokens.reduce((sum, value) => sum + value, 0) / headTokens.length,
       headTokensP95: headTokens.length === 0 ? null : percentile(headTokens, 95),
       truncationRate: answeredRows.length === 0 ? null : truncatedCount / answeredRows.length,
       unansweredRate: (rows.length - answeredRows.length) / rows.length,
     },
-    curve,
-    operatingPoint,
+    curve, operatingPoint,
     gate: {
-      passed: failed.length === 0,
-      legs,
-      bounds: { ...bounds },
-      reading: failed.length === 0 ? 'replay gate passed' : `replay gate failed on ${failed.join(' and ')}`,
+      status: gateRefused ? 'method-unpinned' : 'evaluated',
+      passed: gateRefused ? null : failed.length === 0,
+      legs, bounds: { ...bounds },
+      reading: gateRefused ? 'gate not evaluable: unlabelled rows in label-dependent denominators'
+        : failed.length === 0 ? 'replay gate passed' : 'replay gate failed on ' + failed.join(' and '),
     },
   }
 }
@@ -373,13 +421,9 @@ export function computeReplayMetrics(rows, options) {
 /** Validate the required options of {@link computeReplayMetrics}; nothing is defaulted. */
 function readOptions(options) {
   if (options === null || typeof options !== 'object') throw new TypeError('computeReplayMetrics requires an options object')
-  const { eceBins, tieBreak, gate, entry } = options
-  if (!Number.isSafeInteger(eceBins) || eceBins < 1) throw new TypeError(`options.eceBins must be a positive integer, got ${JSON.stringify(eceBins)}`)
-  if (!Array.isArray(tieBreak) || tieBreak.length === 0) throw new TypeError('options.tieBreak must be a non-empty array of tie-break keys')
-  if (new Set(tieBreak).size !== tieBreak.length) throw new TypeError('options.tieBreak must not repeat a key')
-  for (const key of tieBreak) {
-    if (!(key in TIE_BREAK_KEYS)) throw new TypeError(`options.tieBreak key ${JSON.stringify(key)} is not one of ${Object.keys(TIE_BREAK_KEYS).join(', ')}`)
-  }
+  if (Object.hasOwn(options, 'eceBins') || Object.hasOwn(options, 'tieBreak')) throw new TypeError('eceBins and tieBreak belong in options.method')
+  const { method, methodSha256 } = parseReplayMethod(options.method, { require: ['version', 'eceBins', 'tieBreak'] })
+  const { gate, entry } = options
   if (gate === null || typeof gate !== 'object') throw new TypeError('options.gate is required: the registration layaGate bounds')
   for (const key of ['aurocMin', 'falseDowngradeMax', 'coverageMin']) {
     const value = gate[key]
@@ -394,7 +438,7 @@ function readOptions(options) {
   if (!Array.isArray(entry.candidateIds) || entry.candidateIds.length === 0 || entry.candidateIds.some(id => typeof id !== 'string' || id === '')) {
     throw new TypeError('options.entry.candidateIds must be a non-empty array of non-empty strings')
   }
-  return { eceBins, tieBreak, gate, entry }
+  return { method, methodSha256, gate, entry }
 }
 
 /**
@@ -414,7 +458,7 @@ function chooseOperatingPoint(curve, tieBreak) {
   for (const point of feasible.slice(1)) {
     if (better(point, best, tieBreak)) best = point
   }
-  const { feasible: _feasible, ...chosen } = best
+  const { feasible: _feasible, falseDowngradeStatus: _status, ...chosen } = best
   return chosen
 }
 

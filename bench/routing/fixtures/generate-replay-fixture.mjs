@@ -1,106 +1,123 @@
 /**
- * Regenerates the checked-in replay-labeller fixture through the real product
- * stack: a keyless Context composes the real session store, the real JSONL
- * persistence backend (plain text, unpacked), and the real worker-escalation
- * plugin; a scripted depth-1 worker turn fires the errorBurst trigger, and
- * the product's own write path produces the checked-in log. The checked-in
- * replay-coldpoint-escalation.session.jsonl is that product output verbatim;
- * rerun this script from the repository root to regenerate it.
- *
- * The composed decision carries the default Stage 0 continue (no judgment
- * engine is composed), which is exactly the fired-trigger shape the replay
- * labeller counts: any choice, with the window position taken from
- * data.triggerSeq. No model is called and no credential is read.
- *
- * Run with pnpm run build outputs present: plain Node imports the built
- * lib/ faces, not package sources.
- *
- * @module bench/routing/fixtures/generate-replay-fixture
+ * Record or structurally verify the real CLI's keyless tool-error fixture.
+ * Requires installed workspace links and build outputs. Three real CLI spawns
+ * use the repository mock server and never edit the produced session bytes.
+ * Only --record replaces the checked-in fixture; --check compares behavior.
+ * @module
  */
-import { cp, mkdtemp, readdir, rm } from 'node:fs/promises'
+import assert from 'node:assert/strict'
+import { spawn, execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { mkdtemp, mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createInterface } from 'node:readline'
+import { fileURLToPath } from 'node:url'
+import { executeTrial, resolveHarnessLaunch } from '../../runner/execute.js'
+import { getArm, renderArmOverlay } from '../../runner/arms.js'
+import { decodeStorageRecord } from '../../../packages/core/session/lib/index.js'
+import { ESCALATION_TRIGGERS, foldEscalationTriggers } from '../../../packages/team/progress-signals/lib/index.js'
 
-const here = fileURLToPath(new URL('.', import.meta.url))
-const repo = join(here, '..', '..', '..')
-const lib = (pkg) => pathToFileURL(join(repo, pkg, 'lib', 'index.js')).href
-
-const { Context } = await import(lib('vendor/cordis'))
-const { SessionId, SessionStore } = await import(lib('packages/core/session'))
-const { JsonlSessionPersistence } = await import(lib('packages/session/session-persistence-jsonl'))
-const { CallId, createToolResultMessage } = await import(lib('packages/llm/llm'))
-const workerEscalation = await import(lib('packages/team/worker-escalation'))
-
-const scratch = await mkdtemp(join(tmpdir(), 'bench-replay-fixture-'))
-const sessionsRoot = join(scratch, 'sessions')
-const ctx = new Context()
+const mode = process.argv[2]
+if (!['--record', '--check'].includes(mode)) throw new Error('use --record or --check with the built harness')
+const repo = fileURLToPath(new URL('../../../', import.meta.url))
+const fixture = fileURLToPath(new URL('./replay-c-label-windows.session.jsonl', import.meta.url))
+const sequence = 'success,tool_call_success,tool_call_success,success,success'
+const tool = { name: 'read', arguments: JSON.stringify({ file_path: 'missing-replay-fixture.txt' }) }
+const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD/i.test(key)))
+const launch = resolveHarnessLaunch(repo)
+const root = await mkdtemp(join(tmpdir(), 'bench-label-real-cli-'))
+const records = []
+let parseError
+let stderr = ''
+const stubArgs = [...launch.argsPrefix.slice(0, 2), join(repo, 'packages/test-support/llm-mock-server/src/bin.ts'), '--port', '0', '--api-key', 'bench-stub', '--sequence', sequence, '--tool-name', tool.name, '--tool-arguments', tool.arguments]
+const child = spawn(launch.command, stubArgs, { cwd: repo, env: { ...env, ...launch.env }, stdio: ['ignore', 'pipe', 'pipe'] })
+const closed = new Promise(resolve => child.once('close', resolve))
+child.stderr.setEncoding('utf8')
+child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-65536) })
+let resolveReady
+let rejectReady
+const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
+const timer = setTimeout(() => rejectReady(new Error('mock server did not become ready')), 15000)
+child.once('error', rejectReady)
+child.once('close', code => rejectReady(new Error('mock server exited before ready: ' + code)))
+const lines = createInterface({ input: child.stdout })
+lines.on('line', line => {
+  try {
+    const record = JSON.parse(line)
+    records.push(record)
+    if (record.type === 'ready') resolveReady(record)
+  } catch (error) {
+    parseError = error
+    rejectReady(error)
+  }
+})
+function decode(bytes) {
+  return bytes.toString('utf8').trimEnd().split(String.fromCharCode(10)).flatMap(line => {
+    const value = JSON.parse(line)
+    return value.type === 'session' ? [] : decodeStorageRecord(value)
+  })
+}
+const triggers = Object.fromEntries(ESCALATION_TRIGGERS.map(name => [name, { enabled: name === 'errorBurst', threshold: 2 }]))
+function structure(events) {
+  const starts = events.filter(e => e.type === 'step/start' && e.data.step === 1)
+  assert.equal(starts.length, 3)
+  assert.equal(events.filter(e => e.type === 'turn/end').length, 3)
+  const turns = starts.map(e => e.data.turn)
+  const tools = turns.map(turn => events.filter(e => e.type === 'tool/call' && e.data.turn === turn))
+  const results = turns.map(turn => events.filter(e => e.type === 'tool/result' && e.data.turn === turn))
+  assert.deepEqual(tools.map(items => items.length), [0, 2, 0])
+  assert.deepEqual(results.map(items => items.length), [0, 2, 0])
+  assert.ok(tools[1].every(e => e.data.name === tool.name))
+  assert.ok(results[1].every(e => e.data.message.content[0].isError === true))
+  assert.ok(results[1].every(e => JSON.stringify(e.data.message).includes('missing-replay-fixture.txt')))
+  const before = events.filter(e => e.seq < starts[1].seq)
+  assert.equal(foldEscalationTriggers(before, triggers, -1).find(v => v.trigger === 'errorBurst').fired, false)
+  const middle = events.filter(e => e.seq < starts[2].seq)
+  const burst = foldEscalationTriggers(middle, triggers, -1).find(v => v.trigger === 'errorBurst')
+  assert.equal(burst.fired, true)
+  assert.ok(burst.triggerSeq >= starts[1].seq && burst.triggerSeq < starts[2].seq)
+  assert.ok(!events.some(e => e.type.startsWith('escalation/') || e.type.startsWith('model-routing/')))
+  return { turns: starts.length, tools: tools.map(items => items.length), errors: results.map(items => items.filter(e => e.data.message.content[0].isError).length) }
+}
 try {
-  await ctx.plugin(SessionStore, {})
-  await ctx.plugin(JsonlSessionPersistence, { root: sessionsRoot, packChunks: false, compression: 'none' })
-  await ctx.plugin(workerEscalation, {
-    enabled: true,
-    progressInstructions: 'Is this worker going to finish without help?',
-  })
-
-  const session = ctx.sessions.create(SessionId('bench-replay-coldpoint-escalation'), {
-    meta: { cwd: '/tmp/bench-replay-coldpoint', delegationDepth: 1 },
-  })
-
-  /** One tool call and its result; errored results drive the error burst. */
-  const toolPair = (index, command, ok) => {
-    const callId = CallId('call-' + String(index))
-    session.append('tool/call', { turn: 1, step: 1, callId, name: 'bash', arguments: JSON.stringify({ command }) })
-    session.append('tool/result', {
-      turn: 1, step: 1,
-      message: createToolResultMessage({ callId, content: [{ type: 'text', text: ok ? 'ok' : 'boom' }], isError: !ok }),
-    }, { surfaceOp: 'append' })
+  const server = await ready
+  clearTimeout(timer)
+  const cwd = join(root, 'cwd')
+  const home = join(root, 'home')
+  const sessionRoot = join(root, 'sessions')
+  await mkdir(cwd)
+  await mkdir(home)
+  const overlayPath = join(root, 'off.patch.yml')
+  await writeFile(overlayPath, renderArmOverlay(getArm('off'), { sessionLogRoot: sessionRoot }))
+  const extraPatchPaths = [join(repo, 'bench/tests/fixtures/real-cli/stub-deepseek.patch.yml')]
+  let logPath
+  for (let index = 0; index < 3; index++) {
+    const result = await executeTrial({ repoRoot: repo, overlayPath, extraPatchPaths, sessionArgs: [index === 0 ? '--session-id' : '--resume', 'bench-replay-c-label-windows'], taskText: 'Run fixture turn ' + (index + 1), scratchDir: cwd, sessionLogRoot: sessionRoot, timeoutMs: 60000, env: { ...env, SHRES_HOME: home, BENCH_STUB_BASE_URL: server.baseURL, BENCH_STUB_KEY: 'bench-stub' } })
+    assert.equal(result.exitCode, 0, result.stderr)
+    assert.equal(result.timedOut, false)
+    if (index > 0) assert.equal(result.sessionLogPath, logPath)
+    logPath = result.sessionLogPath
   }
-
-  session.append('turn/start', { turn: 1 })
-  session.append('step/start', { turn: 1, step: 1 })
-  session.append('user/message', {
-    content: [{ type: 'text', text: 'Run the failing parser check twice, then fix it.' }],
-    source: { kind: 'team-message', form: 'relay', teamId: 'team-lead', messageId: 'assignment-1', senderSessionId: 'bench-lead', senderName: 'lead' },
-    role: 'user', id: 'bench-replay-coldpoint-escalation',
-  }, { surfaceOp: 'append' })
-  // The ladder's cooldown requires two completed steps before any first
-  // decision, and the burst counts consecutive errored results across them:
-  // step 1 fails once, step 2's failing result completes the burst, and its
-  // step/end is the earliest point the decision can land.
-  toolPair(1, 'pnpm test -- parser', false)
-  session.append('step/end', { turn: 1, step: 1 })
-  session.append('step/start', { turn: 1, step: 2 })
-  toolPair(2, 'pnpm test -- parser', false)
-  session.append('step/end', { turn: 1, step: 2 })
-  // The ladder evaluates on a microtask; let the decision land here.
-  await new Promise((resolve) => setTimeout(resolve, 0))
-  session.append('step/start', { turn: 1, step: 3 })
-  toolPair(3, 'git diff --stat', true)
-  session.append('step/end', { turn: 1, step: 3 })
-  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-
-  await ctx.fiber.dispose()
+  assert.ifError(parseError)
+  assert.equal(records.filter(record => record.type === 'request').length, 5)
+  const bytes = await readFile(logPath)
+  const summary = structure(decode(bytes))
+  if (mode === '--check') {
+    assert.deepEqual(structure(decode(await readFile(fixture))), summary)
+  } else {
+    await cp(logPath, fixture)
+    assert.ok(bytes.equals(await readFile(fixture)))
+    const provenance = { source: 'real-cli/off-arm/loopback-stub', sequence, tool, commands: { stub: stubArgs, harness: launch.argsPrefix, sessionFlags: ['--session-id', '--resume', '--resume'] }, head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(), node: process.version, sha256: createHash('sha256').update(bytes).digest('hex'), summary }
+    await writeFile(fixture.replace('.session.jsonl', '.provenance.json'), JSON.stringify(provenance, null, 2) + String.fromCharCode(10))
+  }
+  console.log(JSON.stringify({ mode, ...summary, requests: 5 }))
 } finally {
-  // Dispose above already flushed; this guard only covers a boot throw.
-  await ctx.fiber?.dispose().catch(() => {})
+  clearTimeout(timer)
+  if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+  const killTimer = setTimeout(() => child.kill('SIGKILL'), 5000)
+  await closed
+  clearTimeout(killTimer)
+  lines.close()
+  await rm(root, { recursive: true, force: true })
 }
-
-const find = async (dir) => {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      const hit = await find(path)
-      if (hit !== undefined) return hit
-    } else if (entry.name === 'session.jsonl') {
-      return path
-    }
-  }
-  return undefined
-}
-const written = await find(sessionsRoot)
-if (written === undefined) throw new Error('the product wrote no session.jsonl')
-const destination = join(here, 'replay-coldpoint-escalation.session.jsonl')
-await cp(written, destination)
-await rm(scratch, { recursive: true, force: true })
-console.log('fixture regenerated at', destination)

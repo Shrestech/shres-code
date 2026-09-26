@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { computeReplayMetrics } from '../analysis/replay-metrics.js'
+import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 import { renderArmOverlay, getArm } from '../runner/arms.js'
 import { assertConfirmatoryRegistration, loadConfirmatoryOverlays, parseArgs } from '../runner/run.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
@@ -34,16 +35,20 @@ function fixtureTree() {
   for (const name of [REGISTRATION, R_OVERLAY, N_OVERLAY]) {
     copyFileSync(join(routingDir, name), join(benchRoot, 'routing', name))
   }
+  const path = join(benchRoot, 'routing', REGISTRATION)
+  const registration = JSON.parse(readFileSync(path, 'utf8'))
+  registration.method = fixtureMethod()
+  writeFileSync(path, JSON.stringify(registration))
   return { root, benchRoot }
 }
 
 function row(overrides) {
-  return {
+  return fixtureRow({
     task: 'task', stratum: 'routine', coldPointId: 'c1',
     eligible: true, answered: true, truncated: false, headTokens: 100,
     winner: 'flash', confidence: 0.9, margin: 0.5, pCheap: 0.9, difficultyScore: 1,
     cheapSufficient: true, ...overrides,
-  }
+  })
 }
 
 /** Passing replay metrics computed with the copied registration's own gate bounds. */
@@ -58,11 +63,10 @@ function passingMetrics(benchRoot) {
     row({ task: 'b', confidence: 0.9, margin: 0.3, pCheap: 0.8 }),
     row({ task: 'c', confidence: 0.7, margin: 0.2, pCheap: 0.7, stratum: 'hard' }),
     row({ task: 'd', confidence: 0.7, margin: 0.2, pCheap: 0.1, cheapSufficient: false, stratum: 'hard' }),
-    { task: 'e', stratum: 'hard', coldPointId: 'c1', eligible: false, answered: false, truncated: null, headTokens: null, winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null, cheapSufficient: true },
+    fixtureRow({ task: 'e', stratum: 'hard', coldPointId: 'c1', eligible: false, answered: false, truncated: null, headTokens: null, winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null, cheapSufficient: true }),
   ]
   return computeReplayMetrics(rows, {
-    eceBins: 10,
-    tieBreak: ['falseDowngrade', 'downgradeThreshold', 'downgradeMargin'],
+    method: fixtureMethod(),
     gate: { aurocMin, falseDowngradeMax, coverageMin },
     entry: { entryScoreCeiling, candidateIds: candidates.map(candidate => candidate.id) },
   })
@@ -80,34 +84,34 @@ function qualifiedTree() {
   return { root, benchRoot, outDir: join(root, 'out') }
 }
 
-test('confirmatory runs require the flag; the provisional overlays never confirm', () => {
+test('confirmatory runs require the flag; the provisional overlays never confirm', async () => {
   const { benchRoot } = fixtureTree()
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
     /--confirmatory-overlays.*never confirm a run/s,
   )
 })
 
-test('the writer\'s generated overlays are accepted with exact equality', () => {
+test('the writer\'s generated overlays are accepted with exact equality', async () => {
   const { root, benchRoot, outDir } = qualifiedTree()
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
+  await assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
   // The committed routing/ overlays still hold their provisional point: the
   // guard read the adopted directory, not them.
   const provisional = readFileSync(join(benchRoot, 'routing', R_OVERLAY), 'utf8')
   assert.doesNotMatch(provisional, CALIBRATED_POINT)
 })
 
-test('a tampered generated overlay is refused', () => {
+test('a tampered generated overlay is refused', async () => {
   const { root, benchRoot, outDir } = qualifiedTree()
   const rPath = join(outDir, R_OVERLAY)
   writeFileSync(rPath, readFileSync(rPath, 'utf8').replace('"downgradeMargin":0.3', '"downgradeMargin":0.4'))
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir }),
     /differs from the registration/,
   )
 })
 
-test('adopting the provisional content in place of generated overlays is refused', () => {
+test('adopting the provisional content in place of generated overlays is refused', async () => {
   const { root, benchRoot, outDir } = qualifiedTree()
   const provisionalDir = join(root, 'provisional')
   mkdirSync(provisionalDir, { recursive: true })
@@ -116,8 +120,8 @@ test('adopting the provisional content in place of generated overlays is refused
   // registration itself is now replay-qualified.
   copyFileSync(join(benchRoot, 'routing', R_OVERLAY), join(provisionalDir, R_OVERLAY))
   copyFileSync(join(benchRoot, 'routing', N_OVERLAY), join(provisionalDir, N_OVERLAY))
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
-  assert.throws(
+  await assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: provisionalDir }),
     /no calibrated operating point/,
   )

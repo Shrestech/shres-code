@@ -10,11 +10,13 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { REGISTRATION_STATUS, registrationPhase } from '../routing/registration-phase.js'
+import { fixtureMethod } from './replay-fixture-method.js'
 
 /** A minimal consistent provisional registration. */
 function provisional() {
   return {
     schema: 'shres-code/routing-measurement@1',
+    method: fixtureMethod(),
     registration: 'prereg-2026-10',
     status: 'preregistered',
     authorizes: 'confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval',

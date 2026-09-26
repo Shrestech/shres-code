@@ -16,7 +16,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { test } from 'node:test'
-import { computeReplayMetrics } from '../analysis/replay-metrics.js'
+import { computeReplayMetrics as computeMetrics } from '../analysis/replay-metrics.js'
+import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
+import { parseReplayMethod } from '../routing/replay-method.js'
 import { writeRegistration } from '../routing/write-registration.js'
 import { assertConfirmatoryRegistration } from '../runner/run.js'
 
@@ -26,24 +28,31 @@ const REGISTRATION = 'prereg-2026-10.registration.json'
 const R_OVERLAY = 'route-coldpoint.patch.yml'
 const N_OVERLAY = 'random-matched.patch.yml'
 
+/** Keep the arithmetic fixtures independent of method-hash serialization. */
+function computeReplayMetrics(rows, { eceBins, tieBreak, ...options }) {
+  const method = fixtureMethod({ eceBins, tieBreak })
+  const { methodSha256 } = parseReplayMethod(method, { require: ['version', 'eceBins', 'tieBreak'] })
+  return computeMetrics(rows.map(row => ({ ...row, methodSha256 })), { ...options, method })
+}
+
 /** One replayed cold-point row of the labelled-scores fixture. */
 function row(overrides) {
-  return {
+  return fixtureRow({
     task: 'task', stratum: 'routine', coldPointId: 'c1',
     eligible: true, answered: true, truncated: false, headTokens: 100,
     winner: 'flash', confidence: 0.9, margin: 0.5, pCheap: 0.9, difficultyScore: 1,
     cheapSufficient: true, ...overrides,
-  }
+  })
 }
 
 /** The unanswered shape. */
 function unansweredRow(overrides) {
-  return {
+  return fixtureRow({
     task: 'task', stratum: 'hard', coldPointId: 'c1',
     eligible: false, answered: false, truncated: null, headTokens: null,
     winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null,
     cheapSufficient: true, ...overrides,
-  }
+  })
 }
 
 /**
@@ -97,6 +106,10 @@ function fixtureTree() {
   for (const name of [REGISTRATION, R_OVERLAY, N_OVERLAY]) {
     copyFileSync(join(routingDir, name), join(benchRoot, 'routing', name))
   }
+  const registrationPath = join(benchRoot, 'routing', REGISTRATION)
+  const registration = JSON.parse(readFileSync(registrationPath, 'utf8'))
+  registration.method = fixtureMethod()
+  writeFileSync(registrationPath, JSON.stringify(registration))
   return { root, benchRoot }
 }
 
@@ -113,7 +126,7 @@ function nonNullCalibratedBy(value, path = '$', found = []) {
   return found
 }
 
-test('a passed gate finalizes the registration and the runner accepts the generated overlays', () => {
+test('a passed gate finalizes the registration and the runner accepts the generated overlays', async () => {
   const { root, benchRoot } = fixtureTree()
   const metrics = passingMetrics(benchRoot)
   const result = writeRegistration({
@@ -139,11 +152,13 @@ test('a passed gate finalizes the registration and the runner accepts the genera
   const finalized = JSON.parse(readFileSync(join(benchRoot, 'routing', REGISTRATION), 'utf8'))
   assert.equal(finalized.replayGate, 'passed')
   assert.deepEqual(finalized.enforced, result.enforced)
-  assert.deepEqual(finalized.method, metrics.method, 'the metric method is recorded: bins, tie-break, version')
+  const { methodSha256, ...methodFields } = metrics.method
+  assert.deepEqual(finalized.method, methodFields, 'the existing owner method is preserved')
+  assert.equal(finalized.replayMetrics.method.methodSha256, methodSha256)
   assert.equal(finalized.status, 'preregistered', 'the static status survives the finalize untouched')
   assert.equal(finalized.authorizes, 'confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval')
-  assert.ok(!('replayMetrics' in finalized), 'a passed gate embeds no metrics blob')
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: join(root, 'out') })
+  assert.deepEqual(finalized.replayMetrics, metrics)
+  await assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: join(root, 'out') })
   const nText = readFileSync(result.overlays.randomMatched, 'utf8')
   assert.match(nText, /entryRate: 0\.5\n/)
   assert.match(nText, /seed: 20261016\n/)
@@ -154,7 +169,7 @@ test('a passed gate finalizes the registration and the runner accepts the genera
   assert.doesNotMatch(rText, /PROVISIONAL/, 'the generated overlay does not ship the provisional paragraph')
 })
 
-test('a failed gate records no calibration, and the runner refuses the registration', () => {
+test('a failed gate records no calibration, and the runner refuses the registration', async () => {
   const { root, benchRoot } = fixtureTree()
   const metrics = failingMetrics()
   assert.equal(metrics.gate.passed, false)
@@ -177,23 +192,23 @@ test('a failed gate records no calibration, and the runner refuses the registrat
   assert.ok(!existsSync(join(root, 'out')), 'a failed gate generates no confirmatory overlays')
   // With a directory adopted, the guard reaches the phase check and names the
   // failed gate; without it, the flag requirement refuses first.
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
     /--confirmatory-overlays/,
   )
   const emptyDir = join(root, 'adopted')
   mkdirSync(emptyDir, { recursive: true })
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: emptyDir }),
     /replay gate failed, so routing stays shadow-only/,
   )
 })
 
-test('the runner names the phase: a provisional registration is refused, a replay-qualified one accepted', () => {
+test('the runner names the phase: a provisional registration is refused, a replay-qualified one accepted', async () => {
   const { root, benchRoot } = fixtureTree()
   const emptyDir = join(root, 'adopted')
   mkdirSync(emptyDir, { recursive: true })
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: emptyDir }),
     /still provisional/,
   )
@@ -239,7 +254,7 @@ test('a finalized registration is never overwritten', () => {
   )
 })
 
-test('a tampered overlay value is refused by the runner', () => {
+test('a tampered overlay value is refused by the runner', async () => {
   const { root, benchRoot } = fixtureTree()
   const outDir = join(root, 'out')
   const result = writeRegistration({
@@ -248,10 +263,10 @@ test('a tampered overlay value is refused by the runner', () => {
     seed: 20261016,
     outDir,
   })
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
+  await assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
   const rPath = join(outDir, R_OVERLAY)
   writeFileSync(rPath, readFileSync(rPath, 'utf8').replace(String(result.enforced.downgradeThreshold), '0.85'))
-  assert.throws(
+  await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir }),
     /differs from the registration/,
   )
@@ -330,4 +345,24 @@ test('the CLI writes a passed registration and refuses a usage error', async () 
     execFileP(process.execPath, [script, metricsPath, '--registration', join(benchRoot, 'routing', REGISTRATION), '--out-dir', join(root, 'out2')]),
     error => error.code === 2 && /--seed/.test(error.stderr),
   )
+})
+
+test('missing or mismatched owner method writes no files and leaves registration bytes unchanged', () => {
+  for (const variant of ['missing', 'partial', 'mismatch', 'bad-hash', 'unevaluated']) {
+    const { root, benchRoot } = fixtureTree()
+    const registrationPath = join(benchRoot, 'routing', REGISTRATION)
+    const metrics = passingMetrics(benchRoot)
+    const registration = JSON.parse(readFileSync(registrationPath, 'utf8'))
+    if (variant === 'missing') delete registration.method
+    if (variant === 'partial') delete registration.method.finalWindow
+    if (variant === 'mismatch') registration.method.eceBins += 1
+    if (variant === 'bad-hash') metrics.method.methodSha256 = '0'.repeat(64)
+    if (variant === 'unevaluated') metrics.gate = { ...metrics.gate, status: 'method-unpinned', passed: null }
+    writeFileSync(registrationPath, JSON.stringify(registration))
+    const before = readFileSync(registrationPath)
+    const outDir = join(root, 'not-created')
+    assert.throws(() => writeRegistration({ registrationPath, metrics, seed: 7, outDir }), /method|not evaluated/)
+    assert.ok(before.equals(readFileSync(registrationPath)))
+    assert.equal(existsSync(outDir), false)
+  }
 })

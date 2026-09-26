@@ -8,7 +8,9 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { KEEP_CURRENT_OPTION_ID, REPLAY_ROW_SEMANTICS_VERSION, auroc, computeReplayMetrics, ece, parseLabelledScores } from '../analysis/replay-metrics.js'
+import { KEEP_CURRENT_OPTION_ID, REPLAY_ROW_SEMANTICS_VERSION, auroc, computeReplayMetrics as computeMetrics, ece, parseLabelledScores } from '../analysis/replay-metrics.js'
+import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
+import { parseReplayMethod } from '../routing/replay-method.js'
 
 /** The registration's layaGate bounds (prereg-2026-10.registration.json). */
 const gateBounds = { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15 }
@@ -18,24 +20,31 @@ const entry = { entryScoreCeiling: 2, candidateIds: ['flash'] }
 
 const tieBreak = ['falseDowngrade', 'downgradeThreshold', 'downgradeMargin']
 
+/** Keep the arithmetic fixtures independent of method-hash serialization. */
+function computeReplayMetrics(rows, { eceBins, tieBreak, ...options }) {
+  const method = fixtureMethod({ eceBins, tieBreak })
+  const { methodSha256 } = parseReplayMethod(method, { require: ['version', 'eceBins', 'tieBreak'] })
+  return computeMetrics(rows.map(row => ({ ...row, methodSha256 })), { ...options, method })
+}
+
 /** Build one answered candidate row. */
 function row(overrides) {
-  return {
+  return fixtureRow({
     task: 'task', stratum: 'routine', coldPointId: 'c1',
     eligible: true, answered: true, truncated: false, headTokens: 100,
     winner: 'flash', confidence: 0.9, margin: 0.5, pCheap: 0.9, difficultyScore: 1,
     cheapSufficient: true, ...overrides,
-  }
+  })
 }
 
 /** The unanswered shape every excluded non-answer shares. */
 function unansweredRow(overrides) {
-  return {
+  return fixtureRow({
     task: 'task', stratum: 'hard', coldPointId: 'c1',
     eligible: false, answered: false, truncated: null, headTokens: null,
     winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null,
     cheapSufficient: true, ...overrides,
-  }
+  })
 }
 
 test('auroc: perfect, inverse, ties, and the single-class null', () => {
@@ -227,7 +236,8 @@ test('method inputs are recorded verbatim; nothing is defaulted', () => {
   const result = computeReplayMetrics([row({}), row({ task: 'b', pCheap: 0.2, cheapSufficient: false })], {
     eceBins: 7, tieBreak: ['downgradeMargin'], gate: gateBounds, entry,
   })
-  assert.deepEqual(result.method, { version: REPLAY_ROW_SEMANTICS_VERSION, eceBins: 7, tieBreak: ['downgradeMargin'] })
+  const explicit = fixtureMethod({ eceBins: 7, tieBreak: ['downgradeMargin'] })
+  assert.deepEqual(result.method, { ...explicit, methodSha256: parseReplayMethod(explicit, { require: [] }).methodSha256 })
   assert.deepEqual(result.fixed, entry)
   const full = { eceBins: 10, tieBreak, gate: gateBounds, entry }
   const rows = [row({})]
@@ -235,8 +245,8 @@ test('method inputs are recorded verbatim; nothing is defaulted', () => {
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, gate: gateBounds, entry }), /tieBreak/)
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, tieBreak, entry }), /gate/)
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, tieBreak, gate: gateBounds }), /entry/)
-  assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['bogus'] }), /tieBreak key/)
-  assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['falseDowngrade', 'falseDowngrade'] }), /must not repeat/)
+  assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['bogus'] }), /method\.tieBreak.*unknown-key/)
+  assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['falseDowngrade', 'falseDowngrade'] }), /method\.tieBreak.*duplicate/)
 })
 
 test('malformed rows refuse loudly', () => {

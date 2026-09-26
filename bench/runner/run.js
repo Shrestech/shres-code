@@ -63,7 +63,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
-import { runPreflight } from './preflight-models.js'
+import { assertFixturesCarryNoLauncherConfig, PREFLIGHT_ARMS, runPreflight } from './preflight-models.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
 import {
@@ -81,7 +81,6 @@ import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
-import { registrationPhase } from '../routing/registration-phase.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -437,11 +436,11 @@ export function assertRoutesPriced({ benchRoot, arms, accountingContext }) {
  * @param {string} [options.confirmatoryOverlaysDir] - directory holding the replay writer's
  *   generated R and N overlays; required for every confirmatory run, because the committed
  *   provisional overlays never confirm one.
- * @returns {void}
+ * @returns {Promise<void>}
  * @throws UsageError on a missing directory, a missing, inconsistent, not replay-qualified, or
  *   mismatching registration, or generated overlays that differ from it.
  */
-export function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOverlaysDir }) {
+export async function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOverlaysDir }) {
   if (!arms.some(name => CONFIRMATORY_ARMS.has(name))) return
   if (confirmatoryOverlaysDir === undefined) {
     throw new UsageError("confirmatory routing runs require --confirmatory-overlays <dir> naming the replay writer's generated R and N overlays; the committed provisional overlays never confirm a run")
@@ -451,6 +450,15 @@ export function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOv
     reg = JSON.parse(readFileSync(join(benchRoot, 'routing', 'prereg-2026-10.registration.json'), 'utf8'))
   } catch {
     throw new UsageError('confirmatory routing runs require bench/routing/prereg-2026-10.registration.json, which the offline replay writes after the Laya gate passes; none exists yet (pass --calibration for a calibration run)')
+  }
+  let registrationPhase
+  try {
+    ({ registrationPhase } = await import('../routing/registration-phase.js'))
+  } catch (error) {
+    if (error instanceof Error && /** @type {{ code?: string }} */ (error).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new UsageError('run `pnpm run build` (' + error.message + ')')
+    }
+    throw error
   }
   let phase
   try {
@@ -1582,13 +1590,16 @@ export async function main(argv, io = {}) {
   // refuse the run (aegis §10.3), and confirmatory routing runs require the
   // replay-passed registration with matching overlays (aegis §10.4).
   assertRoutesPriced({ benchRoot, arms: options.arms, accountingContext })
-  if (!options.calibration) assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
+  if (!options.calibration) await assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
   // The composed-metadata preflight (prereg §8) boots the real launcher per
   // routing-measurement arm and resolves every conversation and candidate
   // route against the real adapter registry — keyless, spend-free, and before
   // any key resolution. Refused arms and unresolved routes fail the run by
   // name; the loopback request sink must stay at zero requests.
-  await runPreflight({ repoRoot, benchRoot, arms: options.arms, env })
+  if (options.arms.some(arm => PREFLIGHT_ARMS.has(arm))) {
+    await assertFixturesCarryNoLauncherConfig(taskIds.map(id => /** @type {TaskDefinition} */ (tasks.get(id))))
+  }
+  await runPreflight({ repoRoot, benchRoot, arms: options.arms, env, confirmatory: !options.calibration, pinnedBodies: confirmatory?.bodies })
 
   if (apiKeyEnv !== 'none') {
     const fromEnv = env[apiKeyEnv]

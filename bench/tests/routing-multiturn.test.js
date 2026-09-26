@@ -23,6 +23,7 @@ async function writeWorld(root, tasks) {
   const benchRoot = join(repoRoot, 'bench')
   await mkdir(join(repoRoot, 'node_modules', 'tsx'), { recursive: true })
   await writeFile(join(repoRoot, 'package.json'), '{"name":"fake-harness","type":"module"}\n')
+  await writeFile(join(repoRoot, 'tsconfig.json'), '{}\n')
   await writeFile(join(repoRoot, 'node_modules', 'tsx', 'package.json'), '{"name":"tsx","version":"0.0.0","type":"module"}\n')
   await writeFile(join(repoRoot, 'node_modules', 'tsx', 'esm.js'), "import { register } from 'node:module'\nregister('./hooks.mjs', import.meta.url)\n")
   await writeFile(join(repoRoot, 'node_modules', 'tsx', 'hooks.mjs'), FAKE_TSX_HOOKS)
