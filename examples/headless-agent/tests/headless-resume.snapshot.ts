@@ -116,8 +116,11 @@ async function spawnHeadless(cwd: string, args: string[], server: MockLlmServer)
  * Stderr minus the two known dev-boot warning families: the CLI’s shield
  * edition provisions its npm plugin into every fresh profile and warns that it
  * declares no bundle layer, and a source boot runs under an unsigned developer
- * entitlement. Both are orientation for human boots, so any other stderr line
- * is a failure.
+ * entitlement. This helper stays local to this snapshot on purpose: do not
+ * hoist it into a shared helper or broaden the two patterns. The filter also
+ * runs on CI and is inert there only because those warnings do not arise on a
+ * clean CI checkout — it is not CI-conditional. Remove it once the warning
+ * sources are fixed. Any other stderr line is a failure.
  */
 function unexpectedStderr(rawStderr: string): string {
   return rawStderr

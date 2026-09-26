@@ -926,10 +926,16 @@ Requires: `agentDefaultModel` · `agents` · `sessions`
 export interface Config {
   /** The prompt text for the single run. */
   task: string
+  /** Explicit id for the fresh session; absent means a generated id. */
+  sessionId?: SessionId
+  /** Persisted session to continue instead of creating a fresh one; mutually exclusive with `sessionId`. */
+  resume?: SessionId
 }
 ```
 
-Source: [`packages/bundle/headless/src/index.ts:30`](../packages/bundle/headless/src/index.ts)
+Depends on: [`SessionId`](subsystems/core.md)
+
+Source: [`packages/bundle/headless/src/index.ts:34`](../packages/bundle/headless/src/index.ts)
 
 <a id="shres-codeshres-code-hooks-claude-code"></a>
 
