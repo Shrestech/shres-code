@@ -52,6 +52,8 @@
       config:
         initialMode: "on"
         tier: "fast"
+        downgradeThreshold: 0.8
+        downgradeMargin: 0.1
         candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
         routeFrom: [{"provider":"anthropic","model":"claude-opus-5-5","objective":"quota"}]
         operatingPoints: [{"engine":"bench-random","downgradeThreshold":0.8,"downgradeMargin":0.1}]

@@ -20,3 +20,14 @@
   config:
     provider: "deepseek-official"
     model: "deepseek-v4-flash"
+# The §4 label reads C's trajectory for worker-escalation triggers, so the arm
+# composes the worker-escalation observer: a C trial that records no escalation
+# is vacuous, not clean. With no judgment engine composed, every firing trigger
+# resolves to the Stage 0 continue — the `escalation/decision` record the
+# replay labeller counts, positioned by its `triggerSeq`.
+- insert:
+    - id: worker-escalation
+      name: "@shres-code/shres-code-worker-escalation"
+      config:
+        enabled: true
+        progressInstructions: "Is this worker going to finish without help?"

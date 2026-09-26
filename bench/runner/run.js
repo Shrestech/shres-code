@@ -63,6 +63,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
+import { runPreflight } from './preflight-models.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
 import {
@@ -1582,6 +1583,12 @@ export async function main(argv, io = {}) {
   // replay-passed registration with matching overlays (aegis §10.4).
   assertRoutesPriced({ benchRoot, arms: options.arms, accountingContext })
   if (!options.calibration) assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
+  // The composed-metadata preflight (prereg §8) boots the real launcher per
+  // routing-measurement arm and resolves every conversation and candidate
+  // route against the real adapter registry — keyless, spend-free, and before
+  // any key resolution. Refused arms and unresolved routes fail the run by
+  // name; the loopback request sink must stay at zero requests.
+  await runPreflight({ repoRoot, benchRoot, arms: options.arms, env })
 
   if (apiKeyEnv !== 'none') {
     const fromEnv = env[apiKeyEnv]
