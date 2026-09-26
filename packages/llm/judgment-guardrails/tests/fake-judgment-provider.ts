@@ -106,5 +106,3 @@ export class FakeJudgment extends JudgmentService {
     })
   }
 }
-
-export default FakeJudgment

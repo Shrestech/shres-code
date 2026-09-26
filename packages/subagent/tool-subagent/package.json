@@ -45,10 +45,15 @@
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/cordis-plugin-include": "workspace:^",
     "@shres-code/cordis-plugin-loader": "workspace:^",
     "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-llm-mock-server": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",

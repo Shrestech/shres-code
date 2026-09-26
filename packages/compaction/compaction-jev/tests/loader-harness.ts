@@ -46,24 +46,24 @@ export const ROUTE_MODEL = 'stub-model'
 /** Context capacity the adapter advertises, which pricing reads. */
 export const CONTEXT_WINDOW = 500_000
 /** Threshold ratio that puts a seeded history under pressure immediately. */
-export const THRESHOLD_RATIO = 0.01
+const THRESHOLD_RATIO = 0.01
 /** Text the stub model server streams back. */
 export const STUB_TEXT = 'stub reply'
 /** Credential reference the judgment engine resolves per ask. */
-export const CREDENTIAL_REF = 'TYPESAFE_API_KEY'
+const CREDENTIAL_REF = 'TYPESAFE_API_KEY'
 
 /** Loader specifier of the engine under test. */
 export const JE_SPECIFIER = '@shres-code/shres-code-compaction-jev'
 /** Loader specifier of the inherited engine. */
-export const BASIC_SPECIFIER = '@shres-code/shres-code-compaction-basic'
+const BASIC_SPECIFIER = '@shres-code/shres-code-compaction-basic'
 /** Loader specifier of the credentials double. */
-export const CREDENTIALS_SPECIFIER = '@shres-code/shres-code-credentials-memory'
+const CREDENTIALS_SPECIFIER = '@shres-code/shres-code-credentials-memory'
 /** Loader specifier of the judgment provider. */
-export const JUDGMENT_SPECIFIER = '@shres-code/shres-code-judgment-typesafe'
+const JUDGMENT_SPECIFIER = '@shres-code/shres-code-judgment-typesafe'
 /** Loader specifier of the dispatcher that routes asks to the judgment provider. */
 const DISPATCH_SPECIFIER = '@shres-code/shres-code-judgment-dispatch'
 /** Loader specifier of the test-only judgment fixture this package's rows mount. */
-export const JUDGMENT_FIXTURE_SPECIFIER = '@shres-code/shres-code-compaction-jev-judgment-fixture'
+const JUDGMENT_FIXTURE_SPECIFIER = '@shres-code/shres-code-compaction-jev-judgment-fixture'
 
 /** TEST DOUBLE: one loopback stand-in for the vendor's \`systemone\` endpoint. */
 export class StubSystemOne {
@@ -177,7 +177,7 @@ function readContent(body: string): string {
  * TEST DOUBLE: in-memory credentials provider, copied from the judgment
  * provider's focused suite so a composition resolves a key without a secret.
  */
-export class MemoryCredentials extends CredentialProvider {
+class MemoryCredentials extends CredentialProvider {
   private readonly store = new Map<string, string>()
 
   constructor(ctx: Context, seed: Record<string, string> = {}) {
