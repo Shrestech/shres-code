@@ -44,3 +44,4 @@ After its first request, an agent loop instance seeds each request from the last
 - `packages/core/agent/tests/invariant.spec.ts` and `packages/llm/model-router/tests/invariant.spec.ts`: each relation accepts a valid record and rejects every mismatch.
 - `packages/llm/model-router/tests/composition.spec.ts`: through the real Loader with both invariant companions, a routed request records the creation route, the router's fiber is disposed, `selectionInForce` reports the creation route, and the next request runs it with no further consult.
 - `examples/headless-agent` keyless snapshot `model-router-unmount`: the first boot routes to the candidate; the second boot leaves the router entry disabled, resumes the session, restores its selection, and runs the manual model.
+- `apps/web/tests/routing-view.e2e.ts`: on a host without the router, `session.models` reports the recorded manual route of a seeded routed session, not the candidate its last header ran.
