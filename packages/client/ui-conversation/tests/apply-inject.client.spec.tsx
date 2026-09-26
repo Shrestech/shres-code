@@ -429,6 +429,41 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('the service reveals in a mounted session at once, and in an unmounted one when it mounts', async () => {
+    const b = await bench()
+    const conversation = b.runtime.ctx.get('conversation')!
+    const offView = b.slots.register({ name: 'conversation.view', id: 'routing', order: 20, label: 'Routing' } as never, (() => null) as never)
+    // Not mounted yet: the latest request waits for the session's body.
+    conversation.reveal(ROOT, { view: 'chat', target: { kind: 'none' } })
+    conversation.reveal(ROOT, { view: 'routing', target: { kind: 'event', seq: 4 } })
+    const { instance } = b.conversationApi(ROOT)
+    instance.actions.setActivityOpen(true)
+    expect(instance.store.getSnapshot().view).not.toBe('routing')
+    await Promise.resolve()
+    expect(instance.store.getSnapshot()).toMatchObject({
+      view: 'routing', inspect: { view: 'routing', target: { kind: 'event', seq: 4 } }, activityOpen: false,
+    })
+    // Mounted: at once, and nothing waits any more.
+    conversation.reveal(ROOT, { view: 'chat', target: { kind: 'none' } })
+    expect(instance.store.getSnapshot()).toMatchObject({ view: 'chat', inspect: null })
+    b.conversationApi(ROOT)
+    await Promise.resolve()
+    expect(instance.store.getSnapshot().view).toBe('chat')
+    offView()
+    await b.runtime.dispose()
+  })
+
+  it('the service refuses a view no entry registers, and writes nothing', async () => {
+    const b = await bench()
+    const conversation = b.runtime.ctx.get('conversation')!
+    expect(() => { conversation.reveal(ROOT, { view: 'routing', target: { kind: 'none' } }) })
+      .toThrow('ui-conversation: no conversation view "routing" to reveal')
+    const { instance } = b.conversationApi(ROOT)
+    await Promise.resolve()
+    expect(instance.store.getSnapshot().view).toBeNull()
+    await b.runtime.dispose()
+  })
+
   it('inspectCall (chat view face) reveals the call in the Trajectory view', async () => {
     const b = await bench()
     const { instance, injected } = b.chatViewApi(ROOT)

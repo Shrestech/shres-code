@@ -1057,7 +1057,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const projections = this.ctx.get('sessionProjections')
     const cold = new Set<SessionId>()
     for (const id of ids) {
-      const session = this.ctx.sessions.get(id)
+      // An optional peer like the cache and persistence below: a host whose
+      // fiber carries no sessions service summarizes only cached members.
+      const session = this.ctx.get('sessions')?.get(id)
       if (session === undefined) {
         cold.add(id)
         continue

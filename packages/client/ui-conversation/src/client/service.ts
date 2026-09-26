@@ -20,6 +20,8 @@ import type { ComposerBlocks } from './input/blocks.ts'
 import type { ComposerImageInput } from './input/image-input.ts'
 import type { DraftAttachmentId, SessionInputResolver } from './input/contract.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
+import type { InspectRequest } from './contract/views.ts'
+import type { SessionReveals } from './inspect.ts'
 
 /**
  * The outward conversation face (`ctx.conversation`): the scope-addressed
@@ -63,6 +65,17 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
+  /**
+   * Reveal a view in one session through that session's own reveal: it writes
+   * the request, selects the view, and closes Activity. It applies at once
+   * while the session's body is mounted, else when the body next mounts (the
+   * latest request per session waits), so a caller that is about to open the
+   * session reveals first and then opens it.
+   * @param sessionId - the session.
+   * @param request - the view and target.
+   * @throws Error naming the view when no 'conversation.view' entry has its id.
+   */
+  reveal(sessionId: SessionId, request: InspectRequest): void
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -102,6 +115,7 @@ export class ConversationController extends Service implements IConversation {
   readonly blocks: ComposerBlocks
   /** The per-session image-input capability registry. */
   readonly imageInput: ComposerImageInput
+  private readonly reveals: SessionReveals
   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
   private readonly imageUrls = new Map<string, ImageUrlEntry>()
   private readonly imageGenerations = new Map<SessionId, number>()
@@ -112,14 +126,18 @@ export class ConversationController extends Service implements IConversation {
    * @param ctx - owning root context (the plugin apply context; the service
    * registers itself and follows that fiber's lifetime).
    * @param config - carries the SessionInputResolver, the composer-block
-   * registry, and the image-input registry constructed by the plugin apply
-   * (the same instances the slot inject factories close over).
+   * registry, the image-input registry, and the session reveals constructed
+   * by the plugin apply (the same instances the slot inject factories close over).
    */
-  constructor(ctx: Context, config: { input: SessionInputResolver; blocks: ComposerBlocks; imageInput: ComposerImageInput }) {
+  constructor(
+    ctx: Context,
+    config: { input: SessionInputResolver; blocks: ComposerBlocks; imageInput: ComposerImageInput; reveals: SessionReveals },
+  ) {
     super(ctx, 'conversation')
     this.input = config.input
     this.blocks = config.blocks
     this.imageInput = config.imageInput
+    this.reveals = config.reveals
     ctx.effect(() => () => {
       this.disposed = true
       for (const url of this.createdImageUrls) revokePreview(url)
@@ -295,6 +313,15 @@ export class ConversationController extends Service implements IConversation {
   /** Pull one older history page for the scoped Session. */
   async loadOlder(): Promise<void> {
     await this.scopedSession('loadOlder').loadOlder()
+  }
+
+  /**
+   * Reveal a view in one session (see {@link IConversation.reveal}).
+   * @param sessionId - the session.
+   * @param request - the view and target.
+   */
+  reveal(sessionId: SessionId, request: InspectRequest): void {
+    this.reveals.reveal(sessionId, request)
   }
 
   /** Resolve the caller scope's session face or throw on root contexts. */

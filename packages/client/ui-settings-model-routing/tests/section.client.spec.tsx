@@ -5,24 +5,35 @@ import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { ModelRoutingSection } from '../src/client/ModelRoutingSection.tsx'
 import type { ModelRoutingController } from '../src/client/model.ts'
 import { createModelRoutingController } from '../src/client/model.ts'
+import { createOverviewController } from '../src/client/overview.ts'
 import { en } from '../src/client/locales.ts'
 import { GATE, LAYA, LAYA_VIEW, TYPESAFE, namespace, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
 import { double, ready, t } from './helpers.client.tsx'
 
 afterEach(cleanup)
 
-const unused = (() => { throw new Error('unused standard hook') }) as never
+/** Resolve a key the way the locale runtime does, filling {name} placeholders. */
+function t(key: keyof typeof en, params?: Record<string, unknown>): string {
+  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => String(params?.[name]))
+}
+
+/** Session list and workspace hooks over an empty client: no workspace, so the overview reads nothing. */
+const useSessions = bindSnapshotSelector(createSnapshotStore({ current: undefined, byId: {} })) as never
+const useWorkspaces = bindSnapshotSelector(createSnapshotStore({ items: [], recentWorkspaceId: undefined })) as never
 
 /** Render the page over one controller. */
 function mount(controller: ModelRoutingController) {
+  const overview = createOverviewController(() => new Promise(() => {}))
   return render(
     <ModelRoutingSection
       controller={controller}
+      overview={overview}
       useSnapshot={bindSnapshotSelector(controller.store)}
+      useOverview={bindSnapshotSelector(overview.store)}
       t={t as never}
       close={() => {}}
-      useSessions={unused}
-      useWorkspaces={unused}
+      useSessions={useSessions}
+      useWorkspaces={useWorkspaces}
     />,
   )
 }
@@ -320,7 +331,7 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByRole('switch')).toBeTruthy()
     cleanup()
     mount(double(ready({ judgment: null, judgmentValue: undefined } as never)))
-    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: en.modeGroup })).toBeTruthy()
   })
 
   it('shows a routing read failure above the pool editor', () => {

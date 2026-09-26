@@ -99,6 +99,7 @@
     "tests/team-roster-models.e2e.ts",
     "tests/routing-view.e2e.ts",
     "tests/routing-chip-fit.e2e.ts",
+    "tests/routing-overview.e2e.ts",
     "tests/background-job-list.e2e.ts",
     "tests/bash-abort-row.e2e.ts",
     "tests/skill-tool-row.e2e.ts",
