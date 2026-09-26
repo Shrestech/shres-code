@@ -9,11 +9,12 @@ import { test } from 'node:test'
 import { Context } from '../../vendor/cordis/lib/index.js'
 import { SessionId, SessionStore } from '../../packages/core/session/lib/index.js'
 import { JsonlSessionPersistence } from '../../packages/session/session-persistence-jsonl/lib/index.js'
-import { classifyArtifact, decodePhysicalJsonl, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
-import { hostReplayTrial } from '../routing/replay-frontend-host.js'
-import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError } from '../routing/replay-method.js'
+import { classifyArtifact, decodePhysicalJsonl, proposalFromHeader, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
+import { assertUnchangedSnapshots, countRoutersInDump, hostReplayTrial } from '../routing/replay-frontend-host.js'
+import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metrics.js'
+import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError, parseReplayMethod } from '../routing/replay-method.js'
 import { projectKey, encodeSegment } from '../runner/session-layout.js'
-import { fixtureMethod } from './replay-fixture-method.js'
+import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 
 const fixture = new URL('../routing/fixtures/replay-c-label-windows.session.jsonl', import.meta.url)
 const method = fixtureMethod()
@@ -57,6 +58,15 @@ function passthroughRuntime() {
       provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: 3_600_000,
     }),
     prepareCall: async (config) => ({ config }),
+  }
+}
+
+function assertAllRows(rows, n, predicate) {
+  if (!Array.isArray(rows) || rows.length !== n) {
+    throw new TypeError('assertAllRows: expected ' + String(n) + ' rows, got ' + String(rows?.length ?? 'none'))
+  }
+  for (const row of rows) {
+    if (!predicate(row)) throw new TypeError('assertAllRows: predicate failed')
   }
 }
 
@@ -121,7 +131,8 @@ test('an open final turn is class B and rows carry the diagnostic artifact', asy
       arm: 'C',
     })
     assert.equal(result.artifact, 'open-final-turn')
-    assert.ok(result.rows.every(row => row.artifact === 'open-final-turn'))
+    assert.equal(result.rows.length, 5)
+    assertAllRows(result.rows, 5, row => row.artifact === 'open-final-turn')
   })
 })
 
@@ -185,8 +196,7 @@ test('a skipped-verifier C trial labels unlabelled/task-outcome-unknown', async 
       method,
       arm: 'C',
     })
-    assert.ok(result.rows.length > 0)
-    assert.ok(result.rows.every(row => row.label.status === 'unlabelled' && row.label.reason === 'task-outcome-unknown'))
+    assertAllRows(result.rows, 5, row => row.label.status === 'unlabelled' && row.label.reason === 'task-outcome-unknown')
   })
 })
 
@@ -205,25 +215,91 @@ test('missing frontend method fields refuse rather than consult', async () => {
   })
 })
 
-test('missing prepareCall on runtime throws before consult', async () => {
+test('assertAllRows throws on an empty array', () => {
+  assert.throws(() => assertAllRows([], 3, () => true), /expected 3 rows/)
+})
+
+test('C requestConfig equals currentSelection with no maxTokens', () => {
+  const selection = { provider: 'anthropic', model: 'claude-opus-5-5' }
+  const requestConfig = structuredClone(selection)
+  assert.deepEqual(requestConfig, selection)
+  assert.equal('maxTokens' in requestConfig, false)
+  assert.equal('adapterDefaults' in requestConfig, false)
+})
+
+test('proposalFromHeader named S cases', () => {
+  const selection = { provider: 'deepseek-official', model: 'deepseek-v4-pro' }
+  const ok = {
+    config: { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'high', maxTokens: 256000 },
+    adapterDefaults: { reasoningEffort: true, maxTokens: true },
+  }
+  assert.deepEqual(proposalFromHeader(ok), selection)
+  const explicit = {
+    config: { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'low' },
+  }
+  const explicitSelection = { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'low' }
+  assert.deepEqual(proposalFromHeader(explicit), explicitSelection)
+  const unmarked = {
+    config: { provider: 'deepseek-official', model: 'deepseek-v4-pro', maxTokens: 256000 },
+  }
+  assert.notDeepEqual(proposalFromHeader(unmarked), selection)
+  const extra = {
+    config: { provider: 'deepseek-official', model: 'deepseek-v4-pro', temperature: 0.2 },
+    adapterDefaults: { maxTokens: true },
+  }
+  assert.notDeepEqual(proposalFromHeader(extra), selection)
+  const drift = {
+    config: { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'high', maxTokens: 256000 },
+    adapterDefaults: { reasoningEffort: true, maxTokens: true },
+  }
+  assert.notDeepEqual(proposalFromHeader(drift), selection)
+})
+
+test('S request-config-mismatch refuses the whole trial', async () => {
   const bytes = await readFile(fixture)
   await withPersistence(bytes, async ({ persistence, path }) => {
     await assert.rejects(
       () => replayTrialLog({
-        trial: { resolved: true, verifier: { command: 'x', exitCode: 0 } },
-        path, persistence, runtime: { resolveModelInfo: async () => ({}) }, ...composedFields, method, arm: 'C',
+        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+        path, persistence, runtime: passthroughRuntime(), ...composedFields,
+        requestConfig: { provider: 'anthropic', model: 'claude-opus-5-5' },
+        method, arm: 'S',
       }),
-      error => error instanceof TypeError && /prepareCall/.test(error.message),
+      error => error instanceof TrialInputIncompleteError && error.message === 'request-config-mismatch',
     )
   })
 })
 
-test('C requestConfig strips adapterDefaults and does not invent maxTokens', () => {
-  const requestConfig = { provider: 'anthropic', model: 'claude-opus-5-5', adapterDefaults: { reasoningEffort: true } }
-  const stripped = { ...requestConfig }
-  delete stripped.adapterDefaults
-  assert.deepEqual(stripped, { provider: 'anthropic', model: 'claude-opus-5-5' })
-  assert.equal('maxTokens' in stripped, false)
+test('hash-only snapshot difference is trial-artifact-mutated', () => {
+  const before = { 'session.jsonl': { sha256: 'aa', size: 10, mtimeMs: 1 } }
+  const after = { 'session.jsonl': { sha256: 'bb', size: 10, mtimeMs: 1 } }
+  assert.throws(() => assertUnchangedSnapshots(before, after), /trial-artifact-mutated/)
+})
+
+test('dump-config router count is 1, 2, or 0 from YAML', () => {
+  const one = '- name: "@shres-code/shres-code-model-router"\n  config: { initialMode: on }\n'
+  assert.equal(countRoutersInDump(one).count, 1)
+  const two = one + '- id: extra-router\n  name: "@shres-code/shres-code-model-router"\n  config: { initialMode: on }\n'
+  assert.equal(countRoutersInDump(two).count, 2)
+  const none = '- name: "@shres-code/shres-code-model-router"\n  disabled: true\n'
+  assert.equal(countRoutersInDump(none).count, 0)
+})
+
+test('class-B artifact is ignored by metrics', () => {
+  const base = fixtureRow({
+    task: 't', arm: 'S', stratum: 'routine', coldPointId: 'c1',
+    eligible: false, answered: false, truncated: null, headTokens: null,
+    winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null,
+    cheapSufficient: true,
+  })
+  base.arm = 'S'
+  base.label = { status: 'unlabelled', reason: 'no-label-source-for-arm' }
+  validateReplayRow(base, 'plain')
+  validateReplayRow({ ...base, artifact: 'open-final-turn' }, 'b')
+  const options = { method, gate: { aurocMin: 0, falseDowngradeMax: 1, coverageMin: 0 }, entry: { entryScoreCeiling: 2, candidateIds: ['flash'] } }
+  const withB = computeReplayMetrics([base, { ...base, coldPointId: 'c2', artifact: 'open-final-turn' }], options)
+  const without = computeReplayMetrics([base, { ...base, coldPointId: 'c2' }], options)
+  assert.deepEqual(withB, without)
 })
 
 test('seeded headers are refused', () => {
@@ -256,6 +332,7 @@ test('launcher-hosted consults run inside the live plugin with real prepareCall'
       trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
     })
     assert.equal(hosted.status.ok, true)
+    assert.equal(hosted.routerCount, 1)
     assert.equal(hosted.sink, 0)
     assert.equal(hosted.summary.http, 0)
     assert.equal(hosted.summary.artifact, 'complete')

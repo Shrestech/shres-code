@@ -49,7 +49,8 @@ export const KEEP_CURRENT_OPTION_ID = 'keep-current'
  *   the AUROC and ECE score; null unless answered.
  * @property {number | null} difficultyScore - the difficulty answer's score, which an answered row
  *   always carries when the composition sets difficulty instructions; null unless answered.
- * @property {{ status: 'labelled', cheapSufficient: boolean, source: 'c-trajectory', triggerTableId: string } | { status: 'unlabelled', reason: 'no-label-source-for-arm' | 'final-window-unlabelled' }} label - the explicit trajectory label, or the reason no label source applies (an S trial, or the unlabelled final window); unlabelled rows are counted, never dropped.
+ * @property {'open-final-turn'=} artifact - diagnostic only; metrics ignore it.
+ * @property {{ status: 'labelled', cheapSufficient: boolean, source: 'c-trajectory', triggerTableId: string } | { status: 'unlabelled', reason: 'no-label-source-for-arm' | 'final-window-unlabelled' | 'task-outcome-unknown' }} label - the explicit trajectory label, or the reason no label source applies; unlabelled rows are counted, never dropped.
  */
 
 /**
@@ -66,6 +67,9 @@ export function validateReplayRow(row, where) {
     if (typeof row[key] !== 'string' || row[key] === '') throw new TypeError(`${where}: ${key} must be a non-empty string`)
   }
   if (Object.hasOwn(row, 'cheapSufficient')) throw new TypeError(`${where}: cheapSufficient must be represented by label`)
+  if (row.artifact !== undefined && row.artifact !== 'open-final-turn') {
+    throw new TypeError(`${where}: artifact must be omitted or 'open-final-turn'`)
+  }
   if (row.arm !== 'S' && row.arm !== 'C') throw new TypeError(`${where}: arm must be S or C`)
   if (typeof row.methodSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.methodSha256)) throw new TypeError(`${where}: methodSha256 must be a SHA256 hex string`)
   for (const key of ['eligible', 'answered']) {
@@ -82,8 +86,8 @@ export function validateReplayRow(row, where) {
     if (label.source !== 'c-trajectory') throw new TypeError(`${where}: label.source must be 'c-trajectory' on a labelled row`)
     if (typeof label.triggerTableId !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(label.triggerTableId)) throw new TypeError(`${where}: label.triggerTableId must be a non-empty string on a labelled row`)
   } else if (label.status === 'unlabelled') {
-    if (label.reason !== 'no-label-source-for-arm' && label.reason !== 'final-window-unlabelled') {
-      throw new TypeError(`${where}: label.reason must be 'no-label-source-for-arm' or 'final-window-unlabelled'`)
+    if (label.reason !== 'no-label-source-for-arm' && label.reason !== 'final-window-unlabelled' && label.reason !== 'task-outcome-unknown') {
+      throw new TypeError(`${where}: label.reason must be 'no-label-source-for-arm', 'final-window-unlabelled', or 'task-outcome-unknown'`)
     }
   } else {
     throw new TypeError(`${where}: label.status must be 'labelled' or 'unlabelled'`)

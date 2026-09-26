@@ -28,11 +28,27 @@ function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function stripAdapterDefaults(config) {
-  if (!isPlainObject(config)) return config
-  const next = { ...config }
-  delete next.adapterDefaults
-  return next
+/**
+ * Mirror of agent-loop requestProposal: drop only config fields marked true
+ * on header.adapterDefaults.
+ * @param {{ config: object, adapterDefaults?: { reasoningEffort?: true, maxTokens?: true } }} header
+ * @returns {object}
+ */
+export function proposalFromHeader(header) {
+  const config = structuredClone(header.config)
+  const marked = header.adapterDefaults ?? {}
+  for (const field of ['reasoningEffort', 'maxTokens']) {
+    if (marked[field] === true) delete config[field]
+  }
+  return config
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function consultHeaders(events) {
+  return events.filter(event => event.type === 'request/header')
 }
 
 function lastOpenTurn(events) {
@@ -158,9 +174,14 @@ export function classifyArtifact({ header, events, readFrom, inspected }) {
   return { artifact: 'complete' }
 }
 
-function requestConfigFor(arm, requestConfig, routeBase) {
-  if (arm !== 'C') return routeBase
-  return stripAdapterDefaults(requestConfig)
+function assertRequestConfig(arm, requestConfig, events) {
+  if (arm !== 'S') return
+  for (const event of consultHeaders(events)) {
+    const proposal = proposalFromHeader(event.data.header)
+    if (!sameJson(proposal, requestConfig)) {
+      throw new TrialInputIncompleteError('request-config-mismatch')
+    }
+  }
 }
 
 function serializableConsult(result) {
@@ -188,6 +209,7 @@ export async function replayTrialLog({
   const readFrom = await persistence.readFrom(id, 0)
   const inspected = await persistence.inspect(id)
   const { artifact } = classifyArtifact({ header, events, readFrom, inspected })
+  assertRequestConfig(arm, requestConfig, events)
   const config = 'coldPoints' in routerConfig && 'candidates' in routerConfig
     ? routerConfig
     : resolveConfig(routerConfig)
@@ -202,7 +224,7 @@ export async function replayTrialLog({
       at,
       routeBase,
       trialOwnRoute,
-      requestConfigFor(arm, requestConfig, routeBase),
+      requestConfig,
       resolveModelInfo,
       undefined,
       runtime,

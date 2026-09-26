@@ -6,6 +6,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import Schema from '../../vendor/schemastery/lib/index.mjs'
+import { resolveConfig } from '../../packages/llm/model-router/lib/index.js'
 import { replayTrialLog, TrialInputIncompleteError } from './replay-frontend.js'
 
 export const name = 'bench-replay-frontend'
@@ -82,11 +83,16 @@ export function apply(ctx, config) {
       throw new Error('bench-replay-frontend: sessionPersistence must be composed')
     }
     const job = JSON.parse(await readFile(config.job, 'utf8'))
-    const routeBase = defaults.currentSelection()
-    const requestConfig = { ...routeBase }
-    delete requestConfig.adapterDefaults
+    const routeBase = structuredClone(defaults.currentSelection())
+    const requestConfig = structuredClone(routeBase)
     const ttlInfo = await llm.resolveModelInfo(routeBase.provider, routeBase.model)
     const resolved = router.config()
+    if (job.routerRowConfig !== undefined) {
+      const expected = resolveConfig(job.routerRowConfig)
+      if (JSON.stringify(resolved) !== JSON.stringify(expected)) {
+        throw new Error('router-config-mismatch')
+      }
+    }
     const ttl = ttlInfo.promptCacheTtlMs === undefined
       ? { ttlMs: resolved.coldPoints.unknownTtlMs, ttlSource: 'fallback' }
       : { ttlMs: ttlInfo.promptCacheTtlMs, ttlSource: 'adapter' }
