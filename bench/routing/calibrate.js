@@ -18,11 +18,17 @@ import { REGISTRATION_SCHEMA, writeRegistration as finalizeRegistration } from '
 import { TrialInputIncompleteError } from './replay-frontend.js'
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
-const USAGE = 'Usage: node bench/routing/calibrate.js --experiment-dir <dir> --registration <file> --task-root <dir> --out <dir> [--extra-overlay <file>] [--write-registration --seed <int> --overlays-out <dir>]'
+const USAGE = [
+  'Usage: node bench/routing/calibrate.js --experiment-dir <dir> --registration <file> --task-root <dir> --out <dir>',
+  '  [--extra-overlay <file>] [--write-registration --seed <int> --overlays-out <dir>]',
+  '  [--judge-fixture <module> --judge-fixture-config <json> --judge-fixture-engine <id> [--judge-fixture-disabled]]',
+  'Fixture mode produces test evidence, not real calibration.',
+].join('\n')
 const PATH_FLAGS = {
   'experiment-dir': 'experimentDir', registration: 'registrationPath',
   'task-root': 'taskRoot', out: 'outDir',
   'extra-overlay': 'extraOverlayPath', 'overlays-out': 'overlaysOut',
+  'judge-fixture': 'judgeFixturePath', 'judge-fixture-config': 'judgeFixtureConfigPath',
 }
 const GATE_KEYS = ['aurocMin', 'falseDowngradeMax', 'coverageMin']
 
@@ -38,6 +44,7 @@ export function parseArgs(argv) {
       ...Object.fromEntries(Object.keys(PATH_FLAGS).map(key => [key, { type: 'string' }])),
       seed: { type: 'string' }, 'write-registration': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
+      'judge-fixture-engine': { type: 'string' }, 'judge-fixture-disabled': { type: 'boolean' },
     } }).values
   } catch (error) {
     throw new UsageError(error.message)
@@ -53,6 +60,11 @@ export function parseArgs(argv) {
   if (!writing && (values.seed !== undefined || values['overlays-out'] !== undefined)) {
     throw new UsageError('--seed and --overlays-out require --write-registration')
   }
+  const fixtureFlags = ['judge-fixture', 'judge-fixture-config', 'judge-fixture-engine', 'judge-fixture-disabled']
+  const fixture = fixtureFlags.some(flag => values[flag] !== undefined)
+  if (fixture && fixtureFlags.slice(0, 3).some(flag => !values[flag])) {
+    throw new UsageError('--judge-fixture requires --judge-fixture-config and --judge-fixture-engine together')
+  }
   let seed
   if (values.seed !== undefined) {
     if (!/^[0-9]+$/.test(values.seed) || !Number.isSafeInteger(Number(values.seed))) {
@@ -67,7 +79,10 @@ export function parseArgs(argv) {
       paths[key] = resolve(values[flag])
     }
   }
-  return { ...paths, writeRegistration: writing, ...(writing ? { seed } : {}), help: false }
+  return {
+    ...paths, writeRegistration: writing, ...(writing ? { seed } : {}), help: false,
+    ...(fixture ? { judgeFixtureEngine: values['judge-fixture-engine'], judgeFixtureEnabled: values['judge-fixture-disabled'] !== true } : {}),
+  }
 }
 
 /** SHA-256 of file bytes or a UTF-8 artifact string. */
@@ -140,6 +155,22 @@ export async function calibrateRun(options, { repoRoot, env }) {
   const gate = gateBounds(registration)
   await requireAbsent(options.outDir)
   const extraOverlay = options.extraOverlayPath === undefined ? undefined : await readFile(options.extraOverlayPath, 'utf8')
+  let judge = { mode: 'composition' }
+  let fixtureConfigBytes
+  if (options.judgeFixturePath !== undefined) {
+    fixtureConfigBytes = await readFile(options.judgeFixtureConfigPath)
+    let fittingJudgeConfig
+    try {
+      fittingJudgeConfig = JSON.parse(fixtureConfigBytes.toString('utf8'))
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
+      throw new UsageError(`judge fixture config is not valid JSON: ${error.message}`)
+    }
+    if (fittingJudgeConfig === null || typeof fittingJudgeConfig !== 'object' || Array.isArray(fittingJudgeConfig)) {
+      throw new UsageError('judge fixture config must be a JSON object')
+    }
+    judge = { mode: 'fixture', fittingJudgePath: options.judgeFixturePath, fittingJudgeConfig, engineId: options.judgeFixtureEngine, judgmentEnabled: options.judgeFixtureEnabled }
+  }
   const { readReplayRun } = await import('./replay-run-reader.js')
   const { hostReplayRun } = await import('./replay-frontend-host.js')
   let input
@@ -156,7 +187,7 @@ export async function calibrateRun(options, { repoRoot, env }) {
   try {
     const replay = await hostReplayRun({
       repoRoot, env, method, tasks: input.tasks, trials: input.trials,
-      preRefused: input.refused, discovered: input.discovered, extraOverlay, judge: true,
+      preRefused: input.refused, discovered: input.discovered, extraOverlay, judge,
     })
     const routerConfig = replay.summaries[0]?.routerConfig
     if (!routerConfig?.difficultyInstructions || replay.summaries.some(item => !isDeepStrictEqual(item.routerConfig, routerConfig))) {
@@ -164,7 +195,7 @@ export async function calibrateRun(options, { repoRoot, env }) {
     }
     for (const [index, row] of replay.rows.entries()) validateReplayRow(row, `calibration row ${index}`)
     metrics = computeReplayMetrics(replay.rows, { method, gate, entry: {
-      entryScoreCeiling: routerConfig.difficulty.entryScoreCeiling,
+      entryScoreCeiling: routerConfig.entryScoreCeiling,
       candidateIds: routerConfig.candidates.map(candidate => candidate.id),
     } })
     const files = {
@@ -180,7 +211,8 @@ export async function calibrateRun(options, { repoRoot, env }) {
     }
     const manifest = {
       schema: 'shres-code/routing-calibration@1', options, methodSha256,
-      registrationSha256: sha256(registrationBytes),
+      registrationSha256: sha256(registrationBytes), judgeMode: judge.mode,
+      ...(fixtureConfigBytes === undefined ? {} : { judgeFixtureConfigSha256: sha256(fixtureConfigBytes) }),
       ...(extraOverlay === undefined ? {} : { extraOverlaySha256: sha256(extraOverlay) }),
       trialIds: input.trials.map(item => item.id), discovered: input.discovered,
       counts: { discovered: input.discovered.length, refused: input.refused.length, hosted: replay.summaries.length, rows: replay.rows.length },

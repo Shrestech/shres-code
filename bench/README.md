@@ -348,7 +348,7 @@ Before key resolution, the runner boots the real launcher once per selected rout
 node bench/routing/calibrate.js --experiment-dir <run-dir> --registration <file> --task-root <tasks-dir> --out <new-dir>
 ```
 
-`--extra-overlay <file>` supplies an explicit composition overlay. `--write-registration` additionally requires `--seed <integer>` and `--overlays-out <new-dir>`; no seed is inferred. Existing output paths are refused. Evidence files are staged in a private sibling directory and published together; a corrupt-input trial leaves no published output. Registration finalization runs last through the one-shot writer.
+Judging uses the R composition unless `--judge-fixture <module>`, `--judge-fixture-config <json-file>` and `--judge-fixture-engine <id>` explicitly select a keyless fixture; `--judge-fixture-disabled` is restricted to that fixture mode. Fixture outputs are test evidence, not real calibration. `--extra-overlay <file>` supplies an explicit composition overlay. `--write-registration` additionally requires `--seed <integer>` and `--overlays-out <new-dir>`; no seed is inferred. Existing output paths are refused. Evidence files are staged in a private sibling directory and published together; a corrupt-input trial leaves no published output. Registration finalization runs last through the one-shot writer.
 
 Exit codes are `0` for completed evidence, `2` for input or method refusal, `3` for the combined corrupt-trial refusal, and `4` for a registration validation refusal after evidence publication. Exit `4` keeps the complete output directory. Unexpected execution or I/O failures exit `1` and must be investigated separately.
 

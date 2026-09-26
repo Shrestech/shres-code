@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { load as loadYaml } from 'js-yaml'
 import { main, parseArgs } from '../routing/calibrate.js'
 import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metrics.js'
 import { emptyMetrics } from '../runner/metrics.js'
@@ -58,19 +59,23 @@ async function fixture(kind, run) {
       }
       await writeFile(join(armDir, 'trials.jsonl'), trials.map(item => JSON.stringify(item) + '\n').join(''))
     }
+    const routePatch = loadYaml(await readFile(new URL('../routing/route-coldpoint.patch.yml', import.meta.url), 'utf8'))
+    const routerConfig = routePatch.flatMap(row => row.insert ?? []).find(row => row.id === 'model-router').config
+    const fixtureRouter = { ...routerConfig, routeFrom: [{ provider: 'deepseek-official', model: 'deepseek-v4-pro', objective: 'quota' }] }
     const overlayPath = join(root, 'scripted.patch.yml')
     await writeFile(overlayPath, [
       '- id: agent-default-model', '  config:', '    provider: deepseek-official', '    model: deepseek-v4-pro',
-      '- id: model-router', '  config:',
-      '    routeFrom: [{"provider":"deepseek-official","model":"deepseek-v4-pro","objective":"quota"}]',
-      '- id: bench-replay-scripted-judge', '  disabled: true',
-      '- insert:', '    - id: bench-replay-scripted-fitting-judge',
-      '      name: ' + JSON.stringify(REPLAY_SCRIPTED_FITTING_JUDGE_PATH),
-      '      config:', '        defaultScript:', '          kind: ' + kind,
-      '          probabilities: {"keep-current":0.3,"flash":0.7}', '          difficultyScore: 1', '',
+      '- id: model-router', '  config: ' + JSON.stringify(fixtureRouter),
+      '',
     ].join('\n'))
+    const judgeConfigPath = join(root, 'judge.json')
+    await writeFile(judgeConfigPath, JSON.stringify({ defaultScript: { kind, probabilities: { 'keep-current': 0.3, flash: 0.7 }, difficultyScore: 1 } }))
     const outDir = join(root, 'out')
-    const args = ['--experiment-dir', experimentDir, '--registration', registrationPath, '--task-root', taskRoot, '--out', outDir, '--extra-overlay', overlayPath]
+    const args = [
+      '--experiment-dir', experimentDir, '--registration', registrationPath, '--task-root', taskRoot, '--out', outDir,
+      '--extra-overlay', overlayPath, '--judge-fixture', REPLAY_SCRIPTED_FITTING_JUDGE_PATH,
+      '--judge-fixture-config', judgeConfigPath, '--judge-fixture-engine', 'scripted-fitting',
+    ]
     await run({ root, args, outDir, registrationPath, experimentDir, registration })
   } finally {
     assert.equal(digest(await readFile(registrationUrl)), realHash, 'committed registration is untouched')
@@ -82,7 +87,7 @@ test('CLI paths and seed are explicit and malformed options refuse', () => {
   const args = ['--experiment-dir', 'run', '--registration', 'reg.json', '--task-root', 'tasks', '--out', 'out']
   assert.equal(parseArgs(args).writeRegistration, false)
   assert.deepEqual(parseArgs(['--help']), { help: true })
-  for (const extra of [['--write-registration'], ['--seed', '7'], ['--overlays-out', 'patches'], ['--unknown']]) {
+  for (const extra of [['--write-registration'], ['--seed', '7'], ['--overlays-out', 'patches'], ['--unknown'], ['--judge-fixture', 'fixture.mjs'], ['--judge-fixture-disabled'], ['--judge-fixture-engine', 'fixture']]) {
     assert.throws(() => parseArgs([...args, ...extra]))
   }
   for (const seed of ['-1', '1.5', '9007199254740992']) {
