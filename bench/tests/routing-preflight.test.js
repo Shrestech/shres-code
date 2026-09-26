@@ -30,7 +30,7 @@ const bench = join(here, '..')
 /** Fail loud when the repository build outputs the launcher needs are absent. */
 async function assertBuildOutputs() {
   try {
-    await access(join(repo, 'vendor', 'schemastery', 'lib', 'index.mjs'))
+    await access(join(repo, 'vendor/schemastery/lib/index.mjs'))
     await access(PREFLIGHT_PLUGIN_PATH)
   } catch {
     throw new Error(`the preflight boots the real launcher, whose plugin faces need the repository build outputs; run pnpm run build first (${PREFLIGHT_PLUGIN_PATH} or a build face is absent)`)
