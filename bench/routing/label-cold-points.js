@@ -29,7 +29,7 @@ function windowFired(events, start, end, triggerTable) {
  * @param {object} input
  * @param {object[]} input.events - ordered decoded logical session events.
  * @param {{ turn: number, step: number, stepStartSeq: number }[]} input.coldPoints - ordered cold-point boundaries supplied by the replay frontend.
- * @param {boolean} input.taskPassed - final verifier result for the source trial.
+ * @param {boolean | 'unknown'} input.taskPassed - verifier result, or unknown when the verifier was skipped.
  * @param {'S' | 'C'} input.arm - source arm.
  * @param {object} input.method - explicit replay method; absent label inputs refuse.
  * @returns {{ rows: object[], coldPoints: number }} rows with empty consult fields and explicit labels.
@@ -37,7 +37,9 @@ function windowFired(events, start, end, triggerTable) {
 export function labelColdPoints({ events, coldPoints, taskPassed, arm, method: inputMethod }) {
   const { method, methodSha256 } = parseReplayMethod(inputMethod, { require: LABELLER_METHOD_FIELDS })
   if (arm !== 'S' && arm !== 'C') throw new TypeError('label source arm must be S or C')
-  if (typeof taskPassed !== 'boolean') throw new TypeError('taskPassed must be a boolean')
+  if (taskPassed !== true && taskPassed !== false && taskPassed !== 'unknown') {
+    throw new TypeError('taskPassed must be a boolean or \'unknown\'')
+  }
   if (!Array.isArray(coldPoints)) throw new TypeError('coldPoints must be an ordered array')
   for (const [index, point] of coldPoints.entries()) {
     for (const key of ['turn', 'step', 'stepStartSeq']) {
@@ -48,7 +50,9 @@ export function labelColdPoints({ events, coldPoints, taskPassed, arm, method: i
   const rows = coldPoints.map((point, index) => {
     const last = index + 1 === coldPoints.length
     let label
-    if (method.labelSources[arm] !== 'c-trajectory') {
+    if (taskPassed === 'unknown') {
+      label = { status: 'unlabelled', reason: 'task-outcome-unknown' }
+    } else if (method.labelSources[arm] !== 'c-trajectory') {
       label = { status: 'unlabelled', reason: 'no-label-source-for-arm' }
     } else if (last && method.finalWindow === 'unlabelled') {
       label = { status: 'unlabelled', reason: 'final-window-unlabelled' }

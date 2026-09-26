@@ -78,6 +78,13 @@ export const LABELLER_METHOD_FIELDS = Object.freeze([
   'finalWindow',
 ])
 
+/** The method fields the consult frontend needs before calling replayConsultInput. */
+export const FRONTEND_METHOD_FIELDS = Object.freeze([
+  'version',
+  'coldPointBasis',
+  'cRowRequestConfig',
+])
+
 /** The label source each arm may pin; "c-trajectory" is defined for C only. */
 const ARM_LABEL_SOURCES = Object.freeze({
   S: Object.freeze(['unlabelled']),
