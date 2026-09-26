@@ -30,6 +30,7 @@
     - paragraph: Sessions start with this mode; each session changes its own with the Auto chip in the chat input.
     - radiogroup "Routing mode for new sessions":
       - radio "Off" [checked]
+      - radio "Shadow"
       - radio "On"
   - region "Classifier":
     - heading "Classifier" [level=3]

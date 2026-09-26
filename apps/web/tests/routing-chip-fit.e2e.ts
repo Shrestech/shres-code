@@ -135,7 +135,7 @@ async function measure(page: Page, warning: string): Promise<{
       model: extent('model seat', model),
       chip: [
         extent('Auto chip', document.querySelector('[aria-label="Automatic model routing on, press to turn off"]')),
-        extent('routing details', document.querySelector('[aria-label="Routing details…"]')),
+        extent('routing details', document.querySelector('[aria-label="Routing options"]')),
         extent('idle warning', idle),
         extent('Restore', document.querySelector('[aria-label^="Restore strong model"]')),
       ],

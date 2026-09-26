@@ -182,8 +182,8 @@ describe('the model-router section as the pool editor writes it', () => {
     // The resolver names what the schema cannot express, as a SettingsFieldError at the field.
     await expect(write(ctx, { candidates: pool(ctx, 1, { id: 'keep-current' }) }))
       .rejects.toMatchObject({ path: ['candidates', 1, 'id'], message: 'ModelRouterConfig.candidates["keep-current"].id is reserved for the keep-current route option' })
-    await expect(write(ctx, { routeFrom: [{ ...OPUS, objective: 'quota', allowEveryTurn: false }] }))
-      .rejects.toMatchObject({ path: ['routeFrom', 0, 'allowEveryTurn'] })
+    // A quota route without allowEveryTurn is valid: the cold-point entry policy replaced per-turn entry.
+    await write(ctx, { routeFrom: [{ ...OPUS, objective: 'quota', allowEveryTurn: false }] })
     await expect(write(ctx, { routeFrom: [{ ...OPUS, objective: 'latency' }] }))
       .rejects.toMatchObject({ path: ['routeFrom', 0, 'objective'], message: expect.stringContaining('judgmentDeadlineMs of at most 200') as unknown })
     await expect(write(ctx, { candidates: pool(ctx, 1, { id: 'flash' }) }))

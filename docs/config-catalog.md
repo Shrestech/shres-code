@@ -2804,7 +2804,7 @@ export type ModelRoutingMode = 'off' | 'on' | 'shadow'
 export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:130`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:131`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 
