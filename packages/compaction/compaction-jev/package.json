@@ -63,7 +63,6 @@
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/cordis-plugin-include": "workspace:^",
-    "@shres-code/cordis-plugin-loader": "workspace:^",
-    "@shres-code/schemastery": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^"
   }
 }
