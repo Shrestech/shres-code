@@ -1833,12 +1833,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       : replayed.eligibility
     facts.eligibilityMs = Date.now() - eligibilityStarted
     facts.candidateEligibility = eligibility
+    // Fact insertion order is part of the persisted decision bytes; preserve it.
     if (held === undefined && replayed.kind !== 'warm' && replayed.coldPoint !== null) {
       facts.coldPoint = replayed.coldPoint
-    }
-    if (replayed.kind === 'ask') {
-      facts.judgmentQuestions = replayed.questions
-      facts.inputChars = replayed.states.reduce((total, text) => total + text.length, 0)
     }
     // The lifetimes eligibility resolved: the manual route's, and each
     // candidate's declared one. A cold-point consult already recorded the base.
@@ -1870,12 +1867,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
       }
     }
-    const questions: JudgmentQuestion[] = facts.judgmentQuestions === undefined
-      ? [
+    const questions: JudgmentQuestion[] = replayed.kind === 'ask'
+      ? [...replayed.questions]
+      : [
         routeQuestion(eligibleConfig, base),
         ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
       ]
-      : [...facts.judgmentQuestions]
     facts.judgmentQuestions = questions
     /**
      * One failed judgment call. A held streak keeps its candidate while the

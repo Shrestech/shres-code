@@ -4242,6 +4242,12 @@ describe('the quota cold-point policy', () => {
       expect(b.engine.asks).toHaveLength(1)
       expect(b.decision()).toMatchObject({ reason: 'gate-passed', objective })
       expect(b.decision()).not.toHaveProperty('coldPoint')
+      expect(Object.keys(b.decision()).filter(key => key !== 'engineId')).toEqual([
+        'outcome', 'reason', 'stateHash', 'stateSeqs', 'selection', 'eligibilityMs',
+        'candidateEligibility', 'cache', 'judgmentQuestions', 'inputChars',
+        'engine', 'model', 'latencyMs', 'route', 'difficulty', 'thresholds', 'sticky',
+        'objective', 'stateProjection',
+      ])
     }
   })
 
@@ -4250,6 +4256,12 @@ describe('the quota cold-point policy', () => {
     stepAt(b.session, 1, T0)
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toEqual(CHEAP)
+    expect(Object.keys(b.decision()).filter(key => key !== 'engineId')).toEqual([
+      'outcome', 'reason', 'stateHash', 'stateSeqs', 'selection', 'coldPoint', 'cache',
+      'eligibilityMs', 'candidateEligibility', 'judgmentQuestions', 'inputChars',
+      'engine', 'model', 'latencyMs', 'route', 'difficulty', 'thresholds', 'sticky',
+      'objective', 'stateProjection',
+    ])
     closeTurn(b.session, 1)
 
     // One step into the streak, below minSteps: the cold manual model does not end it.

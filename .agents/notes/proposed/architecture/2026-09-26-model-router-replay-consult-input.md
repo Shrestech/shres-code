@@ -16,4 +16,4 @@ Export `replayConsultInput`, `consultPrefix`, and `coldPointAt` from the package
 
 ## Consequences
 
-Held streaks, cooldown, and breaker stay inside `decide()`. Replay refuses an active held streak and, when the two bases differ, a mixed-route log.
+Held streaks, cooldown, and breaker stay inside `decide()`. Replay refuses an active held streak and, when the two bases differ, a mixed-route log. Live `decide()` assigns `facts.cache` immediately after `facts.candidateEligibility`; fact insertion order is part of the persisted decision bytes.
