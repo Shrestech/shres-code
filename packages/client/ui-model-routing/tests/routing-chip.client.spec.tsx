@@ -136,16 +136,27 @@ describe('RoutingChip', () => {
     expect(descriptionOf(secondWarning)).toBe(en['idle.warning.title'])
   })
 
-  it('opens this session\'s Routing view from Routing details, even while locked', () => {
+  it('opens this session\'s Routing view from the details menu, even while locked', () => {
     const reveal = vi.fn()
     setup({ routing: OFF, reveal, locked: true })
-    fireEvent.click(screen.getByRole('button', { name: en['chip.details'] }))
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['chip.details'] }))
     expect(reveal).toHaveBeenCalledWith({ view: 'routing', target: { kind: 'none' } })
   })
 
-  it('offers no Routing details without the session\'s reveal', () => {
+  it('offers the mode group in the details menu and selects the mode in force', () => {
+    setup({ routing: OFF, reveal: vi.fn() })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    expect(screen.getByRole('menuitem', { name: en['mode.shadow'] })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: en['mode.off'] }).className).toContain('selected')
+    expect(screen.getByRole('menuitem', { name: en['mode.on'] }).className).not.toContain('selected')
+  })
+
+  it('offers no Routing view entry in the details menu without the session\'s reveal', () => {
     setup({ routing: OFF })
-    expect(screen.queryByRole('button', { name: en['chip.details'] })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    expect(screen.queryByRole('menuitem', { name: en['chip.details'] })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: en['mode.shadow'] })).toBeTruthy()
   })
 
   it('renders nothing while the host composes no routing projection', () => {
@@ -169,9 +180,9 @@ describe('RoutingChip', () => {
 
     publish(running())
     await waitFor(() => { expect(onChip().textContent).toBe('auto') })
-    // The routed route stays out of the chat surface: the mode wordmark is all
-    // the on state renders.
-    expect(view.container.textContent).toBe('auto')
+    // The routed route stays out of the chat surface: the mode wordmark and
+    // the details affordance are all the on state renders.
+    expect(view.container.textContent).toBe('auto⋯')
   })
 
   it('names no routed model, no confidence, and no streak position while executing /route off', () => {
@@ -217,7 +228,7 @@ describe('RoutingChip', () => {
     const { view } = setup({ routing: { mode: 'on', active: true, pending: false, sticky: { active: false, stepsElapsed: 0 } } })
 
     expect(onChip().textContent).toBe('auto')
-    expect(view.container.textContent).toBe('auto')
+    expect(view.container.textContent).toBe('auto⋯')
     expect(screen.queryByText('turn 0')).toBeNull()
   })
 
@@ -488,5 +499,52 @@ describe('RoutingChip remote-judge confirm', () => {
     view.unmount()
     await act(async () => { resolve(GATE) })
     expect(screen.queryByRole('dialog', { name: en['confirm.title'] })).toBeNull()
+  })
+})
+
+describe('RoutingChip shadow mode', () => {
+  const SHADOW: ModelRoutingProjection = { mode: 'shadow', active: true, pending: false }
+
+  it('renders auto · shadow with a dashed outline, the shadow aria, and turning off as the primary gesture', () => {
+    const setRouting = vi.fn(() => Promise.resolve<string | null>(null))
+    const { view } = setup({ routing: SHADOW, setRouting })
+    const chip = screen.getByRole('button', { name: en['chip.shadow.aria'] })
+    expect(chip.textContent).toBe('auto · shadow')
+    expect(chip.className).toContain('chipShadow')
+    expect(view.container.textContent).not.toContain('deepseek-v4-flash')
+    fireEvent.click(chip)
+    expect(setRouting).toHaveBeenCalledWith(false)
+  })
+
+  it('asks with the shadow confirm before starting shadow with a remote judge', async () => {
+    const { setRouting } = setup({ routing: OFF, engine: { kind: 'ready', snapshot: engines('typesafe') } })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['mode.shadow'] }))
+    const dialog = screen.getByRole('dialog', { name: en['confirm.shadowTitle'] })
+    expect(dialog.textContent).toContain(en['confirm.body'])
+    expect(setRouting).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.shadowConfirm'] }))
+    expect(setRouting).toHaveBeenCalledWith('shadow')
+  })
+
+  it('starts shadow without a confirm when the judge is local', () => {
+    const { setRouting } = setup({ routing: OFF })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['mode.shadow'] }))
+    expect(setRouting).toHaveBeenCalledWith('shadow')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('starts on from the menu with the ordinary confirm, and off without one', () => {
+    const { setRouting } = setup({ routing: SHADOW, engine: { kind: 'ready', snapshot: engines('typesafe') } })
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['mode.on'] }))
+    expect(screen.getByRole('dialog', { name: en['confirm.title'] })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en['confirm.turnOn'] }))
+    expect(setRouting).toHaveBeenCalledWith(true)
+
+    fireEvent.click(screen.getByRole('button', { name: en['chip.menu'] }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['mode.off'] }))
+    expect(setRouting).toHaveBeenCalledWith(false)
   })
 })

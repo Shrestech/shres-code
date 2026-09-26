@@ -86,6 +86,7 @@ export interface RoutingVerdict {
  * @param gate - the configured gate, or null while it loads.
  * @param active - whether routing is in force for the session.
  * @param t - the view's translate.
+ * @param shadow - whether the session runs in shadow, which states the would-have verdict from the shadow decisions alone.
  * @returns the verdict, or undefined when the session has no decisions.
  */
 export function routingVerdict(
@@ -93,9 +94,22 @@ export function routingVerdict(
   gate: ModelRoutingGateView | null,
   active: boolean,
   t: RoutingTranslate,
+  shadow = false,
 ): RoutingVerdict | undefined {
   const { counts } = stats
   if (counts.decisions === 0) return undefined
+  // In shadow nothing was served, so the banner states what live would have
+  // done, from the shadow decisions alone.
+  if (shadow) {
+    if (stats.shadow.decisions === 0) return undefined
+    return {
+      headline: t('verdict.shadow', {
+        share: formatPercent(stats.shadow.downgraded / stats.shadow.decisions),
+        streaks: stats.shadow.streaks,
+      }),
+      detail: '',
+    }
+  }
   const parts: string[] = []
   let headline: string
   if (counts.downgradedSteps === 0) {
@@ -142,6 +156,7 @@ export interface RoutingKpi {
  * @param gate - the configured gate, or null while it loads.
  * @param egressOf - the egress class of an engine name, when the engine registry reports it.
  * @param t - the view's translate.
+ * @param shadow - whether the session runs in shadow: pool figures come from the shadow decisions and the tiles are prefixed.
  * @returns the tiles in display order.
  */
 export function routingKpis(
@@ -149,9 +164,22 @@ export function routingKpis(
   gate: ModelRoutingGateView | null,
   egressOf: ((engine: string) => 'none' | 'local' | 'remote' | undefined) | undefined,
   t: RoutingTranslate,
+  shadow = false,
 ): RoutingKpi[] {
   const { counts, latency, moved } = stats
   const top = stats.keptReasons[0]
+  // In shadow the pool figures are the shadow decisions' would-have share, not
+  // steps any candidate served.
+  const poolKpi = shadow && stats.shadow.decisions > 0
+    ? {
+      id: 'pool-steps',
+      label: `${t('kpi.wouldHave')} ${t('kpi.pool')}`,
+      value: formatPercent(stats.shadow.downgraded / stats.shadow.decisions),
+      detail: t(stats.shadow.streaks === 1 ? 'kpi.pool.detail.one' : 'kpi.pool.detail', {
+        steps: stats.shadow.downgraded, total: stats.shadow.decisions, streaks: stats.shadow.streaks,
+      }),
+    }
+    : undefined
   const switchCost = stats.cold
     .filter(row => row.cause === 'routed-switch' || row.cause === 'routed-return' || row.cause === 'manual-switch')
     .reduce((sum, row) => sum + row.tokens, 0)
@@ -174,7 +202,7 @@ export function routingKpis(
         consults: counts.consults, failed: counts.judgeFailed, warmUps: counts.warmUps,
       }),
     },
-    {
+    poolKpi ?? {
       id: 'pool-steps',
       label: t('kpi.pool'),
       value: formatPercent(counts.steps === 0 ? 0 : counts.downgradedSteps / counts.steps),
@@ -182,13 +210,19 @@ export function routingKpis(
     },
     {
       id: 'kept-strong',
-      label: t('kpi.kept'),
+      label: shadow ? `${t('kpi.wouldHave')} ${t('kpi.kept')}` : t('kpi.kept'),
       value: String(counts.keptStrong),
       detail: top === undefined ? t('kpi.none') : t('kpi.kept.detail', { reason: top.reason, count: top.count }),
     },
     {
+      id: 'warm-skipped',
+      label: t('kpi.warmSkipped'),
+      value: String(counts.warmSkipped),
+      detail: t('kpi.warmSkipped.detail'),
+    },
+    {
       id: 'route-failed',
-      label: t('kpi.routeFailed'),
+      label: shadow ? `${t('kpi.wouldHave')} ${t('kpi.routeFailed')}` : t('kpi.routeFailed'),
       value: String(counts.routeFailed),
       detail: t('kpi.routeFailed.detail'),
     },
@@ -646,6 +680,7 @@ export function judgeNotUsed(judge: RoutingJudge, gate: ModelRoutingGateView | n
  * @param active - whether routing is in force for the session.
  * @param gate - the configured gate, whose `stateMaxChars` caps each consult, or null while it loads.
  * @param t - the view's translate.
+ * @param shadow - whether the session runs in shadow, whose consults send the same state off the machine.
  * @returns the warning, or undefined when nothing leaves the machine.
  */
 export function egressWarning(
@@ -653,11 +688,18 @@ export function egressWarning(
   active: boolean,
   gate: ModelRoutingGateView | null,
   t: RoutingTranslate,
+  shadow = false,
 ): string | undefined {
   if (!active || judge.kind !== 'engine' || judge.engine.egress !== 'remote') return undefined
   // Only a judge the router is known to refuse sends nothing.
   if (judgeRefused(judge, gate) === true) return undefined
   const destination = judge.engine.destination ?? judge.engine.label
+  // Shadow consults send the same state off the machine as live ones.
+  if (shadow) {
+    return gate === null
+      ? t('egress.warning.shadow', { destination })
+      : t('egress.warning.chars.shadow', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })
+  }
   return gate === null
     ? t('egress.warning', { destination })
     : t('egress.warning.chars', { destination, chars: gate.stateMaxChars.toLocaleString('en-US') })

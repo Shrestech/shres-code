@@ -462,7 +462,14 @@ function isAnnotationKind(kind: TrajectoryCellKind): boolean {
 
 /** Translated outcome and reason line one routing row reads. */
 function routingRowText(row: TrajectoryRoutingRow, t: TranslateNS<typeof NS>): string {
-  return `${t(ROUTING_OUTCOME_KEYS[row.outcome])} · ${t(ROUTING_REASON_KEYS[row.reason])}`
+  const verdict = `${t(ROUTING_OUTCOME_KEYS[row.outcome])} · ${t(ROUTING_REASON_KEYS[row.reason])}`
+  // A shadow decision names what live routing would have done; it switched
+  // nothing.
+  if (row.shadow === undefined) return verdict
+  const simulated = row.shadow.switched
+    ? t('routing.shadow.switched', { model: row.shadow.model ?? '' })
+    : t('routing.shadow.kept')
+  return `${verdict} · ${simulated}`
 }
 
 function flattenRecords(turns: readonly TrajectoryTurnModel[]): TableRecord[] {

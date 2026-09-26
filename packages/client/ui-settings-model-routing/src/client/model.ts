@@ -164,10 +164,10 @@ export interface ModelRoutingController {
   setClassifier(enabled: boolean): Promise<WriteFailure | undefined>
   /**
    * Set the routing mode new sessions start in (`model-router.initialMode`).
-   * @param mode - `off` or `on`.
+   * @param mode - `off`, `shadow`, or `on`.
    * @returns the failure, or undefined once the write committed.
    */
-  setDefaultMode(mode: 'off' | 'on'): Promise<WriteFailure | undefined>
+  setDefaultMode(mode: 'off' | 'on' | 'shadow'): Promise<WriteFailure | undefined>
   /**
    * Write the pool and the `routeFrom` allowlist in one settings write.
    * @param candidates - the pool, in order.

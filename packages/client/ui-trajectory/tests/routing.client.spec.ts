@@ -165,6 +165,51 @@ describe('trajectoryRoutingRow', () => {
     expect(en[ROUTING_REASON_KEYS['reentry-cooldown']]).toBe('cooling down after a streak exit')
   })
 
+  it('shows a warm-prefix skip as the quiet marker and a cold-point return as a visible streak exit, each labelled', () => {
+    const warm = decision({
+      outcome: 'kept-strong',
+      reason: 'warm-prefix',
+      coldPoint: null,
+      sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(warm)).toEqual({ outcome: 'kept-strong', reason: 'warm-prefix', quiet: true })
+    const cold = decision({
+      outcome: 'kept-strong',
+      reason: 'cold-point-return',
+      coldPoint: { kind: 'idle', ttlMs: 300_000, ttlSource: 'fallback', idleMs: 400_000, lastBaseSeq: 3 },
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(cold)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'cold-point-return',
+      streak: { kind: 'exited', reason: 'cold-point-return' },
+      quiet: false,
+    })
+    expect(en[ROUTING_REASON_KEYS['warm-prefix']]).toBe('Strong cache still warm: no switch attempted')
+    expect(en[ROUTING_REASON_KEYS['cold-point-return']]).toBe('Strong cache went cold: returned to the strong model')
+    expect(ROUTING_BREAK_KEYS['cold-point-return']).toBe('routing.reason.coldPointReturn')
+  })
+
+  it('marks a shadow row with what live would have done, switched or kept', () => {
+    const switched = decision({
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      shadow: true,
+      selection: { candidateId: 'cheap', provider: 'cheap-provider', model: 'cheap-model' },
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 1 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(switched).shadow).toEqual({ switched: true, model: 'cheap-model' })
+    const kept = decision({
+      outcome: 'kept-strong',
+      reason: 'current-preferred',
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }, ['selection', 'route'])
+    expect(trajectoryRoutingRow(kept).shadow).toEqual({ switched: false })
+    // A live decision carries no shadow verdict.
+    expect(trajectoryRoutingRow(decision({ outcome: 'downgraded', reason: 'gate-passed' }, ['selection', 'route'])).shadow).toBeUndefined()
+  })
+
   it('shows a judgment failure a streak survived as a held downgrade and an open breaker as the quiet marker', () => {
     const held = decision({
       reason: 'judgment-failure-held',

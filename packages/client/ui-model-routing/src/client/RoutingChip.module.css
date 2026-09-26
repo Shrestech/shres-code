@@ -49,6 +49,15 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+/* Shadow judges without ever switching, so it renders as a dashed outline with
+   neutral text: it never looks like an active switch. */
+.chipShadow {
+  background: var(--dsw-alias-button-tool-bar-fill);
+  border: 1px dashed var(--dsw-alias-border-l3);
+  padding: 1px 7px;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .chip:hover:not(:disabled) {
   color: var(--dsw-alias-label-primary);
 }

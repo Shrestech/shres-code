@@ -59,6 +59,7 @@ function assessmentFor(
     ...info?.context === undefined ? {} : { contextWindow: info.context.contextWindow },
     ...hostedTools === undefined ? {} : { hostedTools: Object.freeze([...hostedTools]) },
     ...effectiveMaxTokens === undefined ? {} : { effectiveMaxTokens },
+    ...info?.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: info.promptCacheTtlMs },
     reason,
   })
 }
@@ -84,6 +85,7 @@ function candidateRequirements(
       ...info.context === undefined ? {} : { contextWindow: info.context.contextWindow },
       ...info.hostedTools === undefined ? {} : { hostedTools: Object.freeze([...info.hostedTools]) },
       ...info.thinkingMode === undefined ? {} : { thinkingMode: info.thinkingMode },
+      ...info.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: info.promptCacheTtlMs },
     },
   })
 }

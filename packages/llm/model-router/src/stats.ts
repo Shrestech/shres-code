@@ -22,9 +22,9 @@
  * Input tokens follow the usage presence contract of `TokenUsage`: a call that
  * reported cache counts contributes its `inputTokens` as uncached input plus
  * its cache reads and writes; a call that reported none contributes its whole
- * prompt as unreported input. The log does not record a model's prompt-cache
- * lifetime, so idle expiry uses {@link COLD_TTL_FALLBACK_MS} and the snapshot
- * reports that fallback.
+ * prompt as unreported input. Decisions record each model's prompt-cache
+ * lifetime in `cache`, so idle expiry uses the latest recorded one and
+ * {@link COLD_TTL_FALLBACK_MS} only for a model no decision describes.
  *
  * The unit state is plain JSON. Retained lists are capped as the snapshot
  * documents, and turns are kept as at most {@link RETAINED_TURN_SPANS} spans
@@ -40,6 +40,7 @@ import type { SessionEvent } from '@shres-code/shres-code-session'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
 import { KEEP_CURRENT_OPTION_ID } from './config.ts'
+import { isCompactionEnd } from './folds.ts'
 import type {
   ModelRoutingColdCause,
   ModelRoutingDecision,
@@ -128,6 +129,8 @@ const REASON_GROUPS: Readonly<Record<ModelRoutingReason, ModelRoutingReasonGroup
   'thinking-mode-incompatible': 'fail-closed',
   'hold-cap': 'fail-closed',
   'reentry-cooldown': 'fail-closed',
+  'warm-prefix': 'fail-closed',
+  'cold-point-return': 'judge-no',
   'manual-deviation': 'fail-closed',
   'mode-off': 'fail-closed',
   'engine-unavailable': 'engine',
@@ -197,6 +200,10 @@ interface TimelineDecision {
   reason: string
   best: number | null
   engine: number | null
+  /** A shadow consult logged it: it describes what live would have done. */
+  shadow: boolean
+  /** Model id a shadow downgrade would have served, null otherwise. */
+  wouldModel: string | null
 }
 
 /** One row of the recent-decisions table. */
@@ -255,6 +262,10 @@ export interface ModelRoutingStatsState {
   since: { switchTurn: number | null; exited: boolean; manual: boolean; compacted: boolean }
   /** A streak exited and no call has been served since. */
   returnArmed: boolean
+  /** Latest cache lifetime per provider/model a decision's `cache` recorded. */
+  ttlModels: { provider: string; model: string; ms: number; source: 'adapter' | 'fallback' }[]
+  /** What shadow decisions say live routing would have done. */
+  shadow: { decisions: number; downgraded: number; streaks: number }
   cold: Record<ModelRoutingColdCause, ColdTally>
   moved: { tokensOffStrong: number; returnReprefill: number }
   objective: { latest: ModelRoutingObjective; mixed: boolean } | null
@@ -293,6 +304,7 @@ export function createStatsState(): ModelRoutingStatsState {
       deadlineHits: 0,
       warmUps: 0,
       turnsWithDecisions: 0,
+      warmSkipped: 0,
     },
     lastDecisionTurn: null,
     reasons: {},
@@ -317,6 +329,8 @@ export function createStatsState(): ModelRoutingStatsState {
     turnDecision: null,
     since: { switchTurn: null, exited: false, manual: false, compacted: false },
     returnArmed: false,
+    ttlModels: [],
+    shadow: { decisions: 0, downgraded: 0, streaks: 0 },
     cold: Object.fromEntries(COLD_CAUSES.map(cause => [cause, { count: 0, tokens: 0 }])) as Record<ModelRoutingColdCause, ColdTally>,
     moved: { tokensOffStrong: 0, returnReprefill: 0 },
     objective: null,
@@ -361,15 +375,55 @@ export function applyStatsEvent(state: ModelRoutingStatsState, event: SessionEve
 }
 
 /**
- * Whether the event is a successful `compaction/end`. The compaction package
- * owns that event type and this package does not depend on it, so the type
- * name and the `error` field are read from the envelope.
- * @param event - one committed event.
- * @returns whether a compaction completed.
+ * The cache lifetime a model's decisions recorded, or the fallback for a model
+ * no decision describes.
+ * @param state - the state holding the recorded lifetimes.
+ * @param served - the provider route and model that served a call.
+ * @returns the lifetime in milliseconds.
  */
-function isCompactionEnd(event: SessionEvent): boolean {
-  const record = event as unknown as { type: string; data: { error?: unknown } }
-  return record.type === 'compaction/end' && record.data.error === undefined
+function coldTtlMs(state: ModelRoutingStatsState, served: Route): number {
+  return state.ttlModels.find(model => sameRoute(model, served))?.ms ?? COLD_TTL_FALLBACK_MS
+}
+
+/** Record one model's lifetime, replacing the model's previous value. */
+function upsertTtlModel(
+  models: ModelRoutingStatsState['ttlModels'],
+  entry: { provider: string; model: string; ms: number; source: 'adapter' | 'fallback' },
+): ModelRoutingStatsState['ttlModels'] {
+  const at = models.findIndex(model => sameRoute(model, entry))
+  return at === -1 ? [...models, entry] : models.map((model, index) => index === at ? entry : model)
+}
+
+/**
+ * Fold the lifetimes one decision recorded: its manual route's, and each
+ * candidate's, whose provider/model the decision's own assessments name.
+ * @param models - the recorded lifetimes so far.
+ * @param data - the logged decision.
+ * @returns the lifetimes after the decision.
+ */
+function applyTtlModels(
+  models: ModelRoutingStatsState['ttlModels'],
+  data: ModelRoutingDecision,
+): ModelRoutingStatsState['ttlModels'] {
+  const cache = data.cache
+  if (cache === undefined) return models
+  let next = upsertTtlModel(models, {
+    provider: cache.base.provider,
+    model: cache.base.model,
+    ms: cache.base.ttlMs,
+    source: cache.base.source,
+  })
+  for (const candidate of cache.candidates ?? []) {
+    const assessment = data.candidateEligibility?.assessments.find(entry => entry.id === candidate.id)
+    if (assessment === undefined) continue
+    next = upsertTtlModel(next, {
+      provider: assessment.provider,
+      model: assessment.model,
+      ms: candidate.ttlMs,
+      source: candidate.source,
+    })
+  }
+  return next
 }
 
 /** Fold one decision. */
@@ -393,6 +447,7 @@ function applyDecision(
   // decisions name only the engine that answered, as its provider reported it.
   const engineName = data.engineId ?? data.engine
   const warmUp = data.engineFailure?.engineState !== undefined
+  const shadow = data.shadow === true
   const failed = judgeFailed(data)
   const sent = sentState(data, failed)
   const asked = sent !== 'none'
@@ -418,6 +473,15 @@ function applyDecision(
       deadlineHits: state.counts.deadlineHits + (data.engineFailure?.code === 'DEADLINE' ? 1 : 0),
       warmUps: state.counts.warmUps + (warmUp ? 1 : 0),
       turnsWithDecisions: state.counts.turnsWithDecisions + (state.lastDecisionTurn === turn ? 0 : 1),
+      warmSkipped: state.counts.warmSkipped + (data.reason === 'warm-prefix' ? 1 : 0),
+    },
+    ttlModels: applyTtlModels(state.ttlModels, data),
+    shadow: {
+      decisions: state.shadow.decisions + (shadow ? 1 : 0),
+      downgraded: state.shadow.downgraded + (shadow && data.outcome === 'downgraded' ? 1 : 0),
+      // The fold's sticky state is the shadow simulation's whenever only
+      // shadow decisions are logged, which is the figure the view reports.
+      streaks: state.shadow.streaks + (shadow && entry ? 1 : 0),
     },
     lastDecisionTurn: turn,
     reasons: increment(state.reasons, data.reason),
@@ -474,6 +538,8 @@ function applyDecision(
       reason: data.reason,
       best,
       engine: engineIndex,
+      shadow,
+      wouldModel: shadow && data.outcome === 'downgraded' ? data.selection?.model ?? null : null,
     }], RETAINED_TIMELINE_EVENTS),
     recent: retain([...state.recent, {
       seq,
@@ -517,7 +583,7 @@ function applyCall(
   const found = state.models.findIndex(model => sameRoute(model, served))
   const modelIndex = found === -1 ? state.models.length : found
   const prior = state.models[found]
-  const idle = prior !== undefined && start - prior.lastStart > COLD_TTL_FALLBACK_MS
+  const idle = prior !== undefined && start - prior.lastStart > coldTtlMs(state, served)
   const tally: ModelTally = prior === undefined
     ? {
       ...served,
@@ -928,7 +994,11 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
     thresholds: state.thresholds.map(entry => ({ ...entry })),
     models,
     cold: COLD_CAUSES.map(cause => ({ cause, count: state.cold[cause].count, tokens: state.cold[cause].tokens })),
-    coldTtl: { ms: COLD_TTL_FALLBACK_MS, fallback: true },
+    coldTtl: {
+      perModel: state.ttlModels.map(entry => ({ ...entry })),
+      fallbackMs: COLD_TTL_FALLBACK_MS,
+    },
+    shadow: { ...state.shadow },
     unreportedCallShare: calls === 0 ? null : (calls - reportedCalls) / calls,
     moved: {
       ...state.moved,
@@ -1124,6 +1194,7 @@ export const modelRoutingStatsSchema = zod.object({
     deadlineHits: zod.number(),
     warmUps: zod.number(),
     turnsWithDecisions: zod.number(),
+    warmSkipped: zod.number(),
   }),
   reasons: zod.array(zod.object({
     reason: zod.string(),
@@ -1186,7 +1257,16 @@ export const modelRoutingStatsSchema = zod.object({
     count: zod.number(),
     tokens: zod.number(),
   })),
-  coldTtl: zod.object({ ms: zod.number(), fallback: zod.boolean() }),
+  coldTtl: zod.object({
+    perModel: zod.array(zod.object({
+      provider: zod.string(),
+      model: zod.string(),
+      ms: zod.number(),
+      source: zod.union([zod.literal('adapter'), zod.literal('fallback')]),
+    })),
+    fallbackMs: zod.number(),
+  }),
+  shadow: zod.object({ decisions: zod.number(), downgraded: zod.number(), streaks: zod.number() }),
   unreportedCallShare: nullableNumber,
   moved: zod.object({
     tokensOffStrong: zod.number(),
@@ -1217,6 +1297,8 @@ export const modelRoutingStatsSchema = zod.object({
       reason: zod.string(),
       best: nullableNumber,
       engine: nullableNumber,
+      shadow: zod.boolean(),
+      wouldModel: zod.string().nullable(),
     })),
     aggregated: zod.boolean(),
   }),

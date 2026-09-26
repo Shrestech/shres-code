@@ -92,15 +92,24 @@ describe('routingVerdict', () => {
       .toBe('Routing served 38.0% of steps on deepseek-v4.1-flash, kimi-k3 in one streak.')
     expect(routingKpis(one, GATE, undefined, t).find(tile => tile.id === 'pool-steps')?.detail).toBe('38 of 100 steps · 1 streak')
   })
+
+  it('in shadow, the verdict states what live would have done, from the shadow decisions alone', () => {
+    const stats = { ...liveStats(), shadow: { decisions: 22, downgraded: 9, streaks: 2 } }
+    expect(routingVerdict(stats, GATE, true, t, true)?.headline)
+      .toBe('In shadow, routing would have served 40.9% of judged steps on pool models across 2 streaks.')
+    // No shadow decisions: no verdict.
+    expect(routingVerdict({ ...stats, shadow: { decisions: 0, downgraded: 0, streaks: 0 } }, GATE, true, t, true)).toBeUndefined()
+  })
 })
 
 describe('routingKpis', () => {
-  it('computes the eight tiles for the live-shaped session', () => {
+  it('computes the nine tiles for the live-shaped session', () => {
     const tiles = routingKpis(liveStats(), GATE, () => 'remote', t)
     expect(tiles.map(tile => [tile.id, tile.value, tile.detail])).toEqual([
       ['decisions', '22', '22 judged · 0 failed'],
       ['pool-steps', '0.0%', '0 of 93 steps · 0 streaks'],
       ['kept-strong', '22', 'top: current-preferred (15)'],
+      ['warm-skipped', '0', 'no judge call, prefix kept warm'],
       ['route-failed', '0', 'recovered in-turn on the strong model'],
       ['latency', '1000', 'P95 1 s · deadline 1.5 s · 1 s per turn'],
       ['moved', '0', '0 moved − 0 return re-prefill · quota'],
@@ -108,6 +117,22 @@ describe('routingKpis', () => {
       ['egress', '≤ 264k', '22 asks to a remote engine · at most'],
     ])
     expect(tiles.find(tile => tile.id === 'egress')?.unit).toBe('chars')
+  })
+
+  it('in shadow, prefixes decision-derived tiles and reads the pool share from the shadow figures', () => {
+    const stats = {
+      ...liveStats(),
+      shadow: { decisions: 22, downgraded: 9, streaks: 2 },
+      counts: { ...liveStats().counts, warmSkipped: 4 },
+    }
+    const tiles = routingKpis(stats, GATE, () => 'remote', t, true)
+    expect(tiles.find(tile => tile.id === 'pool-steps')).toMatchObject({
+      label: 'Would have Steps on pool models', value: '40.9%', detail: '9 of 22 steps · 2 streaks',
+    })
+    expect(tiles.find(tile => tile.id === 'kept-strong')?.label).toBe('Would have Kept strong')
+    expect(tiles.find(tile => tile.id === 'warm-skipped')).toMatchObject({ value: '4' })
+    // The measured tiles keep their names: in shadow nothing moved.
+    expect(tiles.find(tile => tile.id === 'moved')?.label).toBe('Strong tokens moved off')
   })
 
   it('reports routed switch cost, exact remote egress, and a missing objective', () => {

@@ -50,8 +50,10 @@ export interface ModelRoutingRouteFromConfig {
   /** How this strong route is billed. Required. */
   objective: ModelRoutingObjective
   /**
-   * Allow per-turn entry from a `quota` route. The per-turn entry policy
-   * refuses a quota route without it.
+   * Allow per-turn entry from a `quota` route, as `dollars` and `latency`
+   * routes enter. Without it a quota route starts a downgrade only at a cold
+   * point of its prompt cache and returns at the next one; set it for bench
+   * arms that measure per-turn entry.
    */
   allowEveryTurn?: boolean
 }
@@ -150,7 +152,7 @@ export interface ModelRoutingRouteFrom {
   readonly model: string
   /** How this strong route is billed. */
   readonly objective: ModelRoutingObjective
-  /** Whether per-turn entry from a `quota` route is allowed. */
+  /** Whether a `quota` route enters per turn instead of only at cold points. */
   readonly allowEveryTurn: boolean
 }
 
@@ -197,6 +199,8 @@ export interface ModelRoutingCandidateAssessment {
   readonly hostedTools?: readonly HostedTool[]
   /** Effective maximum output tokens, when known. */
   readonly effectiveMaxTokens?: number
+  /** Candidate prompt-cache lifetime in milliseconds, when the provider declares one. */
+  readonly promptCacheTtlMs?: number
   /** Stable eligibility result. */
   readonly reason: ModelRoutingCandidateEligibilityReason
 }
@@ -215,6 +219,8 @@ export interface ModelRoutingCandidateRequirements {
   readonly hostedTools?: readonly HostedTool[]
   /** Manual route's thinking mode, when its metadata declares one. */
   readonly thinkingMode?: LlmThinkingMode
+  /** Manual model's prompt-cache lifetime in milliseconds, when its metadata declares one. */
+  readonly promptCacheTtlMs?: number
 }
 
 /** Candidate list and detached capability assessments for one routing request. */
@@ -323,6 +329,16 @@ export type ModelRoutingReason =
   | 'mode-off'
   /** The judgment call itself failed and `onUnavailable` is `error`. */
   | 'judgment-error'
+  /**
+   * The manual route is a `quota` route and its prompt-cache prefix is still
+   * warm, so no switch is attempted and no judgment runs this turn.
+   */
+  | 'warm-prefix'
+  /**
+   * The manual route's prompt cache went cold after the held quota streak
+   * reached `hold.minSteps`, so the streak returns to it without judgment.
+   */
+  | 'cold-point-return'
 
 /** Why a downgraded streak ended. */
 export type ModelRoutingBreakReason =
@@ -337,6 +353,56 @@ export type ModelRoutingBreakReason =
   | 'route-failed'
   | 'hold-cap'
   | 'base-unlisted'
+  | 'cold-point-return'
+
+/**
+ * Why the manual route's prompt-cache prefix counts as cold at a consult,
+ * first match wins: its model never answered in this unseeded session, a
+ * compaction followed its last answer, the manual model changed since that
+ * answer, its cache lifetime is zero, or the time since that answer's step
+ * started exceeds the lifetime.
+ */
+export type ModelRoutingColdPointKind = 'session-start' | 'post-compaction' | 'manual-switch' | 'no-cache' | 'idle'
+
+/** One cold point of the manual route's prompt cache, as a decision records it. */
+export interface ModelRoutingColdPoint {
+  /** Which rule found the prefix cold. */
+  kind: ModelRoutingColdPointKind
+  /** Cache lifetime the rules used, in milliseconds. */
+  ttlMs: number
+  /** `adapter` when the manual model's metadata declared the lifetime, `fallback` for `coldPoints.unknownTtlMs`. */
+  ttlSource: 'adapter' | 'fallback'
+  /** Milliseconds from the start of the manual model's last answering step to this step's start, when it answered. */
+  idleMs?: number
+  /** Seq of the manual model's last `assistant/message`, when it answered. */
+  lastBaseSeq?: number
+  /** Seq of the `compaction/end` that followed that message, for `post-compaction`. */
+  compactionSeq?: number
+}
+
+/** One model's prompt-cache lifetime, as a decision records it. */
+export interface ModelRoutingCacheTtlView {
+  /** Registered provider route of the model. */
+  readonly provider: string
+  /** Provider-owned model id. */
+  readonly model: string
+  /** Cache lifetime in milliseconds. */
+  readonly ttlMs: number
+  /** `adapter` when the model's metadata declared it, `fallback` for `coldPoints.unknownTtlMs`. */
+  readonly source: 'adapter' | 'fallback'
+}
+
+/**
+ * The prompt-cache lifetimes one consult used. `base` always names the manual
+ * route; `candidates` names each configured candidate whose metadata declared
+ * a lifetime.
+ */
+export interface ModelRoutingDecisionCache {
+  /** The manual route's lifetime. */
+  readonly base: ModelRoutingCacheTtlView
+  /** Lifetimes of configured candidates whose metadata declared one. */
+  readonly candidates?: readonly { readonly id: string; readonly ttlMs: number; readonly source: 'adapter' | 'fallback' }[]
+}
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -502,6 +568,26 @@ export interface ModelRoutingDecision {
   objective?: ModelRoutingObjective
   /** The thresholds in force for the route and difficulty answers, when a judgment call answered. */
   thresholds?: ModelRoutingThresholds
+  /**
+   * The cold point a consult under the quota cold-point policy found for the
+   * manual route, or `null` when its prefix was warm; absent when the consult
+   * evaluated none. Replay reads this record and never re-evaluates the clock.
+   */
+  coldPoint?: ModelRoutingColdPoint | null
+  /**
+   * Set on decisions a shadow-mode consult logged: the judgment ran and the
+   * decision describes what live routing would have done, and no request was
+   * rewritten. Only `on` routes, so absence reads as a live decision and logs
+   * written before shadow keep their meaning.
+   */
+  shadow?: true
+  /**
+   * The prompt-cache lifetimes the consult used, when it evaluated a cold
+   * point or judged: the manual route's, and each candidate's declared
+   * lifetime. Statistics fold these into the per-model lifetimes that
+   * idle-expiry causes use.
+   */
+  cache?: ModelRoutingDecisionCache
 }
 
 /** A failed judgment call as a decision records it. */
@@ -731,6 +817,8 @@ export interface ModelRoutingStatsSnapshot {
     warmUps: number
     /** Turns with at least one decision. */
     turnsWithDecisions: number
+    /** Decisions a warm quota prefix skipped: reason `warm-prefix`, no judgment call. */
+    warmSkipped: number
   }
   /** Reason histogram over all decisions, largest first. */
   reasons: { reason: string; group: ModelRoutingReasonGroup; count: number }[]
@@ -813,8 +901,21 @@ export interface ModelRoutingStatsSnapshot {
   models: ModelRoutingStatsModel[]
   /** Cold prefills by cause, every cause present, fixed order. */
   cold: { cause: ModelRoutingColdCause; count: number; tokens: number }[]
-  /** The idle-expiry cache lifetime used, in milliseconds, and whether it is the 300 s fallback. */
-  coldTtl: { ms: number; fallback: boolean }
+  /**
+   * Cache lifetimes idle-expiry causes use: one entry per provider/model a
+   * decision's `cache` described, latest value per model, and the fallback
+   * for models no decision describes.
+   */
+  coldTtl: {
+    perModel: { provider: string; model: string; ms: number; source: 'adapter' | 'fallback' }[]
+    fallbackMs: number
+  }
+  /**
+   * What shadow decisions say live routing would have done: their count, the
+   * downgraded ones, and the streaks their downgraded decisions entered from
+   * an inactive simulated state. Live decisions never enter these figures.
+   */
+  shadow: { decisions: number; downgraded: number; streaks: number }
   /** Share of calls with no reported cache counts, 0 to 1, or null without calls. */
   unreportedCallShare: number | null
   /** Strong-route tokens moved to candidates and re-written on return. */
@@ -860,6 +961,10 @@ export interface ModelRoutingStatsSnapshot {
       best: number | null
       /** Index into `engines`, or null when no engine answered. */
       engine: number | null
+      /** Whether a shadow consult logged it: it describes what live would have done. */
+      shadow: boolean
+      /** Model id a shadow downgrade would have served, null otherwise. */
+      wouldModel: string | null
     }[]
     aggregated: boolean
   }

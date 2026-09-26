@@ -61,6 +61,14 @@ export function trajectoryRoutingRow(decision: ModelRoutingDecision, previous?: 
   return {
     outcome: decision.outcome,
     reason: decision.reason,
+    ...(decision.shadow === true
+      ? {
+        shadow: {
+          switched: decision.selection !== undefined,
+          ...decision.selection?.model === undefined ? {} : { model: decision.selection.model },
+        },
+      }
+      : {}),
     ...(quiet || decision.route === undefined ? {} : { confidence: decision.route.confidence }),
     ...(quiet || decision.selection === undefined
       ? {}

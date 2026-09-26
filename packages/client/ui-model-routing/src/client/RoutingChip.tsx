@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
+import { Button, Menu, Modal } from '@shres-code/shres-code-client-ui-primitives'
+import type { MenuEntry } from '@shres-code/shres-code-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.modelRouting
 // seat and its {locked} owner share).
@@ -51,7 +52,9 @@ export function RoutingChip({
   // Offered only while the page exists: opening a section that is not registered rejects.
   const openSettings = routingSettingsPage(engineState) ? openRoutingSettings : undefined
   const [confirm, setConfirm] = useState<ConfirmedJudge | null>(null)
+  const [confirmMode, setConfirmMode] = useState<'on' | 'shadow'>('on')
   const [confirmGate, setConfirmGate] = useState<ModelRoutingGateView | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
@@ -67,7 +70,8 @@ export function RoutingChip({
 
   if (!available || routing === undefined) return null
 
-  const on = routing.active
+  const mode = routing.mode
+  const on = mode === 'on'
   // Idle is a dead end the projection names: routing is on, but every decision
   // resolves the candidate the session already runs or finds that routing does
   // not start from the session's model, so no turn can downgrade.
@@ -90,57 +94,96 @@ export function RoutingChip({
     })
   }
 
+  // Turning routing on, or starting shadow, is the gesture that starts sending
+  // conversation state to the judge, so a judge that sends it off this machine,
+  // or one not known yet, asks first. An id no engine registers is not known:
+  // an engine registering under it later is asked with no further gesture. A
+  // local judge, judgment switched off, or no dispatcher does not ask.
+  const requestJudged = (wanted: 'on' | 'shadow'): void => {
+    const judge = routingJudge(engineState)
+    if (!confirms(judge)) {
+      run('mode', () => setRouting(wanted === 'shadow' ? 'shadow' : true))
+      return
+    }
+    setConfirmMode(wanted)
+    setConfirm(judge)
+    setConfirmGate(null)
+    loadGate().then((gate) => {
+      if (aliveRef.current) setConfirmGate(gate)
+    }, () => {
+      // Without the cap the confirm names the destination alone; the
+      // gesture stays available, so nothing else needs the failure.
+    })
+  }
+
+  // The mode group is always offered; the Routing view entry exists only while
+  // the session can reveal it.
+  const menuEntries: readonly MenuEntry[] = [
+    { type: 'label', id: 'mode-heading', text: t('menu.mode') },
+    { id: 'off', label: t('mode.off') },
+    { id: 'shadow', label: t('mode.shadow') },
+    { id: 'on', label: t('mode.on') },
+    ...reveal === undefined ? [] : [
+      { type: 'separator' as const, id: 'mode-separator' },
+      { id: 'details', label: t('chip.details') },
+    ],
+  ]
+
   return (
     <span className={css.wrap}>
       <button
         type="button"
-        className={clsx(css.chip, on ? css.chipOn : css.chipOff)}
-        aria-label={on ? t('chip.on.aria') : t('chip.off.aria')}
-        title={on ? t('chip.on.title') : t('chip.off.title')}
+        className={clsx(css.chip, mode === 'shadow' ? css.chipShadow : on ? css.chipOn : css.chipOff)}
+        aria-label={mode === 'shadow' ? t('chip.shadow.aria') : on ? t('chip.on.aria') : t('chip.off.aria')}
+        title={mode === 'shadow' ? t('chip.shadow.title') : on ? t('chip.on.title') : t('chip.off.title')}
         aria-busy={pending === 'mode'}
         disabled={locked || pending !== null}
         onClick={() => {
-          if (on) {
+          // Off's primary gesture turns routing on; on's and shadow's turn it
+          // off, because shadow never switched anything to undo.
+          if (mode !== 'off') {
             run('mode', () => setRouting(false))
             return
           }
-          // Turning routing on is the gesture that starts sending conversation
-          // state to the judge, so a judge that sends it off this machine, or
-          // one not known yet, asks first. An id no engine registers is not
-          // known: an engine registering under it later is asked with no
-          // further gesture. A local judge, judgment switched off, or no
-          // dispatcher does not ask.
-          const judge = routingJudge(engineState)
-          if (!confirms(judge)) {
-            run('mode', () => setRouting(true))
-            return
-          }
-          setConfirm(judge)
-          setConfirmGate(null)
-          loadGate().then((gate) => {
-            if (aliveRef.current) setConfirmGate(gate)
-          }, () => {
-            // Without the cap the confirm names the destination alone; the
-            // gesture stays available, so nothing else needs the failure.
-          })
+          requestJudged('on')
         }}
       >
-        {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
-        {on ? 'auto' : 'Auto'}
+        {/* Design literal, not copy: the wordmark is Auto off, auto on, and
+            auto · shadow in every locale. */}
+        {mode === 'shadow' ? 'auto · shadow' : on ? 'auto' : 'Auto'}
       </button>
-      {reveal !== undefined && (
-        <button
-          type="button"
-          className={css.details}
-          aria-label={t('chip.details')}
-          title={t('chip.details')}
-          // Opening this session's Routing view changes no routing state, so a
-          // locked composer or a gesture in flight leaves it available.
-          onClick={() => { reveal({ view: 'routing', target: { kind: 'none' } }) }}
-        >
-          <span aria-hidden="true">⋯</span>
-        </button>
-      )}
+      <Menu
+        open={menuOpen}
+        items={menuEntries}
+        selectedId={mode}
+        onSelect={(id) => {
+          setMenuOpen(false)
+          if (id === 'details') {
+            // Opening this session's Routing view changes no routing state,
+            // so a locked composer or a gesture in flight leaves it available.
+            if (reveal !== undefined) reveal({ view: 'routing', target: { kind: 'none' } })
+            return
+          }
+          if (id === 'off') {
+            run('mode', () => setRouting(false))
+            return
+          }
+          requestJudged(id === 'shadow' ? 'shadow' : 'on')
+        }}
+        onClose={() => { setMenuOpen(false) }}
+        anchor={(
+          <button
+            type="button"
+            className={css.details}
+            aria-label={t('chip.menu')}
+            title={t('chip.menu')}
+            aria-expanded={menuOpen}
+            onClick={() => { setMenuOpen(open => !open) }}
+          >
+            <span aria-hidden="true">⋯</span>
+          </button>
+        )}
+      />
       {idle && (
         // The visible copy is short and truncates in a narrow composer; the full
         // sentence stays in the tooltip and the accessible description.
@@ -176,7 +219,7 @@ export function RoutingChip({
         <Modal
           open
           onClose={() => { setConfirm(null) }}
-          title={t('confirm.title')}
+          title={confirmMode === 'shadow' ? t('confirm.shadowTitle') : t('confirm.title')}
           description={t('confirm.body')}
           closeLabel={t('confirm.close')}
           footer={(
@@ -200,10 +243,10 @@ export function RoutingChip({
                 variant="primary"
                 onClick={() => {
                   setConfirm(null)
-                  run('mode', () => setRouting(true))
+                  run('mode', () => setRouting(confirmMode === 'shadow' ? 'shadow' : true))
                 }}
               >
-                {t('confirm.turnOn')}
+                {confirmMode === 'shadow' ? t('confirm.shadowConfirm') : t('confirm.turnOn')}
               </Button>
             </span>
           )}

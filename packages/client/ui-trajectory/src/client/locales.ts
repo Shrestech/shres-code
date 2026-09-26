@@ -60,6 +60,10 @@ export type TrajectoryKey =
   | 'routing.reason.routeFailed'
   | 'routing.reason.modeOff'
   | 'routing.reason.judgmentError'
+  | 'routing.reason.warmPrefix'
+  | 'routing.reason.coldPointReturn'
+  | 'routing.shadow.switched'
+  | 'routing.shadow.kept'
   | 'routing.confidence'
   | 'routing.streak.entered'
   | 'routing.streak.exited'
@@ -127,6 +131,10 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.routeFailed': 'route failed, retried on the manual model',
   'routing.reason.modeOff': 'routing off',
   'routing.reason.judgmentError': 'judgment failed',
+  'routing.reason.warmPrefix': 'Strong cache still warm: no switch attempted',
+  'routing.reason.coldPointReturn': 'Strong cache went cold: returned to the strong model',
+  'routing.shadow.switched': 'Shadow: would have switched to {model}',
+  'routing.shadow.kept': 'Shadow: kept the strong model',
   'routing.confidence': 'confidence {value}',
   'routing.streak.entered': 'streak entered · turn {turn}',
   'routing.streak.exited': 'streak ended · {reason}',
@@ -176,6 +184,8 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'route-failed': 'routing.reason.routeFailed',
   'mode-off': 'routing.reason.modeOff',
   'judgment-error': 'routing.reason.judgmentError',
+  'warm-prefix': 'routing.reason.warmPrefix',
+  'cold-point-return': 'routing.reason.coldPointReturn',
 }
 
 /** Dictionary key per streak break reason. */
@@ -191,4 +201,5 @@ export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> 
   'mode-off': 'routing.reason.modeOff',
   'route-errors': 'routing.reason.routeErrors',
   'route-failed': 'routing.reason.routeFailed',
+  'cold-point-return': 'routing.reason.coldPointReturn',
 }

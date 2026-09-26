@@ -83,7 +83,21 @@ function setup(options: Setup = {}) {
 
 const gateLoaded = () => screen.findByText(/switching requires 0\.80/)
 
-describe('RoutingView availability and states', () => {
+describe('RoutingView in shadow', () => {
+  it('reads Shadow in the status line, states the would-have verdict, and prefixes the pool tile', () => {
+    const stats = {
+      ...liveStats(),
+      shadow: { decisions: 22, downgraded: 9, streaks: 2 },
+    }
+    setup({ stats, routing: { mode: 'shadow', active: true, pending: false } })
+    expect(screen.getByText(en['status.shadow'])).toBeTruthy()
+    expect(screen.getByText(en['status.shadow.detail'])).toBeTruthy()
+    expect(screen.getByText('In shadow, routing would have served 40.9% of judged steps on pool models across 2 streaks.')).toBeTruthy()
+    expect(screen.getByText('Would have Steps on pool models')).toBeTruthy()
+    // The measured tiles keep their measured names.
+    expect(screen.getByText('Strong tokens moved off')).toBeTruthy()
+  })
+
   it('holds a skeleton while the host has not answered whether it composes the router', () => {
     setup({ routerStatus: 'loading' })
     expect(screen.getByText(en['view.loading'])).toBeTruthy()
@@ -240,7 +254,8 @@ describe('RoutingView charts', () => {
     await screen.findByText(/Routing served 38\.0% of steps/)
     expect(screen.getByRole('img', { name: /Each entry covers one or more whole turns/ })).toBeTruthy()
     expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual(expect.arrayContaining(['1–3', '4.1', '5–6']))
-    expect(screen.getByText('Idle expiry uses the model cache lifetime of 3600 s.')).toBeTruthy()
+    // The decision that recorded the lifetime names the model, so G5 labels it with its source.
+    expect(screen.getByText('claude-session/claude-opus-5-5: idle past 3600 s (adapter)')).toBeTruthy()
     expect(screen.getByText('Streak length: median 0 steps, longest 3.')).toBeTruthy()
     expect(screen.getByRole('cell', { name: 'gate-failed' })).toBeTruthy()
     expect(screen.getByText('failed 20')).toBeTruthy()

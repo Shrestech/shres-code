@@ -1,0 +1,35 @@
+# Agent Note: Quota cold points and Shadow mode
+
+Status: implemented
+
+## Problem
+
+A `quota` route bills the subscription's own capacity, so a downgrade only pays off when the strong model's prompt cache has gone cold anyway: switching mid-warm-prefix re-prefills the candidate and re-writes nothing useful, and returning mid-warm-prefix wastes the held streak's amortization. Until now a quota route could only opt into per-turn entry like every other objective, so there was no policy that read the cache at all. Separately, tuning the gate and gathering an engine's operating point required running live routing on real traffic; there was no way to judge every turn and record what live routing would have done without ever rewriting a request.
+
+## Decision
+
+**Cold points are a pure fold of the log.** `coldPointAt(events, base, ttl, now, seeded)` in `folds.ts` finds the manual model's cold point, first match wins: the model never answered in an unseeded session (`session-start`), a completed `compaction/end` followed its last answer (`post-compaction`), the manual model changed since that answer (`manual-switch`), its lifetime is zero (`no-cache`), or the time since its last answering step's start exceeds the lifetime (`idle`). The lifetime is the manual model's `promptCacheTtlMs`, else `coldPoints.unknownTtlMs` (default 300000, at most one day). The consult evaluates it on step 1 only, after the reentry-cooldown check and before any engine or capability work, so a warm turn logs `warm-prefix` once — with `coldPoint: null`, no judgment call, and no eligibility assessment — and later steps of the turn reuse it through the existing pin. Replay reads the recorded `coldPoint` and never re-reads the clock.
+
+**Entry and exit.** A quota route without `allowEveryTurn` starts a downgrade only at a cold point; a held streak returns at the next cold point once `hold.minSteps` is reached, with the new break reason `cold-point-return` and no judgment call. `hold.maxSteps`, the quality exits, and route-failure handling are unchanged. `dollars` and `latency` keep per-turn entry; `allowEveryTurn: true` on a quota route restores it for bench arms.
+
+**Cache facts ride the decision.** Every decision that evaluated a cold point or judged records `cache`: the manual route's lifetime with its `adapter`/`fallback` source, plus each configured candidate's declared lifetime. Eligibility already resolved that metadata, so the assessments carry `promptCacheTtlMs` and the stats fold takes the latest recorded lifetime per model for idle-expiry causes, using `COLD_TTL_FALLBACK_MS` only for models no decision describes. The snapshot's `coldTtl` became `{ perModel, fallbackMs }` (stats unit stateVersion 5). No agent-loop change: the rejected alternative of adding the lifetime to `request/context` would make the loop read `LlmModelInfo` for a statistic.
+
+**Shadow is a full consult that never rewrites.** `resolveRequest` switches three ways: `off` stays byte-silent, `on` is unchanged, and `shadow` runs the complete consult — eligibility, egress, breaker, and calibration checks exactly as `on`, awaited on the request's critical path under `judgmentDeadlineMs` — over `shadowStickyState`, a fold that applies only decisions marked `shadow: true`. The decision logs with `shadow: true` and the consult returns `undefined`, so the manual route stands. A shadow pin never returns a selection and `route-failed` never triggers under one because no candidate request is sent; a switch between `on` and `shadow` releases the turn's pin with the same `skipped`/`mode-off` record the off switch logs, and the sticky folds end the streaks with `mode-off`. The invariant companion rejects a `request/header` in the shadow decision's own turn and step that does not name the manual base, which is what keeps the log honest about what the consult judged.
+
+This partially supersedes plan §4.5 and §4.6 (2026-09-24-model-routing-redesign-plan.md) on three points: shadow is awaited before the request, not dispatched after it; the cache lifetime reaches the stats fold through decisions, not through the loop; and `warm-prefix` is logged once per turn, not per step.
+
+## Alternatives considered
+
+**Measuring warmth from cache-read telemetry.** Cache counts arrive after the request, so entry would lag a turn behind and replay could not recompute it; log facts answer before the request is assembled.
+
+**A clock-reading fold on replay.** Recomputing `idle` from event times at replay would make a resumed session's routing depend on when it replays; the decision records the cold point and replay reads it.
+
+**Dispatching the shadow consult after the request.** It would measure nothing about the real critical path, interleave its decisions after the step's events, and need its own pin semantics; the awaited consult keeps log order and pin behavior identical to live, at the cost of one bounded engine call per judged step, which the Settings copy states.
+
+**Hatching G1's would-have segments in the candidate's series colour.** The snapshot colours models that served calls, and a shadow candidate never serves one, so the timeline has no colour slot for it; the segment is drawn hatched and neutral, and its mark names the model live would have served.
+
+## Consequences
+
+- `routeFrom` quota entries no longer require `allowEveryTurn`; existing configurations that set it are unchanged. `initialMode: 'shadow'` requires a non-empty `routeFrom` like `on`.
+- Focused: `vitest run llm/model-router` (377 unit tests including the cold-point and shadow controller suites, the fold isolation, the stats per-model lifetime and shadow figures, and the shadow invariant negative control), the three touched client packages (360 tests), and the keyless router snapshot file: `model-router-coldpoint` (session start judges and downgrades, a warm turn with no ask, a recorded one-hour idle gap downgrades again, and the held streak returns with `cold-point-return`) and `model-router-shadow` (every decision `shadow: true`, every request on the manual model), recorded with a fixture clock jump and replayed byte-stable twice; the thirteen pre-existing router arms replay with the new `cache` field refreshed into their fixtures.
+- Coverage gap: the shadow stats figures (`shadow.decisions/downgraded/streaks`) count a mixed session's streak entries against the fold's single sticky state, so a session that alternates `on` and `shadow` inside one streak under-reports simulated streaks; the pure-shadow sessions the mode is for are exact.

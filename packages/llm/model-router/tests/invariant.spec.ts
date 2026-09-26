@@ -308,3 +308,50 @@ describe('model-router invariant companion', () => {
     expect(() => { header(session, 'strong', 'manual') }).toThrow(/recovery decision carries no manual route/)
   })
 })
+
+describe('a header after a shadow decision', () => {
+  it('must still run the manual base in the same turn and step', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    // Shadow rewrote nothing, so the manual header is the honest one.
+    expect(() => { header(session, 'strong-provider', 'strong-model') }).not.toThrow()
+    // A header that runs the routed candidate contradicts the shadow decision.
+    let rejected: Session | undefined
+    expect(() => {
+      rejected = ctx.sessions.create()
+      header(rejected, 'strong-provider', 'strong-model')
+      rejected.append('turn/start', { turn: 1 })
+      rejected.append('step/start', { turn: 1, step: 1 })
+      rejected.append('model-routing/decision', decision({
+        shadow: true,
+        sticky: { active: false, stepsElapsed: 0 },
+      }))
+      header(rejected, 'cheap-provider', 'cheap-model')
+    }).toThrow(/shadow never leaves the manual route \(strong-provider\/strong-model\)/)
+    expect(rejected?.events.at(-1)?.type).toBe('model-routing/decision')
+  })
+
+  it('leaves the selection of a later step free', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    header(session, 'strong-provider', 'strong-model')
+    // A new step: the user may select another model afresh; the shadow decision
+    // no longer governs.
+    session.append('step/start', { turn: 1, step: 2 })
+    expect(() => { header(session, 'cheap-provider', 'cheap-model') }).not.toThrow()
+  })
+})

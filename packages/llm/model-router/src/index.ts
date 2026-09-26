@@ -94,21 +94,26 @@ import {
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
   DEFAULT_DIFFICULTY_LEVELS,
+  DEFAULT_UNKNOWN_TTL_MS,
   KEEP_CURRENT_OPTION_ID,
   MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
+  MAX_UNKNOWN_TTL_MS,
   resolveConfig,
 } from './config.ts'
 import type { ModelRouterConfig, ResolvedModelRouterConfig } from './config.ts'
 import {
   advanceStickyFoldState,
+  coldPointAt,
   createStickyFoldState,
   foldModelRouting,
   judgmentFailuresFor,
+  latestStepStart,
   modeOfRecord,
   modeRecord,
   readStickyFoldState,
   sameSelection,
+  shadowStickyState,
   stickyState,
 } from './folds.ts'
 import { buildRoutingStateCandidates } from './state.ts'
@@ -125,7 +130,12 @@ import { summarizeSession, workspaceStats } from './workspace-stats.ts'
 import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
-import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
+import type {
+  ModelRoutingCacheTtl,
+  ModelRoutingJudgmentFailures,
+  ModelRoutingStickyFoldState,
+  ModelRoutingStickyState,
+} from './folds.ts'
 import type {
   ModelRoutingCalibration,
   ModelRoutingCandidate,
@@ -169,13 +179,15 @@ export {
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
   DEFAULT_STATE_MAX_FIT_CANDIDATES,
+  DEFAULT_UNKNOWN_TTL_MS,
   KEEP_CURRENT_OPTION_ID,
   MAX_CANDIDATE_DESCRIPTION_CHARS,
   MAX_JUDGMENT_DEADLINE_MS,
   MAX_LATENCY_JUDGMENT_DEADLINE_MS,
+  MAX_UNKNOWN_TTL_MS,
   resolveConfig,
 } from './config.ts'
-export { foldModelRouting, modeOfRecord, modeRecord, stickyState } from './folds.ts'
+export { foldModelRouting, modeOfRecord, modeRecord, shadowStickyState, stickyState } from './folds.ts'
 export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
@@ -270,6 +282,8 @@ interface PinnedDecision {
   decision: ModelRoutingDecision
   /** For a `route-failed` pin: the route that failed and the manual route its retry runs. */
   manualRetry?: { readonly failed: ModelRoutingSelection; readonly manual: ModelSelection }
+  /** Set when `decision` is a shadow consult's, which never returns a selection. */
+  shadow?: true
 }
 
 /** A mode change awaiting an accepted request boundary. */
@@ -535,6 +549,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       breakerThreshold: z.number().step(1).min(1).default(DEFAULT_JUDGMENT_BREAKER_THRESHOLD),
       breakerOpenTurns: z.number().step(1).min(0).default(DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS),
     }),
+    coldPoints: z.object({
+      unknownTtlMs: z.number().step(1).min(1).max(MAX_UNKNOWN_TTL_MS).default(DEFAULT_UNKNOWN_TTL_MS),
+    }),
     inTurnFallback: z.union(['manual', 'off']).default('manual'),
     // Both optional field groups are unions with `z.const(null)`: schemastery
     // materializes an absent bare object as `{}` (probe-verified), which would
@@ -687,7 +704,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         init: createStatsState,
         apply: applyStatsEvent,
         view: viewStats,
-        // The unit state counts nothing sent for a call the dispatcher refused before dispatching it.
+        // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency,
+        // plus the per-model cache lifetimes and shadow figures decisions record, and nothing sent
+        // for a call the dispatcher refused before dispatching it.
         stateVersion: 5,
       })
     })
@@ -1218,13 +1237,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // Only the hook calls the consult, so an agent reported unreachable has it now.
     this.adoptIfReachable(agent)
     const session = agent.session
-    // Shadow never rewrites a request, so only `on` may route one.
-    const active = this.modeOf(session) === 'on'
+    const mode = this.modeOf(session)
     const pinned = this.pins.get(session)
     let state: RoutingState | undefined
     if (pinned !== undefined && pinned.turn === turn) {
-      if (!active) {
-        // A committed off-switch releases this turn's pinned selection.
+      // The pin governs only while the mode that judged it stands: off or a
+      // switch between on and shadow releases it, and no request from here on
+      // runs the selection it named.
+      if (mode !== (pinned.decision.shadow === true ? 'shadow' : 'on')) {
         this.pins.delete(session)
         this.log(session, {
           outcome: 'skipped',
@@ -1233,9 +1253,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           stateSeqs: pinned.decision.stateSeqs,
           sticky: { active: false, stepsElapsed: 0 },
         })
-        return undefined
-      }
-      if (pinned.decision.outcome === 'downgraded') {
+        if (mode === 'off') return undefined
+      } else if (pinned.decision.shadow === true) {
+        // A shadow pin never returns a selection: the same step's retries keep
+        // the manual route, and a strong verdict stands for the rest of the
+        // turn, as a live kept-strong pin does. A later step is judged afresh.
+        if (pinned.decision.outcome !== 'downgraded' || pinned.step === step) return undefined
+      } else if (pinned.decision.outcome === 'downgraded') {
         if (pinned.step === step) {
           state = this.buildState(session, this.config())
           if (pinned.inputKey === state.inputKey) {
@@ -1253,7 +1277,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           || (manual?.provider === base.provider && manual.model === base.model)) return undefined
       }
     }
-    if (!active) {
+    if (mode === 'off') {
       // Off is off: no judgment, no decision event, no request rewrite. This is
       // what keeps a composed-but-off run byte-identical to one without the
       // package.
@@ -1261,12 +1285,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     const config = this.config()
     state ??= this.buildState(session, config)
-    const sticky = stickyState(session.events)
-    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request)
+    // Shadow judges over its own fold, so its holds and exits simulate what
+    // live would do without moving the live route.
+    const sticky = mode === 'shadow' ? shadowStickyState(session.events) : stickyState(session.events)
+    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request, session)
     const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
       ...from === undefined ? {} : { objective: from.objective },
+      ...mode === 'shadow' ? { shadow: true as const } : {},
       stateProjection: resolved.stateProjection ?? {
         renderer: 'conversation-v1' as const,
         contextTurns: config.state.contextTurns,
@@ -1277,6 +1304,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     signal.throwIfAborted()
     this.log(session, decision)
     this.pins.set(session, { turn, step, inputKey: state.inputKey, decision })
+    // A shadow consult only records what live would have done; the manual
+    // route the loop assembled stands.
+    if (mode === 'shadow') return undefined
     return decision.outcome === 'downgraded' ? selectionAsModel(decision.selection) : undefined
   }
 
@@ -1302,6 +1332,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const routed = pinned.decision
     const selection = routed.selection
     if (routed.outcome !== 'downgraded') return undefined
+    // A shadow decision rewrote nothing, so the failure is the manual route's
+    // own and no in-turn fallback applies to it.
+    if (routed.shadow === true) return undefined
     /* v8 ignore next -- only this controller's complete downgraded decisions enter the pin. */
     if (selection === undefined) return undefined
     const ran = session.events.findLast((event): event is SessionEvent<'request/header'> => event.type === 'request/header')
@@ -1442,6 +1475,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * @param step - the step being judged; an entered streak records it.
    * @param signal - cancellation signal forwarded to the judgment call.
    * @param request - content and call configuration whose requirements candidates must preserve.
+   * @param session - the session whose log the cold-point policy reads.
    * @returns the decision to log.
    */
   private async decide(
@@ -1453,13 +1487,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     step: number,
     signal: AbortSignal,
     request: ModelRoutingRequest,
+    session: Session,
   ): Promise<ModelRoutingDecision> {
     const held = sticky.active ? sticky.candidate : undefined
     let observed = state
     const facts: Pick<ModelRoutingDecision,
       'candidateEligibility' | 'judgmentQuestions' | 'stateProjection' | 'judgmentInput'
       | 'judgmentRejection' | 'engine' | 'model' | 'engineId' | 'latencyMs' | 'judgeUsage'
-      | 'eligibilityMs' | 'inputChars'> = {}
+      | 'eligibilityMs' | 'inputChars' | 'coldPoint' | 'cache'> = {}
     /** One fallback: the manual route stands, with the class that kept it. */
     const keep = (reason: ModelRoutingReason): ModelRoutingDecision => ({
       outcome: 'kept-strong',
@@ -1502,7 +1537,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     // Routing starts only from a listed strong route: an unlisted one is never
     // judged, and a held streak ends when its route is removed from the list.
-    if (routeFromFor(config, base) === undefined) {
+    const from = routeFromFor(config, base)
+    if (from === undefined) {
       return {
         ...keep('base-unlisted'),
         sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'base-unlisted' as const } },
@@ -1516,6 +1552,21 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (held === undefined && sticky.cooldownTurn !== undefined && config.reentryCooldownTurns > 0
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
+    }
+    // A quota route enters only at a cold point of the manual model's prompt
+    // cache and returns at the next one, so a warm prefix is never rewritten
+    // and costs no judgment call and no capability assessment. A held streak is
+    // checked on the first step of each turn.
+    if (from.objective === 'quota' && !from.allowEveryTurn && (held === undefined || step === 1)) {
+      const ttl = await this.cacheTtl(config, base, signal)
+      const now = latestStepStart(session.events) ?? Date.now()
+      const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
+      facts.coldPoint = coldPoint ?? null
+      facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
+      if (held === undefined && coldPoint === undefined) return keep('warm-prefix')
+      if (held !== undefined && coldPoint !== undefined && sticky.stepsElapsed >= config.hold.minSteps) {
+        return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
+      }
     }
     const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
     let engine = this.ctx.get('judgment')
@@ -1546,6 +1597,20 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     )
     facts.eligibilityMs = Date.now() - eligibilityStarted
     facts.candidateEligibility = eligibility
+    // The lifetimes eligibility resolved: the manual route's, and each
+    // candidate's declared one. A cold-point consult already recorded the base.
+    facts.cache = {
+      base: facts.cache?.base ?? {
+        provider: base.provider,
+        model: base.model,
+        ...eligibility.requirements.promptCacheTtlMs === undefined
+          ? { ttlMs: config.coldPoints.unknownTtlMs, source: 'fallback' as const }
+          : { ttlMs: eligibility.requirements.promptCacheTtlMs, source: 'adapter' as const },
+      },
+      candidates: eligibility.assessments
+        .filter(assessment => assessment.promptCacheTtlMs !== undefined)
+        .map(assessment => ({ id: assessment.id, ttlMs: assessment.promptCacheTtlMs as number, source: 'adapter' as const })),
+    }
     const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
     if (eligibility.eligibleCandidates.length === 0
       || (held !== undefined && !eligibility.eligibleCandidates.some(candidate => candidate.id === held.candidateId))) {
@@ -1819,6 +1884,36 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       ...hintFor(config, difficulty),
       sticky: { active: false, stepsElapsed: 0 },
     }
+  }
+
+  /**
+   * The manual model's prompt-cache lifetime: its metadata's
+   * `promptCacheTtlMs`, or `coldPoints.unknownTtlMs` when the metadata declares
+   * none or cannot be read.
+   * @param config - resolved configuration carrying the fallback lifetime.
+   * @param base - the manual route.
+   * @param signal - the request's cancellation signal.
+   * @returns the lifetime and its source.
+   */
+  private async cacheTtl(
+    config: ResolvedModelRouterConfig,
+    base: ModelSelection,
+    signal: AbortSignal,
+  ): Promise<ModelRoutingCacheTtl> {
+    const llm = this.ctx.get('llm')
+    let declared: number | undefined
+    if (llm !== undefined) {
+      try {
+        declared = (await llm.resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
+      } catch {
+        // An unreadable manual route declares no lifetime, and the capability
+        // assessment reports it; only a cancellation propagates from here.
+        signal.throwIfAborted()
+      }
+    }
+    return declared === undefined
+      ? { ttlMs: config.coldPoints.unknownTtlMs, ttlSource: 'fallback' }
+      : { ttlMs: declared, ttlSource: 'adapter' }
   }
 
   /** Render the current conversation projection within the configured character budget. */

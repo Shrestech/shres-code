@@ -1,0 +1,69 @@
+# Keyless model-routing composition for the quota cold-point policy: a quota
+# base enters only at a cold point of its prompt cache, measured against the
+# fallback lifetime because the adapter declares none. The fixture jumps the
+# process clock an hour forward before turn 3, so turn 1 starts cold at session
+# start, turn 2 finds the prefix warm after the manual model answered turn 1's
+# second step, turn 3 measures the recorded idle gap and downgrades again, and
+# turn 4 returns the held streak at that cold point without judging.
+
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        config:
+          baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are headless-agent, a coding assistant.
+
+            Verify your work by running the code or tests. Keep answers brief and
+            factual.
+      - insert:
+          - id: agent-default-model
+            name: '@shres-code/shres-code-agent-default-model'
+            config:
+              provider: deepseek-official
+              model: deepseek-v4-pro
+          - id: model-router
+            name: '@shres-code/shres-code-model-router'
+            config:
+              initialMode: on
+              candidates:
+                - id: flash
+                  provider: deepseek-official
+                  model: deepseek-v4-flash
+                  description: a small, well-scoped change in familiar code
+              routeFrom:
+                - provider: deepseek-official
+                  model: deepseek-v4-pro
+                  # Quota without allowEveryTurn: entry only at cold points.
+                  objective: quota
+              downgradeThreshold: 0.7
+              downgradeMargin: 0.5
+              hold:
+                minSteps: 1
+              inTurnFallback: off
+              routeInstructions: Pick the cheapest route that can finish this turn.
+              difficultyInstructions: Rate how much reasoning this turn needs.
+          - id: judgment-dispatch
+            name: '@shres-code/shres-code-judgment-dispatch'
+            config:
+              defaultEngine: snapshot
+          - id: model-router-snapshot-fixture
+            name: './tests/fixtures/model-router-snapshot-fixture.ts'
+            config:
+              # Ask 1 (turn 1's second step) answers below the gate floor, so the
+              # manual model answers there and its prefix exists for turn 2.
+              lowConfidenceAsk: 1
+              clockJumpTurn: 3
+              clockJumpMs: 3600000

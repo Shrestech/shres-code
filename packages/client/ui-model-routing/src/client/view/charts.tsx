@@ -256,9 +256,16 @@ export function ModelTimeline({ stats, gate, t, onStep, onDecision }: GraphProps
             )}
             {decisions.flatMap(entry => (entry.best === null ? [] : [{ ...entry, best: entry.best }])).map((entry) => {
               const best = entry.best
-              const label = t('g1.decision', { outcome: entry.outcome, reason: entry.reason, best: formatScore(best) })
+              const label = entry.shadow
+                ? t('g1.shadowDecision', { outcome: entry.outcome, reason: entry.reason, model: entry.wouldModel ?? '' })
+                : t('g1.decision', { outcome: entry.outcome, reason: entry.reason, best: formatScore(best) })
               return (
                 <Mark key={`d${entry.seq}`} label={label} onDetail={setDetail} onActivate={() => { onDecision(entry.seq) }}>
+                  {entry.shadow && entry.outcome === 'downgraded' && (
+                    // Would-have segment: hatched over the strong bar the step
+                    // really ran, naming the model live would have served.
+                    <rect className={css.hatch} x={x(entry.i)} y={24} width={Math.max(width - 1, 1)} height={16} />
+                  )}
                   <circle className={clsx(css.dot, entry.outcome === 'downgraded' ? css.dotDown : entry.outcome === 'error' ? css.dotError : css.dotKept)} cx={x(entry.i) + width / 2} cy={confidenceY(best)} r={3} />
                 </Mark>
               )
@@ -517,9 +524,17 @@ export function ColdChart({ stats, t }: GraphProps) {
     </table>
   )
   const description = t('g5.desc', { causes: rows.filter(row => row.count > 0).map(row => `${t(`cold.${row.cause}`)} ${formatTokens(row.tokens)}`).join(', ') || t('g5.none') })
-  const ttl = stats.coldTtl.fallback
-    ? t('g5.ttl.fallback', { minutes: Math.round(stats.coldTtl.ms / 60_000) })
-    : t('g5.ttl', { ttl: formatMs(stats.coldTtl.ms) })
+  const described = new Set(stats.coldTtl.perModel.map(entry => `${entry.provider}/${entry.model}`))
+  // Idle expiry counts each model's logged lifetime; the fallback names only
+  // the models no decision described.
+  const ttl = [
+    ...stats.coldTtl.perModel.map(entry => t('g5.ttl.model', {
+      model: `${entry.provider}/${entry.model}`,
+      ttl: formatMs(entry.ms),
+      source: t(entry.source === 'adapter' ? 'g5.ttl.adapter' : 'g5.ttl.assumed'),
+    })),
+    ...described.size === 0 ? [t('g5.ttl.fallback', { minutes: Math.round(stats.coldTtl.fallbackMs / 60_000) })] : [],
+  ].join(' · ')
   return (
     <ChartCard title={t('g5.title')} subtitle={t('g5.subtitle')} table={table} detail={detail} t={t}>
       <ChartSvg title={t('g5.title')} description={description} width={BAR_WIDTH} height={rows.length * 20 + 8}>

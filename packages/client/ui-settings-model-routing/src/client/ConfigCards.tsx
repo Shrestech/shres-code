@@ -41,7 +41,7 @@ interface WritableCardProps {
   t: Translate
 }
 
-/** The Off / On mode new sessions start in (`model-router.initialMode`). */
+/** The Off / Shadow / On mode new sessions start in (`model-router.initialMode`). */
 export function DefaultModeCard({ section, writable, controller, t }: WritableCardProps): ReactNode {
   const { busy, failure, run } = useWrite()
   const mode = initialMode(section)
@@ -50,7 +50,7 @@ export function DefaultModeCard({ section, writable, controller, t }: WritableCa
       <h3 className={css['cardTitle']}>{t('modeTitle')}</h3>
       <p className={css['sub']}>{t('modeIntro')}</p>
       <div className={css['segmented']} role="radiogroup" aria-label={t('modeGroup')}>
-        {(['off', 'on'] as const).map(option => (
+        {(['off', 'shadow', 'on'] as const).map(option => (
           <button
             key={option}
             type="button"
@@ -62,10 +62,11 @@ export function DefaultModeCard({ section, writable, controller, t }: WritableCa
               if (option !== mode) run(() => controller.setDefaultMode(option))
             }}
           >
-            {t(option === 'off' ? 'modeOff' : 'modeOn')}
+            {option === 'off' ? t('modeOff') : option === 'shadow' ? t('modeShadow') : t('modeOn')}
           </button>
         ))}
       </div>
+      {mode === 'shadow' ? <p className={css['sub']}>{t('modeShadowHint')}</p> : null}
       {failure === undefined ? null : <p className={css['fieldError']} role="alert">{failure.message}</p>}
     </section>
   )

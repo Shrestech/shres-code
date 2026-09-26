@@ -76,17 +76,46 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
     }
     if (event.type !== 'request/header') return
     let turnStartSeq = -1
+    let stepStartSeq = -1
     let decided: ModelRoutingDecision | undefined
     let decisionSeq = -1
+    // The manual route in force when that decision was logged: the latest
+    // header or selection at the moment the decision was appended. Headers
+    // after it record what the session ran since and do not move it.
+    let manualBase: { provider: string; model: string } | undefined
+    let baseAtDecision: typeof manualBase
     for (const candidate of session.events) {
       if (candidate.type === 'turn/start') turnStartSeq = candidate.seq
-      if (candidate.type === 'model-routing/decision') {
+      else if (candidate.type === 'step/start') stepStartSeq = candidate.seq
+      if (candidate.type === 'request/header') {
+        manualBase = { provider: candidate.data.header.config.provider, model: candidate.data.header.config.model }
+      } else if (candidate.type === 'agent/model-selection') {
+        manualBase = { provider: candidate.data.provider, model: candidate.data.model }
+      } else if (candidate.type === 'model-routing/decision') {
         decided = candidate.data
         decisionSeq = candidate.seq
+        baseAtDecision = manualBase
       }
     }
     // Only the decision this turn took is in force for this header.
     if (decided === undefined || decisionSeq < turnStartSeq) return
+    if (decided.shadow === true) {
+      // Shadow judges and never rewrites: a header in the shadow decision's own
+      // turn and step must still run the manual base that consult judged. A
+      // later step's header names whatever the user selected since.
+      if (decisionSeq < stepStartSeq) return
+      const base = decided.sticky.entryBase ?? baseAtDecision
+      if (base !== undefined) {
+        const config = event.data.header.config
+        if (config.provider !== base.provider || config.model !== base.model) {
+          fail(
+            `the request header after a shadow decision runs ${config.provider}/${config.model}`
+            + ` but shadow never leaves the manual route (${base.provider}/${base.model})`,
+          )
+        }
+      }
+      return
+    }
     const failed = decided.reason === 'route-failed' ? decided.failure : undefined
     if (failed !== undefined) {
       const retried = event.data.header.config

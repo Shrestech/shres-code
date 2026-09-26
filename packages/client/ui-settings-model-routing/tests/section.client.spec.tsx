@@ -296,6 +296,21 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByRole('radio', { name: en.modeOn }).getAttribute('aria-checked')).toBe('true')
   })
 
+  it('offers Off / Shadow / On for the default mode and states what shadow does', async () => {
+    const controller = double(ready())
+    mount(controller)
+    const group = screen.getByRole('radiogroup', { name: en.modeGroup })
+    expect(within(group).getByRole('radio', { name: en.modeShadow })).toBeTruthy()
+    expect(screen.queryByText(en.modeShadowHint)).toBeNull()
+    fireEvent.click(within(group).getByRole('radio', { name: en.modeShadow }))
+    expect(controller.setDefaultMode).toHaveBeenCalledWith('shadow')
+    // The shadow helper text shows while shadow is the stored default.
+    cleanup()
+    mount(double(ready({ router: namespace('model-router', { initialMode: 'shadow' }) })))
+    expect(screen.getByRole('radio', { name: en.modeShadow }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText(en.modeShadowHint)).toBeTruthy()
+  })
+
   it('switches the classifier, explains the off state, and shows a rejection', async () => {
     const controller = double(ready(), { setClassifier: { message: 'read-only provider' } })
     mount(controller)

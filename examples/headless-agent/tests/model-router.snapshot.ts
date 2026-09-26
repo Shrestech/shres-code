@@ -68,6 +68,31 @@ function logContext(content: string): { sessionIds: string[]; cwd: string } {
 }
 
 /**
+ * Quantize the wall-clock measurements a decision records, which otherwise
+ * carry the run's millisecond jitter into the committed bytes: the cold-point
+ * idle gap rounds to whole minutes, far coarser than any scheduling noise and
+ * identical on every machine.
+ * @param record - one JSONL record, a bare event or a wrapped session_event.
+ * @returns the record with `coldPoint.idleMs` quantized.
+ */
+function quantizeDecisionTimings(record: Record<string, unknown>): Record<string, unknown> {
+  const target = (record['event'] ?? record) as {
+    type?: string
+    data?: { coldPoint?: { idleMs?: number } }
+  }
+  const idleMs = target.data?.coldPoint?.idleMs
+  if (target.type === 'model-routing/decision' && typeof idleMs === 'number') {
+    target.data!.coldPoint!.idleMs = Math.round(idleMs / 60_000) * 60_000
+  }
+  return record
+}
+
+/** Line form of {@link quantizeDecisionTimings} for raw JSONL. */
+function quantizeDecisionTimingsLine(line: string): string {
+  return JSON.stringify(quantizeDecisionTimings(JSON.parse(line) as Record<string, unknown>))
+}
+
+/**
  * Normalize the driver's stdout: one compact record per line, each
  * `session_event` payload scrubbed like the session fixture and every session id
  * tokenized.
@@ -76,7 +101,7 @@ function logContext(content: string): { sessionIds: string[]; cwd: string } {
  * @returns the normalized transcript, ending in one newline.
  */
 function normalizedStream(rawStdout: string, cwd: string): string {
-  const records = parseJsonl(rawStdout)
+  const records = parseJsonl(rawStdout).map(quantizeDecisionTimings) // objects in, objects out
   const result = records.at(-1)
   if (result?.['type'] !== 'result') throw new Error('model-router snapshot did not end with a result record')
   const events = records.slice(0, -1)
@@ -144,9 +169,10 @@ async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
   })
   expect(result.stderr).toBe('')
   if (rawSession === undefined) throw new Error(`${arm.promptFixture} did not persist a comparable session`)
+  const session = rawSession.split('\n').filter(l => l.trim().length > 0).map(quantizeDecisionTimingsLine).join('\n') + '\n'
   return {
     stream: normalizedStream(result.stdout, runCwd),
-    session: scrubRequestHeaders(normalizeSessionLog(rawSession, logContext(rawSession))),
+    session: scrubRequestHeaders(normalizeSessionLog(session, logContext(session))),
   }
 }
 
@@ -748,6 +774,106 @@ describe('headless model-routing snapshots', () => {
       expect(output.session).toBe(reference.session)
       expect(server.requests).toHaveLength(2)
       expect(requestedModel(server, 1)).toBe('deepseek-v4-pro')
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('enters a quota route only at cold points and returns the held streak at the next one', async () => {
+    const server = await startMockLlmServer({
+      sequence: ['tool_call_success', 'success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+      toolName: 'bash',
+      toolArguments: JSON.stringify({ command: "printf 'done'", description: 'Print a fixed line.' }),
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-coldpoint.cordis.snapshot.yml'),
+        promptFixture: 'model-router-coldpoint',
+      }, server)
+      // The manual model served turns 1 (second step), 2, and 4; the routed
+      // candidate served turn 1's first step and turn 3.
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-pro',
+      ])
+      const decisions = parseJsonl(output.session)
+        .filter(event => event['type'] === 'model-routing/decision')
+        .map(event => event['data'] as Record<string, unknown>)
+      expect(decisions.map(decision => decision['reason'])).toEqual([
+        'gate-passed', 'gate-failed', 'warm-prefix', 'gate-passed', 'cold-point-return',
+      ])
+      // Session start is a cold point of the quota route, under the fallback
+      // lifetime: the adapter declares none.
+      expect(decisions[0]).toMatchObject({
+        outcome: 'downgraded',
+        coldPoint: { kind: 'session-start', ttlMs: 300_000, ttlSource: 'fallback' },
+        cache: { base: { provider: 'deepseek-official', model: 'deepseek-v4-pro', ttlMs: 300_000, source: 'fallback' } },
+      })
+      // Turn 2's prefix is warm: logged once for the turn, with no judgment
+      // call and no candidate capability work.
+      expect(decisions[2]).toMatchObject({ outcome: 'kept-strong', coldPoint: null })
+      expect(decisions[2]).not.toHaveProperty('route')
+      expect(decisions[2]).not.toHaveProperty('engineId')
+      expect(decisions[2]).not.toHaveProperty('candidateEligibility')
+      // Turn 3 measures the recorded idle gap against the fallback lifetime.
+      expect(decisions[3]).toMatchObject({
+        outcome: 'downgraded',
+        coldPoint: { kind: 'idle', ttlMs: 300_000, ttlSource: 'fallback' },
+      })
+      expect((decisions[3]?.coldPoint as { idleMs?: number }).idleMs ?? 0).toBeGreaterThan(300_000)
+      // Turn 4 returns the held streak at that cold point without judging.
+      expect(decisions[4]).toMatchObject({
+        outcome: 'kept-strong',
+        coldPoint: { kind: 'idle' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' },
+      })
+      expect(decisions[4]).not.toHaveProperty('route')
+      await expectArmFixtures('model-router-coldpoint', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('judges every turn in shadow, logs shadow decisions, and never rewrites a request', async () => {
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-shadow.cordis.snapshot.yml'),
+        promptFixture: 'model-router-shadow',
+      }, server)
+      // Every request ran the manual model: shadow rewrote nothing.
+      expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
+        'deepseek-v4-pro', 'deepseek-v4-pro',
+      ])
+      const durableEvents = parseJsonl(output.session)
+      const configuration = durableEvents
+        .filter(event => event['type'] === 'model-routing/configuration')
+        .map(event => event['data'])
+      expect(configuration).toEqual([{ active: true, shadow: true }])
+      const decisions = durableEvents
+        .filter(event => event['type'] === 'model-routing/decision')
+        .map(event => event['data'] as Record<string, unknown>)
+      expect(decisions).toHaveLength(2)
+      for (const decision of decisions) {
+        expect(decision).toMatchObject({
+          outcome: 'downgraded',
+          reason: 'gate-passed',
+          shadow: true,
+          selection: { candidateId: 'flash', model: 'deepseek-v4-flash' },
+        })
+      }
+      // The second consult continued the streak the shadow fold simulated.
+      expect(decisions[1]).toMatchObject({ sticky: { active: true, stepsElapsed: 1 } })
+      // The live sticky fold never held anything.
+      expect(durableEvents.some(event => event['type'] === 'agent/model-selection')).toBe(false)
+      const headers = durableEvents
+        .filter(event => event['type'] === 'request/header')
+        .map(event => (event['data'] as { header: { config: { model: string } } }).header.config.model)
+      expect(headers.length).toBeGreaterThan(0)
+      expect(headers.every(model => model === 'deepseek-v4-pro')).toBe(true)
+      await expectArmFixtures('model-router-shadow', output)
     } finally {
       await server.close()
     }

@@ -118,11 +118,15 @@ export function numberAt(section: SettingsNamespaceView | null, path: readonly s
 /**
  * The routing mode new sessions start in.
  * @param router - the resolved `model-router` section.
- * @returns `on` only when the section stores it.
+ * @returns the stored `initialMode`, `off` when absent or unknown: a value
+ * the router would reject cannot come from a validated section, and reading it
+ * as off keeps the card usable instead of showing a phantom selection.
  */
-export function initialMode(router: SettingsNamespaceView): 'off' | 'on' {
+export function initialMode(router: SettingsNamespaceView): 'off' | 'on' | 'shadow' {
   const value = router.value
-  return typeof value === 'object' && value !== null && (value as { initialMode?: unknown }).initialMode === 'on' ? 'on' : 'off'
+  if (typeof value !== 'object' || value === null) return 'off'
+  const stored = (value as { initialMode?: unknown }).initialMode
+  return stored === 'on' || stored === 'shadow' ? stored : 'off'
 }
 
 /**
