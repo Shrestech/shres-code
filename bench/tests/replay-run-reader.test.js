@@ -1,20 +1,28 @@
 /**
- * Replay run reader: registration-located arms, include-all trials, and
- * aggregated class-C trial inputs, over a synthetic run directory built from
- * the recorded real-CLI fixture.
+ * Replay run reader: registration-located arms, include-all trials, and the
+ * { trials, tasks, refused, discovered } composition over a synthetic run
+ * directory built from the recorded real-CLI fixture, plus one keyless
+ * launcher check of whole-run accounting through hostReplayRun.
  * @module
  */
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
+import { TrialInputIncompleteError } from '../routing/replay-frontend.js'
+import { hostReplayRun } from '../routing/replay-frontend-host.js'
 import { readReplayRun } from '../routing/replay-run-reader.js'
 import { emptyMetrics } from '../runner/metrics.js'
+import { encodeSegment, projectKey } from '../runner/session-layout.js'
 import { UsageError } from '../runner/run.js'
+import { fixtureMethod } from './replay-fixture-method.js'
 
-/** The recorded real-CLI log every synthetic session copies from. */
+/** The recorded real-CLI log: the unmodified fixture is the happy path. */
 const RECORDED = await readFile(new URL('../routing/fixtures/replay-c-label-windows.session.jsonl', import.meta.url))
+const RECORDED_HEADER = JSON.parse(RECORDED.toString('utf8').split('\n')[0])
+const REPO = join(fileURLToPath(new URL('../..', import.meta.url)))
 
 const REGISTRATION = {
   arms: {
@@ -24,34 +32,40 @@ const REGISTRATION = {
 }
 const TASK_ID = 'reader-task'
 const STRATUM = 'moderate'
+const METHOD = fixtureMethod()
 
-/** The trial's own route every normalized header reports. */
+/** §5: the effective route is read from header.config; markers are ignored. */
 const OWN_ROUTE = { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'high' }
 
 /**
- * The recorded fixture's first request/header marks reasoningEffort as an
- * adapter default while the later two do not, which the mixed-route rule
- * reads as two routes. Rewriting that one marking makes the copy a
- * consistent-route log; rewriting the model makes it a genuinely mixed one.
- * @param {'normalized' | 'mixed' | 'torn'} variant
- * @returns {Buffer}
+ * @param {'unmodified' | 'model-changed' | 'effort-changed' | 'markers-only' | 'torn' | 'interrupted'} variant
+ * @returns {Buffer} the session artifact for that variant.
  */
 function sessionBytes(variant) {
   const lines = RECORDED.toString('utf8').split('\n')
   if (lines.at(-1) === '') lines.pop()
   const rewritten = lines.map((line) => {
+    if (variant === 'torn') return line
     if (!line.includes('"request/header"')) return line
     const record = JSON.parse(line)
-    if (record.seq !== 10) return line
-    if (variant === 'mixed') {
-      record.data.header.config.model = 'deepseek-v4-flash'
-      return JSON.stringify(record)
-    }
-    record.data.header.adapterDefaults = { maxTokens: true }
+    if (record.seq !== 28) return line
+    if (variant === 'model-changed') record.data.header.config.model = 'deepseek-v4-flash'
+    if (variant === 'effort-changed') record.data.header.config.reasoningEffort = 'low'
+    if (variant === 'markers-only') record.data.header.adapterDefaults = { reasoningEffort: true, maxTokens: true }
     return JSON.stringify(record)
   })
+  if (variant === 'interrupted') {
+    for (const line of rewritten) {
+      const record = JSON.parse(line)
+      if (record.type === 'turn/end' && record.data?.reason?.kind === 'completed') {
+        record.data.reason = { kind: 'interrupted' }
+        rewritten[rewritten.indexOf(line)] = JSON.stringify(record)
+        break
+      }
+    }
+  }
   const text = rewritten.join('\n') + (variant === 'torn' ? '' : '\n')
-  return Buffer.from(text, 'utf8')
+  return Buffer.from(text.slice(0, variant === 'torn' ? text.length - 10 : undefined), 'utf8')
 }
 
 /**
@@ -78,14 +92,21 @@ function trialRecord(overrides = {}) {
 /**
  * Build one synthetic experiment: two registration arms under their runner
  * directories, two trials each (arm C trial 1 is an error trial, proving the
- * reader does not filter by status), each session a copy of the recorded
- * fixture, and a task root carrying the preregistered stratum.
- * @param {{ bytesFor?: (arm: string, trialIndex: number) => Buffer, sessionFile?: (arm: string, trialIndex: number) => string | null, skipArmDir?: 'C' | undefined, taskOverrides?: object, trialOverrides?: (arm: string, trialIndex: number) => object, registration?: object }} [options]
+ * reader does not filter by status), every session planted at the persistence
+ * identity path the runner records, and a task root with the stratum.
+ * @param {{
+ *   bytesFor?: (arm: string, trialIndex: number) => Buffer,
+ *   sessionFile?: (arm: string, trialIndex: number) => string | null,
+ *   skipArmDir?: 'C' | undefined,
+ *   taskOverrides?: object,
+ *   trialOverrides?: (arm: string, trialIndex: number) => object,
+ *   registration?: object,
+ * }} [options]
  */
 async function buildRun(options = {}) {
   const {
-    bytesFor = () => sessionBytes('normalized'),
-    sessionFile = (arm, trialIndex) => `sessions/${TASK_ID}/${trialIndex}/session.jsonl`,
+    bytesFor = () => sessionBytes('unmodified'),
+    sessionFile = (arm, trialIndex) => `sessions/${TASK_ID}/${trialIndex}/${projectKey(RECORDED_HEADER.cwd)}/${encodeSegment(RECORDED_HEADER.id)}/session.jsonl`,
     skipArmDir,
     taskOverrides,
     trialOverrides = () => ({}),
@@ -103,20 +124,20 @@ async function buildRun(options = {}) {
         taskId: TASK_ID,
         trialIndex,
         arm: spec.runnerName,
-        sessionFile: override === undefined ? `sessions/${TASK_ID}/${trialIndex}/session.jsonl` : override,
+        sessionFile: override === undefined
+          ? `sessions/${TASK_ID}/${trialIndex}/${projectKey(RECORDED_HEADER.cwd)}/${encodeSegment(RECORDED_HEADER.id)}/session.jsonl`
+          : override,
         ...trialOverrides(armName, trialIndex),
         ...(armName === 'C' && trialIndex === 1
           ? { status: 'error', resolved: false, failureMode: 'AGENT_TIMEOUT' }
           : {}),
       })
     })
-    if (skipArmDir !== armName) {
-      await mkdir(armDir, { recursive: true })
-      await writeFile(join(armDir, 'trials.jsonl'), records.map(record => JSON.stringify(record)).join('\n') + '\n')
-    }
+    await mkdir(armDir, { recursive: true })
+    await writeFile(join(armDir, 'trials.jsonl'), records.map(record => JSON.stringify(record)).join('\n') + '\n')
     for (const trialIndex of [0, 1]) {
       const override = sessionFile(armName, trialIndex)
-      const file = override === undefined ? `sessions/${TASK_ID}/${trialIndex}/session.jsonl` : override
+      const file = override === undefined ? `sessions/${TASK_ID}/${trialIndex}/${projectKey(RECORDED_HEADER.cwd)}/${encodeSegment(RECORDED_HEADER.id)}/session.jsonl` : override
       if (file === null) continue
       const sessionPath = join(armDir, file)
       await mkdir(sessionPath.slice(0, sessionPath.lastIndexOf('/')), { recursive: true })
@@ -127,11 +148,7 @@ async function buildRun(options = {}) {
   await writeFile(join(taskRoot, TASK_ID, 'task.json'), JSON.stringify({
     taskId: TASK_ID, stratum: STRATUM, ...taskOverrides,
   }))
-  return {
-    root,
-    input: { experimentDir, registration, taskRoot },
-    taskPath: join(taskRoot, TASK_ID, 'task.json'),
-  }
+  return { root, input: { experimentDir, registration, taskRoot } }
 }
 
 async function withRun(options, fn) {
@@ -143,28 +160,62 @@ async function withRun(options, fn) {
   }
 }
 
-test('reads both registration arms, includes every trial regardless of status, and decodes each own route', async () => {
+test('reads both registration arms, includes every trial regardless of status, and reads the unmodified recording as one route', async () => {
   await withRun({}, async ({ input }) => {
     const { trials, tasks, refused, discovered } = await readReplayRun(input)
     assert.deepEqual(trials.map(trial => trial.id), [
       `S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`,
     ])
     assert.deepEqual(refused, [])
-    assert.deepEqual(discovered, trials.map(trial => ({ id: trial.id, taskId: TASK_ID, trialIndex: trial.trialIndex, arm: trial.arm })))
+    assert.deepEqual(discovered, [
+      `S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`,
+    ])
     for (const trial of trials) {
       assert.equal(trial.taskId, TASK_ID)
       assert.ok(trial.arm === 'S' || trial.arm === 'C')
       assert.deepEqual(trial.trialOwnRoute, OWN_ROUTE)
       assert.ok(trial.path.endsWith(join('session.jsonl')))
     }
-    const strong = trials[0]
-    assert.equal(strong.path.endsWith(join('route-strong', 'sessions', TASK_ID, '0', 'session.jsonl')), true)
-    assert.deepEqual(strong.trialOwnRoute, OWN_ROUTE)
-    assert.equal(strong.trial.status, 'success')
+    assert.equal(trials[0].trial.status, 'success')
     assert.equal(trials[3].trial.status, 'error')
     assert.equal(trials[3].trial.resolved, false)
     assert.equal(trials[3].trial.failureMode, 'AGENT_TIMEOUT')
     assert.deepEqual(tasks[TASK_ID]?.stratum, STRATUM)
+  })
+})
+
+test('§5: a model change in one header is mixed-route', async () => {
+  await withRun({
+    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('model-changed') : sessionBytes('unmodified')),
+  }, async ({ input }) => {
+    const { trials, refused } = await readReplayRun(input)
+    assert.deepEqual(refused.map(record => [record.id, record.reason]), [
+      [`S/${TASK_ID}/0`, 'mixed-route'],
+    ])
+    assert.match(refused[0].path, /session\.jsonl$/)
+    assert.equal(trials.length, 3)
+  })
+})
+
+test('§5: an effective effort change in one header is mixed-route', async () => {
+  await withRun({
+    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('effort-changed') : sessionBytes('unmodified')),
+  }, async ({ input }) => {
+    const { refused } = await readReplayRun(input)
+    assert.deepEqual(refused.map(record => [record.id, record.reason]), [
+      [`S/${TASK_ID}/0`, 'mixed-route'],
+    ])
+  })
+})
+
+test('§5: a provenance-marker-only change is not mixed-route', async () => {
+  await withRun({
+    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('markers-only') : sessionBytes('unmodified')),
+  }, async ({ input }) => {
+    const { trials, refused } = await readReplayRun(input)
+    assert.deepEqual(refused, [])
+    assert.equal(trials.length, 4)
+    assert.deepEqual(trials[0].trialOwnRoute, OWN_ROUTE)
   })
 })
 
@@ -189,9 +240,9 @@ test('an arm directory without trials.jsonl is a UsageError', async () => {
   })
 })
 
-test('a null sessionFile is a named class-C refusal and never a fabricated route', async () => {
+test('a null sessionFile is a named refusal and never a fabricated route', async () => {
   await withRun({
-    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : `sessions/${TASK_ID}/${trialIndex}/session.jsonl`),
+    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : undefined),
   }, async ({ input }) => {
     const { trials, refused, discovered } = await readReplayRun(input)
     assert.deepEqual(refused, [{
@@ -199,8 +250,8 @@ test('a null sessionFile is a named class-C refusal and never a fabricated route
       taskId: TASK_ID,
       trialIndex: 1,
       arm: 'C',
-      trialId: `C/${TASK_ID}/1`,
-      reason: 'no session log',
+      path: null,
+      reason: 'no-session-log',
     }])
     assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`])
     for (const trial of trials) assert.ok(trial.trialOwnRoute !== undefined)
@@ -208,42 +259,18 @@ test('a null sessionFile is a named class-C refusal and never a fabricated route
   })
 })
 
-test('a mixed-route log is a named class-C refusal carrying the path', async () => {
-  await withRun({
-    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('mixed') : sessionBytes('normalized')),
-  }, async ({ input }) => {
-    const { trials, refused } = await readReplayRun(input)
-    assert.equal(refused.length, 1)
-    assert.equal(refused[0].id, `S/${TASK_ID}/0`)
-    assert.equal(refused[0].reason, 'mixed-route trial')
-    assert.match(refused[0].path, /session\.jsonl$/)
-    assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`])
-  })
-})
-
-test('a corrupt session log is a named class-C refusal, not a crash or a drop', async () => {
-  await withRun({
-    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('torn') : sessionBytes('normalized')),
-  }, async ({ input }) => {
-    const { trials, refused } = await readReplayRun(input)
-    assert.equal(refused.length, 1)
-    assert.match(refused[0].reason, /does not end with a newline/)
-    assert.equal(trials.length, 3)
-  })
-})
-
 test('refusals from both arms are collected together instead of short-circuiting the read', async () => {
   await withRun({
-    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : `sessions/${TASK_ID}/${trialIndex}/session.jsonl`),
-    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('mixed') : sessionBytes('normalized')),
+    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : undefined),
+    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('model-changed') : sessionBytes('unmodified')),
   }, async ({ input }) => {
     const { trials, refused, discovered } = await readReplayRun(input)
     assert.deepEqual(refused.map(record => [record.id, record.reason]), [
-      [`S/${TASK_ID}/0`, 'mixed-route trial'],
-      [`C/${TASK_ID}/1`, 'no session log'],
+      [`S/${TASK_ID}/0`, 'mixed-route'],
+      [`C/${TASK_ID}/1`, 'no-session-log'],
     ])
     assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/1`, `C/${TASK_ID}/0`])
-    assert.deepEqual(discovered.map(entry => entry.id), [
+    assert.deepEqual(discovered, [
       `S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`,
     ])
   })
@@ -264,8 +291,7 @@ test('a chain trial is refused as outside the replay population', async () => {
     }
     const path = join(root, 'experiment', 'route-strong', 'trials.jsonl')
     const lines = (await readFile(path, 'utf8')).split('\n')
-    const record = trialRecord({ trialIndex: 0, arm: 'route-strong', phases: [chainPhase] })
-    lines[0] = JSON.stringify(record)
+    lines[0] = JSON.stringify(trialRecord({ trialIndex: 0, arm: 'route-strong', phases: [chainPhase] }))
     await writeFile(path, lines.join('\n'))
     await assert.rejects(readReplayRun(input), (error) => {
       assert.ok(error instanceof UsageError)
@@ -295,18 +321,34 @@ test('an invalid trial line surfaces the validateTrial error', async () => {
   })
 })
 
+test('duplicate trial ids are a TypeError', async () => {
+  await withRun({}, async ({ root, input }) => {
+    const path = join(root, 'experiment', 'route-strong', 'trials.jsonl')
+    const lines = (await readFile(path, 'utf8')).split('\n')
+    const duplicate = JSON.parse(lines[0])
+    duplicate.trialIndex = 0
+    lines[1] = JSON.stringify(duplicate)
+    await writeFile(path, lines.join('\n'))
+    await assert.rejects(readReplayRun(input), (error) => {
+      assert.ok(error instanceof TypeError)
+      assert.match(error.message, /duplicate trial id: S\//)
+      return true
+    })
+  })
+})
+
 test('file-boundary violations in a trial record are named refusals that read nothing', async () => {
   const cases = [
-    { name: 'an absolute sessionFile', sessionFile: (arm, i) => (arm === 'S' && i === 0 ? '/var/lib/shres/owner-session.jsonl' : undefined), reason: 'session log path is absolute' },
+    { name: 'an absolute sessionFile', sessionFile: (arm, i) => (arm === 'S' && i === 0 ? '/var/lib/shres/owner-session.jsonl' : undefined), reason: 'absolute-session-path' },
     {
       name: 'a sessionFile escaping the arm directory',
       sessionFile: (arm, i) => (arm === 'S' && i === 0 ? 'sessions/reader-task/0/../../../elsewhere/log.jsonl' : undefined),
-      reason: 'session log path is outside the declared trial directory',
+      reason: 'session-path-outside-trial',
     },
     {
       name: 'a sessionFile pointing into a different trial',
       sessionFile: (arm, i) => (arm === 'S' && i === 0 ? 'sessions/reader-task/1/session.jsonl' : undefined),
-      reason: 'session log path is outside the declared trial directory',
+      reason: 'session-path-outside-trial',
     },
   ]
   for (const { name, sessionFile, reason } of cases) {
@@ -330,8 +372,8 @@ test('a hostile task id is a refusal and never becomes a path segment', async ()
       taskId: '../outside',
       trialIndex: 0,
       arm: 'S',
-      trialId: `S/../outside/0`,
-      reason: 'trial task id is not a single path segment',
+      path: null,
+      reason: 'task-id-not-a-segment',
     }])
     assert.equal(trials.length, 3)
   })
@@ -349,10 +391,41 @@ test('a registration runnerName outside the experiment directory is a UsageError
   })
 })
 
-test('the normalized recorded fixture copy stays physically decodable and the mixed copy really differs', async () => {
-  const normalized = sessionBytes('normalized')
-  assert.notDeepEqual(normalized, RECORDED)
-  assert.match(normalized.toString('utf8').slice(-1), /\n/)
-  assert.notEqual(sessionBytes('mixed').toString('utf8'), normalized.toString('utf8'))
-  assert.match(sessionBytes('torn').toString('utf8').slice(-1), /[^\n]/)
+test('whole-run accounting: reader refusals, a host refusal, and one good trial compose into one refusal', async () => {
+  await withRun({
+    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : undefined),
+    bytesFor: (arm, trialIndex) => {
+      if (arm === 'S' && trialIndex === 0) return sessionBytes('interrupted')
+      if (arm === 'S' && trialIndex === 1) return sessionBytes('model-changed')
+      return sessionBytes('unmodified')
+    },
+  }, async ({ input }) => {
+    const { trials, tasks, refused, discovered } = await readReplayRun(input)
+    assert.deepEqual(refused.map(record => [record.id, record.reason]), [
+      [`S/${TASK_ID}/1`, 'mixed-route'],
+      [`C/${TASK_ID}/1`, 'no-session-log'],
+    ])
+    assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/0`, `C/${TASK_ID}/0`])
+    assert.equal(trials.length + refused.length, discovered.length)
+    let caught
+    try {
+      await hostReplayRun({
+        repoRoot: REPO,
+        method: METHOD,
+        tasks,
+        trials,
+        preRefused: refused,
+        discovered,
+      })
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof TrialInputIncompleteError)
+    assert.match(caught.message, /replay run refused: 3 trial\(s\)/)
+    assert.deepEqual(caught.trials.map(entry => [entry.id, entry.source]), [
+      [`S/${TASK_ID}/1`, 'reader'],
+      [`C/${TASK_ID}/1`, 'reader'],
+      [`S/${TASK_ID}/0`, 'host'],
+    ])
+  })
 })

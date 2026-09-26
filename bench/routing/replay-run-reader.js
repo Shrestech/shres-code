@@ -9,21 +9,24 @@ import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { UsageError } from '../runner/run.js'
 import { validateTrial } from '../schema/trial.js'
-import { decodePhysicalJsonl, proposalFromHeader, TrialInputIncompleteError } from './replay-frontend.js'
+import { decodePhysicalJsonl, TrialInputIncompleteError } from './replay-frontend.js'
 
 /** The registration arms the replay population covers. */
 const REPLAY_ARMS = ['S', 'C']
 
 /**
- * Restrict one request-header proposal to the route fields that identify the
- * trial's own route: provider and model always, reasoningEffort when the
- * proposal kept it (it is absent exactly when the adapter supplied it).
- * @param {ReturnType<typeof proposalFromHeader>} proposal
+ * The effective route one logged request/header carries, read directly from
+ * `header.config`: provider and model always, reasoningEffort when the logged
+ * config has it. The `adapterDefaults` provenance markers are ignored for
+ * route identity — a resume promotes the effort to explicit without changing
+ * the effective call, so marker-only differences are not route changes.
+ * @param {{ config: { provider?: unknown, model?: unknown, reasoningEffort?: unknown } }} header - the logged request/header payload.
  * @returns {{ provider: unknown, model: unknown, reasoningEffort?: unknown }}
  */
-function ownRouteOf(proposal) {
-  const route = { provider: proposal.provider, model: proposal.model }
-  if (proposal.reasoningEffort !== undefined) route.reasoningEffort = proposal.reasoningEffort
+function ownRouteOf(header) {
+  const config = header.config
+  const route = { provider: config.provider, model: config.model }
+  if (config.reasoningEffort !== undefined) route.reasoningEffort = config.reasoningEffort
   return route
 }
 
@@ -102,37 +105,40 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
   const trials = []
   const refused = []
   const discovered = []
+  const seenIds = new Set()
   for (const { armName, runnerName, dir } of armDirs) {
     const records = await readArmTrials(armName, runnerName, dir)
     for (const trial of records) {
       const id = `${armName}/${trial.taskId}/${trial.trialIndex}`
-      discovered.push({ id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName })
+      discovered.push(id)
+      if (seenIds.has(id)) throw new TypeError(`duplicate trial id: ${id}`)
+      seenIds.add(id)
       if (trial.phases !== undefined) {
         throw new UsageError(`chain trials are not in the replay population: ${id}`)
       }
-      const refusal = (reason, extra = {}) => refused.push({
-        id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName, ...extra, reason,
+      const refusal = (reason, path) => refused.push({
+        id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName, path, reason,
       })
       if (trial.sessionFile === null) {
-        refusal('no session log', { trialId: id })
+        refusal('no-session-log', null)
         continue
       }
       // The runner records sessionFile relative to the arm directory, always
       // inside sessions/<taskId>/<trialIndex>/ (run.js relative(armDir, …));
       // a record pointing anywhere else names another trial or outside data.
       if (trial.taskId.includes('/') || trial.taskId.includes('\\') || trial.taskId === '.' || trial.taskId === '..') {
-        refusal('trial task id is not a single path segment', { trialId: id })
+        refusal('task-id-not-a-segment', null)
         continue
       }
       if (isAbsolute(trial.sessionFile)) {
-        refusal('session log path is absolute', { trialId: id })
+        refusal('absolute-session-path', resolve(dir, trial.sessionFile))
         continue
       }
       const trialRoot = resolve(dir, 'sessions', trial.taskId, String(trial.trialIndex))
       const path = resolve(dir, trial.sessionFile)
       const within = relative(trialRoot, path)
       if (within === '' || within === '..' || within.startsWith('../') || isAbsolute(within)) {
-        refusal('session log path is outside the declared trial directory', { path, trialId: id })
+        refusal('session-path-outside-trial', path)
         continue
       }
       let decoded
@@ -140,11 +146,11 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
         decoded = decodePhysicalJsonl(await readFile(path), path)
       } catch (error) {
         if (error instanceof TrialInputIncompleteError) {
-          refusal(error.message, { path, trialId: id })
+          refusal('undecodable-log', path)
           continue
         }
         if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') {
-          refusal('session log is missing', { path, trialId: id })
+          refusal('session-log-missing', path)
           continue
         }
         throw error
@@ -154,10 +160,10 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
         refusal('trial log has no request/header', { path, trialId: id })
         continue
       }
-      const routes = headers.map(header => ownRouteOf(proposalFromHeader(header.data.header)))
+      const routes = headers.map(header => ownRouteOf(header.data.header))
       const distinct = new Set(routes.map(route => JSON.stringify(route)))
       if (distinct.size > 1) {
-        refusal('mixed-route trial', { path, trialId: id })
+        refusal('mixed-route', path)
         continue
       }
       trials.push({ id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName, path, trialOwnRoute: routes[0], trial })
