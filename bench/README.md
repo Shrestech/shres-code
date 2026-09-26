@@ -33,7 +33,7 @@ The nine-arm ladder covers every jspace/session-query contrast. `sq-driver` exis
 | `route-cheap` | disabled | absent | Routing-measurement arm C (opt-in): the cheap route end to end; calibration run and L3 only. |
 | `route-coldpoint` | disabled | absent | Routing-measurement arm R (opt-in): quota base with cold-point entry, the local Laya judge, and the preregistered operating point; needs PR 12. |
 | `route-random` | disabled | absent | Routing-measurement arm N (opt-in): R's composition with the seeded `bench-random` engine at R's realized entry rate; needs PR 12. |
-| `route-static` | disabled | absent | Routing-measurement arm T (opt-in, L3): strong main conversation in shadow, delegated children on Flash through 13b `childPolicies`; needs PR 13b. |
+| `route-static` | disabled | absent | Routing-measurement arm T (opt-in, L3): strong main conversation with no judgment engine, spawned children on Flash through static policies; forks are excluded. Real T trials require owner confirmation of this exploratory definition. |
 
 Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. The `code` arm patches `tools.mode` to `both`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
