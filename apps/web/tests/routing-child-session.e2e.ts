@@ -10,6 +10,8 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-subagent'
 import {
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
