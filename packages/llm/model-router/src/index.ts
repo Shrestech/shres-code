@@ -88,6 +88,7 @@ import {
   DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
   DEFAULT_JUDGMENT_DEADLINE_MS,
   DEFAULT_JUDGMENT_HOLD_TOLERANCE,
+  DEFAULT_CHILD_ROUTE_ERRORS,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -174,6 +175,7 @@ export {
   DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
   DEFAULT_JUDGMENT_DEADLINE_MS,
   DEFAULT_JUDGMENT_HOLD_TOLERANCE,
+  DEFAULT_CHILD_ROUTE_ERRORS,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -518,6 +520,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       objective: z.union(['quota', 'dollars', 'latency']).required(),
       allowEveryTurn: z.boolean(),
     })).default([]),
+    childPolicies: z.array(z.object({
+      match: z.object({
+        kind: z.union(['subagent', 'workflow']),
+        agentType: z.string(),
+      }).required(),
+      candidate: z.string().required(),
+      judge: z.boolean(),
+    })).default([]),
+    childRouteErrors: z.number().step(1).min(1).default(DEFAULT_CHILD_ROUTE_ERRORS),
+    childRouteInstructions: z.string(),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
     operatingPoints: z.array(z.object({

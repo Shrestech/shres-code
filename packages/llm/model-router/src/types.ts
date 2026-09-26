@@ -58,6 +58,24 @@ export interface ModelRoutingRouteFromConfig {
   allowEveryTurn?: boolean
 }
 
+/** Match fields one child-route policy may constrain. An empty object is a catch-all. */
+export interface ModelRoutingChildPolicyMatchConfig {
+  /** Delegation consumer kind. */
+  kind?: 'subagent' | 'workflow'
+  /** Exact tool-facing agent type, such as `explore`. */
+  agentType?: string
+}
+
+/** One ordered child-route rule, as configuration states it. */
+export interface ModelRoutingChildPolicyConfig {
+  /** Match constraints; empty is a catch-all and is allowed only as the last rule. */
+  match: ModelRoutingChildPolicyMatchConfig
+  /** Pool candidate id this rule selects. */
+  candidate: string
+  /** When true, ask the selected engine keep-current vs this candidate. Defaults to false. */
+  judge?: boolean
+}
+
 /** One resolved allowlisted downgrade candidate. */
 export interface ModelRoutingCandidate {
   /** Stable id a decision records, for logs and configuration surfaces. */
@@ -154,6 +172,19 @@ export interface ModelRoutingRouteFrom {
   readonly objective: ModelRoutingObjective
   /** Whether a `quota` route enters per turn instead of only at cold points. */
   readonly allowEveryTurn: boolean
+}
+
+/** One resolved child-route rule. */
+export interface ModelRoutingChildPolicy {
+  /** Match constraints; empty is a catch-all. */
+  readonly match: {
+    readonly kind?: 'subagent' | 'workflow'
+    readonly agentType?: string
+  }
+  /** Pool candidate id this rule selects. */
+  readonly candidate: string
+  /** Whether the rule asks the selected engine. */
+  readonly judge: boolean
 }
 
 /**
