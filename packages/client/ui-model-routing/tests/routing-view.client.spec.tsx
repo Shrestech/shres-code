@@ -124,6 +124,23 @@ describe('RoutingView in shadow', () => {
     expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
   })
 
+  it('tells a child session the model was chosen at spawn and can reveal the parent decision', () => {
+    const stats = {
+      ...emptyStats(),
+      recentChildren: [{ seq: 12, t: 1, outcome: 'routed' as const, reason: 'child-policy', candidateId: 'flash', agentType: null, shadow: false, latencyMs: null }],
+    }
+    const reveal = vi.fn()
+    setup({
+      available: false,
+      stats,
+      reveal,
+      canReveal: view => view === 'trajectory',
+    })
+    expect(screen.getByText(en['view.childChosen'])).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en['view.childOpenParent'] }))
+    expect(reveal).toHaveBeenCalledWith({ view: 'trajectory', target: { kind: 'event', seq: 12 } })
+  })
+
   it('shows the empty-state card and the mode read-only when routing was never used', () => {
     setup({ stats: emptyStats(), routing: OFF })
     expect(screen.getByText(en['state.neverUsed'])).toBeTruthy()

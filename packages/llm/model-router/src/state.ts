@@ -10,7 +10,7 @@
 
 import type { Message, ContentBlock } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import { deriveEventMessage } from '@shres-code/shres-code-session'
+import { deriveEventMessage, foldSurface } from '@shres-code/shres-code-session'
 
 /** The assembled judgment state and the surface records that supplied it. */
 export interface RoutingState {
@@ -188,7 +188,7 @@ export function buildRoutingState(
   session: Session,
   config: { contextTurns: number; maxChars: number },
 ): RoutingState {
-  return assembleRoutingStates(session, config, 1)[0]
+  return assembleRoutingStates(session.events, session.surface.nodes, config, 1)[0]
 }
 
 /**
@@ -203,18 +203,29 @@ export function buildRoutingStateCandidates(
   session: Session,
   config: { contextTurns: number; maxChars: number; maxFitCandidates: number },
 ): [RoutingState, ...RoutingState[]] {
-  return assembleRoutingStates(session, config, config.maxFitCandidates)
+  return assembleRoutingStates(session.events, session.surface.nodes, config, config.maxFitCandidates)
+}
+
+/**
+ * The same alternatives as {@link buildRoutingStateCandidates}, assembled from
+ * a log prefix via the public surface fold (no live Session required).
+ */
+export function buildRoutingStateCandidatesFromEvents(
+  events: readonly SessionEvent[],
+  config: { contextTurns: number; maxChars: number; maxFitCandidates: number },
+): [RoutingState, ...RoutingState[]] {
+  return assembleRoutingStates(events, foldSurface(events).nodes, config, config.maxFitCandidates)
 }
 
 /** Assemble a nonempty ordered list from the same live surface snapshot. */
 function assembleRoutingStates(
-  session: Session,
+  events: readonly SessionEvent[],
+  nodes: readonly number[],
   config: { contextTurns: number; maxChars: number },
   maxCandidates: number,
 ): [RoutingState, ...RoutingState[]] {
-  const events = session.events
   const entries: SurfaceEntry[] = []
-  for (const seq of session.surface.nodes) {
+  for (const seq of nodes) {
     const event = events[seq]
     /* v8 ignore next -- Session keeps every live surface node resident. */
     if (event === undefined) throw new Error(`session surface node seq ${seq} is not resident`)

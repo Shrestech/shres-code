@@ -58,7 +58,6 @@ import {
   judgmentConsumerId,
   judgmentEngineId,
   judgmentEnabled,
-  judgmentQuestionId,
 } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
@@ -136,6 +135,8 @@ import { summarizeSession, workspaceStats } from './workspace-stats.ts'
 import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
+import { replayConsultInput } from './replay.ts'
+import { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 import type {
   ModelRoutingCacheTtl,
   ModelRoutingJudgmentFailures,
@@ -195,7 +196,20 @@ export {
   MAX_UNKNOWN_TTL_MS,
   resolveConfig,
 } from './config.ts'
-export { foldModelRouting, modeOfRecord, modeRecord, shadowStickyState, stickyState } from './folds.ts'
+export { coldPointAt, foldModelRouting, modeOfRecord, modeRecord, shadowStickyState, stickyState } from './folds.ts'
+export {
+  consultPrefix,
+  replayConsultInput,
+  ReplayConsultError,
+} from './replay.ts'
+export type {
+  ReplayConsultAsk,
+  ReplayConsultAt,
+  ReplayConsultCache,
+  ReplayConsultIneligible,
+  ReplayConsultInput,
+  ReplayConsultWarm,
+} from './replay.ts'
 export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
@@ -231,11 +245,7 @@ export function routingCalibration(
   return point.calibratedBy === undefined ? { kind: 'point' } : { kind: 'calibrated', by: point.calibratedBy }
 }
 
-/** The route question's id, echoed by the answer this service reads. */
-export const ROUTE_QUESTION_ID = judgmentQuestionId('model-route')
-
-/** The difficulty question's id, echoed by the answer this service reads. */
-export const DIFFICULTY_QUESTION_ID = judgmentQuestionId('turn-difficulty')
+export { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 
 /** The human command that switches routing. */
 export const ROUTE_COMMAND = 'route'
@@ -1764,17 +1774,42 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
     }
-    // A quota route enters only at a cold point of the manual model's prompt
-    // cache and returns at the next one, so a warm prefix is never rewritten
-    // and costs no judgment call and no capability assessment. A held streak is
-    // checked on the first step of each turn.
-    if (from.objective === 'quota' && !from.allowEveryTurn && (held === undefined || step === 1)) {
+    const now = latestStepStart(session.events) ?? Date.now()
+    const llm = this.ctx.get('llm')
+    if (held === undefined && llm !== undefined) {
+      const replayed = await replayConsultInput(
+        config,
+        session.events,
+        { turn, step, now, seedLength: session.header.seedLength },
+        base,
+        base,
+        request.config,
+        (provider, model, consultSignal) => llm.resolveModelInfo(provider, model, consultSignal),
+        signal,
+      )
+      facts.cache = { base: replayed.cache.base }
+      if (replayed.kind === 'warm') {
+        facts.coldPoint = null
+        return keep('warm-prefix')
+      }
+      facts.coldPoint = replayed.coldPoint
+      facts.candidateEligibility = replayed.eligibility
+      if (replayed.kind === 'ineligible') {
+        if (replayed.eligibility.assessments.every(assessment => assessment.reason === 'equals-base')) {
+          return keep('candidate-equals-base')
+        }
+        if (replayed.eligibility.assessments.some(assessment => assessment.reason === 'thinking-mode-incompatible')) {
+          return keep('thinking-mode-incompatible')
+        }
+        return keep('candidate-ineligible')
+      }
+      facts.judgmentQuestions = replayed.questions
+      facts.inputChars = replayed.states.reduce((total, text) => total + text.length, 0)
+    } else if (from.objective === 'quota' && !from.allowEveryTurn && step === 1) {
       const ttl = await this.cacheTtl(config, base, signal)
-      const now = latestStepStart(session.events) ?? Date.now()
       const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
       facts.coldPoint = coldPoint ?? null
       facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
-      if (held === undefined && coldPoint === undefined) return keep('warm-prefix')
       if (held !== undefined && coldPoint !== undefined && sticky.stepsElapsed >= config.hold.minSteps) {
         return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
       }
@@ -1800,14 +1835,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (engine === undefined || snapshot === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
     if (snapshot.refused) return withEngine(keep('engine-uncalibrated'), snapshot)
-    const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
-    const eligibilityStarted = Date.now()
-    const eligibility = await assessModelRoutingCandidates(
-      llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
-    )
-    facts.eligibilityMs = Date.now() - eligibilityStarted
-    facts.candidateEligibility = eligibility
+    let eligibility = facts.candidateEligibility
+    if (eligibility === undefined) {
+      const eligibilityStarted = Date.now()
+      eligibility = await assessModelRoutingCandidates(
+        llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
+      )
+      facts.eligibilityMs = Date.now() - eligibilityStarted
+      facts.candidateEligibility = eligibility
+    }
     // The lifetimes eligibility resolved: the manual route's, and each
     // candidate's declared one. A cold-point consult already recorded the base.
     facts.cache = {
@@ -1838,11 +1875,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
       }
     }
-    const difficultyInstructions = config.difficultyInstructions
-    const questions: JudgmentQuestion[] = [
-      routeQuestion(eligibleConfig, base),
-      ...difficultyInstructions === undefined ? [] : [difficultyQuestion(config, difficultyInstructions)],
-    ]
+    const questions: JudgmentQuestion[] = facts.judgmentQuestions === undefined
+      ? [
+        routeQuestion(eligibleConfig, base),
+        ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+      ]
+      : [...facts.judgmentQuestions]
     facts.judgmentQuestions = questions
     /**
      * One failed judgment call. A held streak keeps its candidate while the
@@ -1992,7 +2030,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const score = result.answers.find((answer): answer is JudgmentScoreAnswer =>
       answer.kind === 'score' && answer.id === DIFFICULTY_QUESTION_ID)
-    if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) {
+    if (route === undefined || (config.difficultyInstructions !== undefined && score === undefined)) {
       return judgmentFailed('invalid-answer', false, answering.failures)
     }
     const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
