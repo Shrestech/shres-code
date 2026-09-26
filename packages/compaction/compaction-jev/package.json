@@ -43,6 +43,7 @@
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
+    "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
