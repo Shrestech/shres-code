@@ -858,6 +858,15 @@ config(): ResolvedModelRouterConfig
 @Remote('gate') gateView(): ModelRoutingGateView
 
 /**
+ * The pool and `routeFrom` allowlist in force, each model with the facts its
+ * adapter declares, and the router's own eligibility result for every
+ * (base, pool model) pair, computed as a turn without images would compute it.
+ * Makes no model request.
+ * @returns the pool status.
+ */
+@Remote async poolStatus(): Promise<ModelRoutingPoolStatus>
+
+/**
  * One logged decision, verbatim, with the turn and step it was logged in and
  * the gate configuration in force now.
  * @param agent - the session's Agent.
@@ -866,6 +875,19 @@ config(): ResolvedModelRouterConfig
  * @throws when the seq does not name a `model-routing/decision` event.
  */
 @Remote('decision') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail
+
+/**
+ * Routing statistics across one workspace's unarchived sessions, for the
+ * Settings overview: each session's `modelRoutingStats` value, rolled up
+ * over the sessions whose latest decision falls in the range. An attached
+ * session's value is its live one and a cold session's is the persisted
+ * projection cache's; no session log is read, so a cold session without a
+ * cached value on the current unit version is counted as not summarized.
+ * @param request - the workspace and the range.
+ * @returns the workspace statistics.
+ * @throws when this host composes no workspace registry or the workspace is unknown.
+ */
+@Remote('stats') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>
 
 /**
  * Read the logged mode and any selection awaiting the next accepted pre-step.
@@ -935,5 +957,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:488`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:501`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->
