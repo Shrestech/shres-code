@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
+import { SessionId } from '@shres-code/shres-code-session/types'
 import { JudgmentEngineRegistry, JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentBinaryQuestion,
@@ -262,7 +263,9 @@ describe('ShieldJudgmentEngine', () => {
   it('redacts once, maps the typed ask, and returns the owned identity', async () => {
     const { ctx, server } = await harness([{ kind: 'json', body: answerBody() }], { redactor: true })
 
-    const result = await engine(ctx).ask(ask())
+    const result = await engine(ctx).ask(ask({
+      correlation: { sessionId: SessionId('session-shield-capture'), consultKey: 'turn:1/step:1' },
+    }))
 
     expect(result).toEqual({
       engine: 'shield',
@@ -291,6 +294,11 @@ describe('ShieldJudgmentEngine', () => {
     expect(server.requests).toHaveLength(1)
     expect(server.requests[0]?.method).toBe('POST')
     expect(server.requests[0]?.path).toBe('/v1/judgments')
+    // Field selection, not a word search: a whole-input dump would leak without
+    // naming `correlation` and would add keys beyond the local wire vocabulary.
+    expect(Object.keys(server.requests[0]?.body as object).sort()).toEqual(['model', 'questions', 'state'])
+    expect(JSON.stringify(server.requests[0]?.body)).not.toContain('sessionId')
+    expect(JSON.stringify(server.requests[0]?.body)).not.toContain('consultKey')
     expect(server.requests[0]?.body).toEqual({
       state: '[redacted] route state',
       model: MODELS.fast,

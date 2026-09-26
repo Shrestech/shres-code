@@ -1288,7 +1288,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // Shadow judges over its own fold, so its holds and exits simulate what
     // live would do without moving the live route.
     const sticky = mode === 'shadow' ? shadowStickyState(session.events) : stickyState(session.events)
-    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request, session)
+    const resolved = await this.decide(config, state, sticky, base, session.id, turn, step, signal, request, session)
     const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
@@ -1483,6 +1483,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     state: RoutingState,
     sticky: ModelRoutingStickyState,
     base: ModelSelection,
+    sessionId: SessionId,
     turn: number,
     step: number,
     signal: AbortSignal,
@@ -1712,10 +1713,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const askStarted = Date.now()
     let result: JudgmentResult
     try {
+      const correlation = { sessionId, consultKey: `turn:${turn}/step:${step}` }
       if (fitting === undefined) {
-        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer })
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer, correlation })
       } else {
-        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer })
+        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer, correlation })
         signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
           facts.judgmentRejection = { limits: fitted.limits, reason: fitted.reason }

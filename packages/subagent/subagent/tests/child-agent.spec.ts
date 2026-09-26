@@ -15,6 +15,7 @@ import {
   effectiveChildRoute,
   resolveRequestedChildCwd,
 } from '../src/child-agent.ts'
+import { delegationDepthOf } from '../src/depth.ts'
 
 function parent(overrides: {
   header?: { provider?: string; model?: string }
@@ -116,6 +117,18 @@ describe('resolveRequestedChildCwd', () => {
       expect(resolveRequestedChildCwd(`  ${workspace}  `)).toBe(workspace)
     } finally {
       rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('delegationDepthOf', () => {
+  it('rejects a runtime subagentDepth that is not a non-negative safe integer', () => {
+    for (const value of [Number.NaN, 1.5, -1, -0, Number.MAX_SAFE_INTEGER + 1]) {
+      const agent = {
+        options: { subagentDepth: value },
+        session: { header: {} },
+      } as unknown as Agent
+      expect(() => delegationDepthOf(agent)).toThrow('agent subagentDepth must be a non-negative safe integer')
     }
   })
 })

@@ -40,6 +40,7 @@ import { InvariantError } from '@shres-code/shres-code-invariants'
 import type { ContentBlock, MessageId } from '@shres-code/shres-code-llm'
 import type { Agent, AgentOptions } from '@shres-code/shres-code-agent'
 import type { SessionId } from '@shres-code/shres-code-session'
+import { randomUUID } from 'node:crypto'
 import { effectiveChildRoute, resolveChildDepth } from './child-agent.ts'
 import { assertStartCapabilities } from './start-capabilities.ts'
 import type {
@@ -55,6 +56,7 @@ import type {
   SubagentRunInfo,
   SubagentStartRequest,
 } from './types.ts'
+import { SubagentRouteRequestId } from './types.ts'
 import { SubagentError } from './error.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
 import { createActivationObserver, createLifecycleEmitter, observeRun, renderThrown } from './lifecycle.ts'
@@ -71,12 +73,15 @@ import SubagentActivationSetupRegistry from './activation-setup-registry.ts'
 import type { ContinuableSetupContribution } from './activation-setup-registry.ts'
 import { listChildren as listSubagentChildren, listDescendants as listSubagentDescendants } from './list-children.ts'
 import type { SubagentDescendantListEntry, SubagentListEntry } from './list-children.ts'
+import { childTurnOutcomes as readChildTurnOutcomes } from './child-outcomes.ts'
+import type { ChildTurnOutcomesResult } from './child-outcomes.ts'
 import { snapshotSubagentDescriptor } from './descriptor.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
 
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
-export { SubagentRunId } from './types.ts'
+export { SubagentRunId, SubagentRouteRequestId } from './types.ts'
+export type { ChildTurnOutcome, ChildTurnOutcomes, ChildTurnOutcomesResult, ChildTurnOutcomesUnavailable } from './child-outcomes.ts'
 export type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
@@ -305,7 +310,8 @@ export class SubagentRuntime extends Service {
     ctx.inject(['agents'], (childCtx: Context) => {
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
-        observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
+        observeActivation: (provider, childId, parent, subagentRouteRequestId) =>
+          this.observeActivation(provider, childId, parent, subagentRouteRequestId),
         occupySpawn: () => this.occupySpawn(),
       }, this.setupRegistry)
       this.continuations = manager
@@ -480,6 +486,25 @@ export class SubagentRuntime extends Service {
   }
 
   /**
+   * Observe one direct child's accounting turns and the route in force for
+   * each. Live session first; otherwise one persistence inspect under the
+   * same lifecycle witness as listing. Direct children only. Observe-only:
+   * no events, no mutation. Cancellation rejects with the signal's reason.
+   * Data damage returns `unavailable` and never throws.
+   * @param parent - the exact live parent whose child is read.
+   * @param childId - the durable child session id.
+   * @param signal - caller cancellation forwarded to persistence inspect.
+   * @returns accounting turns, or why they cannot be observed.
+   */
+  childTurnOutcomes(
+    parent: Agent,
+    childId: SessionId,
+    signal?: AbortSignal,
+  ): Promise<ChildTurnOutcomesResult> {
+    return readChildTurnOutcomes(this.ctx, parent, childId, signal)
+  }
+
+  /**
    * Register a provider under its name. Registration is effect-scoped and HMR
    * safe; removing a provider blocks new starts but does not revoke runs that
    * were already returned to their holders.
@@ -543,6 +568,9 @@ export class SubagentRuntime extends Service {
       mode: 'one-shot',
       provider: name,
       ...request.label !== undefined ? { label: request.label } : {},
+      ...request.agentOptions?.subagentRouteRequestId !== undefined
+        ? { agentRouteRequestId: request.agentOptions.subagentRouteRequestId }
+        : {},
     })
     const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
     const release = this.occupySpawn()
@@ -566,7 +594,10 @@ export class SubagentRuntime extends Service {
    * provider or model (explicit routes win), when the provider seeds the child
    * with parent history (fork), when the provider does not run requested
    * routes, when no listener answers, or when the answer equals the inherited
-   * route. A throwing listener is logged and the child keeps its inherited
+   * route. A dispatch that reaches listeners mints one `routeRequestId` on the
+   * request. That id is copied onto the returned `agentOptions` only when a
+   * listener changed the route; every other path returns `requested` unchanged.
+   * A throwing listener is logged and the child keeps its inherited
    * route: routing is an optional cost policy, and a broken policy must not
    * fail the delegation it would only have made cheaper. An `InvariantError`
    * raised during the dispatch is not contained: a violated invariant means
@@ -597,6 +628,7 @@ export class SubagentRuntime extends Service {
       ...input.agentType !== undefined ? { agentType: input.agentType } : {},
       prompt: input.prompt,
       signal: input.signal,
+      routeRequestId: SubagentRouteRequestId(randomUUID()),
     }
     let chosen: SubagentChildRoute | undefined
     try {
@@ -623,7 +655,11 @@ export class SubagentRuntime extends Service {
     }
     if (route.provider === inherited.provider && route.model === inherited.model) return requested
     const registered = await this.registeredRoute(route, input.signal)
-    return { ...registered, ...requested }
+    return {
+      ...registered,
+      ...requested,
+      subagentRouteRequestId: request.routeRequestId,
+    }
   }
 
   /**
@@ -711,8 +747,9 @@ export class SubagentRuntime extends Service {
     provider: string,
     childId: SessionId,
     parent: Agent,
+    subagentRouteRequestId?: AgentOptions['subagentRouteRequestId'],
   ): ActivationObserver {
-    return createActivationObserver(this.emitLifecycle, provider, childId, parent)
+    return createActivationObserver(this.emitLifecycle, provider, childId, parent, subagentRouteRequestId)
   }
 
   /**

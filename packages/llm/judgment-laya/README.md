@@ -79,7 +79,7 @@ Disposal clears status listeners, cancels a running install step, fails in-fligh
 
 #### What the model sees
 
-The local gateway receives the redacted `state` and the consumer's `questions`, including each question's `instructions` and its choice options, score levels, or binary criteria. The pinned Laya checkpoint encodes the question head and state into at most `checkpointContext` tokens; the fitted ask judges the first offered state that fits without truncation. This provider contributes one fixed startup smoke question, `Is this text a startup check?` about the state `startup check`, and no other question wording, threshold, or conversation text.
+The local gateway receives the redacted `state` and the consumer's `questions`, including each question's `instructions` and its choice options, score levels, or binary criteria. An ask's optional `correlation` is local-only and is never selected onto that wire body — the same `toWireRequest` field list Shield uses — so a credentialed or local gateway request cannot carry `sessionId` or `consultKey`. The pinned Laya checkpoint encodes the question head and state into at most `checkpointContext` tokens; the fitted ask judges the first offered state that fits without truncation. This provider contributes one fixed startup smoke question, `Is this text a startup check?` about the state `startup check`, and no other question wording, threshold, or conversation text.
 
 #### Token effect
 

@@ -7,11 +7,19 @@
  */
 
 import type { Agent } from '@shres-code/shres-code-agent'
+import type { SubagentRouteRequestId } from './types.ts'
 
 declare module '@shres-code/shres-code-agent' {
   interface AgentOptions {
     /** Delegation depth: zero for a top-level agent and parent depth + 1 for a child. */
     subagentDepth?: number
+    /**
+     * The child-route dispatch that changed this child's route. Present only
+     * when `resolveChildRoute` accepted a listener route that differs from the
+     * inherited one. Explicit routes, forks, unanswered consults, and equal
+     * routes never set it.
+     */
+    subagentRouteRequestId?: SubagentRouteRequestId
   }
 }
 

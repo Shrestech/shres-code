@@ -1056,6 +1056,12 @@ describe('the downgrade gate', () => {
     b.engine.choice = { ...PASSING, confidence: 0.9, probabilities: { cheap: 0.75, strong: 0.5 } }
     expect(await b.resolve(1)).toEqual(CHEAP)
     expect(b.decision()).toMatchObject({ outcome: 'downgraded', reason: 'gate-passed' })
+    // The consult carries the session's correlation: the same coordinates the
+    // decision records, so a stateless engine can replay its draw.
+    const correlation = b.engine.asks.at(-1)?.correlation
+    expect(correlation?.consultKey).toBe('turn:1/step:1')
+    expect(typeof correlation?.sessionId).toBe('string')
+    expect(correlation?.sessionId.length).toBeGreaterThan(0)
   })
 
   it('keeps the manual route just below the confidence floor', async () => {
@@ -4116,6 +4122,7 @@ describe('the quota cold-point policy', () => {
     user(b.session, 'a small change')
     expect(await b.resolve(2)).toBeUndefined()
     expect(b.engine.asks).toHaveLength(0)
+    expect(b.engine.asks.every(ask => ask.correlation === undefined)).toBe(true)
     expect(b.decisions()).toEqual([expect.objectContaining({
       outcome: 'kept-strong',
       reason: 'warm-prefix',
@@ -4140,6 +4147,10 @@ describe('the quota cold-point policy', () => {
     user(start.session, 'a small change')
     expect(await start.resolve(1)).toEqual(CHEAP)
     expect(start.engine.asks).toHaveLength(1)
+    expect(start.engine.asks[0]?.correlation).toEqual({
+      sessionId: start.session.id,
+      consultKey: 'turn:1/step:1',
+    })
     expect(start.decision()).toMatchObject({
       outcome: 'downgraded',
       reason: 'gate-passed',
@@ -4312,6 +4323,10 @@ describe('shadow mode', () => {
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toBeUndefined()
     expect(b.engine.asks).toHaveLength(1)
+    expect(b.engine.asks[0]?.correlation).toEqual({
+      sessionId: b.session.id,
+      consultKey: 'turn:1/step:1',
+    })
     expect(b.decision()).toMatchObject({
       outcome: 'downgraded',
       reason: 'gate-passed',

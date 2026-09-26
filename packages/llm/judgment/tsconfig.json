@@ -28,6 +28,9 @@
     },
     {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../core/session"
     }
   ]
 }

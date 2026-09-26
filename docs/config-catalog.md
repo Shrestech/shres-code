@@ -3834,7 +3834,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:219`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:224`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 

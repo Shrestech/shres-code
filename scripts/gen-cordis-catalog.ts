@@ -455,6 +455,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   SubagentChildRoute: 'subagent.md',
   SubagentChildRouteInput: 'subagent.md',
   SubagentChildRouteKind: 'subagent.md',
+  ChildTurnOutcomesResult: 'subagent.md',
   SubagentChildRouteRequest: 'subagent.md',
   SubagentDescendantListEntry: 'subagent.md',
   SubagentFollowupOptions: 'subagent.md',

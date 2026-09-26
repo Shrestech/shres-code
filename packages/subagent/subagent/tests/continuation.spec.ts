@@ -18,6 +18,7 @@ import InvariantRegistry from '@shres-code/shres-code-invariants'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
   SubagentError,
+  SubagentRouteRequestId,
   SUBAGENT_DESCRIPTOR_VERSION,
 } from '../src/index.ts'
 import type { SubagentRunEndInfo, SubagentRunInfo } from '../src/index.ts'
@@ -479,6 +480,7 @@ describe('SubagentRuntime.startContinuable', () => {
     })
     expect(resumed.options.provider).toBeUndefined()
     expect(resumed.options.model).toBeUndefined()
+    expect(resumed.options.subagentRouteRequestId).toBeUndefined()
     await drainManager(fresh)
   })
 
@@ -578,6 +580,38 @@ describe('SubagentRuntime.followup residency routing', () => {
       block.type === 'text' && block.text === 'steer me'))).toBe(false)
     releaseFirst.resolve(undefined)
     await waitNoActivation(ctx, started.childId)
+  })
+
+  it('cold-resumes the descriptor agentRouteRequestId onto child options', async () => {
+    const { ctx, parent, root } = await setup([textResponse('first'), textResponse('after resume')])
+    const started = await ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      request: {
+        prompt: message('child task'),
+        parent,
+        agentOptions: { subagentRouteRequestId: SubagentRouteRequestId('route-resume-1') },
+      },
+    })
+    await waitNoActivation(ctx, started.childId)
+    const descriptor = (await ctx.sessionPersistence.load(started.childId)).events.find(event => event.type === 'subagent/descriptor')
+    expect(descriptor?.data).toMatchObject({ agentRouteRequestId: 'route-resume-1' })
+
+    const fresh = createTestContext()
+    await mountAgentLoopTestDependencies(fresh)
+    await fresh.plugin(JsonlSessionPersistence, { root: root! })
+    await fresh.plugin(AgentLoop, { agents: [] })
+    await fresh.plugin(SubagentRuntime)
+    await fresh.plugin(SubagentSpawn, { providerName: 'spawn' })
+    fresh.llm.registerAdapter(['mock'], new MockAdapter([textResponse('after resume')]))
+    const freshParent = fresh.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    await followup(fresh, freshParent, started.childId, message('resume routed'))
+    const resumed = await vi.waitFor(() => {
+      const found = fresh.agents.get(started.childId)
+      expect(found).toBeDefined()
+      return found!
+    })
+    expect(resumed.options.subagentRouteRequestId).toBe('route-resume-1')
+    await drainManager(fresh)
   })
 
   it('cold-resumes a settled child into a new Activation', async () => {

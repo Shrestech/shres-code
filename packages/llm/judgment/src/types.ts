@@ -9,6 +9,7 @@
 
 import type { Branded } from '@shres-code/shres-code-brand'
 import type { TokenUsage } from '@shres-code/shres-code-llm/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 declare module '@shres-code/cordis' {
   interface Events {
@@ -150,6 +151,19 @@ export interface JudgmentScoreAnswer {
 /** One answer, discriminated by the kind of question it answers. */
 export type JudgmentAnswer = JudgmentBinaryAnswer | JudgmentChoiceAnswer | JudgmentScoreAnswer
 
+/**
+ * Local correlation facts one ask is keyed on. Informational only: an engine
+ * may use them for local determinism (a stateless per-consult draw) or
+ * diagnostics, and must never transmit them — they are not part of any
+ * serialized model input.
+ */
+export interface JudgmentCorrelation {
+  /** Session the consult belongs to. */
+  sessionId: SessionId
+  /** Consumer-defined key, unique per consult within the session. */
+  consultKey: string
+}
+
 /** One ask: the state every question is evaluated against, and the questions. */
 export interface JudgmentInput {
   /**
@@ -177,6 +191,13 @@ export interface JudgmentInput {
    * implementations ignore it.
    */
   consumer?: JudgmentConsumerId
+  /**
+   * Local correlation facts for engines that key determinism or diagnostics on
+   * the consult's session coordinates. Optional: non-session consumers omit
+   * it, and an engine that needs it treats its absence as a failed ask rather
+   * than falling back to another identity. Never transmitted off-machine.
+   */
+  correlation?: JudgmentCorrelation
 }
 
 /** One ask's answers and the identity of what produced them. */

@@ -101,7 +101,8 @@ describe('subagent/child-route', () => {
     const { ctx, parent } = await setup()
     routeTo(ctx, CHEAP)
     const agentOptions = await ctx.subagents.resolveChildRoute('spawn', input(parent, { requested: { maxTokens: 64 } }))
-    expect(agentOptions).toEqual({ ...CHEAP, maxTokens: 64 })
+    expect(agentOptions).toMatchObject({ ...CHEAP, maxTokens: 64 })
+    expect(agentOptions?.subagentRouteRequestId).toEqual(expect.any(String))
     // The reported route and the run route derive from the same options.
     expect(effectiveChildRoute(parent, agentOptions)).toEqual(CHEAP)
 
@@ -120,7 +121,7 @@ describe('subagent/child-route', () => {
   it('merges a partial listener route over the inherited route', async () => {
     const { ctx, parent } = await setup()
     routeTo(ctx, { model: 'flash' })
-    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual({ provider: 'mock', model: 'flash' })
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toMatchObject({ provider: 'mock', model: 'flash' })
   })
 
   it('keeps the requested options when the listener answers with the inherited route', async () => {
@@ -128,7 +129,7 @@ describe('subagent/child-route', () => {
     routeTo(ctx, { provider: 'cheap' })
     const requested = { maxTokens: 64 }
     // The provider-only answer changes the route, so it resolves; the inherited answer does not.
-    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual({ provider: 'cheap', model: 'strong' })
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toMatchObject({ provider: 'cheap', model: 'strong' })
     const sameRoute = await ctx.plugin(Object.assign((inner: Context) => {
       inner.on('subagent/child-route', async () => ({ ...STRONG }), { prepend: true })
     }, { inject: ['subagents'] }))
@@ -171,7 +172,7 @@ describe('subagent/child-route', () => {
     const fiber = await ctx.plugin(Object.assign((inner: Context) => {
       inner.on('subagent/child-route', listener)
     }, { inject: ['subagents'] }))
-    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual(CHEAP)
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toMatchObject(CHEAP)
 
     await fiber.dispose()
     expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toBeUndefined()
@@ -185,7 +186,7 @@ describe('subagent/child-route', () => {
     parent.ctx.on('subagent/child-route', listener)
 
     expect(await ctx.subagents.resolveChildRoute('spawn', input(other))).toBeUndefined()
-    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual(CHEAP)
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toMatchObject(CHEAP)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -196,7 +197,7 @@ describe('subagent/child-route', () => {
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     routeTo(ctx, CHEAP)
 
-    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toEqual(CHEAP)
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent))).toMatchObject(CHEAP)
     expect(warn).not.toHaveBeenCalled()
   })
 
@@ -314,5 +315,51 @@ describe('subagent/child-route', () => {
   it('rejects an unregistered subagent provider', async () => {
     const { ctx, parent } = await setup()
     await expect(ctx.subagents.resolveChildRoute('missing', input(parent))).rejects.toMatchObject({ code: 'NO_PROVIDER' })
+  })
+
+  it('mints one routeRequestId per dispatch and carries it only when the route changed', async () => {
+    const { ctx, parent } = await setup()
+    const seen: string[] = []
+    ctx.on('subagent/child-route', async (request: SubagentChildRouteRequest) => {
+      seen.push(request.routeRequestId)
+      return CHEAP
+    })
+    const first = await ctx.subagents.resolveChildRoute('spawn', input(parent))
+    const second = await ctx.subagents.resolveChildRoute('spawn', input(parent))
+    expect(seen).toHaveLength(2)
+    expect(seen[0]).not.toBe(seen[1])
+    expect(first?.subagentRouteRequestId).toBe(seen[0])
+    expect(second?.subagentRouteRequestId).toBe(seen[1])
+    expect(first).toMatchObject(CHEAP)
+  })
+
+  it('does not mint a routeRequestId for explicit routes or forks', async () => {
+    const { ctx, parent } = await setup()
+    const listener = routeTo(ctx, CHEAP)
+    expect(await ctx.subagents.resolveChildRoute('spawn', input(parent, { requested: { model: 'pinned' } }))).toEqual({ model: 'pinned' })
+    expect(await ctx.subagents.resolveChildRoute('fork', input(parent))).toBeUndefined()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('a routed one-shot child records agentRouteRequestId and matching start/end ids', async () => {
+    const { ctx, parent } = await setup()
+    routeTo(ctx, CHEAP)
+    const starts: Array<{ id?: string; route?: string | undefined }> = []
+    const ends: Array<{ id?: string; route?: string | undefined }> = []
+    ctx.on('subagent/start', (info) => { starts.push({ id: info.id, route: info.subagentRouteRequestId }) })
+    ctx.on('subagent/end', (info) => { ends.push({ id: info.id, route: info.subagentRouteRequestId }) })
+    const agentOptions = await ctx.subagents.resolveChildRoute('spawn', input(parent))
+    const run = await ctx.subagents.start('spawn', {
+      prompt: [{ type: 'text', text: 'summarise the diff' }],
+      parent,
+      signal: new AbortController().signal,
+      ...agentOptions !== undefined ? { agentOptions } : {},
+    })
+    await run.result
+    const descriptor = run.localAgent?.session.events.find(event => event.type === 'subagent/descriptor')
+    expect(descriptor?.data).toMatchObject({ agentRouteRequestId: agentOptions?.subagentRouteRequestId })
+    expect(starts.find(row => row.id === run.id)?.route).toBe(agentOptions?.subagentRouteRequestId)
+    expect(ends.find(row => row.id === run.id)?.route).toBe(agentOptions?.subagentRouteRequestId)
+    await run.dispose()
   })
 })

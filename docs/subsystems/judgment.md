@@ -153,6 +153,13 @@ interface JudgmentInput {
    * implementations ignore it.
    */
   consumer?: JudgmentConsumerId
+  /**
+   * Local correlation facts for engines that key determinism or diagnostics on
+   * the consult's session coordinates. Optional: non-session consumers omit
+   * it, and an engine that needs it treats its absence as a failed ask rather
+   * than falling back to another identity. Never transmitted off-machine.
+   */
+  correlation?: JudgmentCorrelation
 }
 ```
 
@@ -546,7 +553,7 @@ selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:280`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:281`](../../packages/llm/judgment/src/index.ts)
 
 <a id="ctxjudgmentengines--judgmentengineregistry"></a>
 
@@ -643,5 +650,5 @@ The judgment engine view changed: an engine registered, unregistered, or announc
 'judgment/engines-updated'(): void
 ```
 
-Source: [`packages/llm/judgment/src/types.ts:23`](../../packages/llm/judgment/src/types.ts)
+Source: [`packages/llm/judgment/src/types.ts:24`](../../packages/llm/judgment/src/types.ts)
 <!-- END GENERATED cordis-surface -->

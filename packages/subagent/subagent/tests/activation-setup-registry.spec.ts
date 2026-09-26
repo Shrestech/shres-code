@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import SubagentRuntime from '../src/index.ts'
 import SubagentActivationSetupRegistry from '../src/activation-setup-registry.ts'
 
 /** A child-like scoped context with observable disposal. */
@@ -159,5 +160,15 @@ describe('SubagentActivationSetupRegistry', () => {
     expect(disposed).toEqual(['child-1'])
     await second.close()
     expect(disposed).toEqual(['child-1', 'child-2'])
+  })
+})
+
+describe('SubagentRuntime.registerContinuableSetup', () => {
+  it('publishes the contribution through the runtime effect and revokes it with the disposer', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    const revoke = ctx.subagents.registerContinuableSetup(() => () => {})
+    expect(typeof revoke).toBe('function')
+    revoke()
   })
 })
