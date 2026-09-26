@@ -533,6 +533,9 @@ importers:
       '@shres-code/shres-code-cmdline':
         specifier: workspace:^
         version: link:../../packages/boot/cmdline
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../packages/llm/judgment
       '@shres-code/shres-code-pwsh-local':
         specifier: workspace:^
         version: link:../../packages/shell/pwsh-local
