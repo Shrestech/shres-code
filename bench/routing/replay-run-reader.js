@@ -5,7 +5,7 @@
  * trial inputs aggregate into one class-C refusal that names each trial.
  * @module
  */
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { UsageError } from '../runner/run.js'
 import { validateTrial } from '../schema/trial.js'
@@ -138,6 +138,25 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
       const path = resolve(dir, trial.sessionFile)
       const within = relative(trialRoot, path)
       if (within === '' || within === '..' || within.startsWith('../') || isAbsolute(within)) {
+        refusal('session-path-outside-trial', path)
+        continue
+      }
+      // Lexical containment is not enough: a symlink inside the trial
+      // directory can point anywhere. Resolve both sides (metadata only —
+      // nothing outside is read) and refuse when the artifact's real location
+      // leaves the declared trial directory.
+      let realPath
+      try {
+        realPath = await realpath(path)
+      } catch (error) {
+        if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') {
+          refusal('session-log-missing', path)
+          continue
+        }
+        throw error
+      }
+      const realWithin = relative(await realpath(trialRoot), realPath)
+      if (realWithin === '' || realWithin === '..' || realWithin.startsWith('../') || isAbsolute(realWithin)) {
         refusal('session-path-outside-trial', path)
         continue
       }

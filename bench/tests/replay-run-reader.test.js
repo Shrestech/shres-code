@@ -6,7 +6,7 @@
  * @module
  */
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -377,6 +377,40 @@ test('a hostile task id is a refusal and never becomes a path segment', async ()
     }])
     assert.equal(trials.length, 3)
   })
+})
+
+test('a symlink inside the trial directory pointing outside is refused without reading the target', async (t) => {
+  const outside = await mkdtemp(join(tmpdir(), 'bench-replay-reader-outside-'))
+  const target = join(outside, 'owner-session.jsonl')
+  const ownerBytes = Buffer.from('owner data that must never be read\n')
+  await writeFile(target, ownerBytes)
+  try {
+    await withRun({
+      sessionFile: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? 'sessions/reader-task/0/link.jsonl' : undefined),
+    }, async ({ root, input }) => {
+      const link = join(root, 'experiment', 'route-strong', 'sessions', TASK_ID, '0', 'link.jsonl')
+      try {
+        await rm(link)
+        await symlink(target, link)
+      } catch {
+        t.skip('symlinks unavailable on this platform')
+        return
+      }
+      const { trials, refused } = await readReplayRun(input)
+      assert.deepEqual(refused, [{
+        id: `S/${TASK_ID}/0`,
+        taskId: TASK_ID,
+        trialIndex: 0,
+        arm: 'S',
+        path: link,
+        reason: 'session-path-outside-trial',
+      }])
+      assert.equal(trials.length, 3)
+      assert.deepEqual(await readFile(target), ownerBytes, 'the target was never read or modified')
+    })
+  } finally {
+    await rm(outside, { recursive: true, force: true })
+  }
 })
 
 test('a registration runnerName outside the experiment directory is a UsageError', async () => {
