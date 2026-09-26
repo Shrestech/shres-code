@@ -231,6 +231,7 @@
     { "path": "./packages/llm/judgment-typesafe" },
     { "path": "./packages/llm/judgment-shield" },
     { "path": "./packages/llm/judgment-laya" },
+    { "path": "./packages/llm/judgment-bench-random" },
     { "path": "./packages/llm/judgment-guardrails" },
     { "path": "./packages/llm/model-router" },
     { "path": "./packages/compaction/compaction-jev" },

@@ -1,0 +1,43 @@
+{
+  "name": "@shres-code/shres-code-judgment-bench-random",
+  "description": "Seeded random-matched bench judgment engine for the Shres Code typed-judgment seam (ctx.judgment)",
+  "version": "0.1.0-rc.5",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/llm/judgment-bench-random"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./engine": {
+      "types": "./lib/types/engine.d.ts",
+      "default": "./lib/engine.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/engine.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "private": true
+}
