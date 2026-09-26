@@ -288,7 +288,7 @@ test('dump-config router count is 1, 2, or 0 from YAML', () => {
 
 test('class-B artifact is ignored by metrics', () => {
   const base = fixtureRow({
-    task: 't', arm: 'S', stratum: 'routine', coldPointId: 'c1',
+    task: 't', arm: 'S', stratum: 'routine', coldPointId: 'c1', trialIndex: 0,
     eligible: false, answered: false, truncated: null, headTokens: null,
     winner: null, confidence: null, margin: null, pCheap: null, difficultyScore: null,
     cheapSufficient: true,
