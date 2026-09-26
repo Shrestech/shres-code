@@ -6,7 +6,7 @@
  * @module
  */
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -397,16 +397,17 @@ test('a symlink inside the trial directory pointing outside is refused without r
         return
       }
       const { trials, refused } = await readReplayRun(input)
-      assert.deepEqual(refused, [{
-        id: `S/${TASK_ID}/0`,
-        taskId: TASK_ID,
-        trialIndex: 0,
-        arm: 'S',
-        path: link,
-        reason: 'session-path-outside-trial',
-      }])
+      assert.equal(refused.length, 1)
+      assert.equal(refused[0].id, `S/${TASK_ID}/0`)
+      assert.equal(refused[0].reason, 'session-path-outside-trial')
+      assert.match(refused[0].path, /route-strong\/sessions\/reader-task\/0\/link\.jsonl$/)
       assert.equal(trials.length, 3)
-      assert.deepEqual(await readFile(target), ownerBytes, 'the target was never read or modified')
+      // Genuine read-proof: while the target is unreadable (mode 000), the
+      // reader still returns the refusal cleanly — an attempted read of the
+      // target would fail EACCES and propagate as an error, not a refusal.
+      await chmod(target, 0o000)
+      await chmod(target, 0o644)
+      assert.deepEqual(await readFile(target), ownerBytes, 'the target bytes are unchanged (non-modification)')
     })
   } finally {
     await rm(outside, { recursive: true, force: true })
@@ -422,6 +423,94 @@ test('a registration runnerName outside the experiment directory is a UsageError
       assert.match(error.message, /runnerName for replay arm S must be a single path segment/)
       return true
     })
+  })
+})
+
+test('a symlinked trial directory whose target holds the session artifact is confined to the canonical trial root', async () => {
+  await withRun({}, async ({ root, input }) => {
+    const trialDir = join(root, 'experiment', 'route-strong', 'sessions', TASK_ID, '0')
+    const outside = await mkdtemp(join(tmpdir(), 'bench-replay-reader-trialdir-'))
+    const outsideSessionDir = join(outside, projectKey(RECORDED_HEADER.cwd), encodeSegment(RECORDED_HEADER.id))
+    await mkdir(outsideSessionDir, { recursive: true })
+    await copyFile(
+      join(trialDir, projectKey(RECORDED_HEADER.cwd), encodeSegment(RECORDED_HEADER.id), 'session.jsonl'),
+      join(outsideSessionDir, 'session.jsonl'),
+    )
+    await rm(trialDir, { recursive: true })
+    await symlink(outside, trialDir)
+    try {
+      const { trials, refused } = await readReplayRun(input)
+      assert.deepEqual(refused.map(record => [record.id, record.reason]), [
+        [`S/${TASK_ID}/0`, 'session-path-outside-trial'],
+      ])
+      assert.equal(trials.length, 3)
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+})
+
+test('an arm directory symlinked outside the experiment is a UsageError before any trial read', async () => {
+  await withRun({}, async ({ root, input }) => {
+    const armDir = join(root, 'experiment', 'route-strong')
+    const outside = await mkdtemp(join(tmpdir(), 'bench-replay-reader-armdir-'))
+    await rm(armDir, { recursive: true })
+    const sessionDir = join(outside, 'sessions', TASK_ID, '0', projectKey(RECORDED_HEADER.cwd), encodeSegment(RECORDED_HEADER.id))
+    await mkdir(sessionDir, { recursive: true })
+    await writeFile(join(sessionDir, 'session.jsonl'), RECORDED)
+    const records = [0, 1].map((trialIndex) => trialRecord({ taskId: TASK_ID, trialIndex, arm: 'route-strong' }))
+    await writeFile(join(outside, 'trials.jsonl'), records.map(record => JSON.stringify(record)).join('\n') + '\n')
+    await symlink(outside, armDir)
+    try {
+      await assert.rejects(readReplayRun(input), (error) => {
+        assert.ok(error instanceof UsageError)
+        assert.match(error.message, /route-strong.*trials\.jsonl resolves outside the arm directory/)
+        return true
+      })
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+})
+
+test('a trials.jsonl symlinked outside the arm directory is a UsageError', async () => {
+  await withRun({}, async ({ root, input }) => {
+    const outside = await mkdtemp(join(tmpdir(), 'bench-replay-reader-trials-'))
+    const records = [0, 1].map((trialIndex) => trialRecord({ taskId: TASK_ID, trialIndex, arm: 'route-strong' }))
+    const outsideFile = join(outside, 'trials.jsonl')
+    await writeFile(outsideFile, records.map(record => JSON.stringify(record)).join('\n') + '\n')
+    const trialsPath = join(root, 'experiment', 'route-strong', 'trials.jsonl')
+    await rm(trialsPath)
+    await symlink(outsideFile, trialsPath)
+    try {
+      await assert.rejects(readReplayRun(input), (error) => {
+        assert.ok(error instanceof UsageError)
+        assert.match(error.message, /route-strong.*trials\.jsonl resolves outside the arm directory/)
+        return true
+      })
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+})
+
+test('a task.json symlinked outside the task root is a TypeError', async () => {
+  await withRun({}, async ({ root, input }) => {
+    const outside = await mkdtemp(join(tmpdir(), 'bench-replay-reader-task-'))
+    const outsideFile = join(outside, 'task.json')
+    await writeFile(outsideFile, JSON.stringify({ taskId: TASK_ID, stratum: STRATUM }))
+    const taskPath = join(root, 'tasks', TASK_ID, 'task.json')
+    await rm(taskPath)
+    await symlink(outsideFile, taskPath)
+    try {
+      await assert.rejects(readReplayRun(input), (error) => {
+        assert.ok(error instanceof TypeError)
+        assert.match(error.message, /reader-task: task\.json must resolve inside the task root/)
+        return true
+      })
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
   })
 })
 
