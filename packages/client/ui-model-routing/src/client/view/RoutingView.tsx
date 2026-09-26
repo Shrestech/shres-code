@@ -131,7 +131,18 @@ export function RoutingView({
     )
   }
   if (!available || routing === undefined || stats === undefined) {
-    return <div className={css.view}><p className={css.muted}>{t('view.unavailable')}</p></div>
+    const child = stats?.recentChildren[0]
+    const parentReveal = reveal !== undefined && canReveal?.('trajectory') === true && child !== undefined
+      ? () => { reveal({ view: 'trajectory', target: { kind: 'event', seq: child.seq } }) }
+      : undefined
+    return (
+      <div className={css.view}>
+        <p className={css.muted}>{t('view.childChosen')}</p>
+        {parentReveal === undefined
+          ? <p className={css.muted}>{t('view.unavailable')}</p>
+          : <button type="button" className={css.link} onClick={parentReveal}>{t('view.childOpenParent')}</button>}
+      </div>
+    )
   }
 
   const judge = routingJudge(engineState)
@@ -248,6 +259,23 @@ export function RoutingView({
               <LatencyChart stats={stats} gate={gate} t={t} />
               <StreakExits stats={stats} gate={gate} t={t} />
             </div>
+            {stats.children.decided > 0 && (
+              <section className={css.card}>
+                <h3>{t('children.title')}</h3>
+                <table>
+                  <tbody>
+                    {stats.recentChildren.map(row => (
+                      <tr key={row.seq}>
+                        <td>{row.agentType ?? t('children.yourModel')}</td>
+                        <td>{row.outcome}</td>
+                        <td>{row.candidateId ?? t('children.yourModel')}</td>
+                        <td>{row.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
             <RecentDecisions rows={stats.recent} total={stats.counts.decisions} onOpen={setOpenSeq} onTrajectory={trajectory} t={t} />
           </>
         )}

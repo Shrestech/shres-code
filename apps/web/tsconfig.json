@@ -98,6 +98,7 @@
     "tests/busy-parent-report.e2e.ts",
     "tests/team-roster-models.e2e.ts",
     "tests/routing-view.e2e.ts",
+    "tests/routing-child-session.e2e.ts",
     "tests/routing-chip-fit.e2e.ts",
     "tests/routing-overview.e2e.ts",
     "tests/background-job-list.e2e.ts",

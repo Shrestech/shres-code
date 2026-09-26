@@ -81,6 +81,7 @@ import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinitio
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
 export { SubagentRunId, SubagentRouteRequestId } from './types.ts'
+export { childTurnOutcomes } from './child-outcomes.ts'
 export type { ChildTurnOutcome, ChildTurnOutcomes, ChildTurnOutcomesResult, ChildTurnOutcomesUnavailable } from './child-outcomes.ts'
 export type {
   ContinuableCreateRequest,

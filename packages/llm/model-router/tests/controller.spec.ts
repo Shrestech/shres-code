@@ -77,6 +77,8 @@ import ModelRoutingController, {
 } from '../src/index.ts'
 import { judgmentFailuresFor, shadowStickyState, stickyState } from '../src/folds.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
+import { SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
+import type { SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
 import type { ModelRoutingDecision, ModelRoutingProjection } from '../src/types.ts'
 
 /** Manual (strong) route every case starts on. */
@@ -4240,6 +4242,12 @@ describe('the quota cold-point policy', () => {
       expect(b.engine.asks).toHaveLength(1)
       expect(b.decision()).toMatchObject({ reason: 'gate-passed', objective })
       expect(b.decision()).not.toHaveProperty('coldPoint')
+      expect(Object.keys(b.decision()).filter(key => key !== 'engineId')).toEqual([
+        'outcome', 'reason', 'stateHash', 'stateSeqs', 'selection', 'eligibilityMs',
+        'candidateEligibility', 'cache', 'judgmentQuestions', 'inputChars',
+        'engine', 'model', 'latencyMs', 'route', 'difficulty', 'thresholds', 'sticky',
+        'objective', 'stateProjection',
+      ])
     }
   })
 
@@ -4248,6 +4256,12 @@ describe('the quota cold-point policy', () => {
     stepAt(b.session, 1, T0)
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toEqual(CHEAP)
+    expect(Object.keys(b.decision()).filter(key => key !== 'engineId')).toEqual([
+      'outcome', 'reason', 'stateHash', 'stateSeqs', 'selection', 'coldPoint', 'cache',
+      'eligibilityMs', 'candidateEligibility', 'judgmentQuestions', 'inputChars',
+      'engine', 'model', 'latencyMs', 'route', 'difficulty', 'thresholds', 'sticky',
+      'objective', 'stateProjection',
+    ])
     closeTurn(b.session, 1)
 
     // One step into the streak, below minSteps: the cold manual model does not end it.
@@ -4446,5 +4460,82 @@ describe('shadow mode', () => {
     expect(await b.resolve(1, STRONG, b.signal, 2)).toBeUndefined()
     expect(b.decisions()).toHaveLength(1)
     expect(b.engine.asks).toHaveLength(1)
+  })
+})
+
+describe('child-route consult through the controller', () => {
+  const CHILD_CONFIG: ModelRouterConfig = {
+    ...CONFIG,
+    childPolicies: [{ match: { kind: 'subagent', agentType: 'explore' }, candidate: 'cheap' }],
+  }
+
+  async function childRequest(b: Awaited<ReturnType<typeof bench>>, overrides: Partial<SubagentChildRouteRequest> = {}) {
+    b.session.append('request/header', {
+      header: { config: { provider: STRONG.provider, model: STRONG.model } },
+      reason: 'initial',
+    })
+    const request: SubagentChildRouteRequest = {
+      parent: b.agent,
+      kind: 'subagent',
+      subagentProvider: 'spawn',
+      inherited: STRONG,
+      agentType: 'explore',
+      prompt: 'explore the tree',
+      signal: b.signal,
+      routeRequestId: SubagentRouteRequestId('child-route-1'),
+      ...overrides,
+    }
+    return b.ctx.modelRouting.onChildRoute(request, () => Promise.resolve(undefined))
+  }
+
+  it('off writes nothing', async () => {
+    const b = await bench({ config: { ...CHILD_CONFIG, initialMode: 'off' } })
+    expect(await childRequest(b)).toBeUndefined()
+    expect(b.session.events.filter(event => event.type === 'model-routing/child-decision')).toEqual([])
+    expect(b.engine.asks).toHaveLength(0)
+  })
+
+  it('on routes the matching pool candidate without judging', async () => {
+    const b = await bench({ config: CHILD_CONFIG })
+    expect(await childRequest(b)).toEqual(CHEAP)
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')
+    expect(decision?.data).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-policy',
+      routeRequestId: 'child-route-1',
+      selection: { candidateId: 'cheap', ...CHEAP },
+      effortApplied: false,
+    })
+    expect(b.engine.asks).toHaveLength(0)
+  })
+
+  it('shadow logs the routed decision and returns undefined', async () => {
+    const b = await bench({ config: { ...CHILD_CONFIG, initialMode: 'shadow' } })
+    expect(await childRequest(b)).toBeUndefined()
+    expect(b.session.events.find(event => event.type === 'model-routing/child-decision')?.data).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-policy',
+      shadow: true,
+    })
+  })
+
+  it('judge:true asks with child:routeRequestId correlation', async () => {
+    const b = await bench({
+      config: {
+        ...CHILD_CONFIG,
+        childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
+        childRouteInstructions: 'Keep the parent model or use the cheaper child?',
+      },
+    })
+    b.engine.choice = { kind: 'choice', id: ROUTE_QUESTION_ID, option: 'cheap', confidence: 0.95, probabilities: { cheap: 0.95, [KEEP_CURRENT_OPTION_ID]: 0.05 } }
+    expect(await childRequest(b)).toEqual(CHEAP)
+    expect(b.engine.asks.at(-1)?.correlation).toEqual({
+      sessionId: b.session.id,
+      consultKey: 'child:child-route-1',
+    })
+    expect(b.session.events.find(event => event.type === 'model-routing/child-decision')?.data).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-judged',
+    })
   })
 })

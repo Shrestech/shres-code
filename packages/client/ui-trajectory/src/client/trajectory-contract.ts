@@ -63,6 +63,15 @@ export type TrajectoryContribution =
     readonly decision: TrajectoryRoutingDecision
   }
   | {
+    readonly kind: 'routing-child'
+    readonly seq: number
+    readonly time: number
+    readonly outcome: 'routed' | 'kept'
+    readonly reason: string
+    readonly model?: string
+    readonly shadow?: true
+  }
+  | {
     readonly kind: 'jspace'
     readonly badge: TrajectoryJSpaceBadge
   }
@@ -109,6 +118,8 @@ export interface TrajectorySnapshot {
   readonly jspace: readonly TrajectoryJSpaceBadge[]
   /** Folded routing decisions, each rendering as its own row at its seq. */
   readonly routing: readonly TrajectoryRoutingDecision[]
+  /** Folded child-route decisions, each a CHILD-ROUTE row at its seq. */
+  readonly routingChildren: readonly Extract<TrajectoryContribution, { kind: 'routing-child' }>[]
 }
 
 declare module '@shres-code/shres-code-client-runtime/client' {

@@ -249,6 +249,12 @@ export function routingKpis(
       value: formatTokens(switchCost),
       detail: t('kpi.switchCost.detail'),
     },
+    {
+      id: 'subagents',
+      label: t('kpi.subagents'),
+      value: stats.children.decided === 0 ? t('kpi.subagents.empty') : `${stats.children.routed}/${stats.children.decided}`,
+      detail: t('kpi.subagents.detail'),
+    },
     egressKpi(stats, egressOf, t),
   ]
 }

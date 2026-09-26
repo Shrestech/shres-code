@@ -42,6 +42,8 @@ import type { ZodType } from 'zod'
 import { KEEP_CURRENT_OPTION_ID } from './config.ts'
 import { isCompactionEnd } from './folds.ts'
 import type {
+  ModelRoutingChildDecision,
+  ModelRoutingChildOutcome,
   ModelRoutingColdCause,
   ModelRoutingDecision,
   ModelRoutingObjective,
@@ -283,6 +285,16 @@ export interface ModelRoutingStatsState {
   decisions: TimelineDecision[]
   /** Oldest first. */
   recent: RecentDecision[]
+  children: {
+    decided: number
+    routed: number
+    kept: number
+    byReason: Record<string, number>
+    byModel: Record<string, number>
+    failures: number
+    suspended: string[]
+  }
+  recentChildren: ModelRoutingStatsSnapshot['recentChildren']
 }
 
 /**
@@ -305,6 +317,10 @@ export function createStatsState(): ModelRoutingStatsState {
       warmUps: 0,
       turnsWithDecisions: 0,
       warmSkipped: 0,
+      childRouted: 0,
+      childFailures: 0,
+      childSuccesses: 0,
+      childNeutral: 0,
     },
     lastDecisionTurn: null,
     reasons: {},
@@ -343,6 +359,16 @@ export function createStatsState(): ModelRoutingStatsState {
     marks: [],
     decisions: [],
     recent: [],
+    children: {
+      decided: 0,
+      routed: 0,
+      kept: 0,
+      byReason: {},
+      byModel: {},
+      failures: 0,
+      suspended: [] as string[],
+    },
+    recentChildren: [],
   }
 }
 
@@ -361,6 +387,10 @@ export function applyStatsEvent(state: ModelRoutingStatsState, event: SessionEve
       return { ...state, position: { turn: event.data.turn, step: event.data.step, start: event.time } }
     case 'model-routing/decision':
       return applyDecision(state, event.seq, event.time, event.data)
+    case 'model-routing/child-decision':
+      return applyChildDecision(state, event.seq, event.time, event.data as ModelRoutingChildDecision)
+    case 'model-routing/child-outcome':
+      return applyChildOutcome(state, event.data as ModelRoutingChildOutcome)
     case 'assistant/message':
       if (event.data.usage === undefined) return state
       return applyCall(state, event.seq, event.time, event.data.turn, event.data.step, {
@@ -427,6 +457,64 @@ function applyTtlModels(
 }
 
 /** Fold one decision. */
+function applyChildDecision(
+  state: ModelRoutingStatsState,
+  seq: number,
+  time: number,
+  data: ModelRoutingChildDecision,
+): ModelRoutingStatsState {
+  const routed = data.outcome === 'routed'
+  const candidateId = data.selection?.candidateId
+  const byModel = candidateId === undefined
+    ? state.children.byModel
+    : increment(state.children.byModel, candidateId)
+  const row = {
+    seq,
+    t: time,
+    outcome: data.outcome,
+    reason: data.reason,
+    candidateId: candidateId ?? null,
+    agentType: data.agentType ?? null,
+    shadow: data.shadow === true,
+    latencyMs: data.latencyMs ?? null,
+  }
+  return {
+    ...state,
+    counts: {
+      ...state.counts,
+      childRouted: state.counts.childRouted + (routed ? 1 : 0),
+    },
+    children: {
+      ...state.children,
+      decided: state.children.decided + 1,
+      routed: state.children.routed + (routed ? 1 : 0),
+      kept: state.children.kept + (routed ? 0 : 1),
+      byReason: increment(state.children.byReason, data.reason),
+      byModel,
+    },
+    recentChildren: retain([row, ...state.recentChildren], 100),
+  }
+}
+
+function applyChildOutcome(
+  state: ModelRoutingStatsState,
+  data: ModelRoutingChildOutcome,
+): ModelRoutingStatsState {
+  const counts = { ...state.counts }
+  const children = { ...state.children, suspended: [...state.children.suspended] }
+  if (data.countedAs === 'failure') {
+    counts.childFailures += 1
+    children.failures += 1
+    if (!children.suspended.includes(data.candidateId)) children.suspended = [...children.suspended, data.candidateId]
+  } else if (data.countedAs === 'success') {
+    counts.childSuccesses += 1
+    children.suspended = children.suspended.filter(id => id !== data.candidateId)
+  } else {
+    counts.childNeutral += 1
+  }
+  return { ...state, counts, children }
+}
+
 function applyDecision(
   state: ModelRoutingStatsState,
   seq: number,
@@ -1013,6 +1101,16 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
     engines: state.engines.map(engine => ({ ...engine })),
     timeline: timeline(state, indexOf),
     recent: [...state.recent].reverse(),
+    children: {
+      decided: state.children.decided,
+      routed: state.children.routed,
+      kept: state.children.kept,
+      byReason: ranked(state.children.byReason).map(({ key, count }) => ({ reason: key, count })),
+      byModel: ranked(state.children.byModel).map(({ key, count }) => ({ candidateId: key, count })),
+      failures: state.children.failures,
+      suspended: state.children.suspended.length,
+    },
+    recentChildren: [...state.recentChildren].reverse(),
   }
 }
 
@@ -1195,6 +1293,10 @@ export const modelRoutingStatsSchema = zod.object({
     warmUps: zod.number(),
     turnsWithDecisions: zod.number(),
     warmSkipped: zod.number(),
+    childRouted: zod.number(),
+    childFailures: zod.number(),
+    childSuccesses: zod.number(),
+    childNeutral: zod.number(),
   }),
   reasons: zod.array(zod.object({
     reason: zod.string(),
@@ -1312,6 +1414,25 @@ export const modelRoutingStatsSchema = zod.object({
     best: nullableNumber,
     difficulty: nullableNumber,
     engine: zod.string().nullable(),
+    latencyMs: nullableNumber,
+  })),
+  children: zod.object({
+    decided: zod.number(),
+    routed: zod.number(),
+    kept: zod.number(),
+    byReason: zod.array(zod.object({ reason: zod.string(), count: zod.number() })),
+    byModel: zod.array(zod.object({ candidateId: zod.string(), count: zod.number() })),
+    failures: zod.number(),
+    suspended: zod.number(),
+  }),
+  recentChildren: zod.array(zod.object({
+    seq: zod.number(),
+    t: zod.number(),
+    outcome: zod.enum(['routed', 'kept']),
+    reason: zod.string(),
+    candidateId: zod.string().nullable(),
+    agentType: zod.string().nullable(),
+    shadow: zod.boolean(),
     latencyMs: nullableNumber,
   })),
 }) as unknown as ZodType<ModelRoutingStatsSnapshot>

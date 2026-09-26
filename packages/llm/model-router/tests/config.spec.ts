@@ -651,3 +651,56 @@ describe('resolveConfig defaults and detachment', () => {
     expect(resolved.difficultyLevels).toEqual(['one', 'two'])
   })
 })
+
+describe('resolveConfig childPolicies', () => {
+  it('defaults to no child routing', () => {
+    const resolved = resolveConfig(valid())
+    expect(resolved.childPolicies).toEqual([])
+    expect(resolved.childRouteErrors).toBe(2)
+    expect(resolved.childRouteInstructions).toBeUndefined()
+  })
+
+  it('resolves a matching rule and freezes it', () => {
+    const resolved = resolveConfig(valid({
+      childPolicies: [{ match: { kind: 'subagent', agentType: 'explore' }, candidate: 'cheap' }],
+    }))
+    expect(resolved.childPolicies).toEqual([
+      { match: { kind: 'subagent', agentType: 'explore' }, candidate: 'cheap', judge: false },
+    ])
+    expect(Object.isFrozen(resolved.childPolicies)).toBe(true)
+    expect(Object.isFrozen(resolved.childPolicies[0])).toBe(true)
+  })
+
+  it('rejects a candidate not in the pool', () => {
+    expect(() => resolveConfig(valid({
+      childPolicies: [{ match: { kind: 'subagent' }, candidate: 'missing' }],
+    }))).toThrow('ModelRouterConfig.childPolicies[0].candidate "missing" is not in candidates')
+  })
+
+  it('rejects an empty match except as the last rule', () => {
+    expect(() => resolveConfig(valid({
+      childPolicies: [
+        { match: {}, candidate: 'cheap' },
+        { match: { kind: 'workflow' }, candidate: 'cheap' },
+      ],
+    }))).toThrow('ModelRouterConfig.childPolicies[0].match {} is a catch-all and is allowed only as the last rule')
+    expect(resolveConfig(valid({
+      childPolicies: [{ match: {}, candidate: 'cheap' }],
+    })).childPolicies).toEqual([{ match: {}, candidate: 'cheap', judge: false }])
+  })
+
+  it('requires childRouteInstructions when any rule judges', () => {
+    expect(() => resolveConfig(valid({
+      childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
+    }))).toThrow('ModelRouterConfig.childRouteInstructions is required when a childPolicies rule sets judge')
+    expect(resolveConfig(valid({
+      childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
+      childRouteInstructions: 'Keep the parent model or use the cheaper child?',
+    })).childRouteInstructions).toBe('Keep the parent model or use the cheaper child?')
+  })
+
+  it('rejects childRouteErrors below 1', () => {
+    expect(() => resolveConfig(valid({ childRouteErrors: 0 })))
+      .toThrow('ModelRouterConfig.childRouteErrors must be a positive integer')
+  })
+})

@@ -872,6 +872,34 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 
 ### `model-routing/*`
 
+<a id="model-routingchild-decision--log-only"></a>
+
+#### `model-routing/child-decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One child's routing decision at spawn: log-only, append-only, written on
+ * the parent session before the child exists. Not ignorable.
+ */
+'model-routing/child-decision': ModelRoutingChildDecision
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1331`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingchild-outcome--log-only"></a>
+
+#### `model-routing/child-outcome` — log-only
+
+```ts persistence-catalog
+/**
+ * One accounting turn's classified outcome for a routed child: log-only,
+ * append-only, on the parent session. Not ignorable.
+ */
+'model-routing/child-outcome': ModelRoutingChildOutcome
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1336`](../packages/llm/model-router/src/types.ts)
+
 <a id="model-routingconfiguration--log-only"></a>
 
 #### `model-routing/configuration` — log-only
@@ -885,7 +913,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/configuration': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1173`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1314`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -900,7 +928,7 @@ Source: [`packages/llm/model-router/src/types.ts:1173`](../packages/llm/model-ro
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1185`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1326`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -915,7 +943,7 @@ Source: [`packages/llm/model-router/src/types.ts:1185`](../packages/llm/model-ro
 'model-routing/mode': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1179`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1320`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

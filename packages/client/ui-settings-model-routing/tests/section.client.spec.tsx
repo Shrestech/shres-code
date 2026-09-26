@@ -8,7 +8,7 @@ import type { ModelRoutingController } from '../src/client/model.ts'
 import { createModelRoutingController } from '../src/client/model.ts'
 import { createOverviewController } from '../src/client/overview.ts'
 import { en } from '../src/client/locales.ts'
-import { GATE, LAYA, LAYA_VIEW, TYPESAFE, namespace, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
+import { GATE, LAYA, LAYA_VIEW, ROUTER_CHILD, TYPESAFE, namespace, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
 import { double, ready, t } from './helpers.client.tsx'
 
 afterEach(cleanup)
@@ -365,5 +365,28 @@ describe('Settings › Model routing page', () => {
     expect(s.mutate.mock.calls[0]?.[0]).toMatchObject({ ns: 'judgment', ops: [{ op: 'set', path: ['engine'], value: 'laya' }] })
     void act
     void remoteFail
+  })
+
+  it('hides Subagent routing without the childPolicies schema capability', () => {
+    mount(double(ready()))
+    expect(screen.queryByRole('heading', { name: en.childTitle })).toBeNull()
+  })
+
+  it('shows Subagent routing, the three copy lines, and pool-id-only rules when the schema declares childPolicies', () => {
+    mount(double(ready({
+      router: {
+        ...ROUTER_CHILD,
+        value: {
+          ...(typeof ROUTER_CHILD.value === 'object' && ROUTER_CHILD.value !== null ? ROUTER_CHILD.value : {}),
+          candidates: [{ id: 'cheap', provider: 'p', model: 'm', description: 'd' }],
+          childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap' }],
+        },
+      },
+    })))
+    expect(screen.getByRole('heading', { name: en.childTitle })).toBeTruthy()
+    expect(screen.getByText(en.childIntro)).toBeTruthy()
+    expect(screen.getByText(en.childFork)).toBeTruthy()
+    expect(screen.getByText(en.childOnce)).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: en.childCandidate }).textContent).toContain('cheap')
   })
 })

@@ -90,6 +90,7 @@ function historySnapshot(
     decisions: [],
     jspace: [],
     routing: [],
+    routingChildren: [],
     ...inspection,
   }
   return {
@@ -1223,6 +1224,34 @@ describe('TrajectoryView state', () => {
     fireEvent.click(screen.getByRole('row', { name: /USER, hello, Open/ }))
     expect(screen.getByText('J-Space')).toBeTruthy()
     expect(screen.getAllByText('Open')).toHaveLength(2)
+  })
+
+  it('renders a CHILD-ROUTE row from folded child-decision contributions', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 1, time: 1_000,
+        content: [{ type: 'text', text: 'delegate' }], source: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          routingChildren: [{
+            kind: 'routing-child',
+            seq: 3,
+            time: 3_000,
+            outcome: 'routed',
+            reason: 'child-policy',
+            model: 'deepseek-official/deepseek-v4-flash',
+          }],
+        })),
+        ...standaloneDuration(),
+      },
+    ) as never)
+    expect(screen.getByText('Subagent routed to deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.queryByText(/kept strong/)).toBeNull()
   })
 
   it('renders the folded decision row and the routed route the request ran on', () => {

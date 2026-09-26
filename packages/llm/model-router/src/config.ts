@@ -18,6 +18,8 @@ import type {
   ModelRoutingObjective,
   ModelRoutingOperatingPoint,
   ModelRoutingOperatingPointConfig,
+  ModelRoutingChildPolicy,
+  ModelRoutingChildPolicyConfig,
   ModelRoutingRouteFrom,
   ModelRoutingRouteFromConfig,
 } from './types.ts'
@@ -148,6 +150,17 @@ export interface ModelRouterConfig {
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
   /**
+   * Ordered child-route rules. First match wins. An empty list (the default)
+   * never routes a child. Each `candidate` must be a pool id.
+   */
+  childPolicies?: ModelRoutingChildPolicyConfig[]
+  /** Consecutive counted child failures that suspend one pool candidate. Defaults to 2. */
+  childRouteErrors?: number
+  /**
+   * Two-option child-route question text. Required when any rule sets `judge`.
+   */
+  childRouteInstructions?: string
+  /**
    * Route confidence at or above which a candidate may be selected. Required.
    * The global default for any engine without an operating point.
    */
@@ -249,6 +262,12 @@ export interface ResolvedModelRouterConfig {
   readonly candidates: readonly Readonly<ModelRoutingCandidate>[]
   /** Detached `routeFrom` allowlist in configuration order. */
   readonly routeFrom: readonly ModelRoutingRouteFrom[]
+  /** Detached child-route rules in configuration order. */
+  readonly childPolicies: readonly ModelRoutingChildPolicy[]
+  /** Consecutive counted child failures that suspend one pool candidate. */
+  readonly childRouteErrors: number
+  /** Two-option child-route question text; present when any rule judges. */
+  readonly childRouteInstructions?: string
   /** Route-confidence floor. */
   readonly downgradeThreshold: number
   /** Top-two margin floor. */
@@ -339,6 +358,9 @@ export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
 /** Default durable route-failure streak. */
 export const DEFAULT_MAX_ROUTE_ERRORS = 2
 
+/** Default consecutive counted child failures that suspend one pool candidate. */
+export const DEFAULT_CHILD_ROUTE_ERRORS = 2
+
 /**
  * Default judgment deadline, in milliseconds: above the slowest judgment call a
  * live session recorded (924 ms) and far above a local Laya call (about 14 ms).
@@ -381,6 +403,9 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'initialMode',
   'candidates',
   'routeFrom',
+  'childPolicies',
+  'childRouteErrors',
+  'childRouteInstructions',
   'downgradeThreshold',
   'downgradeMargin',
   'operatingPoints',
@@ -565,6 +590,18 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   }
   const routeFrom = resolveRouteFrom(config.routeFrom ?? [], judgmentDeadlineMs)
   const operatingPoints = resolveOperatingPoints(config.operatingPoints ?? [])
+  const childRouteErrors = config.childRouteErrors ?? DEFAULT_CHILD_ROUTE_ERRORS
+  if (!Number.isInteger(childRouteErrors) || childRouteErrors < 1) {
+    throw new SettingsFieldError(['childRouteErrors'], 'ModelRouterConfig.childRouteErrors must be a positive integer')
+  }
+  const childRouteInstructions = config.childRouteInstructions === undefined || config.childRouteInstructions.length === 0
+    ? undefined
+    : config.childRouteInstructions
+  const childPolicies = resolveChildPolicies(
+    config.childPolicies ?? [],
+    new Set(candidates.map(candidate => candidate.id)),
+    childRouteInstructions,
+  )
   if (config.initialMode !== 'off' && routeFrom.length === 0) {
     throw new SettingsFieldError(['routeFrom'], 'ModelRouterConfig.routeFrom is empty: routing can never run')
   }
@@ -613,6 +650,9 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     initialMode: config.initialMode,
     candidates: Object.freeze(candidates),
     routeFrom,
+    childPolicies,
+    childRouteErrors,
+    ...childRouteInstructions === undefined ? {} : { childRouteInstructions },
     downgradeThreshold: config.downgradeThreshold,
     downgradeMargin: config.downgradeMargin,
     operatingPoints,
@@ -685,6 +725,70 @@ function resolveRouteFrom(
     }
     return Object.freeze({ provider: entry.provider, model: entry.model, objective: entry.objective, allowEveryTurn })
   }))
+}
+
+/**
+ * Resolve ordered child-route rules: each `candidate` is a pool id, an empty
+ * `match` is a catch-all allowed only as the last rule, and `judge` requires
+ * `childRouteInstructions`.
+ * @param entries - the configured rules.
+ * @param candidateIds - pool ids in configuration order.
+ * @param childRouteInstructions - the two-option question text, when present.
+ * @returns the frozen rules in configuration order.
+ */
+function resolveChildPolicies(
+  entries: readonly ModelRoutingChildPolicyConfig[],
+  candidateIds: ReadonlySet<string>,
+  childRouteInstructions: string | undefined,
+): readonly ModelRoutingChildPolicy[] {
+  let anyJudge = false
+  const resolved = entries.map((entry, index) => {
+    const at = (field: string): (string | number)[] => ['childPolicies', index, field]
+    const name = `ModelRouterConfig.childPolicies[${index}]`
+    const raw = entry as { match?: unknown; candidate?: unknown; judge?: unknown }
+    if (raw.match === undefined || typeof raw.match !== 'object' || raw.match === null || Array.isArray(raw.match)) {
+      throw new SettingsFieldError(at('match'), `${name}.match must be an object`)
+    }
+    const matchRaw = raw.match as { kind?: unknown; agentType?: unknown }
+    for (const key of Object.keys(matchRaw)) {
+      if (key !== 'kind' && key !== 'agentType') {
+        throw new SettingsFieldError(['childPolicies', index, 'match', key], `${name}.match has unknown key "${key}"`)
+      }
+    }
+    if (matchRaw.kind !== undefined && matchRaw.kind !== 'subagent' && matchRaw.kind !== 'workflow') {
+      throw new SettingsFieldError(at('match'), `${name}.match.kind must be "subagent" or "workflow"`)
+    }
+    if (matchRaw.agentType !== undefined && (typeof matchRaw.agentType !== 'string' || matchRaw.agentType.length === 0)) {
+      throw new SettingsFieldError(['childPolicies', index, 'match', 'agentType'], `${name}.match.agentType must be a non-empty string`)
+    }
+    const emptyMatch = matchRaw.kind === undefined && matchRaw.agentType === undefined
+    if (emptyMatch && index !== entries.length - 1) {
+      throw new SettingsFieldError(at('match'), `${name}.match {} is a catch-all and is allowed only as the last rule`)
+    }
+    if (typeof raw.candidate !== 'string' || raw.candidate.length === 0) {
+      throw new SettingsFieldError(at('candidate'), `${name}.candidate must be a non-empty string`)
+    }
+    if (!candidateIds.has(raw.candidate)) {
+      throw new SettingsFieldError(at('candidate'), `${name}.candidate "${raw.candidate}" is not in candidates`)
+    }
+    if (raw.judge !== undefined && typeof raw.judge !== 'boolean') {
+      throw new SettingsFieldError(at('judge'), `${name}.judge must be a boolean`)
+    }
+    const judge = entry.judge === true
+    if (judge) anyJudge = true
+    return Object.freeze({
+      match: Object.freeze({
+        ...matchRaw.kind === undefined ? {} : { kind: matchRaw.kind },
+        ...matchRaw.agentType === undefined ? {} : { agentType: matchRaw.agentType },
+      }),
+      candidate: raw.candidate,
+      judge,
+    })
+  })
+  if (anyJudge && (childRouteInstructions === undefined || childRouteInstructions.length === 0)) {
+    throw new SettingsFieldError(['childRouteInstructions'], 'ModelRouterConfig.childRouteInstructions is required when a childPolicies rule sets judge')
+  }
+  return Object.freeze(resolved)
 }
 
 /**

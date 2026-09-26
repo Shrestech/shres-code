@@ -176,6 +176,17 @@ export interface ModelRoutingController {
    */
   savePool(candidates: readonly PoolCandidateDraft[], routeFrom: readonly RouteFromDraft[]): Promise<WriteFailure | undefined>
   /**
+   * Write child-route rules, the failure streak, and optional judge text.
+   * @param childPolicies - ordered rules.
+   * @param childRouteErrors - consecutive failures that suspend one candidate.
+   * @param childRouteInstructions - judge question text, when any rule judges.
+   */
+  saveChildPolicies(
+    childPolicies: readonly { match: { kind?: 'subagent' | 'workflow'; agentType?: string }; candidate: string; judge?: boolean }[],
+    childRouteErrors: number,
+    childRouteInstructions?: string,
+  ): Promise<WriteFailure | undefined>
+  /**
    * Install or restart the local Laya gateway.
    * @param action - the operation.
    * @returns settlement once the operation and the following read finished; a
@@ -369,6 +380,11 @@ export function createModelRoutingController(api: Pick<IApiClient, 'settings' | 
     setClassifier: enabled => write(JUDGMENT_NS, { enabled }, store.getSnapshot().judgment?.revision),
     setDefaultMode: mode => write(MODEL_ROUTER_NS, { initialMode: mode }, store.getSnapshot().router?.revision),
     savePool: (candidates, routeFrom) => write(MODEL_ROUTER_NS, { candidates, routeFrom }, store.getSnapshot().router?.revision),
+    saveChildPolicies: (childPolicies, childRouteErrors, childRouteInstructions) => write(MODEL_ROUTER_NS, {
+      childPolicies,
+      childRouteErrors,
+      ...childRouteInstructions === undefined ? {} : { childRouteInstructions },
+    }, store.getSnapshot().router?.revision),
     runLaya: async (action) => {
       store.update((s) => { s.layaAction = action; s.layaError = null })
       let failure: string | null = null
