@@ -354,4 +354,37 @@ describe('a header after a shadow decision', () => {
     session.append('step/start', { turn: 1, step: 2 })
     expect(() => { header(session, 'cheap-provider', 'cheap-model') }).not.toThrow()
   })
+
+  it('a route-failed decision never follows a shadow decision', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    // Shadow rewrote nothing, so no routed request of its step can fail: the
+    // shadow decision is ignored as the prior, and the append is rejected.
+    let rejected: Session | undefined
+    expect(() => {
+      rejected = ctx.sessions.create()
+      header(rejected, 'strong-provider', 'strong-model')
+      rejected.append('turn/start', { turn: 1 })
+      rejected.append('step/start', { turn: 1, step: 1 })
+      rejected.append('model-routing/decision', decision({
+        shadow: true,
+        sticky: { active: false, stepsElapsed: 0 },
+      }))
+      rejected.append('model-routing/decision', decision({
+        outcome: 'kept-strong',
+        reason: 'route-failed',
+        selection: undefined,
+        failure: { code: 'RATE_LIMIT', provider: 'cheap-provider', model: 'cheap-model' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'route-failed' },
+      }))
+    }).toThrow("a route-failed decision must follow the same step's downgraded decision for the failed provider")
+    expect(rejected?.events.at(-1)?.type).toBe('model-routing/decision')
+  })
 })

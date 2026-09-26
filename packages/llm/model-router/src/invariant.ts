@@ -158,7 +158,8 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
 /**
  * Require a `route-failed` decision to retry the step a downgrade selected:
  * the last decision before it, with no `turn/start` or `step/start` between,
- * is downgraded and selected the failed provider.
+ * is downgraded and selected the failed provider. A shadow decision is never
+ * that prior: it rewrote nothing, so no routed request it described can fail.
  * @param events - the session log before the decision is published.
  * @param decision - the `route-failed` decision being appended.
  * @param fail - the reporter that rejects the append.
@@ -166,7 +167,7 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
 function checkRouteFailed(events: readonly SessionEvent[], decision: ModelRoutingDecision, fail: InvariantFailure): void {
   let previous: ModelRoutingDecision | undefined
   for (const candidate of events) {
-    if (candidate.type === 'model-routing/decision') previous = candidate.data
+    if (candidate.type === 'model-routing/decision' && candidate.data.shadow !== true) previous = candidate.data
     else if (candidate.type === 'turn/start' || candidate.type === 'step/start') previous = undefined
   }
   if (previous?.outcome !== 'downgraded' || previous.selection?.provider !== decision.failure?.provider) {

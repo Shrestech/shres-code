@@ -903,6 +903,11 @@ describe('coldPointAt', () => {
     decide(time: number, data: Partial<ModelRoutingDecision>): void {
       this.add('model-routing/decision', { stateHash: '0', stateSeqs: [], sticky: { active: false, stepsElapsed: 0 }, ...data }, time)
     }
+
+    /** One durable manual-base record: the manual route beneath a routed request. */
+    routeBase(time: number, manual: { provider: string; model: string }, routed: { provider: string; model: string }): void {
+      this.add('agent/route-base', { manual, routed }, time)
+    }
   }
 
   /** One strong turn at `time`: its step starts, then the manual model answers 1 s later. */
@@ -1048,5 +1053,54 @@ describe('coldPointAt', () => {
       vi.useRealTimers()
     }
     expect(latestStepStart(new TimedLog().events)).toBeUndefined()
+  })
+
+  it('a header recorded in agent/route-base is routed and never a manual switch', () => {
+    const cheap = { provider: 'cheap-provider', model: 'cheap-model' }
+    const log = new TimedLog()
+    strongTurn(log, 0, 1)
+    log.turn(10_000, 2)
+    log.step(10_000, 2)
+    log.routeBase(10_000, STRONG_ROUTE, cheap)
+    log.header(10_000, cheap)
+    // The routed header runs the recorded candidate: the manual prefix is not switched.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 10_000, false)).toBeUndefined()
+
+    // A manual header back to the strong model bounds the record, so a later
+    // candidate header without a fresh record is a manual choice again.
+    log.turn(20_000, 3)
+    log.step(20_000, 3)
+    log.header(20_000, STRONG_ROUTE)
+    log.header(21_000, cheap)
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 25_000, false)?.kind).toBe('manual-switch')
+
+    // The record must match the header it describes: one for another route is ignored.
+    const other = new TimedLog()
+    strongTurn(other, 0, 1)
+    other.turn(10_000, 2)
+    other.step(10_000, 2)
+    other.routeBase(10_000, { provider: 'mid-provider', model: 'mid-model' }, { provider: 'mid-provider', model: 'mid-model-2' })
+    other.header(10_000, cheap)
+    expect(coldPointAt(other.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+  })
+
+  it('a shadow decision never licenses the routed-header fallback for logs without records', () => {
+    const cheap = { provider: 'cheap-provider', model: 'cheap-model' }
+    const log = new TimedLog()
+    strongTurn(log, 0, 1)
+    log.turn(10_000, 2)
+    log.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', shadow: true, selection: { candidateId: 'cheap', ...cheap } })
+    log.step(11_000, 2, 2)
+    log.header(11_000, cheap)
+    // Shadow rewrote nothing, so the header to the candidate is a manual choice.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+    // The same header after a live downgraded decision of its own step is routed.
+    const live = new TimedLog()
+    strongTurn(live, 0, 1)
+    live.turn(10_000, 2)
+    live.step(10_000, 2)
+    live.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', selection: { candidateId: 'cheap', ...cheap } })
+    live.header(11_000, cheap)
+    expect(coldPointAt(live.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
   })
 })

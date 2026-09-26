@@ -173,6 +173,44 @@ export function latestStepStart(events: readonly SessionEvent[]): number | undef
   return events.findLast(event => event.type === 'step/start')?.time
 }
 
+/**
+ * Whether the durable manual base records the header at `end` as routed: the
+ * latest `agent/route-base` at or before it whose `routed` route the header
+ * runs, searched back past request headers that run the same route and no
+ * further than the first header that runs another one. The event belongs to
+ * the durable manual base, which this package does not depend on, so the
+ * envelope is read without its type.
+ * @param events - the session log.
+ * @param end - index of the header the record would describe.
+ * @param config - the header's call configuration.
+ * @returns whether a record beneath the header exists.
+ */
+function routedBeneathRecorded(
+  events: readonly SessionEvent[],
+  end: number,
+  config: { provider: string; model: string; reasoningEffort?: unknown },
+): boolean {
+  for (let index = end - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event === undefined) return false
+    const record = event as unknown as { type: string; data: unknown }
+    if (record.type === 'agent/route-base') {
+      const routed = (record.data as { routed?: { provider: string; model: string; reasoningEffort?: string } } | undefined)?.routed
+      if (routed !== undefined && routed.provider === config.provider && routed.model === config.model
+        && (routed.reasoningEffort === undefined || routed.reasoningEffort === config.reasoningEffort)) {
+        return true
+      }
+    } else if (event.type === 'request/header') {
+      const prior = event.data.header.config
+      if (prior.provider !== config.provider || prior.model !== config.model
+        || (config.reasoningEffort !== undefined && prior.reasoningEffort !== config.reasoningEffort)) {
+        return false
+      }
+    }
+  }
+  return false
+}
+
 /** Whether two routes name the same provider and model; effort is not compared. */
 function sameModel(a: ModelRoutingColdPointBase, b: ModelRoutingColdPointBase): boolean {
   return a.provider === b.provider && a.model === b.model
@@ -185,8 +223,10 @@ function sameModel(a: ModelRoutingColdPointBase, b: ModelRoutingColdPointBase): 
  *   fork seeded with its parent's prefix;
  * - `post-compaction`: a successful compaction followed its last answer;
  * - `manual-switch`: after that answer, an `agent/model-selection` or a
- *   request header not rewritten by a downgraded decision of its turn named
- *   another provider/model;
+ *   request header that runs another provider/model without the durable
+ *   manual base recording it beneath `agent/route-base` — and, for logs
+ *   written before that record existed, without a live downgraded decision
+ *   of its own turn rewriting it;
  * - `no-cache`: the lifetime is zero, so no prefix is kept;
  * - `idle`: `now` is more than the lifetime after the start of the step whose
  *   answer was that last one, which is where the cache lifetime counts from.
@@ -220,18 +260,22 @@ export function coldPointAt(
   let compactionSeq: number | undefined
   let switched = false
   let turnDecision: ModelRoutingDecision | undefined
-  for (const event of events.slice(last + 1)) {
+  for (let index = last + 1; index < events.length; index += 1) {
+    const event = events[index]
+    if (event === undefined) continue
     if (isCompactionEnd(event)) compactionSeq = event.seq
     else if (event.type === 'turn/start') turnDecision = undefined
     else if (event.type === 'model-routing/decision') turnDecision = event.data
     else if (event.type === 'agent/model-selection') switched ||= !sameModel(event.data, base)
-    // The routed-header exemption reads the turn's own downgraded decision
-    // until the durable manual base lands: `agent/route-base` recording the
-    // manual route beneath a routed request will replace this inference, so a
-    // routed header can never count as a manual switch.
     else if (event.type === 'request/header') {
-      const routed = turnDecision?.outcome === 'downgraded' && turnDecision.selection !== undefined
-        && sameModel(turnDecision.selection, event.data.header.config)
+      // A header recorded in `agent/route-base` is routed, never a manual
+      // switch, whatever the turn's decisions say. A header without a record
+      // predates the record or was never routed: there, the turn's own live
+      // downgraded decision - never a shadow one, which rewrites nothing -
+      // tells a routed header from a manual choice.
+      const routed = routedBeneathRecorded(events, index, event.data.header.config)
+        || (turnDecision?.outcome === 'downgraded' && turnDecision.shadow !== true
+          && turnDecision.selection !== undefined && sameModel(turnDecision.selection, event.data.header.config))
       switched ||= !routed && !sameModel(event.data.header.config, base)
     }
   }
