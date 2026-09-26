@@ -11,7 +11,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import type { Session } from '@shres-code/shres-code-session'
 import type { SubagentChildRoute, SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
 import type { ResolvedModelRouterConfig } from './config.ts'
-import type { ModelRoutingChildDecision, ModelRoutingChildPolicy, ModelRoutingMode } from './types.ts'
+import type { ModelRoutingCandidate, ModelRoutingChildDecision, ModelRoutingChildPolicy, ModelRoutingMode } from './types.ts'
 
 /** Inputs one child-route consult needs from the controller. */
 export interface ChildRouteConsult {
@@ -52,7 +52,14 @@ export function matchChildPolicy(
 export function resolveChildRouteConsult(
   consult: ChildRouteConsult,
   request: SubagentChildRouteRequest,
-): { readonly route?: SubagentChildRoute; readonly decision?: ModelRoutingChildDecision } {
+): {
+  readonly route?: SubagentChildRoute
+  readonly decision?: ModelRoutingChildDecision
+  readonly pendingJudge?: true
+  readonly candidate?: ModelRoutingCandidate
+  readonly common?: Omit<ModelRoutingChildDecision, 'outcome' | 'reason' | 'selection'>
+  readonly keep?: (reason: ModelRoutingChildDecision['reason']) => { decision: ModelRoutingChildDecision }
+} {
   if (consult.mode === 'off') return {}
   const matched = matchChildPolicy(consult.config.childPolicies, request)
   if (matched === undefined) return {}
@@ -87,7 +94,9 @@ export function resolveChildRouteConsult(
   if (!listed) return keep('base-unlisted')
   if (consult.suspended.has(candidate.id)) return keep('child-route-errors')
   if (candidate.provider === base.provider && candidate.model === base.model) return keep('candidate-equals-base')
-  if (matched.policy.judge) return keep('engine-absent')
+  if (matched.policy.judge) {
+    return { pendingJudge: true, candidate, common, keep }
+  }
   const decision: ModelRoutingChildDecision = {
     outcome: 'routed',
     reason: 'child-policy',

@@ -48,8 +48,9 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
-import type { SubagentChildRoute, SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
+import type { SubagentChildRoute, SubagentChildRouteRequest, SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
 import { logChildDecision, resolveChildRouteConsult } from './child-route.ts'
+import { outcomesFromChildTurns, recordedChildOutcomes, routedChildDecisions, suspendedChildCandidates } from './child-outcomes.ts'
 import {
   declareJudgmentConsumer,
   JudgmentError,
@@ -71,7 +72,8 @@ import type {
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
-import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children,
@@ -727,6 +729,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
     this.reportUnregisteredOperatingPoints(ctx)
     ctx.effect(() => ctx.on('subagent/child-route', (request, next) => this.onChildRoute(request, next)))
+    this.observeChildOutcomes()
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
@@ -866,6 +869,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     this.liveAgents.add(agent)
     this.reconcileConfiguration(agent.session)
+    void this.reconcileChildOutcomes(agent)
   }
 
   /**
@@ -878,6 +882,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.unreachable.delete(agent)
     this.liveAgents.add(agent)
     this.reconcileConfiguration(agent.session)
+    void this.reconcileChildOutcomes(agent)
   }
 
   /** Resolve service ownership through the agent's current isolation realm. */
@@ -1189,13 +1194,170 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   ): Promise<SubagentChildRoute | undefined> {
     const answered = await next()
     if (answered !== undefined) return answered
+    const config = this.config()
     const consult = resolveChildRouteConsult({
-      config: this.config(),
+      config,
       mode: this.modeOf(request.parent.session),
-      suspended: new Set(),
+      suspended: suspendedChildCandidates(request.parent.session.events, config.childRouteErrors),
     }, request)
+    if (consult.pendingJudge === true && consult.candidate !== undefined && consult.common !== undefined && consult.keep !== undefined) {
+      const judged = await this.judgeChildRoute(request, consult.candidate, consult.common, consult.keep, config)
+      logChildDecision(request.parent.session, judged.decision)
+      return judged.route
+    }
     if (consult.decision !== undefined) logChildDecision(request.parent.session, consult.decision)
     return consult.route
+  }
+
+  /**
+   * Ask keep-current vs one pool candidate over the child's prompt. Correlation
+   * is `child:<routeRequestId>` and is never transmitted by the engines.
+   */
+  private async judgeChildRoute(
+    request: SubagentChildRouteRequest,
+    candidate: ModelRoutingCandidate,
+    common: Omit<ModelRoutingChildDecision, 'outcome' | 'reason' | 'selection'>,
+    keep: (reason: ModelRoutingChildDecision['reason']) => { decision: ModelRoutingChildDecision },
+    config: ResolvedModelRouterConfig,
+  ): Promise<{ route?: SubagentChildRoute; decision: ModelRoutingChildDecision }> {
+    const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
+    const engine = this.ctx.get('judgment')
+    if (engine === undefined) return keep('engine-absent')
+    if (!judgmentEnabled(engine.settings)) return keep('engine-absent')
+    const snapshot = this.engineSnapshot(engine, config, { active: false, stepsElapsed: 0 })
+    if (snapshot.refused) return keep('engine-uncalibrated')
+    if (snapshot.warming !== undefined) return keep('engine-unavailable')
+    const instructions = config.childRouteInstructions
+    if (instructions === undefined) return keep('engine-absent')
+    const questions = [{
+      kind: 'choice' as const,
+      id: ROUTE_QUESTION_ID,
+      instructions,
+      options: [
+        { option: KEEP_CURRENT_OPTION_ID, description: 'Keep the inherited parent model.' },
+        { option: candidate.id, description: `Use ${candidate.provider}/${candidate.model}.` },
+      ],
+    }]
+    const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
+    const askSignal = AbortSignal.any([request.signal, deadline])
+    const correlation = { sessionId: request.parent.session.id, consultKey: `child:${request.routeRequestId}` }
+    let result: JudgmentResult
+    const askStarted = Date.now()
+    try {
+      const fitting = engine.fittingFor(consumer)
+      if (fitting === undefined) {
+        result = await engine.ask({ state: request.prompt, questions, tier: config.tier, signal: askSignal, consumer, correlation })
+      } else {
+        const fitted = await fitting.ask({
+          states: [request.prompt],
+          questions,
+          tier: config.tier,
+          signal: askSignal,
+          consumer,
+          correlation,
+        })
+        result = fitted.result
+      }
+    } catch (error: unknown) {
+      if (request.signal.aborted) throw error
+      return {
+        decision: {
+          ...keep('engine-unavailable').decision,
+          latencyMs: Date.now() - askStarted,
+          ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
+        },
+      }
+    }
+    const latencyMs = Date.now() - askStarted
+    const route = result.answers.find(answer => answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
+    const identity = {
+      ...result.engine === undefined ? {} : { engine: result.engine },
+      ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
+      ...result.model === undefined ? {} : { model: result.model },
+      latencyMs,
+    }
+    if (route === undefined) return { decision: { ...keep('invalid-answer').decision, ...identity } }
+    if (route.option === KEEP_CURRENT_OPTION_ID) {
+      return { decision: { ...keep('child-judged').decision, ...identity } }
+    }
+    const thresholds = {
+      downgradeThreshold: snapshot.thresholds.downgradeThreshold,
+      downgradeMargin: snapshot.thresholds.downgradeMargin,
+    }
+    if (route.confidence < thresholds.downgradeThreshold) {
+      return { decision: { ...keep('low-confidence').decision, ...identity } }
+    }
+    const probabilities = Object.values(route.probabilities).sort((left, right) => right - left)
+    const top = probabilities[0] ?? 0
+    const second = probabilities[1] ?? 0
+    if (top - second < thresholds.downgradeMargin) {
+      return { decision: { ...keep('thin-margin').decision, ...identity } }
+    }
+    if (route.option !== candidate.id) return { decision: { ...keep('invalid-answer').decision, ...identity } }
+    const decision: ModelRoutingChildDecision = {
+      outcome: 'routed',
+      reason: 'child-judged',
+      ...common,
+      selection: { candidateId: candidate.id, provider: candidate.provider, model: candidate.model },
+      ...identity,
+    }
+    if (this.modeOf(request.parent.session) === 'shadow') return { decision }
+    return { route: { provider: candidate.provider, model: candidate.model }, decision }
+  }
+
+  /** Re-read routed children of a resumed parent and append missing outcomes. */
+  private async reconcileChildOutcomes(parent: Agent): Promise<void> {
+    const runtime = this.ctx.get('subagents')
+    if (runtime === undefined) return
+    for (const row of routedChildDecisions(parent.session.events)) {
+      const recorded = recordedChildOutcomes(parent.session.events)
+      const childIds = new Set<string>()
+      for (const event of parent.session.events) {
+        if (event.type !== 'model-routing/child-outcome') continue
+        if (event.data.routeRequestId !== row.decision.routeRequestId) continue
+        childIds.add(event.data.childSessionId)
+      }
+      for (const childId of childIds) {
+        const result = await runtime.childTurnOutcomes(parent, SessionId(childId))
+        for (const outcome of outcomesFromChildTurns(row.decision, childId, result, recorded, undefined, true)) {
+          parent.session.append('model-routing/child-outcome', outcome)
+        }
+      }
+    }
+  }
+
+  /** Observe live child settlement and a resumed parent's missing outcomes. */
+  private observeChildOutcomes(): void {
+    this.ctx.on('subagent/end', (info) => {
+      void this.recordChildOutcomes(info.id, info.subagentRouteRequestId, info.runId)
+    })
+  }
+
+  /**
+   * Append missing child-outcomes for one routed child. Live-first runtime
+   * read; cancellation of the parent consult is not used here — settlement is
+   * observe-only.
+   */
+  private async recordChildOutcomes(
+    childId: SessionId,
+    routeRequestId: SubagentRouteRequestId | undefined,
+    runId?: string,
+    reconciled?: true,
+  ): Promise<void> {
+    if (routeRequestId === undefined) return
+    const child = this.ctx.sessions.get(childId)
+    const parentId = child?.header.parentSession
+    const parentAgent = parentId === undefined ? undefined : [...this.liveAgents].find(agent => agent.id === parentId)
+    if (parentAgent === undefined) return
+    const runtime = this.ctx.get('subagents')
+    if (runtime === undefined) return
+    const result = await runtime.childTurnOutcomes(parentAgent, childId)
+    const recorded = recordedChildOutcomes(parentAgent.session.events)
+    const decision = routedChildDecisions(parentAgent.session.events).find(row => row.decision.routeRequestId === routeRequestId)?.decision
+    if (decision === undefined) return
+    for (const outcome of outcomesFromChildTurns(decision, childId, result, recorded, runId, reconciled)) {
+      parentAgent.session.append('model-routing/child-outcome', outcome)
+    }
   }
 
   /**

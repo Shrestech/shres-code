@@ -70,6 +70,24 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       if (event.data.reason === 'route-failed') checkRouteFailed(session.events, event.data, fail)
       return
     }
+    if (event.type === 'model-routing/child-decision') {
+      const data = event.data
+      if (data.effortApplied !== false) fail('a model-routing/child-decision must record effortApplied: false')
+      if (data.outcome === 'routed' && data.selection === undefined) {
+        fail('a routed model-routing/child-decision must record a selection')
+      }
+      return
+    }
+    if (event.type === 'model-routing/child-outcome') {
+      const data = event.data
+      if (data.countedAs === 'failure' && data.failureCode === undefined) {
+        fail('a failure model-routing/child-outcome must record failureCode')
+      }
+      if (data.countedAs === 'neutral' && data.failureCode !== undefined && data.failureCode !== 'UNKNOWN') {
+        // Neutral may record UNKNOWN; a counted LlmError is a failure.
+      }
+      return
+    }
     if (event.type === 'agent/route-base') {
       checkRouteBase(session.events, event.data, fail)
       return
