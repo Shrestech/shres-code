@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 const benchRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 export const REPLAY_FRONTEND_PLUGIN_PATH = join(benchRoot, 'routing', 'replay-frontend-plugin.mjs')
 export const REPLAY_SCRIPTED_JUDGE_PATH = join(benchRoot, 'routing', 'replay-scripted-judge.mjs')
+export const REPLAY_SCRIPTED_FITTING_JUDGE_PATH = join(benchRoot, 'routing', 'replay-scripted-fitting-judge.mjs')
 
 /**
  * @param {{ pluginPath?: string, judgePath?: string, sinkUrl: string, sessionLogRoot: string, job: string, out: string }} input

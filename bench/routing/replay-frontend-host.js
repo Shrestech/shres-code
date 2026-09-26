@@ -130,7 +130,7 @@ async function spawnLauncher({ repoRoot, scratchDir, armOverlayPath, overlayPath
  */
 export async function hostReplayTrial({
   repoRoot, trial, path, arm, method, trialOwnRoute, env = process.env,
-  extraOverlay,
+  extraOverlay, judge = false,
 }) {
   const root = await mkdtemp(join(tmpdir(), 'bench-replay-host-'))
   const home = join(root, 'home')
@@ -163,6 +163,7 @@ export async function hostReplayTrial({
     }
     await writeFile(jobPath, JSON.stringify({
       trial, path, arm, method, trialOwnRoute, routerRowConfig: routers.row?.config,
+      ...judge === true ? { judge: true } : {},
     }))
     const spawned = await spawnLauncher({
       repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
@@ -197,7 +198,8 @@ export async function hostReplayTrial({
     const summary = records.at(-1)
     const rows = records.filter(record => record.kind === 'row').map(record => record.row)
     const consults = records.filter(record => record.kind === 'consult').map(record => record.consult)
-    return { rows, consults, summary, status: line, sink: 0, routerCount: routers.count }
+    const asks = records.filter(record => record.kind === 'ask').map(record => record.ask)
+    return { rows, consults, asks, summary, status: line, sink: 0, routerCount: routers.count }
   } finally {
     await sink.close()
     await rm(root, { recursive: true, force: true })
@@ -250,7 +252,7 @@ function prepareRows(hosted, { id, taskId, arm, stratum, trialIndex }) {
  */
 export async function hostReplayRun({
   repoRoot, method, tasks, trials, env = process.env, extraOverlay,
-  preRefused = [], discovered,
+  preRefused = [], discovered, judge = false,
 }) {
   if (!Array.isArray(preRefused)) throw new TypeError('preRefused must be an array')
   if (!Array.isArray(trials)) throw new TypeError('hostReplayRun requires a trials array')
@@ -312,6 +314,7 @@ export async function hostReplayRun({
         trialOwnRoute: item.trialOwnRoute,
         env,
         extraOverlay,
+        judge,
       })
     } catch (error) {
       if (error instanceof TrialInputIncompleteError) {
@@ -337,6 +340,7 @@ export async function hostReplayRun({
       artifact: hosted.summary?.artifact ?? hosted.status?.artifact,
       rows: prepared.rows.length,
       summary: hosted.summary,
+      routerConfig: hosted.summary?.routerConfig,
     })
   }
   const all = [
