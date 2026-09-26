@@ -23,11 +23,15 @@ The engine requires the correlation: without it the consult fails with `UNAVAILA
 
 #### What the model sees
 
-Nothing reaches a model. The engine is not a model and makes no request: it reads only the ask's correlation facts and its question list, answers deterministically from the draw, and never decodes the state text. A composed session shows arm N's judge answering in the same answer shapes the real judge uses — a choice answer with probabilities and confidence 1, a lowest-level score, a zero binary — so the router's decision log is shape-identical across arms while the selection is pure chance at the matched rate.
+Nothing reaches a model. The engine is not a model and makes no request: it reads only the ask's `correlation` facts and its `questions` list, answers deterministically from the draw, and never decodes the state text. A composed session shows arm N's judge answering in the same answer shapes the real judge uses — a `kind: "choice"` answer with `probabilities` and `confidence: 1`, a lowest-level `score`, a zero `binary` — so the router's decision log is shape-identical across arms while the selection is pure chance at the matched rate.
 
 #### Token effect
 
-Zero. The engine reports no usage, bills nothing, and adds no tokens to any arm's accounting; the contrast between arms R and N is the judge's discrimination, not spend.
+Zero. The engine reports no `usage`, bills nothing, and adds no tokens to any arm's accounting; the contrast between arms R and N is the judge's discrimination, not spend.
+
+#### KV Cache effect
+
+None. The engine makes no request, so it reads no provider cache and writes none; its `egress: "none"` descriptor keeps every ask on this machine, and any cache behavior in an arm's session belongs to the arm's conversation route, never to this judge.
 
 ## Known Limitations and Deferred Work
 
