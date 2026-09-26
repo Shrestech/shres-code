@@ -177,6 +177,12 @@ export async function replayTrialLog({ trial, path, persistence, composed, metho
   const { artifact } = classifyArtifact({ header, events, readFrom, inspected })
   const config = resolveConfig(composed.routerConfig)
   const ttl = composed.ttl
+  const resolveModelInfo = composed.resolveModelInfo
+    ?? ((provider, model, signal) => composed.llm.resolveModelInfo(provider, model, signal))
+  const runtime = composed.runtime ?? {
+    resolveModelInfo,
+    prepareCall: (callConfig, signal) => composed.llm.prepareCall(callConfig, signal),
+  }
   const coldPoints = []
   const consults = []
   for (const start of events.filter(event => event.type === 'step/start')) {
@@ -188,7 +194,9 @@ export async function replayTrialLog({ trial, path, persistence, composed, metho
       composed.routeBase,
       composed.trialOwnRoute,
       requestConfigFor(arm, composed),
-      composed.resolveModelInfo,
+      resolveModelInfo,
+      undefined,
+      runtime,
     )
     consults.push({ turn: start.data.turn, step: start.data.step, result })
     if (result.kind === 'warm') continue

@@ -4,12 +4,16 @@ import { createHash } from 'node:crypto'
 import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { Context } from '../../vendor/cordis/lib/index.js'
 import { SessionId, SessionStore } from '../../packages/core/session/lib/index.js'
 import { JsonlSessionPersistence } from '../../packages/session/session-persistence-jsonl/lib/index.js'
 import { classifyArtifact, decodePhysicalJsonl, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
+import { renderReplayFrontendOverlay } from '../routing/replay-frontend-overlay.js'
 import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError, parseReplayMethod } from '../routing/replay-method.js'
+import { getArm, renderArmOverlay } from '../runner/arms.js'
+import { startRequestSink, spawnPreflight } from '../runner/preflight-models.js'
 import { projectKey, encodeSegment } from '../runner/session-layout.js'
 import { fixtureMethod } from './replay-fixture-method.js'
 
@@ -223,4 +227,68 @@ test('seeded headers are refused', () => {
     }),
     /seeded bench logs/,
   )
+})
+
+test('launcher-hosted R composition uses ctx.llm and currentSelection with zero HTTP', async () => {
+  const repo = join(fileURLToPath(new URL('../..', import.meta.url)))
+  const bench = join(fileURLToPath(new URL('..', import.meta.url)))
+  const root = await mkdtemp(join(tmpdir(), 'bench-replay-hosted-'))
+  const home = join(root, 'home')
+  const scratchDir = join(root, 'cwd')
+  await mkdir(home)
+  await mkdir(scratchDir)
+  const sink = await startRequestSink()
+  try {
+    const armOverlay = renderArmOverlay(getArm('route-coldpoint'), { sessionLogRoot: join(scratchDir, 'sessions') })
+    const armPath = join(root, 'arm.patch.yml')
+    const overlayPath = join(root, 'replay.patch.yml')
+    await writeFile(armPath, armOverlay)
+    await writeFile(overlayPath, renderReplayFrontendOverlay({ sinkUrl: sink.sinkUrl }))
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/.test(key)))
+    const spawned = await spawnPreflight({
+      repoRoot: repo,
+      scratchDir,
+      armOverlayPath: armPath,
+      overlayPath,
+      homeDir: home,
+      env,
+    })
+    assert.equal(spawned.line.ok, true, JSON.stringify(spawned.line) + '\n' + spawned.stderr)
+    assert.deepEqual(spawned.line.routeBase, { provider: 'anthropic', model: 'claude-opus-5-5' })
+    assert.deepEqual(spawned.line.requestConfig, { provider: 'anthropic', model: 'claude-opus-5-5' })
+    assert.equal('adapterDefaults' in spawned.line.requestConfig, false)
+    assert.equal('maxTokens' in spawned.line.requestConfig, false)
+    assert.equal(spawned.line.http, 0)
+    assert.equal(sink.count(), 0)
+    const bytes = await readFile(fixture)
+    await withPersistence(bytes, async ({ persistence, path }) => {
+      const composed = {
+        routerConfig: {
+          initialMode: spawned.line.routerConfig.initialMode,
+          candidates: spawned.line.routerConfig.candidates,
+          routeFrom: spawned.line.routerConfig.routeFrom,
+          downgradeThreshold: spawned.line.routerConfig.downgradeThreshold,
+          downgradeMargin: spawned.line.routerConfig.downgradeMargin,
+          routeInstructions: 'Which route should handle this turn?',
+          difficultyInstructions: 'How hard is this turn?',
+        },
+        routeBase: spawned.line.routeBase,
+        trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        requestConfig: spawned.line.requestConfig,
+        ttl: spawned.line.ttl,
+        resolveModelInfo: async (provider, model) => ({
+          provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: spawned.line.ttl.ttlMs,
+        }),
+      }
+      const result = await replayTrialLog({
+        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+        path, persistence, composed, method, arm: 'C',
+      })
+      assert.equal(result.artifact, 'complete')
+      assert.ok(result.consults.length > 0)
+    })
+  } finally {
+    await sink.close()
+    await rm(root, { recursive: true, force: true })
+  }
 })
