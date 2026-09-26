@@ -65,6 +65,7 @@ describe('consultInputFrom (live producer)', () => {
       coldPointBase: STRONG,
       at: { turn: 1, step: 1, now: 1, seedLength: undefined },
       resolveModelInfo: resolve,
+      cachePolicy: { kind: 'live-eligibility' },
     })
     expect(['ask', 'ineligible', 'warm']).toContain(result.kind)
   })

@@ -1775,8 +1775,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       return keep('reentry-cooldown')
     }
     const now = latestStepStart(session.events) ?? Date.now()
+    let liveTtl: ModelRoutingCacheTtl | undefined
     if (from.objective === 'quota' && !from.allowEveryTurn && (held === undefined || step === 1)) {
       const ttl = await this.cacheTtl(config, base, signal)
+      liveTtl = ttl
       const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
       facts.coldPoint = coldPoint ?? null
       facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
@@ -1820,6 +1822,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       resolveModelInfo: (provider, model, consultSignal) => llm.resolveModelInfo(provider, model, consultSignal),
       runtime: llm,
       signal,
+      cachePolicy: liveTtl === undefined ? { kind: 'live-eligibility' } : { kind: 'live-given', ttl: liveTtl },
     })
     if (replayed.kind === 'warm' && held === undefined) {
       facts.cache = { base: replayed.cache.base }

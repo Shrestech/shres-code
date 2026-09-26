@@ -76,6 +76,15 @@ export class ReplayConsultError extends Error {
   }
 }
 
+/**
+ * How the shared producer obtains the manual base's prompt-cache lifetime and
+ * `cache.base`. Internal; live and replay each pass an explicit kind.
+ */
+export type ConsultCachePolicy =
+  | { readonly kind: 'live-given'; readonly ttl: ModelRoutingCacheTtl }
+  | { readonly kind: 'live-eligibility' }
+  | { readonly kind: 'replay-resolve' }
+
 /** Inputs the shared producer reads. Live and replay both fill this. */
 export interface ConsultInputSource {
   readonly config: ResolvedModelRouterConfig
@@ -89,6 +98,8 @@ export interface ConsultInputSource {
   /** Live LLM runtime when present so eligibility uses prepareCall; replay may omit it. */
   readonly runtime?: Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
   readonly signal?: AbortSignal
+  /** Required TTL / cache.base policy; no default. */
+  readonly cachePolicy: ConsultCachePolicy
 }
 
 /**
@@ -227,27 +238,45 @@ async function cacheTtl(
  * @param src - live or replay consult inputs.
  * @returns warm, ineligible, or ask.
  */
-export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
-  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal } = src
-  const from = routeFromFor(config, routeBase)
-  const consultKey = `turn:${at.turn}/step:${at.step}`
-  const ttl = await cacheTtl(config, routeBase, resolveModelInfo, signal)
-  const cache: ReplayConsultCache = {
+function cacheBaseFromTtl(routeBase: ModelSelection, ttl: ModelRoutingCacheTtl): ReplayConsultCache {
+  return {
     base: { provider: routeBase.provider, model: routeBase.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource },
   }
-  const quotaGate = from?.objective === 'quota' && from.allowEveryTurn !== true
-  const observedCold = quotaGate
-    ? coldPointAt(prefix, coldPointBase, ttl, at.now, at.seedLength !== undefined)
-    : undefined
-  const coldPoint: ModelRoutingColdPoint | null = quotaGate ? observedCold ?? null : null
-  if (quotaGate && observedCold === undefined) {
-    return { kind: 'warm', coldPoint: undefined, cache }
+}
+
+function cacheBaseFromEligibility(
+  config: ResolvedModelRouterConfig,
+  routeBase: ModelSelection,
+  eligibility: ModelRoutingCandidateEligibility,
+): ReplayConsultCache {
+  return {
+    base: {
+      provider: routeBase.provider,
+      model: routeBase.model,
+      ...eligibility.requirements.promptCacheTtlMs === undefined
+        ? { ttlMs: config.coldPoints.unknownTtlMs, source: 'fallback' as const }
+        : { ttlMs: eligibility.requirements.promptCacheTtlMs, source: 'adapter' as const },
+    },
   }
+}
+
+/**
+ * Shared producer: coldPoint, eligibility, states, questions, consultKey, cache.
+ * No slicing and no replay refusals. Live `decide()` supplies the live log and
+ * request messages; the replay wrapper slices first.
+ * @param src - live or replay consult inputs, including a required cachePolicy.
+ * @returns warm, ineligible, or ask.
+ */
+export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
+  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal, cachePolicy } = src
+  const from = routeFromFor(config, routeBase)
+  const consultKey = `turn:${at.turn}/step:${at.step}`
+  const quotaGate = from?.objective === 'quota' && from.allowEveryTurn !== true
   const eligibilityRuntime = src.runtime ?? {
     resolveModelInfo,
     prepareCall: async (callConfig: LlmCallConfig) => ({ config: callConfig }),
   }
-  const eligibility = await assessModelRoutingCandidates(
+  const runEligibility = () => assessModelRoutingCandidates(
     eligibilityRuntime as never,
     requestConfig,
     messages,
@@ -255,30 +284,69 @@ export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayC
     config.difficultyToEffort,
     signal,
   )
-  const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
-  if (eligibility.eligibleCandidates.length === 0) {
-    return { kind: 'ineligible', coldPoint, cache, eligibility }
+  const finish = async (coldPoint: ModelRoutingColdPoint | null, cache: ReplayConsultCache): Promise<ReplayConsultInput> => {
+    const eligibility = await runEligibility()
+    if (eligibility.eligibleCandidates.length === 0) {
+      return { kind: 'ineligible', coldPoint, cache, eligibility }
+    }
+    const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
+    const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
+    const questions: JudgmentQuestion[] = [
+      routeQuestion(eligibleConfig, routeBase),
+      ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+    ]
+    return {
+      kind: 'ask',
+      coldPoint,
+      cache,
+      eligibility,
+      states: alternatives.map(candidate => candidate.text),
+      questions,
+      consultKey,
+    }
   }
-  const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
-  const questions: JudgmentQuestion[] = [
-    routeQuestion(eligibleConfig, routeBase),
-    ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
-  ]
-  return {
-    kind: 'ask',
-    coldPoint,
-    cache,
-    eligibility,
-    states: alternatives.map(candidate => candidate.text),
-    questions,
-    consultKey,
+  if (cachePolicy.kind === 'live-eligibility') {
+    const eligibility = await runEligibility()
+    const cache = cacheBaseFromEligibility(config, routeBase, eligibility)
+    if (eligibility.eligibleCandidates.length === 0) {
+      return { kind: 'ineligible', coldPoint: null, cache, eligibility }
+    }
+    const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
+    const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
+    const questions: JudgmentQuestion[] = [
+      routeQuestion(eligibleConfig, routeBase),
+      ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+    ]
+    return {
+      kind: 'ask',
+      coldPoint: null,
+      cache,
+      eligibility,
+      states: alternatives.map(candidate => candidate.text),
+      questions,
+      consultKey,
+    }
   }
+  const ttl = cachePolicy.kind === 'live-given'
+    ? cachePolicy.ttl
+    : await cacheTtl(config, routeBase, resolveModelInfo, signal)
+  const cache = cacheBaseFromTtl(routeBase, ttl)
+  const observedCold = quotaGate
+    ? coldPointAt(prefix, coldPointBase, ttl, at.now, at.seedLength !== undefined)
+    : undefined
+  const coldPoint: ModelRoutingColdPoint | null = quotaGate ? observedCold ?? null : null
+  if (quotaGate && observedCold === undefined) {
+    return { kind: 'warm', coldPoint: undefined, cache }
+  }
+  return finish(coldPoint, cache)
 }
 
 /**
  * Offline reconstruction of the entry-path consult. Applies {@link consultPrefix}
  * and replay-only refusals, then {@link consultInputFrom}. Live `decide()` does
- * not call this.
+ * not call this. `cache.base` reports the independently resolved lifetime; the
+ * live decision reports the lifetime eligibility retained, which is the fallback
+ * when base preparation fails.
  * @param config - resolved router configuration.
  * @param events - the session log to slice.
  * @param at - consult coordinates and clock.
@@ -324,6 +392,7 @@ export async function replayConsultInput(
     coldPointBase,
     at,
     resolveModelInfo,
+    cachePolicy: { kind: 'replay-resolve' },
     ...signal === undefined ? {} : { signal },
     ...runtime === undefined ? {} : { runtime },
   })
