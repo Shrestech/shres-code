@@ -6,7 +6,7 @@
  * @module
  */
 import { readFile, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { UsageError } from '../runner/run.js'
 import { validateTrial } from '../schema/trial.js'
 import { decodePhysicalJsonl, proposalFromHeader, TrialInputIncompleteError } from './replay-frontend.js'
@@ -76,12 +76,13 @@ async function readArmTrials(armName, runnerName, armDir) {
  * are a population defect and fail the read outright.
  *
  * Trials with unusable session inputs (no session log, missing file, corrupt
- * log, mixed routes, no request/header) are never dropped and never given a
- * fabricated route: they are returned in `refused` as named class-C records
- * — the same identities `hostReplayRun` aggregates — while `trials` holds
- * only the hostable descriptors. `discovered` names every trial found, so a
- * caller can refuse the whole run after all trials instead of returning a
- * partial one.
+ * log, mixed routes, no request/header, or a session path outside the
+ * declared trial directory) are never dropped and never given a fabricated
+ * route: they are returned in `refused` as named class-C records — the same
+ * identities `hostReplayRun` aggregates — while `trials` holds only the
+ * hostable descriptors. `discovered` names every trial found, so a caller
+ * can refuse the whole run after all trials instead of returning a partial
+ * one.
  *
  * @param {{ experimentDir: string, registration: { arms: Record<string, { runnerName: string }> }, taskRoot: string }} input
  * @returns {Promise<{ trials: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C', path: string, trialOwnRoute: { provider: unknown, model: unknown, reasoningEffort?: unknown }, trial: object }[], tasks: Record<string, object>, refused: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C', path?: string, trialId?: string, reason: string }[], discovered: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C' }[] }>}
@@ -91,6 +92,9 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
     const spec = registration?.arms?.[armName]
     if (typeof spec?.runnerName !== 'string' || spec.runnerName.length === 0) {
       throw new UsageError(`registration does not name a runnerName for replay arm ${armName}`)
+    }
+    if (spec.runnerName.includes('/') || spec.runnerName.includes('\\') || spec.runnerName === '.' || spec.runnerName === '..') {
+      throw new UsageError(`registration runnerName for replay arm ${armName} must be a single path segment`)
     }
     return { armName, runnerName: spec.runnerName, dir: join(experimentDir, spec.runnerName) }
   })
@@ -113,7 +117,24 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
         refusal('no session log', { trialId: id })
         continue
       }
+      // The runner records sessionFile relative to the arm directory, always
+      // inside sessions/<taskId>/<trialIndex>/ (run.js relative(armDir, …));
+      // a record pointing anywhere else names another trial or outside data.
+      if (trial.taskId.includes('/') || trial.taskId.includes('\\') || trial.taskId === '.' || trial.taskId === '..') {
+        refusal('trial task id is not a single path segment', { trialId: id })
+        continue
+      }
+      if (isAbsolute(trial.sessionFile)) {
+        refusal('session log path is absolute', { trialId: id })
+        continue
+      }
+      const trialRoot = resolve(dir, 'sessions', trial.taskId, String(trial.trialIndex))
       const path = resolve(dir, trial.sessionFile)
+      const within = relative(trialRoot, path)
+      if (within === '' || within === '..' || within.startsWith('../') || isAbsolute(within)) {
+        refusal('session log path is outside the declared trial directory', { path, trialId: id })
+        continue
+      }
       let decoded
       try {
         decoded = decodePhysicalJsonl(await readFile(path), path)

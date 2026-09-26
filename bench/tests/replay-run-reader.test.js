@@ -80,7 +80,7 @@ function trialRecord(overrides = {}) {
  * directories, two trials each (arm C trial 1 is an error trial, proving the
  * reader does not filter by status), each session a copy of the recorded
  * fixture, and a task root carrying the preregistered stratum.
- * @param {{ bytesFor?: (arm: string, trialIndex: number) => Buffer, sessionFile?: (arm: string, trialIndex: number) => string | null, skipArmDir?: 'C' | undefined, taskOverrides?: object }} [options]
+ * @param {{ bytesFor?: (arm: string, trialIndex: number) => Buffer, sessionFile?: (arm: string, trialIndex: number) => string | null, skipArmDir?: 'C' | undefined, taskOverrides?: object, trialOverrides?: (arm: string, trialIndex: number) => object, registration?: object }} [options]
  */
 async function buildRun(options = {}) {
   const {
@@ -88,6 +88,8 @@ async function buildRun(options = {}) {
     sessionFile = (arm, trialIndex) => `sessions/${TASK_ID}/${trialIndex}/session.jsonl`,
     skipArmDir,
     taskOverrides,
+    trialOverrides = () => ({}),
+    registration = REGISTRATION,
   } = options
   const root = await mkdtemp(join(tmpdir(), 'bench-replay-run-reader-'))
   const experimentDir = join(root, 'experiment')
@@ -95,21 +97,26 @@ async function buildRun(options = {}) {
   for (const [armName, spec] of Object.entries(REGISTRATION.arms)) {
     if (skipArmDir === armName) continue
     const armDir = join(experimentDir, spec.runnerName)
-    const records = [0, 1].map((trialIndex) => trialRecord({
-      taskId: TASK_ID,
-      trialIndex,
-      arm: spec.runnerName,
-      sessionFile: sessionFile(armName, trialIndex),
-      ...(armName === 'C' && trialIndex === 1
-        ? { status: 'error', resolved: false, failureMode: 'AGENT_TIMEOUT' }
-        : {}),
-    }))
+    const records = [0, 1].map((trialIndex) => {
+      const override = sessionFile(armName, trialIndex)
+      return trialRecord({
+        taskId: TASK_ID,
+        trialIndex,
+        arm: spec.runnerName,
+        sessionFile: override === undefined ? `sessions/${TASK_ID}/${trialIndex}/session.jsonl` : override,
+        ...trialOverrides(armName, trialIndex),
+        ...(armName === 'C' && trialIndex === 1
+          ? { status: 'error', resolved: false, failureMode: 'AGENT_TIMEOUT' }
+          : {}),
+      })
+    })
     if (skipArmDir !== armName) {
       await mkdir(armDir, { recursive: true })
       await writeFile(join(armDir, 'trials.jsonl'), records.map(record => JSON.stringify(record)).join('\n') + '\n')
     }
     for (const trialIndex of [0, 1]) {
-      const file = sessionFile(armName, trialIndex)
+      const override = sessionFile(armName, trialIndex)
+      const file = override === undefined ? `sessions/${TASK_ID}/${trialIndex}/session.jsonl` : override
       if (file === null) continue
       const sessionPath = join(armDir, file)
       await mkdir(sessionPath.slice(0, sessionPath.lastIndexOf('/')), { recursive: true })
@@ -122,7 +129,7 @@ async function buildRun(options = {}) {
   }))
   return {
     root,
-    input: { experimentDir, registration: REGISTRATION, taskRoot },
+    input: { experimentDir, registration, taskRoot },
     taskPath: join(taskRoot, TASK_ID, 'task.json'),
   }
 }
@@ -285,6 +292,60 @@ test('an invalid trial line surfaces the validateTrial error', async () => {
     lines[0] = JSON.stringify({ taskId: TASK_ID })
     await writeFile(path, lines.join('\n'))
     await assert.rejects(readReplayRun(input), /trial\.arm must be a non-empty string/)
+  })
+})
+
+test('file-boundary violations in a trial record are named refusals that read nothing', async () => {
+  const cases = [
+    { name: 'an absolute sessionFile', sessionFile: (arm, i) => (arm === 'S' && i === 0 ? '/var/lib/shres/owner-session.jsonl' : undefined), reason: 'session log path is absolute' },
+    {
+      name: 'a sessionFile escaping the arm directory',
+      sessionFile: (arm, i) => (arm === 'S' && i === 0 ? 'sessions/reader-task/0/../../../elsewhere/log.jsonl' : undefined),
+      reason: 'session log path is outside the declared trial directory',
+    },
+    {
+      name: 'a sessionFile pointing into a different trial',
+      sessionFile: (arm, i) => (arm === 'S' && i === 0 ? 'sessions/reader-task/1/session.jsonl' : undefined),
+      reason: 'session log path is outside the declared trial directory',
+    },
+  ]
+  for (const { name, sessionFile, reason } of cases) {
+    await withRun({ sessionFile }, async ({ input }) => {
+      const { trials, refused } = await readReplayRun(input)
+      assert.equal(refused.length, 1, name)
+      assert.equal(refused[0].id, `S/${TASK_ID}/0`, name)
+      assert.equal(refused[0].reason, reason, name)
+      assert.equal(trials.length, 3, name)
+    })
+  }
+})
+
+test('a hostile task id is a refusal and never becomes a path segment', async () => {
+  await withRun({
+    trialOverrides: (arm, i) => (arm === 'S' && i === 0 ? { taskId: '../outside' } : {}),
+  }, async ({ input }) => {
+    const { trials, refused } = await readReplayRun(input)
+    assert.deepEqual(refused, [{
+      id: `S/../outside/0`,
+      taskId: '../outside',
+      trialIndex: 0,
+      arm: 'S',
+      trialId: `S/../outside/0`,
+      reason: 'trial task id is not a single path segment',
+    }])
+    assert.equal(trials.length, 3)
+  })
+})
+
+test('a registration runnerName outside the experiment directory is a UsageError', async () => {
+  await withRun({
+    registration: { arms: { S: { runnerName: '../elsewhere/run' }, C: { runnerName: 'route-cheap' } } },
+  }, async ({ input }) => {
+    await assert.rejects(readReplayRun(input), (error) => {
+      assert.ok(error instanceof UsageError)
+      assert.match(error.message, /runnerName for replay arm S must be a single path segment/)
+      return true
+    })
   })
 })
 
