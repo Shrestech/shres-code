@@ -43,7 +43,10 @@ import ModelRoutingController, {
   ROUTE_QUESTION_ID,
   DIFFICULTY_QUESTION_ID,
   foldModelRoutingStats,
+  replayConsultInput,
+  consultPrefix,
 } from '../src/index.ts'
+import { suspendedChildCandidates } from '../src/child-outcomes.ts'
 import * as ModelRouterInvariant from '../src/invariant.ts'
 import { FakeJudgment, SCRIPTED_CANDIDATE, SCRIPTED_ENGINE, SCRIPTED_OTHER_CANDIDATE } from './fake-judgment-provider.ts'
 
@@ -1085,5 +1088,83 @@ describe('children of a parent on a held downgrade', () => {
       expect(persisted.events.find(event => event.type === 'subagent/descriptor')?.data)
         .toMatchObject({ agentProvider: PROVIDER, agentModel: MANUAL_MODEL })
     })
+  })
+
+  it('replayConsultInput over the persisted log equals live ask input and logged facts', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { workspaceStats: true, compaction: {} })
+    scriptedEngine(loaded).scriptRoute(KEEP_CURRENT_OPTION_ID, 0.9)
+    const agent = createAgent(loaded, 'router-replay-persist')
+    await pinManualRoute(loaded, agent)
+    await turn(agent, `cold start. ${'Context line. '.repeat(200)}`)
+    await turn(agent, 'warm follow-up')
+    const compacted = await loaded.compaction.compactNow(agent, new AbortController().signal)
+    expect(compacted).not.toBeNull()
+    await turn(agent, 'after compaction')
+    const liveAsks = scriptedEngine(loaded).asks
+    const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
+      .filter(event => event.data.reason !== 'warm-prefix')
+    expect(decisions.length).toBeGreaterThanOrEqual(3)
+    await loaded.sessions.flush(agent.session)
+    const persisted = await loaded.sessionPersistence.inspect(agent.id)
+    const llm = loaded.llm
+    for (const decision of decisions) {
+      const stepStart = persisted.events.findLast(event => event.type === 'step/start' && event.seq < decision.seq)
+      const turnNo = stepStart?.type === 'step/start' ? stepStart.data.turn : 1
+      const stepNo = stepStart?.type === 'step/start' ? stepStart.data.step : 1
+      const consultKey = `turn:${String(turnNo)}/step:${String(stepNo)}`
+      const ask = liveAsks.find(entry => entry.correlation?.consultKey === consultKey)
+      const now = persisted.events.find(event => event.type === 'step/start' && event.data.turn === turnNo && event.data.step === stepNo)?.time ?? decision.time
+      const replayed = await replayConsultInput(
+        loaded.modelRouting.config(),
+        persisted.events,
+        { turn: turnNo, step: stepNo, now, seedLength: persisted.meta.seedLength },
+        MANUAL,
+        MANUAL,
+        { provider: PROVIDER, model: MANUAL_MODEL },
+        (provider, model, signal) => llm.resolveModelInfo(provider, model, signal),
+        undefined,
+        llm,
+      )
+      expect(replayed.kind).toBe('ask')
+      expect(ask).toBeDefined()
+      if (replayed.kind !== 'ask' || ask === undefined) continue
+      expect(replayed.questions).toEqual(ask.questions)
+      expect(replayed.consultKey).toBe(ask.correlation?.consultKey)
+      expect(replayed.states[0]).toBe(ask.state)
+      expect(replayed.eligibility).toEqual(decision.data.candidateEligibility)
+      expect(consultPrefix(persisted.events, turnNo, stepNo).at(-1)?.seq).toBeLessThan(decision.seq)
+    }
+  })
+
+  it('a steered subagent-report during an open parent consult does not change child-route breaker counters', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], {
+      subagents: true,
+      routerExtra: [
+        '    childPolicies:',
+        `      - { match: { kind: subagent }, candidate: ${SCRIPTED_CANDIDATE} }`,
+        '    childRouteErrors: 2',
+      ],
+    })
+    const parent = createAgent(loaded, 'router-215-parent')
+    await pinManualRoute(loaded, parent)
+    parent.session.append('model-routing/child-decision', {
+      outcome: 'routed',
+      reason: 'child-policy',
+      routeRequestId: 'report-route',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: { provider: PROVIDER, model: MANUAL_MODEL },
+      selection: { candidateId: SCRIPTED_CANDIDATE, provider: PROVIDER, model: CANDIDATE_MODEL },
+      effortApplied: false,
+      promptChars: 4,
+    })
+    const before = suspendedChildCandidates(parent.session.events, 2)
+    parent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'progress from child' }],
+      source: { kind: 'subagent-report', form: 'relay', senderSessionId: SessionId('child-215') },
+    }))
+    await parent.whenIdle()
+    expect(eventsOfType(parent.session.events, 'model-routing/child-outcome')).toHaveLength(0)
+    expect(suspendedChildCandidates(parent.session.events, 2)).toEqual(before)
   })
 })

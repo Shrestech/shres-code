@@ -1,12 +1,12 @@
 /**
- * Public consult-input reconstruction for offline replay. Live `decide()`
- * calls the same producer, so bench never imports `src/*`.
+ * Shared consult-input producer. Live `decide()` calls {@link consultInputFrom}
+ * with the live log and request messages. Offline replay slices first.
  *
  * @module @shres-code/shres-code-model-router/replay
  */
 
 import type { ModelSelection } from '@shres-code/shres-code-agent'
-import type { LlmCallConfig, LlmResolvedModelInfo, Message } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig, LlmResolvedModelInfo, LlmRuntime, Message } from '@shres-code/shres-code-llm'
 import type { JudgmentQuestion } from '@shres-code/shres-code-judgment'
 import { deriveEventMessage, foldSurface } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
@@ -14,7 +14,7 @@ import type { ResolvedModelRouterConfig } from './config.ts'
 import { KEEP_CURRENT_OPTION_ID } from './config.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingCacheTtl } from './folds.ts'
-import { coldPointAt, stickyState } from './folds.ts'
+import { coldPointAt, foldModelRouting, stickyState } from './folds.ts'
 import { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 import { buildRoutingStateCandidatesFromEvents } from './state.ts'
 import type {
@@ -43,7 +43,7 @@ export interface ReplayConsultWarm {
   readonly cache: ReplayConsultCache
 }
 
-/** Entry path that cannot ask: eligibility is present, questions are not. */
+/** Path that cannot ask: eligibility is present, questions are not. */
 export interface ReplayConsultIneligible {
   readonly kind: 'ineligible'
   readonly coldPoint: ModelRoutingColdPoint | null
@@ -51,7 +51,7 @@ export interface ReplayConsultIneligible {
   readonly eligibility: ModelRoutingCandidateEligibility
 }
 
-/** Entry path that would ask: states, questions, and consultKey. */
+/** Path that would ask: states, questions, and consultKey. */
 export interface ReplayConsultAsk {
   readonly kind: 'ask'
   readonly coldPoint: ModelRoutingColdPoint | null
@@ -65,12 +65,27 @@ export interface ReplayConsultAsk {
 export type ReplayConsultInput = ReplayConsultWarm | ReplayConsultIneligible | ReplayConsultAsk
 
 export class ReplayConsultError extends Error {
-  readonly code: 'held-streak' | 'mixed-route'
-  constructor(code: 'held-streak' | 'mixed-route', message: string) {
+  readonly code: 'missing-step' | 'held-streak' | 'reentry-cooldown' | 'mixed-route' | 'mode-off'
+  constructor(code: ReplayConsultError['code'], message: string) {
     super(message)
     this.name = 'ReplayConsultError'
     this.code = code
   }
+}
+
+/** Inputs the shared producer reads. Live and replay both fill this. */
+export interface ConsultInputSource {
+  readonly config: ResolvedModelRouterConfig
+  readonly prefix: readonly SessionEvent[]
+  readonly messages: readonly Message[]
+  readonly requestConfig: LlmCallConfig
+  readonly routeBase: ModelSelection
+  readonly coldPointBase: ModelSelection
+  readonly at: ReplayConsultAt
+  readonly resolveModelInfo: (provider: string, model: string, signal?: AbortSignal) => Promise<LlmResolvedModelInfo>
+  /** Live LLM runtime when present so eligibility uses prepareCall; replay may omit it. */
+  readonly runtime?: Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -88,7 +103,10 @@ export function consultPrefix(events: readonly SessionEvent[], turn: number, ste
     }
   }
   if (startSeq === undefined) {
-    throw new Error(`consultPrefix: no step/start for turn ${String(turn)} step ${String(step)}`)
+    throw new ReplayConsultError(
+      'missing-step',
+      `consultPrefix: no step/start for turn ${String(turn)} step ${String(step)}`,
+    )
   }
   const out: SessionEvent[] = []
   for (const event of events) {
@@ -178,40 +196,30 @@ function difficultyQuestion(config: ResolvedModelRouterConfig, instructions: str
   }
 }
 
-/**
- * Reconstruct the entry-path consult input live `decide()` would ask.
- *
- * Entry path only: no held streak, re-entry cooldown, breaker, or engine
- * snapshot. A log whose sticky fold is active at `at` is refused. Messages
- * are `foldSurface(consultPrefix).nodes` mapped through `deriveEventMessage`
- * (the same public session exports `Session.deriveMessages` uses). There is
- * no public reconstruction of `request.config` from the log; callers pass
- * `requestConfig` explicitly.
- *
- * @param config - resolved router configuration.
- * @param events - the full session log; the consult prefix is applied internally.
- * @param at - turn, step, step-start clock, and seedLength (present even when undefined).
- * @param routeBase - keep-current / eligibility / cache.base route.
- * @param coldPointBase - the trial's own conversation route for `coldPointAt`.
- * @param requestConfig - the assembled request config of this step; never read from the log.
- * @param resolveModelInfo - the same resolver eligibility uses live (`ctx.llm.resolveModelInfo`).
- * @param signal - optional cancellation forwarded to eligibility.
- */
-export async function replayConsultInput(
+async function cacheTtl(
   config: ResolvedModelRouterConfig,
-  events: readonly SessionEvent[],
-  at: ReplayConsultAt,
-  routeBase: ModelSelection,
-  coldPointBase: ModelSelection,
-  requestConfig: LlmCallConfig,
-  resolveModelInfo: (provider: string, model: string, signal?: AbortSignal) => Promise<LlmResolvedModelInfo>,
+  base: ModelSelection,
+  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
   signal?: AbortSignal,
-): Promise<ReplayConsultInput> {
-  const prefix = consultPrefix(events, at.turn, at.step)
-  if (!sameRoute(routeBase, coldPointBase)) conversationRoute(events)
-  if (stickyState(prefix).active) {
-    throw new ReplayConsultError('held-streak', 'replayConsultInput evaluates the entry path only; the consult prefix has an active held streak')
+): Promise<ModelRoutingCacheTtl> {
+  let declared: number | undefined
+  try {
+    declared = (await resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
+  } catch {
+    signal?.throwIfAborted()
   }
+  return declared === undefined
+    ? { ttlMs: config.coldPoints.unknownTtlMs, ttlSource: 'fallback' }
+    : { ttlMs: declared, ttlSource: 'adapter' }
+}
+
+/**
+ * Shared producer: coldPoint, eligibility, states, questions, consultKey, cache.
+ * No slicing and no replay refusals. Live `decide()` supplies the live log and
+ * request messages; the replay wrapper slices first.
+ */
+export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
+  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal } = src
   const from = routeFromFor(config, routeBase)
   const consultKey = `turn:${at.turn}/step:${at.step}`
   const ttl = await cacheTtl(config, routeBase, resolveModelInfo, signal)
@@ -223,14 +231,17 @@ export async function replayConsultInput(
     ? coldPointAt(prefix, coldPointBase, ttl, at.now, at.seedLength !== undefined)
     : undefined
   const coldPoint: ModelRoutingColdPoint | null = quotaGate ? observedCold ?? null : null
-  const quotaWarm = quotaGate && observedCold === undefined
-  if (quotaWarm) {
+  if (quotaGate && observedCold === undefined) {
     return { kind: 'warm', coldPoint: undefined, cache }
   }
+  const eligibilityRuntime = src.runtime ?? {
+    resolveModelInfo,
+    prepareCall: async (callConfig: LlmCallConfig) => ({ config: callConfig }),
+  }
   const eligibility = await assessModelRoutingCandidates(
-    { resolveModelInfo, prepareCall: async (callConfig: LlmCallConfig) => ({ config: callConfig }) } as never,
+    eligibilityRuntime as never,
     requestConfig,
-    derivedMessages(prefix),
+    messages,
     config.candidates,
     config.difficultyToEffort,
     signal,
@@ -255,19 +266,46 @@ export async function replayConsultInput(
   }
 }
 
-async function cacheTtl(
+/**
+ * Offline reconstruction of the entry-path consult. Applies {@link consultPrefix}
+ * and replay-only refusals, then {@link consultInputFrom}. Live `decide()` does
+ * not call this.
+ */
+export async function replayConsultInput(
   config: ResolvedModelRouterConfig,
-  base: ModelSelection,
-  resolveModelInfo: (provider: string, model: string, signal?: AbortSignal) => Promise<LlmResolvedModelInfo>,
+  events: readonly SessionEvent[],
+  at: ReplayConsultAt,
+  routeBase: ModelSelection,
+  coldPointBase: ModelSelection,
+  requestConfig: LlmCallConfig,
+  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
   signal?: AbortSignal,
-): Promise<ModelRoutingCacheTtl> {
-  let declared: number | undefined
-  try {
-    declared = (await resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
-  } catch {
-    signal?.throwIfAborted()
+  runtime?: ConsultInputSource['runtime'],
+): Promise<ReplayConsultInput> {
+  const prefix = consultPrefix(events, at.turn, at.step)
+  if (!sameRoute(routeBase, coldPointBase)) conversationRoute(events)
+  const sticky = stickyState(prefix)
+  if (sticky.active) {
+    throw new ReplayConsultError('held-streak', 'replayConsultInput evaluates the entry path only; the consult prefix has an active held streak')
   }
-  return declared === undefined
-    ? { ttlMs: config.coldPoints.unknownTtlMs, ttlSource: 'fallback' }
-    : { ttlMs: declared, ttlSource: 'adapter' }
+  if (sticky.cooldownTurn !== undefined && config.reentryCooldownTurns > 0
+    && at.turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
+    throw new ReplayConsultError('reentry-cooldown', 'replayConsultInput evaluates the entry path only; a re-entry cooldown is in force')
+  }
+  const mode = foldModelRouting(prefix, prefix.length, config.initialMode)
+  if (mode === 'off') {
+    throw new ReplayConsultError('mode-off', 'replayConsultInput refuses a consult prefix whose folded mode is off')
+  }
+  return consultInputFrom({
+    config,
+    prefix,
+    messages: derivedMessages(prefix),
+    requestConfig,
+    routeBase,
+    coldPointBase,
+    at,
+    resolveModelInfo,
+    ...signal === undefined ? {} : { signal },
+    ...runtime === undefined ? {} : { runtime },
+  })
 }

@@ -84,6 +84,15 @@ describe('web e2e: Settings › Model routing', () => {
     expect(tripwire.pageErrors).toEqual([])
   })
 
+  it('shows Subagent routing copy when the host schema declares childPolicies', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-model-routing-child'))
+    const section = page.locator(SECTION)
+    await expect.poll(async () => section.getByRole('heading', { name: 'Subagent routing' }).count(), { timeout: 10_000 }).toBe(1)
+    await expect.poll(async () => section.getByText('Subagents start fresh, so routing them never disturbs your conversation\'s cache.').count()).toBe(1)
+    await expect.poll(async () => section.getByText('Forked subagents always use your model.').count()).toBe(1)
+    await expect.poll(async () => section.getByText('The route is chosen once when a subagent starts.').count()).toBe(1)
+  })
+
   it('keeps the fixture inventory exact', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, ['local.expected.md', 'remote.expected.md'])
   })

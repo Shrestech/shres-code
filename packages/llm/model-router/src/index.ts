@@ -135,7 +135,7 @@ import { summarizeSession, workspaceStats } from './workspace-stats.ts'
 import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
-import { replayConsultInput } from './replay.ts'
+import { consultInputFrom } from './replay.ts'
 import { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 import type {
   ModelRoutingCacheTtl,
@@ -1775,45 +1775,17 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       return keep('reentry-cooldown')
     }
     const now = latestStepStart(session.events) ?? Date.now()
-    const llm = this.ctx.get('llm')
-    if (held === undefined && llm !== undefined) {
-      const replayed = await replayConsultInput(
-        config,
-        session.events,
-        { turn, step, now, seedLength: session.header.seedLength },
-        base,
-        base,
-        request.config,
-        (provider, model, consultSignal) => llm.resolveModelInfo(provider, model, consultSignal),
-        signal,
-      )
-      facts.cache = { base: replayed.cache.base }
-      if (replayed.kind === 'warm') {
-        facts.coldPoint = null
-        return keep('warm-prefix')
-      }
-      facts.coldPoint = replayed.coldPoint
-      facts.candidateEligibility = replayed.eligibility
-      if (replayed.kind === 'ineligible') {
-        if (replayed.eligibility.assessments.every(assessment => assessment.reason === 'equals-base')) {
-          return keep('candidate-equals-base')
-        }
-        if (replayed.eligibility.assessments.some(assessment => assessment.reason === 'thinking-mode-incompatible')) {
-          return keep('thinking-mode-incompatible')
-        }
-        return keep('candidate-ineligible')
-      }
-      facts.judgmentQuestions = replayed.questions
-      facts.inputChars = replayed.states.reduce((total, text) => total + text.length, 0)
-    } else if (from.objective === 'quota' && !from.allowEveryTurn && step === 1) {
+    if (from.objective === 'quota' && !from.allowEveryTurn && (held === undefined || step === 1)) {
       const ttl = await this.cacheTtl(config, base, signal)
       const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
       facts.coldPoint = coldPoint ?? null
       facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
+      if (held === undefined && coldPoint === undefined) return keep('warm-prefix')
       if (held !== undefined && coldPoint !== undefined && sticky.stepsElapsed >= config.hold.minSteps) {
         return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
       }
     }
+    const llm = this.ctx.get('llm')
     const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
     let engine = this.ctx.get('judgment')
     // Failures count per engine, so an engine switch starts from none. The
@@ -1836,14 +1808,37 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
     if (snapshot.refused) return withEngine(keep('engine-uncalibrated'), snapshot)
     if (llm === undefined) return keep('model-unavailable')
-    let eligibility = facts.candidateEligibility
-    if (eligibility === undefined) {
-      const eligibilityStarted = Date.now()
-      eligibility = await assessModelRoutingCandidates(
+    const eligibilityStarted = Date.now()
+    const replayed = await consultInputFrom({
+      config,
+      prefix: session.events,
+      messages: request.content.messages,
+      requestConfig: request.config,
+      routeBase: base,
+      coldPointBase: base,
+      at: { turn, step, now, seedLength: session.header.seedLength },
+      resolveModelInfo: (provider, model, consultSignal) => llm.resolveModelInfo(provider, model, consultSignal),
+      runtime: llm,
+      signal,
+    })
+    if (replayed.kind === 'warm' && held === undefined) {
+      facts.cache = { base: replayed.cache.base }
+      facts.coldPoint = null
+      return keep('warm-prefix')
+    }
+    const eligibility = replayed.kind === 'warm'
+      ? await assessModelRoutingCandidates(
         llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
       )
-      facts.eligibilityMs = Date.now() - eligibilityStarted
-      facts.candidateEligibility = eligibility
+      : replayed.eligibility
+    facts.eligibilityMs = Date.now() - eligibilityStarted
+    facts.candidateEligibility = eligibility
+    if (held === undefined && replayed.kind !== 'warm' && replayed.coldPoint !== null) {
+      facts.coldPoint = replayed.coldPoint
+    }
+    if (replayed.kind === 'ask') {
+      facts.judgmentQuestions = replayed.questions
+      facts.inputChars = replayed.states.reduce((total, text) => total + text.length, 0)
     }
     // The lifetimes eligibility resolved: the manual route's, and each
     // candidate's declared one. A cold-point consult already recorded the base.

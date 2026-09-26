@@ -277,3 +277,34 @@ describe('web e2e: the Routing view follows a judge switch', () => {
     await page.locator('section[aria-label="Model routing"]').getByRole('combobox', { name: 'Engine' }).waitFor({ timeout: 30_000 })
   }, 180_000)
 })
+
+describe('web e2e: child-session Routing notice', () => {
+  let overlayDir: string
+  let scaffold: WebScaffold
+  let browser: Browser
+  let page: Page
+
+  beforeAll(async () => {
+    overlayDir = await mkdtemp(join(tmpdir(), 'shres-routing-child-'))
+    const overlay = join(overlayDir, 'routing.overlay.yml')
+    await writeFile(overlay, OVERLAY(ROUTER))
+    scaffold = await launchWebScaffold({ extraOverlayPath: overlay })
+    await seedSession(scaffold, await readFile(SEED, 'utf8'), 'routing-child-notice', undefined, 'subagent')
+    browser = await chromium.launch()
+    page = await newEnglishPage(browser, 1000)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+  }, 120_000)
+
+  afterAll(async () => {
+    await browser?.close()
+    await scaffold?.close()
+    if (overlayDir !== undefined) await rm(overlayDir, { recursive: true, force: true })
+  })
+
+  it('tells a subagent session the model was chosen when it started', async () => {
+    onTestFailed(() => saveFailureShot(page, 'routing-child-notice'))
+    await openSeed(page)
+    await selectSessionView(page, 'Routing')
+    await expect.poll(() => page.getByText("This subagent's model was chosen when it started.").count(), { timeout: 30_000 }).toBe(1)
+  }, 180_000)
+})
