@@ -273,5 +273,5 @@ export async function replayTrialLog({
   const rows = labelled.rows.map(row => (
     artifact === 'open-final-turn' ? { ...row, artifact: 'open-final-turn' } : row
   ))
-  return { artifact, rows, consults }
+  return { artifact, rows, consults, sessionId: header.id }
 }

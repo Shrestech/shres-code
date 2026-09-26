@@ -8,6 +8,7 @@ import { readFile, unlink, writeFile } from 'node:fs/promises'
 import Schema from '../../vendor/schemastery/lib/index.mjs'
 import { resolveConfig } from '../../packages/llm/model-router/lib/index.js'
 import { replayTrialLog, TrialInputIncompleteError } from './replay-frontend.js'
+import { judgeReplayRows } from './replay-judge.js'
 
 export const name = 'bench-replay-frontend'
 export const inject = ['llm', 'agentDefaultModel', 'sessionPersistence']
@@ -131,21 +132,40 @@ export function apply(ctx, config) {
       arm: job.arm,
       sPrepared,
     })
+    let rows = result.rows
+    let asks = []
+    if (job.judge === true) {
+      const judged = await judgeReplayRows({
+        rows: result.rows,
+        consults: result.consults,
+        engine: ctx.get('judgment'),
+        config: resolved,
+        sessionId: result.sessionId,
+      })
+      rows = judged.rows
+      asks = judged.asks
+    }
     const kinds = consultKindCounts(result.consults)
     const summary = {
       kind: 'summary',
       artifact: result.artifact,
       routeBase,
       requestConfig,
+      routerConfig: resolved,
       ttl,
       counts,
       kinds,
+      asks,
+      recordedAsks: job.judge === true
+        ? (await import('./replay-scripted-fitting-judge.mjs')).internals.asks.slice()
+        : [],
       http: internals.http,
     }
     structuredClone(result.consults)
     const lines = [
-      ...result.rows.map(row => JSON.stringify({ kind: 'row', row })),
+      ...rows.map(row => JSON.stringify({ kind: 'row', row })),
       ...result.consults.map(consult => JSON.stringify({ kind: 'consult', consult })),
+      ...asks.map(ask => JSON.stringify({ kind: 'ask', ask })),
       JSON.stringify(summary),
     ]
     await writeFile(config.out, lines.join('\n') + '\n')
