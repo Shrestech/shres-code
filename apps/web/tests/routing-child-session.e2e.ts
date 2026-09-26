@@ -146,6 +146,12 @@ describe('web e2e: child-session Routing notice and parent CHILD-ROUTE row', () 
 
   it('shows a CHILD-ROUTE row on the parent Trajectory and the child Routing notice', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-routing-child-session'))
+    await selectSessionView(page, 'Trajectory')
+    const timeline = page.getByLabel('Trajectory timeline')
+    await timeline.waitFor({ timeout: 30_000 })
+    await expect.poll(() => page.getByText(/Subagent routed to /).count(), { timeout: 30_000 }).toBeGreaterThan(0)
+    expect(await page.getByText(/Subagent routed to /).first().innerText()).toMatch(/deepseek/)
+    expect(await page.getByText(/Subagent routed to /).first().innerText()).not.toMatch(/escalated|kept-strong/)
     const activity = await openSessionActivity(page)
     const catalogButton = activity.getByRole('button', { name: /subagent/i })
     await catalogButton.click()
