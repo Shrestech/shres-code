@@ -52,6 +52,8 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'ledger/decision',
   'llm/retry',
   'llm/retry-started',
+  'model-routing/child-decision',
+  'model-routing/child-outcome',
   'model-routing/configuration',
   'model-routing/decision',
   'model-routing/mode',

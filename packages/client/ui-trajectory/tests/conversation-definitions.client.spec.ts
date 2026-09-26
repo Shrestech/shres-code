@@ -431,6 +431,39 @@ describe('Trajectory conversation Definitions', () => {
       sticky: { active: true, stepsElapsed: 0, enteredTurn: 1 },
     }])
     expect(current.eventNodes.map(node => node.kind)).not.toContain('routing')
+  })
+
+  it('folds model-routing/child-decision into a CHILD-ROUTE layout row', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'model-routing/child-decision', {
+        outcome: 'routed',
+        reason: 'child-policy',
+        routeRequestId: 'route-1',
+        childKind: 'subagent',
+        policyIndex: 0,
+        inherited: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        effortApplied: false,
+        promptChars: 8,
+      }),
+      at(4, 'step/end', { turn: 1, step: 1 }),
+    ]))
+    expect(current.routingChildren).toMatchObject([{
+      kind: 'routing-child',
+      seq: 3,
+      outcome: 'routed',
+      reason: 'child-policy',
+      model: 'deepseek-official/deepseek-v4-flash',
+    }])
+    const texts = deriveTrajectoryLayout({
+      nodes: current.eventNodes,
+      partial: null,
+      runningCalls: current.runningCalls,
+      routingChildren: current.routingChildren,
+    }).flatMap(turn => turn.groups.flatMap(group => group.cells.map(cell => cell.text)))
+    expect(texts).toContain('Subagent routed to deepseek-official/deepseek-v4-flash')
 
     const definition = DEFINITIONS.find(entry => entry.kind === 'trajectory-routing')
     expect(definition?.match({ type: 'turn/start', data: { turn: 1 } } as never)).toBeNull()
