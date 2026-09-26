@@ -4,7 +4,7 @@ import { SessionId } from '@shres-code/shres-code-session'
 import { SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
 import type { SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
 import { resolveConfig } from '../src/config.ts'
-import { matchChildPolicy, resolveChildRouteConsult } from '../src/child-route.ts'
+import { isChildRouteParent, logChildDecision, matchChildPolicy, resolveChildRouteConsult } from '../src/child-route.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 
 const STRONG = { provider: 'strong-provider', model: 'strong-model' }
@@ -123,5 +123,75 @@ describe('resolveChildRouteConsult', () => {
     )
     expect(result.route).toBeUndefined()
     expect(result.decision).toMatchObject({ outcome: 'kept', reason: 'child-route-errors' })
+  })
+
+  it('marks a judge rule as pendingJudge', () => {
+    const resolved = config({
+      childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
+      childRouteInstructions: 'Keep the parent model or use the cheaper child?',
+    })
+    const result = resolveChildRouteConsult({ config: resolved, mode: 'on', suspended: new Set() }, request())
+    expect(result.pendingJudge).toBe(true)
+    expect(result.route).toBeUndefined()
+    expect(result.candidate?.id).toBe('cheap')
+  })
+
+  it('uses parent options when selectionInForce is empty and options name a listed base', () => {
+    const resolved = config({ childPolicies: [{ match: {}, candidate: 'cheap' }] })
+    const result = resolveChildRouteConsult(
+      { config: resolved, mode: 'on', suspended: new Set() },
+      request({
+        parent: {
+          ...parent(STRONG),
+          session: {
+            ...parent().session,
+            events: [],
+            requestHeader: () => undefined,
+          },
+        } as Agent,
+        inherited: {},
+        agentType: undefined,
+      }),
+    )
+    expect(result.route).toEqual({ provider: CHEAP.provider, model: CHEAP.model })
+  })
+
+  it('falls back when parent options omit provider and model', () => {
+    const result = resolveChildRouteConsult(
+      { config: config(), mode: 'on', suspended: new Set() },
+      request({
+        parent: {
+          ...parent(),
+          options: {},
+          session: {
+            ...parent().session,
+            events: [],
+            requestHeader: () => undefined,
+          },
+        } as Agent,
+      }),
+    )
+    expect(result.decision).toMatchObject({ outcome: 'kept', reason: 'base-unlisted' })
+  })
+
+  it('logs a child-decision and recognises a live parent', () => {
+    const appended: unknown[] = []
+    const agent = parent()
+    const session = {
+      ...agent.session,
+      append(type: string, data: unknown) { appended.push({ type, data }) },
+    }
+    logChildDecision(session as typeof agent.session, {
+      outcome: 'kept',
+      reason: 'base-unlisted',
+      routeRequestId: 'route-1',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: {},
+      effortApplied: false,
+      promptChars: 1,
+    })
+    expect(appended).toEqual([{ type: 'model-routing/child-decision', data: expect.objectContaining({ reason: 'base-unlisted' }) }])
+    expect(isChildRouteParent({ ...agent, session } as Agent)).toBe(true)
   })
 })

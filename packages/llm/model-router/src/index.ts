@@ -72,7 +72,7 @@ import type {
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
-import { SessionId } from '@shres-code/shres-code-session'
+import { SessionId } from '@shres-code/shres-code-session/types'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
@@ -144,6 +144,7 @@ import type {
 import type {
   ModelRoutingCalibration,
   ModelRoutingCandidate,
+  ModelRoutingChildDecision,
   ModelRoutingDecision,
   ModelRoutingDecisionDetail,
   ModelRoutingEngineFailure,
@@ -1256,6 +1257,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           consumer,
           correlation,
         })
+        if (fitted.kind === 'unfit') {
+          return {
+            decision: {
+              ...keep('invalid-answer').decision,
+              latencyMs: Date.now() - askStarted,
+              ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
+            },
+          }
+        }
         result = fitted.result
       }
     } catch (error: unknown) {
@@ -1269,7 +1279,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
     }
     const latencyMs = Date.now() - askStarted
-    const route = result.answers.find(answer => answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
+    const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
+      answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const identity = {
       ...result.engine === undefined ? {} : { engine: result.engine },
       ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },

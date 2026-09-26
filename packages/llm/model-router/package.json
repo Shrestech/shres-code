@@ -65,7 +65,8 @@
     "@shres-code/shres-code-session-projection-cache": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^",
-    "@shres-code/shres-code-workspace": "workspace:^"
+    "@shres-code/shres-code-workspace": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@shres-code/shres-code-commands": {
@@ -84,6 +85,9 @@
       "optional": true
     },
     "@shres-code/shres-code-workspace": {
+      "optional": true
+    },
+    "@shres-code/shres-code-subagent": {
       "optional": true
     }
   },
