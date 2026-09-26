@@ -1,7 +1,6 @@
 /**
- * Overlay for launcher-hosted replay: disable one-shot and Laya, insert the
- * scripted judge and the replay frontend plugin. Adapter endpoints are
- * redirected by the caller the same way preflight does.
+ * Overlay for launcher-hosted replay: disable one-shot and Laya, pin the
+ * trial persistence root, insert the scripted judge and the replay plugin.
  * @module
  */
 import { dirname, join } from 'node:path'
@@ -12,10 +11,10 @@ export const REPLAY_FRONTEND_PLUGIN_PATH = join(benchRoot, 'routing', 'replay-fr
 export const REPLAY_SCRIPTED_JUDGE_PATH = join(benchRoot, 'routing', 'replay-scripted-judge.mjs')
 
 /**
- * @param {{ pluginPath?: string, judgePath?: string, sinkUrl: string }} input
+ * @param {{ pluginPath?: string, judgePath?: string, sinkUrl: string, sessionLogRoot: string, job: string, out: string }} input
  * @returns {string}
  */
-export function renderReplayFrontendOverlay({ pluginPath, judgePath, sinkUrl }) {
+export function renderReplayFrontendOverlay({ pluginPath, judgePath, sinkUrl, sessionLogRoot, job, out }) {
   const plugin = pluginPath ?? REPLAY_FRONTEND_PLUGIN_PATH
   const judge = judgePath ?? REPLAY_SCRIPTED_JUDGE_PATH
   return [
@@ -26,6 +25,10 @@ export function renderReplayFrontendOverlay({ pluginPath, judgePath, sinkUrl }) 
     '  disabled: true',
     '- id: judgment-laya',
     '  disabled: true',
+    '- id: session-persistence-jsonl',
+    '  config:',
+    '    root: ' + JSON.stringify(sessionLogRoot),
+    '    compression: none',
     '- id: llm-deepseek',
     '  config:',
     '    baseURL: ' + JSON.stringify(sinkUrl),
@@ -34,6 +37,9 @@ export function renderReplayFrontendOverlay({ pluginPath, judgePath, sinkUrl }) 
     '      name: ' + JSON.stringify(judge),
     '    - id: bench-replay-frontend',
     '      name: ' + JSON.stringify(plugin),
+    '      config:',
+    '        job: ' + JSON.stringify(job),
+    '        out: ' + JSON.stringify(out),
     '',
   ].join('\n')
 }

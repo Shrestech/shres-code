@@ -1,7 +1,7 @@
 /**
- * Offline PR16 replay frontend: physical JSONL decode plus public
- * replayConsultInput. Inspect detects synthetic recovery only.
- * load/prepare are never called.
+ * Offline PR16 replay frontend library. Decode physical JSONL, classify
+ * artifacts, and call public replayConsultInput. runtime and persistence are
+ * required; the C prepareCall stand-in is never reached.
  * @module
  */
 import { readFile } from 'node:fs/promises'
@@ -158,50 +158,59 @@ export function classifyArtifact({ header, events, readFrom, inspected }) {
   return { artifact: 'complete' }
 }
 
-function requestConfigFor(arm, composed) {
-  if (arm !== 'C') return composed.routeBase
-  return stripAdapterDefaults(composed.requestConfig)
+function requestConfigFor(arm, requestConfig, routeBase) {
+  if (arm !== 'C') return routeBase
+  return stripAdapterDefaults(requestConfig)
+}
+
+function serializableConsult(result) {
+  return structuredClone(result)
 }
 
 /**
- * Replay one trial log: physical decode, classify, consult, label.
+ * Replay one trial log. runtime and persistence are required.
  * @param {object} input
+ * @returns {Promise<{ artifact: string, rows: object[], consults: object[] }>}
  */
-export async function replayTrialLog({ trial, path, persistence, composed, method, arm, now = Date.now() }) {
+export async function replayTrialLog({
+  trial, path, persistence, runtime, routerConfig, routeBase, trialOwnRoute, requestConfig, ttl, method, arm, now = Date.now(),
+}) {
   parseReplayMethod(method, { require: FRONTEND_METHOD_FIELDS })
+  if (persistence === undefined || typeof persistence.readFrom !== 'function' || typeof persistence.inspect !== 'function') {
+    throw new TypeError('replayTrialLog requires persistence.readFrom and persistence.inspect')
+  }
+  if (runtime === undefined || typeof runtime.resolveModelInfo !== 'function' || typeof runtime.prepareCall !== 'function') {
+    throw new TypeError('replayTrialLog requires runtime.resolveModelInfo and runtime.prepareCall')
+  }
   const bytes = await readFile(path)
   const { header, events } = decodePhysicalJsonl(bytes, path)
   const id = SessionId(header.id)
   const readFrom = await persistence.readFrom(id, 0)
   const inspected = await persistence.inspect(id)
   const { artifact } = classifyArtifact({ header, events, readFrom, inspected })
-  const config = resolveConfig(composed.routerConfig)
-  const ttl = composed.ttl
-  const resolveModelInfo = composed.resolveModelInfo
-    ?? ((provider, model, signal) => composed.llm.resolveModelInfo(provider, model, signal))
-  const runtime = composed.runtime ?? {
-    resolveModelInfo,
-    prepareCall: (callConfig, signal) => composed.llm.prepareCall(callConfig, signal),
-  }
+  const config = 'coldPoints' in routerConfig && 'candidates' in routerConfig
+    ? routerConfig
+    : resolveConfig(routerConfig)
   const coldPoints = []
   const consults = []
+  const resolveModelInfo = runtime.resolveModelInfo.bind(runtime)
   for (const start of events.filter(event => event.type === 'step/start')) {
     const at = { turn: start.data.turn, step: start.data.step, now, seedLength: header.seedLength }
     const result = await replayConsultInput(
       config,
       events,
       at,
-      composed.routeBase,
-      composed.trialOwnRoute,
-      requestConfigFor(arm, composed),
+      routeBase,
+      trialOwnRoute,
+      requestConfigFor(arm, requestConfig, routeBase),
       resolveModelInfo,
       undefined,
       runtime,
     )
-    consults.push({ turn: start.data.turn, step: start.data.step, result })
+    consults.push({ turn: start.data.turn, step: start.data.step, result: serializableConsult(result) })
     if (result.kind === 'warm') continue
     const point = result.coldPoint ?? coldPointAt(
-      events, composed.trialOwnRoute, ttl, now, header.seedLength !== undefined,
+      events, trialOwnRoute, ttl, now, header.seedLength !== undefined,
     )
     if (point === undefined || point === null) continue
     coldPoints.push({
@@ -223,5 +232,5 @@ export async function replayTrialLog({ trial, path, persistence, composed, metho
   const rows = labelled.rows.map(row => (
     artifact === 'open-final-turn' ? { ...row, artifact: 'open-final-turn' } : row
   ))
-  return { artifact, events, header, rows, consults }
+  return { artifact, rows, consults }
 }

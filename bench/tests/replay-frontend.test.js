@@ -1,24 +1,23 @@
-/** Physical JSONL replay frontend: class A/B/C, inspect-only recovery, no HTTP. @module */
+/** Physical JSONL replay frontend: class A/B/C, inspect-only recovery, hosted consults. @module */
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { Context } from '../../vendor/cordis/lib/index.js'
 import { SessionId, SessionStore } from '../../packages/core/session/lib/index.js'
 import { JsonlSessionPersistence } from '../../packages/session/session-persistence-jsonl/lib/index.js'
 import { classifyArtifact, decodePhysicalJsonl, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
-import { renderReplayFrontendOverlay } from '../routing/replay-frontend-overlay.js'
-import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError, parseReplayMethod } from '../routing/replay-method.js'
-import { getArm, renderArmOverlay } from '../runner/arms.js'
-import { startRequestSink, spawnPreflight } from '../runner/preflight-models.js'
+import { hostReplayTrial } from '../routing/replay-frontend-host.js'
+import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError } from '../routing/replay-method.js'
 import { projectKey, encodeSegment } from '../runner/session-layout.js'
 import { fixtureMethod } from './replay-fixture-method.js'
 
 const fixture = new URL('../routing/fixtures/replay-c-label-windows.session.jsonl', import.meta.url)
 const method = fixtureMethod()
+const repo = join(fileURLToPath(new URL('../..', import.meta.url)))
 
 async function withPersistence(bytes, fn) {
   const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
@@ -52,28 +51,29 @@ async function withPersistence(bytes, fn) {
   }
 }
 
-function fakeComposed() {
-  let http = 0
+function passthroughRuntime() {
   return {
-    routerConfig: {
-      initialMode: 'on',
-      candidates: [{ id: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash', description: 'small' }],
-      routeFrom: [{ provider: 'anthropic', model: 'claude-opus-5-5', objective: 'quota' }],
-      downgradeThreshold: 0.8,
-      downgradeMargin: 0.1,
-      routeInstructions: 'Pick the cheapest route that can finish this turn.',
-      difficultyInstructions: 'Rate how much reasoning this turn needs.',
-    },
-    routeBase: { provider: 'anthropic', model: 'claude-opus-5-5' },
-    trialOwnRoute: { provider: 'anthropic', model: 'claude-opus-5-5' },
-    requestConfig: { provider: 'anthropic', model: 'claude-opus-5-5', adapterDefaults: { reasoningEffort: true } },
-    ttl: { ttlMs: 3_600_000, ttlSource: 'adapter' },
-    resolveModelInfo: async (provider, model) => {
-      http++
-      return { provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: 3_600_000 }
-    },
-    http: () => http,
+    resolveModelInfo: async (provider, model) => ({
+      provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: 3_600_000,
+    }),
+    prepareCall: async (config) => ({ config }),
   }
+}
+
+const composedFields = {
+  routerConfig: {
+    initialMode: 'on',
+    candidates: [{ id: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash', description: 'small' }],
+    routeFrom: [{ provider: 'anthropic', model: 'claude-opus-5-5', objective: 'quota' }],
+    downgradeThreshold: 0.8,
+    downgradeMargin: 0.1,
+    routeInstructions: 'Pick the cheapest route that can finish this turn.',
+    difficultyInstructions: 'Rate how much reasoning this turn needs.',
+  },
+  routeBase: { provider: 'anthropic', model: 'claude-opus-5-5' },
+  trialOwnRoute: { provider: 'anthropic', model: 'claude-opus-5-5' },
+  requestConfig: { provider: 'anthropic', model: 'claude-opus-5-5' },
+  ttl: { ttlMs: 3_600_000, ttlSource: 'adapter' },
 }
 
 test('FRONTEND_METHOD_FIELDS are version, coldPointBasis, cRowRequestConfig', () => {
@@ -86,24 +86,18 @@ test('the real 3-spawn fixture is class A and accepted without load/prepare', as
   assert.equal(createHash('sha256').update(bytes).digest('hex'), provenance.sha256)
   const before = await stat(fixture)
   await withPersistence(bytes, async ({ persistence, path, header, load, prepare }) => {
-    const composed = fakeComposed()
     const result = await replayTrialLog({
       trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
       path,
       persistence,
-      composed,
+      runtime: passthroughRuntime(),
+      ...composedFields,
       method,
       arm: 'C',
     })
     assert.equal(result.artifact, 'complete')
-    assert.equal(result.header.id, header.id)
-    assert.equal(result.events[0].seq, 0)
-    assert.equal(result.events.at(-1).seq, result.events.length - 1)
     assert.equal(load.count, 0)
     assert.equal(prepare.count, 0)
-    const after = await stat(path)
-    assert.equal(after.size, bytes.length)
-    assert.equal(after.mtimeMs, (await stat(path)).mtimeMs)
     const decoded = decodePhysicalJsonl(bytes, path)
     const readFrom = await persistence.readFrom(SessionId(header.id), 0)
     assert.deepEqual(decoded.events, readFrom.events)
@@ -121,13 +115,13 @@ test('an open final turn is class B and rows carry the diagnostic artifact', asy
       trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
       path,
       persistence,
-      composed: fakeComposed(),
+      runtime: passthroughRuntime(),
+      ...composedFields,
       method,
       arm: 'C',
     })
     assert.equal(result.artifact, 'open-final-turn')
     assert.ok(result.rows.every(row => row.artifact === 'open-final-turn'))
-    assert.ok(!result.events.some(event => event.type === 'turn/end' && event.data?.reason?.kind === 'interrupted'))
   })
 })
 
@@ -138,7 +132,7 @@ test('a torn last line is class C and refuses the whole replay', async () => {
     await assert.rejects(
       () => replayTrialLog({
         trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
-        path, persistence, composed: fakeComposed(), method, arm: 'C',
+        path, persistence, runtime: passthroughRuntime(), ...composedFields, method, arm: 'C',
       }),
       error => error instanceof TrialInputIncompleteError && /newline/.test(error.message),
     )
@@ -152,7 +146,7 @@ test('a malformed JSON line is class C', async () => {
     await assert.rejects(
       () => replayTrialLog({
         trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
-        path, persistence, composed: fakeComposed(), method, arm: 'C',
+        path, persistence, runtime: passthroughRuntime(), ...composedFields, method, arm: 'C',
       }),
       TrialInputIncompleteError,
     )
@@ -172,7 +166,7 @@ test('a physically present interrupted turn/end is class C', async () => {
     await assert.rejects(
       () => replayTrialLog({
         trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
-        path, persistence, composed: fakeComposed(), method, arm: 'C',
+        path, persistence, runtime: passthroughRuntime(), ...composedFields, method, arm: 'C',
       }),
       error => error instanceof TrialInputIncompleteError && /interrupted recovery/.test(error.message),
     )
@@ -186,7 +180,8 @@ test('a skipped-verifier C trial labels unlabelled/task-outcome-unknown', async 
       trial: { resolved: false, status: 'error', verifier: { command: 'node verify.mjs', exitCode: 0, detail: 'skipped: provider error' } },
       path,
       persistence,
-      composed: fakeComposed(),
+      runtime: passthroughRuntime(),
+      ...composedFields,
       method,
       arm: 'C',
     })
@@ -201,7 +196,7 @@ test('missing frontend method fields refuse rather than consult', async () => {
     await assert.rejects(
       () => replayTrialLog({
         trial: { resolved: true, verifier: { command: 'x', exitCode: 0 } },
-        path, persistence, composed: fakeComposed(), method: { version: 'pr16-replay@1' }, arm: 'C',
+        path, persistence, runtime: passthroughRuntime(), ...composedFields, method: { version: 'pr16-replay@1' }, arm: 'C',
       }),
       error => error instanceof MethodUnpinnedError
         && error.missing.includes('coldPointBasis')
@@ -210,9 +205,22 @@ test('missing frontend method fields refuse rather than consult', async () => {
   })
 })
 
+test('missing prepareCall on runtime throws before consult', async () => {
+  const bytes = await readFile(fixture)
+  await withPersistence(bytes, async ({ persistence, path }) => {
+    await assert.rejects(
+      () => replayTrialLog({
+        trial: { resolved: true, verifier: { command: 'x', exitCode: 0 } },
+        path, persistence, runtime: { resolveModelInfo: async () => ({}) }, ...composedFields, method, arm: 'C',
+      }),
+      error => error instanceof TypeError && /prepareCall/.test(error.message),
+    )
+  })
+})
+
 test('C requestConfig strips adapterDefaults and does not invent maxTokens', () => {
-  const composed = fakeComposed()
-  const stripped = { ...composed.requestConfig }
+  const requestConfig = { provider: 'anthropic', model: 'claude-opus-5-5', adapterDefaults: { reasoningEffort: true } }
+  const stripped = { ...requestConfig }
   delete stripped.adapterDefaults
   assert.deepEqual(stripped, { provider: 'anthropic', model: 'claude-opus-5-5' })
   assert.equal('maxTokens' in stripped, false)
@@ -229,66 +237,46 @@ test('seeded headers are refused', () => {
   )
 })
 
-test('launcher-hosted R composition uses ctx.llm and currentSelection with zero HTTP', async () => {
-  const repo = join(fileURLToPath(new URL('../..', import.meta.url)))
-  const bench = join(fileURLToPath(new URL('..', import.meta.url)))
-  const root = await mkdtemp(join(tmpdir(), 'bench-replay-hosted-'))
-  const home = join(root, 'home')
-  const scratchDir = join(root, 'cwd')
-  await mkdir(home)
-  await mkdir(scratchDir)
-  const sink = await startRequestSink()
+test('launcher-hosted consults run inside the live plugin with real prepareCall', async () => {
+  const bytes = await readFile(fixture)
+  const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
+  const plant = await mkdtemp(join(tmpdir(), 'bench-replay-plant-'))
+  const dir = join(plant, projectKey(header.cwd), encodeSegment(header.id))
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, 'session.jsonl')
+  await writeFile(path, bytes)
+  const before = await stat(path)
   try {
-    const armOverlay = renderArmOverlay(getArm('route-coldpoint'), { sessionLogRoot: join(scratchDir, 'sessions') })
-    const armPath = join(root, 'arm.patch.yml')
-    const overlayPath = join(root, 'replay.patch.yml')
-    await writeFile(armPath, armOverlay)
-    await writeFile(overlayPath, renderReplayFrontendOverlay({ sinkUrl: sink.sinkUrl }))
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/.test(key)))
-    const spawned = await spawnPreflight({
+    const hosted = await hostReplayTrial({
       repoRoot: repo,
-      scratchDir,
-      armOverlayPath: armPath,
-      overlayPath,
-      homeDir: home,
-      env,
+      trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+      path,
+      arm: 'C',
+      method,
+      trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
     })
-    assert.equal(spawned.line.ok, true, JSON.stringify(spawned.line) + '\n' + spawned.stderr)
-    assert.deepEqual(spawned.line.routeBase, { provider: 'anthropic', model: 'claude-opus-5-5' })
-    assert.deepEqual(spawned.line.requestConfig, { provider: 'anthropic', model: 'claude-opus-5-5' })
-    assert.equal('adapterDefaults' in spawned.line.requestConfig, false)
-    assert.equal('maxTokens' in spawned.line.requestConfig, false)
-    assert.equal(spawned.line.http, 0)
-    assert.equal(sink.count(), 0)
-    const bytes = await readFile(fixture)
-    await withPersistence(bytes, async ({ persistence, path }) => {
-      const composed = {
-        routerConfig: {
-          initialMode: spawned.line.routerConfig.initialMode,
-          candidates: spawned.line.routerConfig.candidates,
-          routeFrom: spawned.line.routerConfig.routeFrom,
-          downgradeThreshold: spawned.line.routerConfig.downgradeThreshold,
-          downgradeMargin: spawned.line.routerConfig.downgradeMargin,
-          routeInstructions: 'Which route should handle this turn?',
-          difficultyInstructions: 'How hard is this turn?',
-        },
-        routeBase: spawned.line.routeBase,
-        trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-        requestConfig: spawned.line.requestConfig,
-        ttl: spawned.line.ttl,
-        resolveModelInfo: async (provider, model) => ({
-          provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: spawned.line.ttl.ttlMs,
-        }),
-      }
-      const result = await replayTrialLog({
-        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
-        path, persistence, composed, method, arm: 'C',
-      })
-      assert.equal(result.artifact, 'complete')
-      assert.ok(result.consults.length > 0)
-    })
+    assert.equal(hosted.status.ok, true)
+    assert.equal(hosted.sink, 0)
+    assert.equal(hosted.summary.http, 0)
+    assert.equal(hosted.summary.artifact, 'complete')
+    assert.deepEqual(hosted.summary.routeBase, { provider: 'anthropic', model: 'claude-opus-5-5' })
+    assert.equal('adapterDefaults' in hosted.summary.requestConfig, false)
+    assert.equal('maxTokens' in hosted.summary.requestConfig, false)
+    const judged = hosted.summary.kinds.ask + hosted.summary.kinds.ineligible
+    assert.equal(hosted.summary.counts.prepareCall, judged * 2)
+    const judgedConsults = hosted.consults.filter(entry => entry.result.kind === 'ask' || entry.result.kind === 'ineligible')
+    assert.ok(judgedConsults.length > 0)
+    for (const entry of judgedConsults) {
+      const assessments = entry.result.eligibility?.assessments ?? []
+      const flash = assessments.find(item => item.candidateId === 'flash' || item.id === 'flash' || item.model === 'deepseek-v4-flash')
+        ?? assessments[0]
+      assert.equal(flash?.reasoningEffort, 'high', JSON.stringify(flash))
+      assert.ok(typeof flash?.effectiveMaxTokens === 'number' && flash.effectiveMaxTokens > 0)
+    }
+    const after = await stat(path)
+    assert.equal(after.size, before.size)
+    assert.equal(after.mtimeMs, before.mtimeMs)
   } finally {
-    await sink.close()
-    await rm(root, { recursive: true, force: true })
+    await rm(plant, { recursive: true, force: true })
   }
 })
