@@ -6,7 +6,7 @@
  */
 
 import type { ModelSelection } from '@shres-code/shres-code-agent'
-import type { LlmCallConfig, LlmResolvedModelInfo, LlmRuntime, Message } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig, LlmRuntime, Message } from '@shres-code/shres-code-llm'
 import type { JudgmentQuestion } from '@shres-code/shres-code-judgment'
 import { deriveEventMessage, foldSurface } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
@@ -85,7 +85,10 @@ export type ConsultCachePolicy =
   | { readonly kind: 'live-eligibility' }
   | { readonly kind: 'replay-resolve' }
 
-/** Inputs the shared producer reads. Live and replay both fill this. */
+/** Composed model lookup and preparation used by one consult. */
+type ConsultRuntime = Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
+
+/** Inputs the shared producer reads. Live and replay supply the composed runtime. */
 export interface ConsultInputSource {
   readonly config: ResolvedModelRouterConfig
   readonly prefix: readonly SessionEvent[]
@@ -94,9 +97,8 @@ export interface ConsultInputSource {
   readonly routeBase: ModelSelection
   readonly coldPointBase: ModelSelection
   readonly at: ReplayConsultAt
-  readonly resolveModelInfo: (provider: string, model: string, signal?: AbortSignal) => Promise<LlmResolvedModelInfo>
-  /** Live LLM runtime when present so eligibility uses prepareCall; replay may omit it. */
-  readonly runtime?: Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
+  /** Metadata and preparation share the same provider registrations. */
+  readonly runtime: ConsultRuntime
   readonly signal?: AbortSignal
   /** Required TTL / cache.base policy; no default. */
   readonly cachePolicy: ConsultCachePolicy
@@ -217,12 +219,12 @@ function difficultyQuestion(config: ResolvedModelRouterConfig, instructions: str
 async function cacheTtl(
   config: ResolvedModelRouterConfig,
   base: ModelSelection,
-  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
+  runtime: ConsultRuntime,
   signal?: AbortSignal,
 ): Promise<ModelRoutingCacheTtl> {
   let declared: number | undefined
   try {
-    declared = (await resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
+    declared = (await runtime.resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
   } catch {
     signal?.throwIfAborted()
   }
@@ -231,13 +233,7 @@ async function cacheTtl(
     : { ttlMs: declared, ttlSource: 'adapter' }
 }
 
-/**
- * Shared producer: coldPoint, eligibility, states, questions, consultKey, cache.
- * No slicing and no replay refusals. Live `decide()` supplies the live log and
- * request messages; the replay wrapper slices first.
- * @param src - live or replay consult inputs.
- * @returns warm, ineligible, or ask.
- */
+/** Report the manual base with the already-resolved cache lifetime. */
 function cacheBaseFromTtl(routeBase: ModelSelection, ttl: ModelRoutingCacheTtl): ReplayConsultCache {
   return {
     base: { provider: routeBase.provider, model: routeBase.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource },
@@ -268,16 +264,12 @@ function cacheBaseFromEligibility(
  * @returns warm, ineligible, or ask.
  */
 export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
-  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal, cachePolicy } = src
+  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, runtime, signal, cachePolicy } = src
   const from = routeFromFor(config, routeBase)
   const consultKey = `turn:${at.turn}/step:${at.step}`
   const quotaGate = from?.objective === 'quota' && from.allowEveryTurn !== true
-  const eligibilityRuntime = src.runtime ?? {
-    resolveModelInfo,
-    prepareCall: async (callConfig: LlmCallConfig) => ({ config: callConfig }),
-  }
   const runEligibility = () => assessModelRoutingCandidates(
-    eligibilityRuntime as never,
+    runtime,
     requestConfig,
     messages,
     config.candidates,
@@ -329,7 +321,7 @@ export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayC
   }
   const ttl = cachePolicy.kind === 'live-given'
     ? cachePolicy.ttl
-    : await cacheTtl(config, routeBase, resolveModelInfo, signal)
+    : await cacheTtl(config, routeBase, runtime, signal)
   const cache = cacheBaseFromTtl(routeBase, ttl)
   const observedCold = quotaGate
     ? coldPointAt(prefix, coldPointBase, ttl, at.now, at.seedLength !== undefined)
@@ -353,9 +345,8 @@ export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayC
  * @param routeBase - manual route the consult compares against.
  * @param coldPointBase - route whose prompt-cache lifetime is folded.
  * @param requestConfig - live request config; never read from the log.
- * @param resolveModelInfo - adapter metadata lookup for TTL and eligibility.
+ * @param runtime - composed LLM runtime; prepares base and candidate calls as live routing does.
  * @param signal - optional cancellation.
- * @param runtime - optional live LLM runtime so eligibility can call prepareCall.
  * @returns the shared producer result after replay-only refusals.
  */
 export async function replayConsultInput(
@@ -365,9 +356,8 @@ export async function replayConsultInput(
   routeBase: ModelSelection,
   coldPointBase: ModelSelection,
   requestConfig: LlmCallConfig,
-  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
+  runtime: ConsultRuntime,
   signal?: AbortSignal,
-  runtime?: ConsultInputSource['runtime'],
 ): Promise<ReplayConsultInput> {
   const prefix = consultPrefix(events, at.turn, at.step)
   if (!sameRoute(routeBase, coldPointBase)) conversationRoute(events)
@@ -391,9 +381,8 @@ export async function replayConsultInput(
     routeBase,
     coldPointBase,
     at,
-    resolveModelInfo,
+    runtime,
     cachePolicy: { kind: 'replay-resolve' },
     ...signal === undefined ? {} : { signal },
-    ...runtime === undefined ? {} : { runtime },
   })
 }

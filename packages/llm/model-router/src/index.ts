@@ -1819,7 +1819,6 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       routeBase: base,
       coldPointBase: base,
       at: { turn, step, now, seedLength: session.header.seedLength },
-      resolveModelInfo: (provider, model, consultSignal) => llm.resolveModelInfo(provider, model, consultSignal),
       runtime: llm,
       signal,
       cachePolicy: liveTtl === undefined ? { kind: 'live-eligibility' } : { kind: 'live-given', ttl: liveTtl },
