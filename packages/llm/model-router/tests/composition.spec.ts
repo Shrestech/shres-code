@@ -781,6 +781,13 @@ describe('real Loader composition', () => {
     await workspace.attachSession(live.session.id)
     const liveStats = loaded.sessionProjections.snapshot(live.session).values.modelRoutingStats!
 
+    // Settled read: both folds must still hold their barrier values when the
+    // rollup reads them, or the sum races the projection cache's write-behind.
+    await vi.waitFor(() => {
+      expect(loaded.sessionProjectionCache.cachedSnapshot(header)?.values.modelRoutingStats).toEqual(closedStats)
+      expect(loaded.sessionProjections.snapshot(live.session).values.modelRoutingStats!).toEqual(liveStats)
+    })
+
     const stats = await loaded.modelRouting.workspaceStats({ workspaceId: workspace.id, range: 'all' })
     expect(stats.sessions).toEqual({ members: 2, summarized: 2, inRange: 2, included: 2, capped: false })
     for (const key of Object.keys(stats.counts) as (keyof typeof stats.counts)[]) {
