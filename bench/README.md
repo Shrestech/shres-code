@@ -340,6 +340,20 @@ node --test bench/tests/replay-frontend.test.js bench/tests/routing-replay-metri
 Before key resolution, the runner boots the real launcher once per selected routing-measurement arm through [the metadata preflight](runner/preflight-models.js). S/C/R/N are supported; T is refused until its consumer composition is available. The preflight uses [the trial renderer](runner/arms.js), including adopted confirmatory R/N bodies, before adding an overlay that disables the one-shot runner and startup row and inserts [the metadata plugin](routing/preflight-plugin.mjs). Arm C remains always-cheap and refuses any worker-escalation row. The plugin awaits the loader, resolves conversation and candidate routes through the adapter registry, prints one JSON result and exits without a task or session.
 
 [The source launcher](runner/execute.js) pins `TSX_TSCONFIG_PATH` to the repository tsconfig for every spawn, so scratch working directories retain workspace source resolution. Preflight uses an empty scratch cwd and home. Selected fixtures containing `cordis.yml`, `cordis.patch.yml`, `.shres`, `.agents` or `AGENTS.md` are refused because the empty cwd does not represent that launcher context. Every configured adapter endpoint points to a loopback sink whose request count must remain zero; any session log also refuses the result. The tests require installed workspace links and `pnpm run build` outputs.
+### Calibration replay
+
+[`routing/calibrate.js`](routing/calibrate.js) reads every recorded S/C trial, prepares and judges eligible consults in the launcher composition, and publishes labelled scores, consults, ask outcomes, metrics and a hash manifest. It requires built host artifacts and a complete owner method. The committed registration refuses before any child starts because its method is unpinned. Real judging and trial collection require the separate owner approvals; keyless fixtures do not provide measurement evidence.
+
+```sh
+node bench/routing/calibrate.js --experiment-dir <run-dir> --registration <file> --task-root <tasks-dir> --out <new-dir>
+```
+
+Judging uses the R composition unless `--judge-fixture <module>`, `--judge-fixture-config <json-file>` and `--judge-fixture-engine <id>` explicitly select a keyless fixture; `--judge-fixture-disabled` is restricted to that fixture mode. Fixture outputs are test evidence, not real calibration. `--extra-overlay <file>` supplies an explicit composition overlay. `--write-registration` additionally requires `--seed <integer>` and `--overlays-out <new-dir>`; no seed is inferred. Existing output paths are refused. Evidence files are staged in a private sibling directory and published together; a corrupt-input trial leaves no published output. Registration finalization runs last through the one-shot writer.
+
+Exit codes are `0` for completed evidence, `2` for input or method refusal, `3` for the combined corrupt-trial refusal, and `4` for a registration validation refusal after evidence publication. Exit `4` keeps the complete output directory. Unexpected execution or I/O failures exit `1` and must be investigated separately.
+
+Answered S rows retain unknown labels under the supported S label source, so they prevent evaluation of the label-dependent replay gate. The driver neither drops those rows nor assigns labels. A valid output directory can therefore contain an unevaluated gate, and `--write-registration` refuses it. An all-unanswered run can evaluate a failed gate, but it cannot establish routing quality.
+
 ## Known limitations and deferred work
 
 - **The arm-integrity audit is one-directional.** It checks presence where a surface is expected and absence where it is excluded (an arm that must not mount jspace logs no `jspace/` event, a routing arm logs a decision on every session that ran a turn). There is no inverse leakage check: an event type no arm expects, or a surface that reaches a session through the profile rather than the arm's overlay, is not audited, so a violation of that direction is invisible to `trial.integrity.violations`.
