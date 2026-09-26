@@ -23,11 +23,14 @@ import type { SessionEvent } from '@shres-code/shres-code-session'
  * the mode is off instead of only proving that an absent package is absent.
  *
  * Child-route arms pin parent logs plus each child's own session log. Spawn
- * carries `subagent/descriptor.agentRouteRequestId`; fork does not. Shadow
- * logs `shadow: true` and keeps the child's header on the inherited model.
+ * carries `subagent/descriptor.agentRouteRequestId`; fork never dispatches
+ * child-route. A fork copies the parent seed (`seedLength`); its own first
+ * `request/header` is the first header with `seq >= seedLength` and stays on
+ * the manual base. Shadow logs `shadow: true` and does not rewrite the child.
  * `judge: true` records `child-judged`. Two countable candidate failures
- * (`QUOTA`, not retryable; `SERVER` would also count after retries are exhausted)
- * suspend that candidate so the next child is kept with `child-route-errors`.
+ * (`QUOTA` is not retryable, so the scripted count is exact; `SERVER` also
+ * counts after retries are exhausted) suspend that candidate so the next child
+ * is kept with `child-route-errors`.
  */
 
 const testsDir = dirname(fileURLToPath(import.meta.url))
@@ -249,6 +252,21 @@ function childHeaderModel(content: string): string | undefined {
     if (line.trim() === '') continue
     const event = JSON.parse(line) as { type?: string; data?: { header?: { config?: { model?: string } } } }
     if (event.type === 'request/header') return event.data?.header?.config?.model
+  }
+  return undefined
+}
+
+/** Model on the first request/header at or after the fork seed, when present. */
+function ownHeaderModelAfterSeed(content: string): string | undefined {
+  const headerLine = content.split('\n', 1)[0]
+  if (headerLine === undefined || headerLine.trim() === '') return undefined
+  const session = JSON.parse(headerLine) as { seedLength?: unknown }
+  if (typeof session.seedLength !== 'number') return undefined
+  for (const line of content.split('\n').slice(1)) {
+    if (line.trim() === '') continue
+    const event = JSON.parse(line) as { type?: string; seq?: number; data?: { header?: { config?: { model?: string } } } }
+    if (event.type !== 'request/header' || typeof event.seq !== 'number' || event.seq < session.seedLength) continue
+    return event.data?.header?.config?.model
   }
   return undefined
 }
@@ -980,9 +998,11 @@ describe('headless model-routing snapshots', () => {
       expect(childHeaderModel(spawnChild)).toBe('deepseek-v4-flash')
       const forkChild = children.find(content => !content.includes('"agentRouteRequestId"'))
       if (forkChild === undefined) throw new Error('model-router-subagent persisted no inherited fork child log')
-      const parentHeader = events.filter(event => event['type'] === 'request/header').at(-1) as { data?: { header?: { config?: { model?: string } } } } | undefined
-      expect(childHeaderModel(forkChild)).toBe(parentHeader?.data?.header?.config?.model)
+      expect(ownHeaderModelAfterSeed(forkChild)).toBe('deepseek-v4-pro')
+      expect(forkChild).toContain('"provider":"fork"')
+      expect(forkChild).not.toContain('model-routing/child-decision')
       expect(childDecisions).toHaveLength(1)
+      expect(childDecisions[0]).toMatchObject({ data: { childKind: 'subagent', outcome: 'routed' } })
       await expectArmFixtures('model-router-subagent', output)
       await expectChildFixtures('model-router-subagent', children)
     } finally {

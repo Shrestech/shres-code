@@ -30,6 +30,14 @@ describe('classifyChildTurn', () => {
 
   it('counts LlmError codes other than UNKNOWN on-selection as failure', () => {
     expect(classifyChildTurn(turn('error'), SELECTION)).toEqual({ countedAs: 'failure', failureCode: 'QUOTA' })
+    for (const code of ['SERVER', 'TRANSPORT'] as const) {
+      const known: ChildTurnOutcome = {
+        turn: 1,
+        reason: { kind: 'error', error: { code, message: code.toLowerCase() } },
+        route: SELECTION,
+      }
+      expect(classifyChildTurn(known, SELECTION)).toEqual({ countedAs: 'failure', failureCode: code })
+    }
     const unknown: ChildTurnOutcome = {
       turn: 1,
       reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'tool' } },

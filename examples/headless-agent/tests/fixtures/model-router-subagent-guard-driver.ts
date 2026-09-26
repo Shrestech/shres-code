@@ -51,7 +51,7 @@ try {
     try {
       await spawned.result
     } catch {
-      // The first two children fail on the candidate (quota). The third is kept.
+      // The first two children fail on the candidate with unretryable QUOTA. The third is kept.
     }
     await spawned.dispose()
     if (index === 2) {
