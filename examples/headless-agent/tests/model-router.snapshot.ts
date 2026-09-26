@@ -21,6 +21,13 @@ import type { SessionEvent } from '@shres-code/shres-code-session'
  * The OFF arm composes the router rather than omitting it: a composed-but-off
  * tree is the stronger claim, because it proves the package writes nothing while
  * the mode is off instead of only proving that an absent package is absent.
+ *
+ * Child-route arms pin parent logs plus each child's own session log. Spawn
+ * carries `subagent/descriptor.agentRouteRequestId`; fork does not. Shadow
+ * logs `shadow: true` and keeps the child's header on the inherited model.
+ * `judge: true` records `child-judged`. Two countable candidate failures
+ * (`QUOTA`, not retryable; `SERVER` would also count after retries are exhausted)
+ * suspend that candidate so the next child is kept with `child-route-errors`.
  */
 
 const testsDir = dirname(fileURLToPath(import.meta.url))
@@ -40,7 +47,7 @@ interface Arm {
   /** Fixture holding the prompt both arms run. */
   readonly promptFixture: string
   /** Fixture driver that owns an explicit create/dispose/resume or select lifecycle, instead of the headless driver. */
-  readonly driver?: 'model-router-resume-driver' | 'model-router-unmount-driver' | 'model-router-select-driver' | 'model-router-subagent-driver'
+  readonly driver?: 'model-router-resume-driver' | 'model-router-unmount-driver' | 'model-router-select-driver' | 'model-router-subagent-driver' | 'model-router-subagent-shadow-driver' | 'model-router-subagent-judge-driver' | 'model-router-subagent-guard-driver'
 }
 
 /** One arm's harvested, normalized outputs. */
@@ -49,6 +56,8 @@ interface ArmOutput {
   readonly stream: string
   /** Normalized durable session log. */
   readonly session: string
+  /** Normalized child session logs, spawn-order, when the driver persists children. */
+  readonly children?: readonly string[]
 }
 
 /** Parse newline-delimited JSON records. */
@@ -145,6 +154,7 @@ async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
   const driver = arm.driver === undefined ? binScript : join(testsDir, 'fixtures', `${arm.driver}.ts`)
   let runCwd = ''
   let rawSession: string | undefined
+  let harvestedChildren: string[] = []
   const result = await runLoaderSmoke({
     label: `model routing ${arm.promptFixture} headless stream-json snapshot`,
     tempDirPrefix: `headless-snapshot-model-router-${arm.promptFixture}-`,
@@ -163,18 +173,25 @@ async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
     inspect: async (cwd) => {
       const root = join(cwd, '.sessions')
       const logs = (await readdir(root, { recursive: true })).filter(name => name.endsWith('.jsonl')).sort()
-      if (arm.driver === 'model-router-subagent-driver') {
+      const isChildDriver = arm.driver === 'model-router-subagent-driver'
+        || arm.driver === 'model-router-subagent-shadow-driver'
+        || arm.driver === 'model-router-subagent-judge-driver'
+        || arm.driver === 'model-router-subagent-guard-driver'
+      if (isChildDriver) {
         expect(logs.length).toBeGreaterThanOrEqual(2)
-        let parent: string | undefined
-        for (const name of logs) {
-          const content = await readFile(join(root, name), 'utf8')
-          if (content.includes('model-routing/child-decision')) {
-            parent = content
-            break
-          }
-        }
+        const contents = await Promise.all(logs.map(name => readFile(join(root, name), 'utf8')))
+        const parsed = contents.map((content) => {
+          const header = JSON.parse(content.split('\n', 1)[0] ?? '{}') as { id?: unknown; parentSession?: unknown }
+          return { content, header }
+        })
+        const parent = parsed.find(entry => typeof entry.header.parentSession !== 'string'
+          && entry.content.includes('model-routing/child-decision'))
         if (parent === undefined) throw new Error(`${arm.promptFixture} persisted no parent child-decision log`)
-        rawSession = parent
+        rawSession = parent.content
+        harvestedChildren = parsed
+          .filter(entry => typeof entry.header.parentSession === 'string')
+          .map(entry => entry.content)
+          .sort((a, b) => firstUserPrompt(a).localeCompare(firstUserPrompt(b)))
       } else {
         expect(logs).toHaveLength(1)
         rawSession = await readFile(join(root, logs[0]!), 'utf8')
@@ -184,9 +201,20 @@ async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
   expect(result.stderr).toBe('')
   if (rawSession === undefined) throw new Error(`${arm.promptFixture} did not persist a comparable session`)
   const session = rawSession.split('\n').filter(l => l.trim().length > 0).map(quantizeDecisionTimingsLine).join('\n') + '\n'
+  const parentContext = logContext(session)
+  const children = harvestedChildren.map((content) => {
+    const quantized = content.split('\n').filter(l => l.trim().length > 0).map(quantizeDecisionTimingsLine).join('\n') + '\n'
+    const childHeader = JSON.parse(quantized.split('\n', 1)[0] ?? '{}') as { id?: unknown }
+    const childId = typeof childHeader.id === 'string' ? childHeader.id : ''
+    return scrubRequestHeaders(normalizeSessionLog(quantized, {
+      sessionIds: [...parentContext.sessionIds, ...childId === '' ? [] : [childId]],
+      cwd: parentContext.cwd,
+    }))
+  })
   return {
     stream: normalizedStream(result.stdout, runCwd),
-    session: scrubRequestHeaders(normalizeSessionLog(session, logContext(session))),
+    session: scrubRequestHeaders(normalizeSessionLog(session, parentContext)),
+    ...children.length === 0 ? {} : { children },
   }
 }
 
@@ -201,6 +229,37 @@ async function expectArmFixtures(fixture: string, output: ArmOutput): Promise<vo
   }
   expect(output.session).toBe(await readFile(sessionFixture, 'utf8'))
   expect(output.stream).toBe(await readFile(streamFixture, 'utf8'))
+}
+
+/** First user-message text in a persisted child log, used to order fixtures. */
+function firstUserPrompt(content: string): string {
+  for (const line of content.split('\n')) {
+    if (line.trim() === '') continue
+    const event = JSON.parse(line) as { type?: string; data?: { content?: Array<{ type?: string; text?: string }> } }
+    if (event.type !== 'user/message') continue
+    const text = event.data?.content?.find(block => block.type === 'text')?.text
+    if (typeof text === 'string') return text
+  }
+  return ''
+}
+
+/** Model on the child's first request/header, when present. */
+function childHeaderModel(content: string): string | undefined {
+  for (const line of content.split('\n')) {
+    if (line.trim() === '') continue
+    const event = JSON.parse(line) as { type?: string; data?: { header?: { config?: { model?: string } } } }
+    if (event.type === 'request/header') return event.data?.header?.config?.model
+  }
+  return undefined
+}
+
+/** Compare one arm's child logs with committed child.expected.jsonl files. */
+async function expectChildFixtures(fixture: string, children: readonly string[]): Promise<void> {
+  for (const [index, content] of children.entries()) {
+    const path = join(snapshotsDir, fixture, index === 0 ? 'child.expected.jsonl' : `child.${String(index)}.expected.jsonl`)
+    if (refreshing) await writeFile(path, content)
+    else expect(content).toBe(await readFile(path, 'utf8'))
+  }
 }
 
 /** The session-event records of a normalized transcript. */
@@ -914,7 +973,90 @@ describe('headless model-routing snapshots', () => {
       const models = server.requests.map((_, index) => requestedModel(server, index))
       expect(models).toContain('deepseek-v4-flash')
       expect(models).toContain('deepseek-v4-pro')
+      const children = output.children ?? []
+      expect(children).toHaveLength(2)
+      const spawnChild = children.find(content => content.includes('"agentRouteRequestId"'))
+      if (spawnChild === undefined) throw new Error('model-router-subagent persisted no routed spawn child log')
+      expect(childHeaderModel(spawnChild)).toBe('deepseek-v4-flash')
+      const forkChild = children.find(content => !content.includes('"agentRouteRequestId"'))
+      if (forkChild === undefined) throw new Error('model-router-subagent persisted no inherited fork child log')
+      const parentHeader = events.filter(event => event['type'] === 'request/header').at(-1) as { data?: { header?: { config?: { model?: string } } } } | undefined
+      expect(childHeaderModel(forkChild)).toBe(parentHeader?.data?.header?.config?.model)
+      expect(childDecisions).toHaveLength(1)
       await expectArmFixtures('model-router-subagent', output)
+      await expectChildFixtures('model-router-subagent', children)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('shadows a child-decision and keeps the child header on the inherited route', async () => {
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-subagent-shadow.cordis.snapshot.yml'),
+        promptFixture: 'model-router-subagent-shadow',
+        driver: 'model-router-subagent-shadow-driver',
+      }, server)
+      const childDecisions = parseJsonl(output.session).filter(event => event['type'] === 'model-routing/child-decision')
+      expect(childDecisions.some(event => (event['data'] as { shadow?: boolean }).shadow === true)).toBe(true)
+      const child = output.children?.[0]
+      if (child === undefined) throw new Error('model-router-subagent-shadow persisted no child log')
+      expect(child).toContain('deepseek-v4-pro')
+      expect(child).not.toContain('deepseek-v4-flash')
+      await expectArmFixtures('model-router-subagent-shadow', output)
+      await expectChildFixtures('model-router-subagent-shadow', output.children ?? [])
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('judges a child route with the scripted engine and runs the selected candidate', async () => {
+    const server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText: SUCCESS_TEXT })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-subagent-judge.cordis.snapshot.yml'),
+        promptFixture: 'model-router-subagent-judge',
+        driver: 'model-router-subagent-judge-driver',
+      }, server)
+      const childDecisions = parseJsonl(output.session).filter(event => event['type'] === 'model-routing/child-decision')
+      expect(childDecisions.some(event => (event['data'] as { reason?: string }).reason === 'child-judged')).toBe(true)
+      const child = output.children?.[0]
+      if (child === undefined) throw new Error('model-router-subagent-judge persisted no child log')
+      expect(child).toContain('agentRouteRequestId')
+      expect(child).toContain('deepseek-v4-flash')
+      await expectArmFixtures('model-router-subagent-judge', output)
+      await expectChildFixtures('model-router-subagent-judge', output.children ?? [])
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('suspends a candidate after two countable child failures and keeps the third child inherited', async () => {
+    const server = await startMockLlmServer({
+      sequence: ['success', 'quota_exceeded', 'quota_exceeded', 'success'],
+      repeatLast: false,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-subagent-guard.cordis.snapshot.yml'),
+        promptFixture: 'model-router-subagent-guard',
+        driver: 'model-router-subagent-guard-driver',
+      }, server)
+      const events = parseJsonl(output.session)
+      const outcomes = events.filter(event => event['type'] === 'model-routing/child-outcome')
+      expect(outcomes.filter(event => (event['data'] as { countedAs?: string }).countedAs === 'failure').length).toBe(2)
+      const decisions = events.filter(event => event['type'] === 'model-routing/child-decision')
+      expect(decisions.at(-1)).toMatchObject({ data: { outcome: 'kept', reason: 'child-route-errors' } })
+      const children = output.children ?? []
+      expect(children).toHaveLength(3)
+      expect(childHeaderModel(children[0]!)).toBe('deepseek-v4-flash')
+      expect(childHeaderModel(children[1]!)).toBe('deepseek-v4-flash')
+      expect(childHeaderModel(children[2]!)).toBe('deepseek-v4-pro')
+      await expectArmFixtures('model-router-subagent-guard', output)
+      await expectChildFixtures('model-router-subagent-guard', output.children ?? [])
     } finally {
       await server.close()
     }

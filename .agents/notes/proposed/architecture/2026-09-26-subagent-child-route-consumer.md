@@ -12,7 +12,7 @@ The controller registers `subagent/child-route` (next() first). Off and unmatche
 
 Live `subagent/end` and parent attach reconcile missing outcomes via `SubagentRuntime.childTurnOutcomes`. Classification uses the route in force, not stopReason: completed-on-selection is success; LlmError codes other than UNKNOWN on-selection are failure; max-tokens, abort, interrupt, blocked, UNKNOWN, and off-selection errors are neutral. Neutral never resets. Dedupe key is `(routeRequestId, childTurn)`. Events are required-on-read.
 
-Stats fold `children`/`recentChildren`, Settings Subagent routing (schema-gated), parent Routing KPI/card, child-session notice, and Trajectory CHILD-ROUTE rows ship with the consumer. A routed child's first `request/header` must match the parent `model-routing/child-decision` selection (runtime-owned join via the live session store and `childTurnOutcomes`; missing/corrupt/no-persistence/not-a-child stay unavailable). The keyless `model-router-subagent` snapshot starts a real spawn (routed) and fork (inherited) through `resolveChildRoute` + `ctx.subagents.start`. Web GIF remains Lead-only.
+Stats fold `children`/`recentChildren`, Settings Subagent routing (schema-gated), parent Routing KPI/card, child-session notice, and Trajectory CHILD-ROUTE rows ship with the consumer. A routed child's first `request/header` must match the parent `model-routing/child-decision` selection (runtime-owned join via the live session store and `childTurnOutcomes`; missing/corrupt/no-persistence/not-a-child stay unavailable). The keyless `model-router-subagent` snapshot starts a real spawn (routed) and fork (inherited) through `resolveChildRoute` + `ctx.subagents.start`, and pins each child's own session log. Follow-up arms pin shadow inheritance, `judge: true` / `child-judged`, and two countable candidate failures then `child-route-errors`. Web GIF remains Lead-only.
 
 ## Alternatives considered
 
@@ -38,4 +38,4 @@ Stats fold `children`/`recentChildren`, Settings Subagent routing (schema-gated)
 
 ## Verification
 
-Covered by the acceptance criteria above.
+Covered by the acceptance criteria above. Keyless child-log snapshots: `model-router-subagent` (spawn + fork), `model-router-subagent-shadow`, `model-router-subagent-judge`, `model-router-subagent-guard`. Countable child failure is an on-selection LlmError other than UNKNOWN; the guard arm scripts `quota_exceeded` → `QUOTA` (not retryable). `server_error` maps to `SERVER`, which also counts, but default retries would swallow it.
