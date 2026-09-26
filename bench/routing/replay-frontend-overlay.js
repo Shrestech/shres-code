@@ -1,6 +1,6 @@
 /**
- * Overlay for launcher-hosted replay: disable one-shot and Laya, pin the
- * trial persistence root, insert the scripted judge and the replay plugin.
+ * Overlay for launcher-hosted replay: disable one-shot, pin persistence, and
+ * insert the replay plugin. Judge mode decides Laya and which engine is inserted.
  * @module
  */
 import { dirname, join } from 'node:path'
@@ -12,20 +12,20 @@ export const REPLAY_SCRIPTED_JUDGE_PATH = join(benchRoot, 'routing', 'replay-scr
 export const REPLAY_SCRIPTED_FITTING_JUDGE_PATH = join(benchRoot, 'routing', 'replay-scripted-fitting-judge.mjs')
 
 /**
- * @param {{ pluginPath?: string, judgePath?: string, sinkUrl: string, sessionLogRoot: string, job: string, out: string }} input
+ * @param {{ pluginPath?: string, judgePath?: string, fittingJudgePath?: string, fittingJudgeConfig?: object, sinkUrl: string, sessionLogRoot: string, job: string, out: string, judgeMode?: 'off'|'composition'|'fixture' }} input
  * @returns {string}
  */
 export function renderReplayFrontendOverlay({
   pluginPath, judgePath, fittingJudgePath, fittingJudgeConfig, sinkUrl, sessionLogRoot, job, out,
-  omitScriptedJudge = false,
+  judgeMode = 'off',
 }) {
   const plugin = pluginPath ?? REPLAY_FRONTEND_PLUGIN_PATH
-  const judge = judgePath ?? REPLAY_SCRIPTED_JUDGE_PATH
+  const placeholder = judgePath ?? REPLAY_SCRIPTED_JUDGE_PATH
   const inserts = []
-  if (omitScriptedJudge !== true) {
-    inserts.push('    - id: bench-replay-scripted-judge', '      name: ' + JSON.stringify(judge))
+  if (judgeMode === 'off') {
+    inserts.push('    - id: bench-replay-scripted-judge', '      name: ' + JSON.stringify(placeholder))
   }
-  if (fittingJudgePath !== undefined) {
+  if (judgeMode === 'fixture') {
     inserts.push(
       '    - id: bench-replay-scripted-fitting-judge',
       '      name: ' + JSON.stringify(fittingJudgePath),
@@ -41,14 +41,17 @@ export function renderReplayFrontendOverlay({
     '        job: ' + JSON.stringify(job),
     '        out: ' + JSON.stringify(out),
   )
+  const disableLaya = judgeMode === 'composition' ? [] : [
+    '- id: judgment-laya',
+    '  disabled: true',
+  ]
   return [
-    '# Generated: disable one-shot and Laya; insert scripted judge + replay frontend.',
+    '# Generated: disable one-shot; insert replay frontend for the selected judge mode.',
     '- id: headless-runner',
     '  disabled: true',
     '- id: headless-startup',
     '  disabled: true',
-    '- id: judgment-laya',
-    '  disabled: true',
+    ...disableLaya,
     '- id: session-persistence-jsonl',
     '  config:',
     '    root: ' + JSON.stringify(sessionLogRoot),
