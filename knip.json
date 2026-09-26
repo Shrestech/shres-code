@@ -36,6 +36,10 @@
     "examples": {
       "entry": [
         "headless-agent/tests/fixtures/cli-mock-llm.ts",
+        "headless-agent/tests/fixtures/model-router-resume-driver.ts",
+        "headless-agent/tests/fixtures/model-router-select-driver.ts",
+        "headless-agent/tests/fixtures/model-router-snapshot-fixture.ts",
+        "headless-agent/tests/fixtures/model-router-unmount-driver.ts",
         "headless-agent/tests/fixtures/semantic-checkpoint-agent.ts",
         "headless-agent/tests/fixtures/subagent-diagnostic-agent.ts",
         "headless-agent/tests/fixtures/subagent-inheritance-agent.ts",
@@ -463,6 +467,36 @@
       ]
     },
     "packages/code-runtime/code-runtime-worker-thread": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/judgment-laya": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/judgment-typesafe": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/llm-claude-session": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
