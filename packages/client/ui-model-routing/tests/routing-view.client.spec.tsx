@@ -334,6 +334,49 @@ describe('RoutingView decisions and drill-down', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('shows per-question head tokens and a logged fit rejection, inventing nothing when the log lacks them', async () => {
+    const fitted = decisionDetail({
+      judgmentQuestions: [
+        { kind: 'score', id: 'difficulty' as never, instructions: 'Rate the difficulty.', levels: ['a', 'b'] },
+        { kind: 'choice', id: 'route' as never, instructions: 'Which route should handle this turn?', options: [{ option: 'keep-current' }, { option: 'flash' }] },
+      ],
+      judgmentInput: {
+        selectedIndex: 0, state: 'USER: fix the typo', stateTokens: 612, sequenceTokens: [700, 812], paddedTokens: 812,
+        limits: { maxSequenceTokens: 4096, maxHeadTokens: 256, maxBatchTokens: 8192, manifestSha256: 'a'.repeat(64) },
+      },
+    })
+    setup({ loadDecision: () => Promise.resolve(fitted) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const drawer = await screen.findByRole('dialog')
+    // Head = the question's sequence tokens minus the state tokens, of the recorded head limit.
+    expect(within(drawer).getByText('difficulty head')).toBeTruthy()
+    expect(within(drawer).getByText('88 of 256 tokens')).toBeTruthy()
+    expect(within(drawer).getByText('route head')).toBeTruthy()
+    expect(within(drawer).getByText('200 of 256 tokens')).toBeTruthy()
+    expect(within(drawer).queryByText('Fit rejected')).toBeNull()
+
+    const rejected = decisionDetail({
+      judgmentInput: undefined,
+      judgmentRejection: {
+        reason: 'head',
+        limits: { maxSequenceTokens: 4096, maxHeadTokens: 256, maxBatchTokens: 8192, manifestSha256: 'b'.repeat(64) },
+      },
+    })
+    cleanup()
+    setup({ loadDecision: () => Promise.resolve(rejected) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const rejectedDrawer = await screen.findByRole('dialog')
+    expect(within(rejectedDrawer).getByText('head — head limit 256 tokens')).toBeTruthy()
+
+    // The shipped fixture's fit records no limits: no head row is invented.
+    cleanup()
+    setup()
+    await gateLoaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const plain = await screen.findByRole('dialog')
+    expect(within(plain).queryByText('difficulty head')).toBeNull()
+  })
+
   it('reads the challenger confidence and an unmeasured state size', async () => {
     const onlyKeep = decisionDetail({
       route: { choice: 'keep-current', confidence: 1, probabilities: { 'keep-current': 1 } },

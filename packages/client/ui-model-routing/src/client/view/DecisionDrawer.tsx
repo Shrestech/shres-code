@@ -6,7 +6,7 @@
  * path with its first failing check, candidate eligibility, the state sent to
  * the judge, and the streak facts.
  */
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { promptTokens } from '@shres-code/shres-code-llm/usage'
 import type { ModelRoutingDecisionDetail } from '@shres-code/shres-code-model-router/client'
@@ -110,6 +110,17 @@ function DecisionBody({ detail, showState, onShowState, t }: {
   const assessments = decision.candidateEligibility?.assessments ?? []
   const input = decision.judgmentInput
   const projection = decision.stateProjection
+  // Per-question head tokens, from the logged fit only: sequenceTokens[i]
+  // minus stateTokens against limits.maxHeadTokens. A fit that recorded no
+  // limits, or fewer measurements than questions, contributes no row - facts
+  // the log lacks stay unavailable rather than reading as zero.
+  const heads = input === undefined ? [] : input.sequenceTokens
+    .map((sequenceTokens, index) => ({
+      question: decision.judgmentQuestions?.[index]?.id ?? String(index + 1),
+      tokens: sequenceTokens - input.stateTokens,
+      max: input.limits.maxHeadTokens,
+    }))
+    .filter(head => Number.isFinite(head.tokens) && Number.isFinite(head.max))
   return (
     <>
       <span className={css.outcome} data-outcome={decision.outcome}>{decision.outcome}</span>
@@ -239,6 +250,21 @@ function DecisionBody({ detail, showState, onShowState, t }: {
           : decision.inputChars !== undefined
             ? t('drill.state.sent', { chars: decision.inputChars })
             : projection === undefined ? t('drill.none') : t('drill.state.atMost', { chars: projection.maxChars })}</dd>
+        {heads.map(head => (
+          <Fragment key={head.question}>
+            <dt>{t('drill.state.head', { question: head.question })}</dt>
+            <dd>{t('drill.state.headValue', { head: head.tokens, max: head.max })}</dd>
+          </Fragment>
+        ))}
+        {decision.judgmentRejection !== undefined && (
+          <>
+            <dt>{t('drill.state.rejected')}</dt>
+            <dd>{t('drill.state.rejectedValue', {
+              reason: decision.judgmentRejection.reason,
+              head: decision.judgmentRejection.limits.maxHeadTokens,
+            })}</dd>
+          </>
+        )}
         {input !== undefined && decision.inputChars !== undefined && decision.inputChars !== input.state.length && (
           <><dt>{t('drill.state.offered')}</dt><dd>{t('drill.state.offeredValue', { chars: decision.inputChars })}</dd></>
         )}
