@@ -561,9 +561,10 @@ test('hostReplayRun two class-C trials plus one good names both and returns no r
       caught = error
     }
     assert.ok(caught instanceof TrialInputIncompleteError)
-    assert.match(caught.message, /replay run refused: 2 trial\(s\) class C/)
+    assert.match(caught.message, /replay run refused: 2 trial\(s\)/)
     assert.equal(caught.trials.length, 2)
     assert.deepEqual(caught.trials.map(entry => entry.id), ['bad-first', 'bad-last'])
+    assert.ok(caught.trials.every(entry => entry.source === 'host'))
     assert.equal(caught.rows, undefined)
   } finally {
     await rm(good.plant, { recursive: true, force: true })
@@ -616,6 +617,72 @@ test('hostReplayRun all-good rows validate with task, stratum, and eligible from
   } finally {
     await rm(planted.plant, { recursive: true, force: true })
   }
+})
+
+test('hostReplayRun preRefused plus host class-C plus good lists all sources and returns no rows', async () => {
+  const bytes = await readFile(fixture)
+  const torn = Buffer.from(bytes.toString('utf8').trimEnd().slice(0, -10))
+  const good = await plantFixture(bytes, 'pre-good')
+  const hostBad = await plantFixture(torn, 'pre-host-bad')
+  try {
+    let caught
+    try {
+      await hostReplayRun({
+        repoRoot: repo, method, tasks,
+        trials: [
+          trialOf('good-hosted', good.path, { trialIndex: 0 }),
+          trialOf('host-c', hostBad.path, { trialIndex: 1 }),
+        ],
+        preRefused: [
+          { id: 'reader-null', taskId: 'task-a', trialIndex: 2, arm: 'C', path: null, reason: 'no-session-log' },
+          { id: 'reader-mixed', taskId: 'task-a', trialIndex: 3, arm: 'S', path: '/tmp/mixed.jsonl', reason: 'mixed-route' },
+        ],
+        discovered: ['good-hosted', 'host-c', 'reader-null', 'reader-mixed'],
+      })
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof TrialInputIncompleteError)
+    assert.match(caught.message, /replay run refused: 3 trial\(s\)/)
+    assert.equal(caught.trials.length, 3)
+    assert.deepEqual(caught.trials.map(entry => [entry.id, entry.source]), [
+      ['reader-null', 'reader'],
+      ['reader-mixed', 'reader'],
+      ['host-c', 'host'],
+    ])
+    assert.equal(caught.rows, undefined)
+  } finally {
+    await rm(good.plant, { recursive: true, force: true })
+    await rm(hostBad.plant, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun all-reader-refused throws with no rows and does not require hosted trials', async () => {
+  await assert.rejects(
+    () => hostReplayRun({
+      repoRoot: repo, method, tasks, trials: [],
+      preRefused: [
+        { id: 'reader-only', taskId: 'task-a', trialIndex: 0, arm: 'C', path: null, reason: 'no-session-log' },
+      ],
+      discovered: ['reader-only'],
+    }),
+    error => error instanceof TrialInputIncompleteError
+      && error.trials.length === 1
+      && error.trials[0].id === 'reader-only'
+      && error.trials[0].source === 'reader'
+      && error.rows === undefined,
+  )
+})
+
+test('hostReplayRun duplicate id across trials and preRefused is TypeError', async () => {
+  await assert.rejects(
+    () => hostReplayRun({
+      repoRoot: repo, method, tasks,
+      trials: [trialOf('same', '/nope', { trialIndex: 0 })],
+      preRefused: [{ id: 'same', taskId: 'task-a', trialIndex: 1, arm: 'C', path: null, reason: 'no-session-log' }],
+    }),
+    error => error instanceof TypeError && /duplicate trial id/.test(error.message),
+  )
 })
 
 test('hostReplayRun shared arm/taskId/trialIndex is TypeError with no spawn', async () => {
