@@ -25,7 +25,11 @@ function config(overrides: Partial<ModelRouterConfig> = {}) {
   })
 }
 
-function parent(route = STRONG): Agent {
+function parent(
+  route: { provider?: string; model?: string } = STRONG,
+  header: { config: { provider?: string; model?: string } } | undefined = { config: route },
+  onAppend: (type: string, data: unknown) => void = () => undefined,
+): Agent {
   return {
     id: SessionId('parent'),
     options: route,
@@ -34,8 +38,8 @@ function parent(route = STRONG): Agent {
       id: SessionId('parent'),
       events: [],
       header: {},
-      append: () => undefined,
-      requestHeader: () => ({ config: route }),
+      append: onAppend,
+      requestHeader: () => header,
     },
   } as unknown as Agent
 }
@@ -138,20 +142,13 @@ describe('resolveChildRouteConsult', () => {
 
   it('uses parent options when selectionInForce is empty and options name a listed base', () => {
     const resolved = config({ childPolicies: [{ match: {}, candidate: 'cheap' }] })
+    const { agentType: _agentType, ...withoutType } = request({
+      parent: parent(STRONG, undefined),
+      inherited: {},
+    })
     const result = resolveChildRouteConsult(
       { config: resolved, mode: 'on', suspended: new Set() },
-      request({
-        parent: {
-          ...parent(STRONG),
-          session: {
-            ...parent().session,
-            events: [],
-            requestHeader: () => undefined,
-          },
-        } as Agent,
-        inherited: {},
-        agentType: undefined,
-      }),
+      withoutType,
     )
     expect(result.route).toEqual({ provider: CHEAP.provider, model: CHEAP.model })
   })
@@ -160,15 +157,7 @@ describe('resolveChildRouteConsult', () => {
     const result = resolveChildRouteConsult(
       { config: config(), mode: 'on', suspended: new Set() },
       request({
-        parent: {
-          ...parent(),
-          options: {},
-          session: {
-            ...parent().session,
-            events: [],
-            requestHeader: () => undefined,
-          },
-        } as Agent,
+        parent: parent({}, undefined),
       }),
     )
     expect(result.decision).toMatchObject({ outcome: 'kept', reason: 'base-unlisted' })
@@ -176,12 +165,8 @@ describe('resolveChildRouteConsult', () => {
 
   it('logs a child-decision and recognises a live parent', () => {
     const appended: unknown[] = []
-    const agent = parent()
-    const session = {
-      ...agent.session,
-      append(type: string, data: unknown) { appended.push({ type, data }) },
-    }
-    logChildDecision(session as typeof agent.session, {
+    const agent = parent(STRONG, { config: STRONG }, (type, data) => { appended.push({ type, data }) })
+    logChildDecision(agent.session, {
       outcome: 'kept',
       reason: 'base-unlisted',
       routeRequestId: 'route-1',
@@ -192,6 +177,6 @@ describe('resolveChildRouteConsult', () => {
       promptChars: 1,
     })
     expect(appended).toEqual([{ type: 'model-routing/child-decision', data: expect.objectContaining({ reason: 'base-unlisted' }) }])
-    expect(isChildRouteParent({ ...agent, session } as Agent)).toBe(true)
+    expect(isChildRouteParent(agent)).toBe(true)
   })
 })

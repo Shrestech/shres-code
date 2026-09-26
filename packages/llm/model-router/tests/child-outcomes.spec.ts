@@ -227,7 +227,8 @@ describe('outcomesFromChildTurns', () => {
   })
 
   it('skips a decision with no selection', () => {
-    const kept: ModelRoutingChildDecision = { ...decision, outcome: 'kept', selection: undefined }
+    const { selection: _selection, ...withoutSelection } = decision
+    const kept: ModelRoutingChildDecision = { ...withoutSelection, outcome: 'kept' }
     expect(outcomesFromChildTurns(kept, 'child', {
       routeRequestId: SubagentRouteRequestId('r1'),
       turns: [turn('completed')],
