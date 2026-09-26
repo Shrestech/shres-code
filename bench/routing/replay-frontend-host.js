@@ -236,15 +236,38 @@ function prepareRows(hosted, { id, taskId, arm, stratum, trialIndex }) {
 
 /**
  * Host every trial of one replay run, then aggregate class-C refusals.
+ * `preRefused` is the reader's per-trial refusals (`source: 'reader'`). After every
+ * hosted trial, one `TrialInputIncompleteError` lists `preRefused` then host class-C
+ * (`source: 'host'`) and returns no rows. Empty `trials` is allowed only when
+ * `preRefused` is non-empty (all-reader-refused). Ids and (arm, taskId, trialIndex)
+ * are unique across `trials` and `preRefused`. When `discovered` is provided,
+ * `trials.length + preRefused.length === discovered.length` and every id appears in
+ * exactly one of those two lists.
  * @param {object} input
+ * @param {object[]} [input.preRefused]
+ * @param {string[]} [input.discovered]
  * @returns {Promise<{ rows: object[], consults: object[], summaries: object[] }>}
  */
 export async function hostReplayRun({
   repoRoot, method, tasks, trials, env = process.env, extraOverlay,
+  preRefused = [], discovered,
 }) {
-  if (!Array.isArray(trials) || trials.length === 0) throw new TypeError('hostReplayRun requires a non-empty trials array')
+  if (!Array.isArray(preRefused)) throw new TypeError('preRefused must be an array')
+  if (!Array.isArray(trials)) throw new TypeError('hostReplayRun requires a trials array')
+  if (trials.length === 0 && preRefused.length === 0) throw new TypeError('hostReplayRun requires a non-empty trials array')
   const seenIds = new Set()
   const seenTriple = new Set()
+  for (const entry of preRefused) {
+    if (typeof entry?.id !== 'string' || entry.id === '') throw new TypeError('every preRefused trial needs a non-empty id')
+    if (seenIds.has(entry.id)) throw new TypeError('duplicate trial id: ' + entry.id)
+    seenIds.add(entry.id)
+    if (!Number.isSafeInteger(entry.trialIndex) || entry.trialIndex < 0) {
+      throw new TypeError('every preRefused trial needs a non-negative trialIndex')
+    }
+    const triple = entry.arm + '\0' + entry.taskId + '\0' + String(entry.trialIndex)
+    if (seenTriple.has(triple)) throw new TypeError('duplicate (arm, taskId, trialIndex): ' + triple)
+    seenTriple.add(triple)
+  }
   for (const trial of trials) {
     if (typeof trial.id !== 'string' || trial.id === '') throw new TypeError('every trial needs a non-empty id')
     if (seenIds.has(trial.id)) throw new TypeError('duplicate trial id: ' + trial.id)
@@ -257,6 +280,20 @@ export async function hostReplayRun({
     seenTriple.add(triple)
     const stratum = tasks?.[trial.taskId]?.stratum
     if (!STRATA.has(stratum)) throw new TypeError('task ' + String(trial.taskId) + ' has no preregistered stratum')
+  }
+  if (discovered !== undefined) {
+    if (!Array.isArray(discovered)) throw new TypeError('discovered must be an array of trial ids')
+    if (trials.length + preRefused.length !== discovered.length) {
+      throw new TypeError('hosted.length + preRefused.length must equal discovered.length')
+    }
+    const discoveredSet = new Set(discovered)
+    if (discoveredSet.size !== discovered.length) throw new TypeError('duplicate discovered id')
+    for (const id of seenIds) {
+      if (!discoveredSet.has(id)) throw new TypeError('trial id not in discovered: ' + id)
+    }
+    for (const id of discovered) {
+      if (!seenIds.has(id)) throw new TypeError('discovered id not in trials or preRefused: ' + id)
+    }
   }
   const refusals = []
   const rows = []
@@ -279,7 +316,8 @@ export async function hostReplayRun({
     } catch (error) {
       if (error instanceof TrialInputIncompleteError) {
         refusals.push({
-          id: item.id, taskId: item.taskId, trialIndex: item.trialIndex, arm: item.arm, path: item.path, reason: error.message,
+          id: item.id, taskId: item.taskId, trialIndex: item.trialIndex, arm: item.arm, path: item.path,
+          reason: error.message, source: 'host',
         })
         continue
       }
@@ -301,10 +339,14 @@ export async function hostReplayRun({
       summary: hosted.summary,
     })
   }
-  if (refusals.length > 0) {
+  const all = [
+    ...preRefused.map(entry => ({ ...entry, source: 'reader' })),
+    ...refusals,
+  ]
+  if (all.length > 0) {
     throw new TrialInputIncompleteError(
-      'replay run refused: ' + String(refusals.length) + ' trial(s) class C',
-      { trials: refusals },
+      'replay run refused: ' + String(all.length) + ' trial(s)',
+      { trials: all },
     )
   }
   return { rows, consults, summaries }
