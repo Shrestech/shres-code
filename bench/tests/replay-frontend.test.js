@@ -11,7 +11,7 @@ import { SessionId, SessionStore } from '../../packages/core/session/lib/index.j
 import { JsonlSessionPersistence } from '../../packages/session/session-persistence-jsonl/lib/index.js'
 import { classifyArtifact, decodePhysicalJsonl, proposalFromHeader, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
 import { coldPointAt } from '../../packages/llm/model-router/lib/index.js'
-import { assertUnchangedSnapshots, countRoutersInDump, hostReplayTrial } from '../routing/replay-frontend-host.js'
+import { assertUnchangedSnapshots, countRoutersInDump, hostReplayRun, hostReplayTrial } from '../routing/replay-frontend-host.js'
 import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metrics.js'
 import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError, parseReplayMethod } from '../routing/replay-method.js'
 import { projectKey, encodeSegment } from '../runner/session-layout.js'
@@ -487,4 +487,167 @@ test('quota consults use each step/start.time so a job-wide clock cannot hide ex
     const constantKinds = result.consults.map(entry => entry.result.kind)
     assert.notDeepEqual(constantKinds, ['ask', 'warm', 'warm'])
   })
+})
+
+async function plantFixture(bytes, tag) {
+  const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
+  const plant = await mkdtemp(join(tmpdir(), 'bench-replay-run-' + tag + '-'))
+  const dir = join(plant, projectKey(header.cwd), encodeSegment(header.id))
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, 'session.jsonl')
+  await writeFile(path, bytes)
+  return { plant, path }
+}
+
+const ownRoute = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
+const tasks = { 'task-a': { stratum: 'routine' } }
+
+function trialOf(id, path, extra = {}) {
+  return {
+    id, taskId: 'task-a', trialIndex: extra.trialIndex ?? 0, arm: 'C', path,
+    trialOwnRoute: ownRoute,
+    trial: extra.trial ?? { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+  }
+}
+
+test('hostReplayRun missing stratum TypeError does not spawn', async () => {
+  await assert.rejects(
+    () => hostReplayRun({
+      repoRoot: repo, method, tasks: { 'task-a': {} },
+      trials: [trialOf('t1', '/nope')],
+    }),
+    error => error instanceof TypeError && /has no preregistered stratum/.test(error.message),
+  )
+})
+
+test('hostReplayRun empty trials or duplicate id TypeError does not spawn', async () => {
+  await assert.rejects(
+    () => hostReplayRun({ repoRoot: repo, method, tasks, trials: [] }),
+    /non-empty trials/,
+  )
+  const bytes = await readFile(fixture)
+  const { plant, path } = await plantFixture(bytes, 'dup-id')
+  try {
+    await assert.rejects(
+      () => hostReplayRun({
+        repoRoot: repo, method, tasks,
+        trials: [trialOf('same', path), trialOf('same', path, { trialIndex: 1 })],
+      }),
+      /duplicate trial id/,
+    )
+  } finally {
+    await rm(plant, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun two class-C trials plus one good names both and returns no rows', async () => {
+  const bytes = await readFile(fixture)
+  const torn = Buffer.from(bytes.toString('utf8').trimEnd().slice(0, -10))
+  const good = await plantFixture(bytes, 'good')
+  const bad1 = await plantFixture(torn, 'bad1')
+  const bad2 = await plantFixture(torn, 'bad2')
+  try {
+    let caught
+    try {
+      await hostReplayRun({
+        repoRoot: repo, method, tasks,
+        trials: [
+          trialOf('bad-first', bad1.path, { trialIndex: 0 }),
+          trialOf('good-mid', good.path, { trialIndex: 1 }),
+          trialOf('bad-last', bad2.path, { trialIndex: 2 }),
+        ],
+      })
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof TrialInputIncompleteError)
+    assert.match(caught.message, /replay run refused: 2 trial\(s\) class C/)
+    assert.equal(caught.trials.length, 2)
+    assert.deepEqual(caught.trials.map(entry => entry.id), ['bad-first', 'bad-last'])
+    assert.equal(caught.rows, undefined)
+  } finally {
+    await rm(good.plant, { recursive: true, force: true })
+    await rm(bad1.plant, { recursive: true, force: true })
+    await rm(bad2.plant, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun non-class-C error propagates before later trials', async () => {
+  const bytes = await readFile(fixture)
+  const later = await plantFixture(bytes, 'later')
+  try {
+    await assert.rejects(
+      () => hostReplayRun({
+        repoRoot: join(repo, 'does-not-exist-launcher'), method, tasks,
+        trials: [
+          trialOf('boom', later.path, { trialIndex: 0 }),
+          trialOf('later', later.path, { trialIndex: 1 }),
+        ],
+      }),
+      error => !(error instanceof TrialInputIncompleteError),
+    )
+  } finally {
+    await rm(later.plant, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun all-good rows validate with task, stratum, and eligible from consults', async () => {
+  const bytes = await readFile(fixture)
+  const planted = await plantFixture(bytes, 'all-good')
+  try {
+    const result = await hostReplayRun({
+      repoRoot: repo, method, tasks,
+      trials: [trialOf('good', planted.path)],
+    })
+    assert.equal(result.rows.length, 5)
+    assert.equal(result.consults.length, 1)
+    assert.equal(result.summaries.length, 1)
+    for (const row of result.rows) {
+      validateReplayRow(row, 'all-good ' + row.coldPointId)
+      assert.equal(row.task, 'task-a')
+      assert.equal(row.stratum, 'routine')
+      assert.equal(row.trialIndex, 0)
+      assert.equal(row.answered, false)
+      assert.equal(row.winner, null)
+      const consult = result.consults[0].consults.find(entry => entry.turn === row.turn && entry.step === row.step)
+      assert.ok(consult)
+      assert.equal(row.eligible, consult.result.kind === 'ask')
+    }
+  } finally {
+    await rm(planted.plant, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun shared arm/taskId/trialIndex is TypeError with no spawn', async () => {
+  await assert.rejects(
+    () => hostReplayRun({
+      repoRoot: repo, method, tasks,
+      trials: [trialOf('a', '/nope', { trialIndex: 0 }), trialOf('b', '/nope', { trialIndex: 0 })],
+    }),
+    error => error instanceof TypeError && /duplicate \(arm, taskId, trialIndex\)/.test(error.message),
+  )
+})
+
+test('hostReplayRun two valid repeats same task and arm keep both trials rows', async () => {
+  const bytes = await readFile(fixture)
+  const a = await plantFixture(bytes, 'rep-a')
+  const b = await plantFixture(bytes, 'rep-b')
+  try {
+    const result = await hostReplayRun({
+      repoRoot: repo, method, tasks,
+      trials: [trialOf('a', a.path, { trialIndex: 0 }), trialOf('b', b.path, { trialIndex: 1 })],
+    })
+    assert.equal(result.summaries.length, 2)
+    assert.equal(result.rows.length, 10)
+    const zeros = result.rows.filter(row => row.trialIndex === 0)
+    const ones = result.rows.filter(row => row.trialIndex === 1)
+    assert.equal(zeros.length, 5)
+    assert.equal(ones.length, 5)
+    for (const row of result.rows) validateReplayRow(row, 'repeat ' + row.trialIndex + ' ' + row.coldPointId)
+    assert.ok(result.rows.some(row => row.coldPointId === 'turn:1/step:1' && row.trialIndex === 0))
+    assert.ok(result.rows.some(row => row.coldPointId === 'turn:1/step:1' && row.trialIndex === 1))
+  } finally {
+    await rm(a.plant, { recursive: true, force: true })
+    await rm(b.plant, { recursive: true, force: true })
+  }
 })
