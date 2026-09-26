@@ -16,6 +16,7 @@ import { resolveHarnessLaunch } from '../runner/execute.js'
 import { startRequestSink } from '../runner/preflight-models.js'
 import { renderReplayFrontendOverlay } from './replay-frontend-overlay.js'
 import { TrialInputIncompleteError } from './replay-frontend.js'
+import { validateReplayRow } from '../analysis/replay-metrics.js'
 
 const PREFLIGHT_TIMEOUT_MS = 120_000
 const ROUTER_NAME = '@shres-code/shres-code-model-router'
@@ -201,4 +202,110 @@ export async function hostReplayTrial({
     await sink.close()
     await rm(root, { recursive: true, force: true })
   }
+}
+
+const STRATA = new Set(['routine', 'moderate', 'hard'])
+
+function consultEligible(consults, turn, step, where) {
+  const match = consults.find(entry => entry.turn === turn && entry.step === step)
+  if (match === undefined || match.result?.kind === 'warm' || match.result?.kind === undefined) {
+    throw new Error('row/consult mismatch at ' + where)
+  }
+  if (match.result.kind === 'ask') return true
+  if (match.result.kind === 'ineligible') return false
+  throw new Error('row/consult mismatch at ' + where)
+}
+
+function prepareRows(hosted, { id, taskId, arm, stratum, trialIndex }) {
+  const keys = new Set()
+  const rows = hosted.rows.map((row) => {
+    const prepared = {
+      ...row,
+      task: taskId,
+      stratum,
+      trialIndex,
+      eligible: consultEligible(hosted.consults, row.turn, row.step, id + ' turn:' + row.turn + '/step:' + row.step),
+    }
+    const key = [taskId, arm, String(trialIndex), prepared.coldPointId].join('\0')
+    if (keys.has(key)) throw new TypeError('duplicate (task, arm, trialIndex, coldPointId): ' + key)
+    keys.add(key)
+    return validateReplayRow(prepared, id + ' ' + prepared.coldPointId)
+  })
+  return { rows, keys }
+}
+
+/**
+ * Host every trial of one replay run, then aggregate class-C refusals.
+ * @param {object} input
+ * @returns {Promise<{ rows: object[], consults: object[], summaries: object[] }>}
+ */
+export async function hostReplayRun({
+  repoRoot, method, tasks, trials, env = process.env, extraOverlay,
+}) {
+  if (!Array.isArray(trials) || trials.length === 0) throw new TypeError('hostReplayRun requires a non-empty trials array')
+  const seenIds = new Set()
+  const seenTriple = new Set()
+  for (const trial of trials) {
+    if (typeof trial.id !== 'string' || trial.id === '') throw new TypeError('every trial needs a non-empty id')
+    if (seenIds.has(trial.id)) throw new TypeError('duplicate trial id: ' + trial.id)
+    seenIds.add(trial.id)
+    if (!Number.isSafeInteger(trial.trialIndex) || trial.trialIndex < 0) {
+      throw new TypeError('every trial needs a non-negative trialIndex')
+    }
+    const triple = trial.arm + '\0' + trial.taskId + '\0' + String(trial.trialIndex)
+    if (seenTriple.has(triple)) throw new TypeError('duplicate (arm, taskId, trialIndex): ' + triple)
+    seenTriple.add(triple)
+    const stratum = tasks?.[trial.taskId]?.stratum
+    if (!STRATA.has(stratum)) throw new TypeError('task ' + String(trial.taskId) + ' has no preregistered stratum')
+  }
+  const refusals = []
+  const rows = []
+  const consults = []
+  const summaries = []
+  const runKeys = new Set()
+  for (const item of trials) {
+    let hosted
+    try {
+      hosted = await hostReplayTrial({
+        repoRoot,
+        trial: item.trial,
+        path: item.path,
+        arm: item.arm,
+        method,
+        trialOwnRoute: item.trialOwnRoute,
+        env,
+        extraOverlay,
+      })
+    } catch (error) {
+      if (error instanceof TrialInputIncompleteError) {
+        refusals.push({
+          id: item.id, taskId: item.taskId, trialIndex: item.trialIndex, arm: item.arm, path: item.path, reason: error.message,
+        })
+        continue
+      }
+      throw error
+    }
+    const prepared = prepareRows(hosted, {
+      id: item.id, taskId: item.taskId, arm: item.arm, stratum: tasks[item.taskId].stratum, trialIndex: item.trialIndex,
+    })
+    for (const key of prepared.keys) {
+      if (runKeys.has(key)) throw new TypeError('duplicate (task, arm, trialIndex, coldPointId): ' + key)
+      runKeys.add(key)
+    }
+    rows.push(...prepared.rows)
+    consults.push({ id: item.id, consults: hosted.consults })
+    summaries.push({
+      id: item.id,
+      artifact: hosted.summary?.artifact ?? hosted.status?.artifact,
+      rows: prepared.rows.length,
+      summary: hosted.summary,
+    })
+  }
+  if (refusals.length > 0) {
+    throw new TrialInputIncompleteError(
+      'replay run refused: ' + String(refusals.length) + ' trial(s) class C',
+      { trials: refusals },
+    )
+  }
+  return { rows, consults, summaries }
 }

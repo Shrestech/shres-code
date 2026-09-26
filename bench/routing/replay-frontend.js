@@ -14,13 +14,14 @@ import { labelColdPoints } from './label-cold-points.js'
 export class TrialInputIncompleteError extends Error {
   /**
    * @param {string} message - named refusal.
-   * @param {{ trialId?: string, path?: string }} [detail]
+   * @param {{ trialId?: string, path?: string, trials?: object[] }} [detail]
    */
   constructor(message, detail = {}) {
     super(message)
     this.name = 'TrialInputIncompleteError'
     this.trialId = detail.trialId
     this.path = detail.path
+    if (detail.trials !== undefined) this.trials = detail.trials
   }
 }
 
