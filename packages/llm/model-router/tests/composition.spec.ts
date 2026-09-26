@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
-import AgentRegistry, { modelSelectionInstalled } from '@shres-code/shres-code-agent'
+import AgentRegistry, { modelSelectionInstalled, selectionInForce } from '@shres-code/shres-code-agent'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
 import InvariantRegistry from '@shres-code/shres-code-invariants'
 import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
 import AgentDefaultModel from '@shres-code/shres-code-agent-default-model'
@@ -116,7 +117,7 @@ afterEach(async () => {
 interface SpineOptions {
   /** Deployment persona template for the system-prompt row. */
   readonly persona?: string
-  /** Compose the invariant registry and this package's companion. */
+  /** Compose the invariant registry, this package's companion, and the agent package's companion. */
   readonly invariants?: boolean
   /** Router `inTurnFallback`; omitted keeps the documented default. */
   readonly inTurnFallback?: 'manual' | 'off'
@@ -173,7 +174,11 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ...ROUTER_CONFIG.map(line => options.hold !== undefined && line.startsWith('    hold:') ? `    hold: ${options.hold}` : line),
     ...options.inTurnFallback === undefined ? [] : [`    inTurnFallback: ${options.inTurnFallback}`],
     ...options.invariants === true
-      ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
+      ? [
+        "- name: '@shres-code/shres-code-invariants'",
+        "- name: '@shres-code/shres-code-model-router/invariant'",
+        "- name: '@shres-code/shres-code-agent/invariant'",
+      ]
       : [],
     ...options.subagents === true ? [
       "- name: '@shres-code/shres-code-session-persistence-jsonl'",
@@ -222,6 +227,7 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ['@shres-code/shres-code-model-router', ModelRoutingController],
     ['@shres-code/shres-code-invariants', InvariantRegistry],
     ['@shres-code/shres-code-model-router/invariant', ModelRouterInvariant],
+    ['@shres-code/shres-code-agent/invariant', AgentInvariant],
     ['@shres-code/shres-code-token-meter', TokenMeter],
     ['@shres-code/shres-code-compaction-basic', BasicCompactionEngine],
     ['@shres-code/shres-code-session-persistence-jsonl', JsonlSessionPersistence],
@@ -825,19 +831,34 @@ describe('a root agent no front end provided a model selection for', () => {
     expect(requestedModel(1)).toBe(SECOND_CANDIDATE_MODEL)
   })
 
-  it('keeps a routed header in force after the router is removed, because nothing reports a manual route beneath it', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
-    // A known limitation shared with the Web front end: with no router and no
-    // explicit selection, the last logged header is the route in force.
-    const loaded = await boot()
+  it('returns to the manual route recorded beneath the routed header after the router is removed', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { invariants: true })
+    const bases = consultBases()
     const agent = createAgent(loaded, 'router-empty-source-removed')
     await turn(agent, 'First easy turn.')
     expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+    // The hook recorded the creation route beneath the routed request before the
+    // loop logged its header; both invariant companions admitted the record.
+    const records = eventsOfType(agent.session.events, 'agent/route-base')
+    expect(records.map(event => event.data)).toEqual([{ manual: MANUAL, routed: { provider: PROVIDER, model: CANDIDATE_MODEL } }])
+    const routedHeader = eventsOfType(agent.session.events, 'request/header').at(-1)
+    expect(routedHeader?.data.header.config.model).toBe(CANDIDATE_MODEL)
+    expect(records[0]!.seq).toBeLessThan(routedHeader!.seq)
+
     const entry = [...loaded.loader.entries()]
       .find(candidate => candidate.options.name === '@shres-code/shres-code-model-router')
     await entry?.fiber?.dispose()
     expect(loaded.get('modelRouting')).toBeUndefined()
+    // With no router to ask, the selection a front end restores is the manual route.
+    expect(selectionInForce(agent)).toEqual(MANUAL)
+
     await turn(agent, 'Second easy turn.')
-    expect(requestedModel(1)).toBe(CANDIDATE_MODEL)
+    // The loop seeded the request from the routed header; the hook returned it to the creation route.
+    expect(requestedModel(1)).toBe(MANUAL_MODEL)
+    expect(eventsOfType(agent.session.events, 'request/header').at(-1)?.data.header.config).toMatchObject(MANUAL)
+    // One consult for the routed request, none once the router is gone, and no further record.
+    expect(bases()).toEqual([MANUAL])
+    expect(eventsOfType(agent.session.events, 'agent/route-base')).toHaveLength(1)
   })
 })
 

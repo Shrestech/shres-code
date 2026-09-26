@@ -1,10 +1,28 @@
 /* The routing chip mirrors the plan chip's pill; routing is a mode rather than
    a warning, so it carries the neutral business state. */
 
+/* The chip's controls and text are flex items of the composer's trailing
+   group, so the idle and error text can shrink with an ellipsis while the
+   controls keep their width. */
 .wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: contents;
+}
+
+.chip,
+.details,
+.restore {
+  flex: none;
+}
+
+/* Shrinks before the model seat: the full sentence is in the title. The
+   minimum keeps a hoverable ellipsis in a narrow composer. */
+.idle,
+.error {
+  flex: 0 1000 auto;
+  min-width: 2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chip {
@@ -43,6 +61,15 @@
 .chip:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .idle {

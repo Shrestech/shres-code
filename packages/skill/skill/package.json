@@ -22,12 +22,22 @@
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
     },
+    "./name": {
+      "types": "./lib/types/name.d.ts",
+      "default": "./lib/name.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/invariant.js",
+    "lib/name.js",
+    "lib/types.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",

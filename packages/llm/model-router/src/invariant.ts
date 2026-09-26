@@ -5,7 +5,8 @@
 
 import type { Context } from '@shres-code/cordis'
 import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
-import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-agent/types'
+import type { Session, SessionEvent, SessionEventMap } from '@shres-code/shres-code-session'
 import type { ModelRoutingDecision } from './types.ts'
 
 const PACKAGE_NAME = '@shres-code/shres-code-model-router'
@@ -23,6 +24,9 @@ export const inject = ['invariants']
  * decision directly follows the same step's downgraded decision, with no turn
  * or step boundary between them, and names the provider that decision selected;
  * the request headers after it in its turn do not run the route that failed.
+ * An `agent/route-base` the model-selection hook records follows its step's
+ * downgraded decision: the record's manual route has that decision's entry
+ * base provider and model, and its routed route is that decision's selection.
  *
  * That relation is the whole point of the feature — the decision is only
  * meaningful if the loop actually ran the downgraded route — and it is owned
@@ -57,6 +61,10 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
     }
     if (event.type === 'model-routing/decision') {
       if (event.data.reason === 'route-failed') checkRouteFailed(session.events, event.data, fail)
+      return
+    }
+    if (event.type === 'agent/route-base') {
+      checkRouteBase(session.events, event.data, fail)
       return
     }
     if (event.type !== 'request/header') return
@@ -127,6 +135,43 @@ function checkRouteFailed(events: readonly SessionEvent[], decision: ModelRoutin
   }
   if (previous?.outcome !== 'downgraded' || previous.selection?.provider !== decision.failure?.provider) {
     fail('a route-failed decision must follow the same step\'s downgraded decision for the failed provider')
+  }
+}
+
+/**
+ * Require an `agent/route-base` to agree with the downgrade it records: the
+ * latest downgraded decision with no `turn/start` or `step/start` after it has
+ * an entry base with the record's manual provider and model, and a selection
+ * equal to the record's routed route.
+ * @param events - the session log before the record is published.
+ * @param record - the `agent/route-base` being appended.
+ * @param fail - the reporter that rejects the append.
+ */
+function checkRouteBase(events: readonly SessionEvent[], record: SessionEventMap['agent/route-base'], fail: InvariantFailure): void {
+  let downgraded: ModelRoutingDecision | undefined
+  for (const candidate of events) {
+    if (candidate.type === 'turn/start' || candidate.type === 'step/start') downgraded = undefined
+    else if (candidate.type === 'model-routing/decision' && candidate.data.outcome === 'downgraded') downgraded = candidate.data
+  }
+  const entryBase = downgraded?.sticky.entryBase
+  const selection = downgraded?.selection
+  if (entryBase === undefined || selection === undefined) {
+    fail('an agent/route-base must follow its step\'s downgraded decision with an entry base and a selection')
+    return
+  }
+  const { manual, routed } = record
+  if (entryBase.provider !== manual.provider || entryBase.model !== manual.model) {
+    fail(
+      `agent/route-base manual route (${manual.provider}/${manual.model})`
+      + ` differs from the downgrade's entry base (${entryBase.provider}/${entryBase.model})`,
+    )
+  }
+  if (selection.provider !== routed.provider || selection.model !== routed.model
+    || selection.reasoningEffort !== routed.reasoningEffort) {
+    fail(
+      `agent/route-base routed route (${routed.provider}/${routed.model})`
+      + ` differs from the downgrade's selection (${selection.provider}/${selection.model})`,
+    )
   }
 }
 

@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+'use strict'
+/**
+ * Owned test stub for the bsk browser CLI, used by the browser-skill CLI
+ * snapshot. It accepts exactly the documented command forms, prints synthetic
+ * output, records every argv as one JSON line in the file named by
+ * BROWSERSKILL_ARGV_LOG (before validation, so rejected calls are recorded
+ * too), and rejects any other argument shape with exit code 2. No browser,
+ * daemon, or network is involved.
+ */
+
+const fs = require('node:fs')
+const path = require('node:path')
+
+const logPath = process.env.BROWSERSKILL_ARGV_LOG
+if (logPath === undefined || logPath === '') {
+  process.stderr.write('bsk: BROWSERSKILL_ARGV_LOG must name the argv record file\n')
+  process.exit(3)
+}
+
+const argv = process.argv.slice(2)
+fs.mkdirSync(path.dirname(logPath), { recursive: true })
+fs.appendFileSync(logPath, JSON.stringify(argv) + '\n')
+
+const USAGE = [
+  'bsk - browser session CLI (test stub)',
+  '',
+  'Usage:',
+  '  bsk --help',
+  '  bsk session start --no-focus --json',
+  '  bsk navigate <url> --session <id>',
+  '  bsk observe --session <id>',
+  '  bsk session stop <id>',
+  '',
+  'session stop takes the session id as a positional argument.',
+  'Any other argument shape exits with code 2.',
+].join('\n')
+
+const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+const URL_PATTERN = /^https?:\/\/[^\s]+$/
+
+function fail() {
+  process.stderr.write('bsk: unrecognized arguments: ' + argv.join(' ') + '\n')
+  process.exit(2)
+}
+
+function sessionId(value) {
+  if (typeof value !== 'string' || !SESSION_ID.test(value)) fail()
+  return value
+}
+
+if (argv.length === 1 && argv[0] === '--help') {
+  process.stdout.write(USAGE + '\n')
+  process.exit(0)
+}
+
+if (argv.length === 4
+  && argv[0] === 'session' && argv[1] === 'start'
+  && argv[2] === '--no-focus' && argv[3] === '--json') {
+  process.stdout.write('{"session_id":"stub-1"}\n')
+  process.exit(0)
+}
+
+if (argv.length === 4 && argv[0] === 'navigate' && argv[2] === '--session') {
+  const url = argv[1]
+  if (typeof url !== 'string' || !URL_PATTERN.test(url)) fail()
+  process.stdout.write('navigated ' + url + ' in session ' + sessionId(argv[3]) + ' (stub: no browser attached)\n')
+  process.exit(0)
+}
+
+if (argv.length === 3 && argv[0] === 'observe' && argv[1] === '--session') {
+  const id = sessionId(argv[2])
+  process.stdout.write([
+    'page example.test in session ' + id + ' (stub observe)',
+    '- heading "Example Domain"',
+    '- link "More information" href=https://www.iana.org/domains/example',
+    '',
+  ].join('\n'))
+  process.exit(0)
+}
+
+if (argv.length === 3 && argv[0] === 'session' && argv[1] === 'stop') {
+  process.stdout.write('session ' + sessionId(argv[2]) + ' stopped (stub: no daemon ran)\n')
+  process.exit(0)
+}
+
+fail()

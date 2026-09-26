@@ -74,7 +74,8 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
  * creation-time options. This is the route a delegating parent passes to new
  * children and the route the Team roster reports for the Lead. The selection
  * in force is the explicit `agent/model-selection`, else the manual base a
- * composed router reports beneath a routed request header, else that logged
+ * composed router reports beneath a routed request header, else the manual
+ * route recorded beneath that header (`agent/route-base`), else that logged
  * header. It is therefore never a routed candidate: while a downgrade is held,
  * the header carries the candidate, and a child that inherited it would run
  * the cheaper route with no routing decision of its own.

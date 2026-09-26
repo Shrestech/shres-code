@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Reply with exactly: ROUTED_OK"
+    },
+    {
+      "op": "prompt",
+      "text": "Continue with the explicitly selected model."
+    },
+    {
+      "op": "prompt",
+      "text": "Reply once more on the routing target itself."
+    }
+  ]
+}

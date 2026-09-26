@@ -1,9 +1,11 @@
 /** Platform-neutral assembly of generated Host Remote contributions. */
 
 import type { Context } from '@shres-code/cordis'
+import browserSkillRemote from '@shres-code/shres-code-browserskill/remote'
 import commandsRemote from '@shres-code/shres-code-commands/remote'
 import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
+import pluginAdminRemote from '@shres-code/shres-code-host-plugin-admin/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
 import judgmentEnginesRemote from '@shres-code/shres-code-judgment-dispatch/remote'
 import layaRemote from '@shres-code/shres-code-judgment-laya/remote'
@@ -27,12 +29,26 @@ export type {
   LayaGatewayExitView, LayaGatewayState, LayaGatewayView, LayaInstallResult,
 } from '@shres-code/shres-code-judgment-laya/types'
 export type {
+  BrowserSkillConsent, BrowserSkillConsentDownload, BrowserSkillOperation, BrowserSkillOperationId,
+  BrowserSkillRefusal, BrowserSkillState, BrowserSkillStatus, BrowserSkillToken,
+} from '@shres-code/shres-code-browserskill/types'
+// The pluginAdmin namespaces' payload vocabulary rides the same rule: the
+// Client contribution names what it sends and receives through this
+// assembly, never through a Host package import.
+export type {
+  InstalledSkillView, ParkedTransactionView, PluginAdminConfirmOutcome, PluginAdminGestureVerb,
+  PluginAdminInstallOutcome, PluginAdminRemoveOutcome, PluginAdminStatusResult, PluginConfirmToken,
+  PluginGestureToken, PluginMutations, PluginTransactionId, SkillInstallOutcome, SkillRemoveOutcome,
+} from '@shres-code/shres-code-host-plugin-admin/types'
+export type {
   ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldPayloadInfo,
   ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
   ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from '@shres-code/shres-code-shield/types'
+export type {} from '@shres-code/shres-code-browserskill/remote'
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
+export type {} from '@shres-code/shres-code-host-plugin-admin/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
 export type {} from '@shres-code/shres-code-judgment-dispatch/remote'
 export type {} from '@shres-code/shres-code-judgment-laya/remote'
@@ -143,8 +159,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, remoteControlRemote, messageFeedbackRemote,
-      modelRoutingRemote, speechRemote, shieldRemote, judgmentEnginesRemote, layaRemote,
+      browserSkillRemote, commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote,
+      remoteControlRemote, messageFeedbackRemote, modelRoutingRemote, speechRemote, shieldRemote, judgmentEnginesRemote,
+      layaRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

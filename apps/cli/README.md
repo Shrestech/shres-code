@@ -9,11 +9,16 @@ The `shres` command is the product launcher for profiles: ordered stacks of plug
 | `shres --profile <name>` | Boot the named profile under `$SHRES_HOME/profiles/<name>`. |
 | `shres --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
 | `shres web` | Alias of `--profile web`. |
-| `shres plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
+| `shres plugin --profile <name> install-plugin <spec> [--yes]` | Preview and confirm a Shres bundle installation; activation requires a restart. |
+| `shres plugin --profile <name> remove-plugin <name> [--yes]` | Confirm removal of a profile-managed plugin; loaded code remains until restart. |
+| `shres plugin --profile <name> <pnpm args>` | Expert pnpm forwarding, without the managed commands' confirmation guarantees. |
+| `shres skill add <directory>` / `list` / `remove <name>` | Manage local skill copies in the Shres-specific installed directory. |
 | `shres plugin --profile <name> enable-edition <edition>` | Select a declared profile edition: mark it `autoProvision` and provision its packages through pnpm. |
 | `shres models` / `shres providers` | List, set, discover, and add models using the same `$SHRES_HOME` settings and credentials as Settings → Models. |
 
 The invoking directory is the default workspace root. The `web` and `headless` profiles auto-initialize on first use from shipped templates; any other profile must be created through `shres plugin`.
+
+For managed browser control, follow the [BrowserSkill Web installation tutorial](../../docs/cookbook/browserskill.md). If you manage the upstream CLI and extension yourself, use the [external CLI tutorial](../../docs/cookbook/browserskill-manual.md); installing its skill alone does not provision a browser.
 
 ## App arguments
 

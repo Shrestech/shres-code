@@ -20,6 +20,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { JUDGMENT_SETTINGS_NAMESPACE } from '@shres-code/shres-code-judgment'
+import { SessionId } from '@shres-code/shres-code-session'
 import { launchWebScaffold, seedSession, watchConsole, type WebScaffold } from './scaffold.ts'
 import { newEnglishPage, openSessionActivity, saveFailureShot, selectSessionView } from './support.ts'
 
@@ -32,6 +33,10 @@ const LOCAL_JUDGE = 'llm:deepseek-official/deepseek-v4-flash'
 const REMOTE_JUDGE = 'llm:deepseek-official/deepseek-v4-pro'
 const SEED_ID = 'routing-view-web-e2e'
 const PROMPT = 'Inspect the supplied evidence with the bash tool, then answer briefly.'
+/** A recording whose last request header runs the routed candidate, above its recorded manual route. */
+const ROUTED_SEED = fileURLToPath(new URL('../../../examples/headless-agent/tests/snapshots/model-router-on/session.jsonl', import.meta.url))
+const ROUTED_SEED_ID = 'routing-view-manual-base-web-e2e'
+const ROUTED_PROMPT = 'Reply with exactly: ROUTED_OK'
 
 /**
  * The host composition row the shipped Web surface lacks: the model router,
@@ -100,11 +105,11 @@ const JUDGES = `    - id: judgment-dispatch
         maxStateTokens: 4096
 `
 
-/** Open the seeded session from the sidebar search. */
-async function openSeed(page: Page): Promise<void> {
+/** Open a seeded session from the sidebar search by its prompt. */
+async function openSeed(page: Page, prompt = PROMPT): Promise<void> {
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  await page.getByRole('textbox', { name: 'Search sessions...', exact: true }).fill(PROMPT)
+  await page.getByRole('textbox', { name: 'Search sessions...', exact: true }).fill(prompt)
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
   await results.click()
@@ -179,6 +184,7 @@ describe('web e2e: no Routing view on a host without the router', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, await readFile(SEED, 'utf8'), SEED_ID)
+    await seedSession(scaffold, await readFile(ROUTED_SEED, 'utf8'), ROUTED_SEED_ID)
     browser = await chromium.launch()
     page = await newEnglishPage(browser, 1000)
     await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
@@ -195,6 +201,19 @@ describe('web e2e: no Routing view on a host without the router', () => {
     const panel = await openSessionActivity(page)
     await panel.getByRole('button', { name: 'Trajectory', exact: true }).waitFor()
     await expect.poll(() => panel.getByRole('button', { name: 'Routing', exact: true }).count(), { timeout: 10_000 }).toBe(0)
+  }, 180_000)
+
+  it('reports the manual route of a routed session to the model picker, not the candidate its last header ran', async () => {
+    onTestFailed(() => saveFailureShot(page, 'routing-view-absent-manual-base'))
+    await openSeed(page, ROUTED_PROMPT)
+    // The picker's `session.models` read: this host serves no DeepSeek route, so
+    // the trigger names no model, and the read carries the session's selection.
+    const response = await scaffold.ctx.apiProxy.sessions.models({
+      rpcId: 'routing-view-manual-base' as never,
+      payload: { sessionId: SessionId(ROUTED_SEED_ID) },
+    })
+    if (!response.result.ok) throw new Error(`session.models failed: ${response.result.error.message}`)
+    expect(response.result.value.current).toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-pro' })
   }, 180_000)
 })
 

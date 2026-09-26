@@ -1,0 +1,23 @@
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ../../../cordis.yml
+    patches:
+      - id: llm-deepseek
+        disabled: true
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: installed-skill-snapshot
+              model: fixture
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          skills:
+            filesystem:
+              watch: false
+          persona: Load the requested skill and report completion.
+      - insert:
+          - id: installed-skill-model
+            name: ./tests/fixtures/installed-skills/model.ts

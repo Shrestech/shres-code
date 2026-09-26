@@ -17,8 +17,10 @@ import type { ScopeKey, ScopeLayer } from '@shres-code/shres-code-scope'
 import { UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE, wrapUntrusted } from '@shres-code/shres-code-untrusted-frame'
 import z from '@shres-code/schemastery'
 import type Schema from '@shres-code/schemastery'
+import { isSkillName, SKILL_NAME } from './name.ts'
+import type { SkillSource } from './types.ts'
 
-const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+export { isSkillName }
 const DEFAULT_COLLECT_CACHE_ENTRIES = 128
 const MAX_COLLECT_ATTEMPTS = 2
 const RUNTIME_PROVIDER = 'runtime'
@@ -28,21 +30,14 @@ const RUNTIME_RANK = 250
 export const BUNDLED_SKILL_RANK = 600
 
 /**
- * Return whether a string is a valid kebab-case skill name.
- * @param name - candidate skill name to validate.
- * @returns whether the name matches the public skill-name grammar.
+ * Standard precedence rank for plugin-installed skill roots. The lowest tier:
+ * within one layer an installed candidate loses every same-name race, so a
+ * plugin-installed skill can never shadow a project, runtime, user, custom,
+ * or bundled skill of the same name.
  */
-export function isSkillName(name: string): boolean {
-  return SKILL_NAME.test(name)
-}
+export const INSTALLED_SKILL_RANK = 700
 
-/**
- * Origin bucket for a skill contribution. The value is prompt-visible
- * metadata, not precedence by itself. `renderSkillContent` treats only
- * `bundled`, `user-*`, `runtime`, and `custom` as trusted local content;
- * `project-*` and every other label, including a missing source, are untrusted.
- */
-export type SkillSource = 'project-shres' | 'project-agents' | 'runtime' | 'user-shres' | 'user-agents' | 'custom' | 'bundled' | (string & {})
+export type { SkillSource } from './types.ts'
 
 /** Optional provider-specific base used by loaded skill bodies to resolve relative resources. */
 export type SkillResourceBase =
@@ -174,9 +169,9 @@ ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
  * sees one canonical `<skill_content>` shape on both paths. The name rides an
  * escaped attribute. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`)
  * neutralize a close-tag family in the body so it cannot end the wrapper.
- * Every other source, including `project-*` and a missing label, places the
- * untrusted-frame header inside `<skill_content>` and wraps the body with
- * `wrapUntrusted('skill_instructions', …)` so every `<` is escaped.
+ * Every other source, including `project-*`, `installed`, and a missing
+ * label, places the untrusted-frame header inside `<skill_content>` and wraps
+ * the body with `wrapUntrusted('skill_instructions', …)` so every `<` is escaped.
  * @param skill - name, source, provider, optional resource base, and body to render.
  * @returns the complete model-facing `<skill_content>` block.
  */

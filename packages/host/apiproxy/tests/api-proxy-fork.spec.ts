@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
+import AgentRegistry, { agentEvents, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@shres-code/shres-code-agent'
 import { createUserMessage, ReasoningEffortId } from '@shres-code/shres-code-llm'
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
@@ -284,6 +284,29 @@ describe('sessions.fork', () => {
       model: 'inherited-model',
       reasoningEffort: 'high',
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('restores the recorded manual route of a routed parent, not the candidate its last header ran', async () => {
+    const ctx = await composed()
+    const source = liveAgent(ctx, 'session-route-base', 1)
+    const manual = { provider: 'manual-provider', model: 'manual-model' }
+    const routed = { provider: 'candidate-provider', model: 'candidate-model' }
+    source.append('agent/route-base', { manual, routed })
+    source.append('request/header', { header: { config: routed }, reason: 'initial' })
+    const response = await api(ctx).sessions.fork(request({ sessionId: source.id }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    const child = ctx.agents.get(response.result.value.sessionId)
+    if (child === undefined) throw new Error('fork did not publish the child agent')
+    expect(child.session.events.filter(event => event.type === 'agent/route-base').map(event => event.data))
+      .toEqual([{ manual, routed }])
+    expect(child.session.requestHeader()?.config).toEqual(routed)
+    expect(selectionInForce(child)).toEqual(manual)
+    const fallback: LlmCallConfig = { provider: 'default-provider', model: 'default-model' }
+    await expect(agentEvents(child.ctx, child).waterfall(
+      'agent/request', { turn: 1, step: 0, content: { messages: [], system: '', tools: [] }, signal: new AbortController().signal }, () => Promise.resolve(fallback),
+    )).resolves.toMatchObject(manual)
     await ctx.fiber.dispose()
   })
 

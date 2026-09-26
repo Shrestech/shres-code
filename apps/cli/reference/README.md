@@ -34,9 +34,19 @@ shres --profile web --dump-default-config
 shres --profile web --patch ./extra.yml --dump-config
 ```
 
-`--dump-default-config` prints only the bundle layers; `--dump-config` adds the profile's `cordis.patch.yml`, the home-level `$SHRES_HOME/cordis.patch.yml`, and `--patch` overlays. Both print comments naming the file that supplied each row and every overlay that changed it; `!!js` expressions remain unevaluated, and unmatched patch targets are reported on stderr. A dump never runs app command-line providers, so it shows the composed tree before any app argument is resolved and rejects an invocation that carries app arguments.
+`--dump-default-config` prints only the bundle layers; `--dump-config` adds the profile's `cordis.patch.yml`, the home-level `$SHRES_HOME/cordis.patch.yml`, and `--patch` overlays. Both print comments naming the file that supplied each row and every overlay that changed it; `!!js` expressions remain unevaluated, and unmatched patch targets are reported on stderr. A dump never runs app command-line providers, so it shows the composed tree before any app argument is resolved and rejects an invocation that carries app arguments. A dump and a profile boot both take the profile's plugin lock while they recover an interrupted plugin operation and load the profile; each refuses with the owning process id while a managed install or removal holds the profile, and names another `shres` process when its lock is still held after the wait.
 
 ## Plugin management
+
+### Managed installation and removal
+
+`shres plugin --profile <name> install-plugin <spec> [--yes]` installs one Shres bundle through the shared [profile installer](../../../packages/boot/app-boot/README.md). An interactive terminal shows the resolved package preview and asks for confirmation before activation. Non-interactive use requires `--yes` and otherwise exits before installing. Successful activation changes the next profile boot, not an already-running process.
+
+Local directories are retained as profile-owned snapshots, not live links to the original directory; explicit `link:` specifications and local dependency references outside the snapshot are refused. Dependency lifecycle scripts are disabled. Packages requiring a build step, including transitive dependencies, are refused rather than built automatically. A package declaring only another harness’s bundle format is not Shres-compatible. The expert command below retains pnpm’s broader operations and must be used deliberately.
+
+`shres plugin --profile <name> remove-plugin <name> [--yes]` confirms and deactivates a managed plugin before removing its package. A running process retains its loaded code until restart. These managed commands do not update existing plugins. The installer owns locking, interrupted-operation recovery, and the limits of restoring packages after failure; see its README before manually clearing a stale lock.
+
+### Expert pnpm forwarding
 
 `shres plugin --profile <name> <args...>` initializes the profile when missing (shipped template, or `@shres-code/shres-code-base` alone for other names), then forwards `<args...>` to `pnpm` with the profile directory as working directory — `add`, `remove`, `why`, `update`, and every other pnpm verb work unchanged; pnpm must be on PATH. Relative path specs (`.`, `../plugin`, and their `file:`/`link:` forms) are anchored to the invoking directory first, so `add .` from a plugin checkout installs that checkout, not the profile. After every successful run, `shres.profile.bundles` is reconciled against the installed state: each dependency resolving to a package whose manifest declares `"shres": { "bundle": { "patch": "./cordis.patch.yml" } }` joins the layer stack (so an `update` that gains the declaration activates it), a bundle-less dependency stays plain with a one-time warning, and a removed dependency leaves the stack.
 
@@ -47,6 +57,12 @@ shres --profile tui
 ```
 
 Git-hosted plugins that ship sources build during install through their `prepare` script, which pnpm ≥10 blocks until the consumer allows it: the first `add` fails with pnpm's `allowBuilds` hint (and a shres pointer at the profile's `pnpm-workspace.yaml`); copy the printed key there and re-run. Installing a built tarball or a local checkout needs no allowance.
+
+## Installed skills
+
+`shres skill add <directory>` copies a local directory containing `SKILL.md` into `$SHRES_HOME/skills-installed`. It does not fetch repositories, execute the skill, install external programs, or connect browser extensions. Installed skills are untrusted and have lower precedence than project, user, bundled, and runtime skills. Discovery watches the installed directory, so successful copies do not require a profile restart.
+
+`shres skill list` prints the managed installation records. `shres skill remove <name>` removes only a managed copy, not an arbitrary user-authored skill. The offline CLI checks filesystem name conflicts but cannot inspect skills registered by a running plugin or agent preset. The web host additionally checks its global catalog; preset-specific overrides remain outside that check. Filesystem validation, copying, provenance, and removal rules belong to [skill-filesystem](../../../packages/skill/skill-filesystem/README.md).
 
 ## Web alias
 
@@ -65,7 +81,7 @@ Process shutdown gives the plugin tree up to five seconds to dispose. The first 
 
 All modes treat the invoking directory as the default workspace root, load applicable `AGENTS.md` or `CLAUDE.md` instructions with a 65,536-byte render budget, and use an in-memory SQLite session content index. Every profile boot watches valid edits of both `cordis.patch.yml` layers (profile and home) and reapplies them transactionally; a one-shot surface exits through its bounded shutdown, which disposes the watchers.
 
-New sessions default to the `workspace-write` permission preset. Bash and filesystem mutations are restricted to the session workspace and platform temporary roots; reads, network access, and process visibility are not confined. `SHRES_PERMISSION_MODE` changes the process fallback. Stored General-settings permissions affect later Web sessions, not an already-open one.
+New sessions default to the `workspace-write` permission preset. Bash and filesystem mutations are restricted to the session workspace and platform temporary roots; reads and process visibility are not confined. Confined bash denies outbound network by default, including local socket connections on macOS. Network policy is deployment-wide; `danger-full-access` runs bash unconfined. `SHRES_PERMISSION_MODE` changes the process fallback. Stored General-settings permissions affect later Web sessions, not an already-open one.
 
 `SHRES_TOOLS_MODE` selects `native`, `code`, or `both` for the process; another value fails at boot. The shipped `minimal` agent preset keeps that deployment presentation, fixes the complete system prompt to `You are a helpful software engineer assistant.`, and composes only persistent `bash` plus `str_replace_editor`. Select Minimal mode when creating a Web session; every other prompt section and model-facing plugin remains absent from that agent while the shared browser, workspace, persistence, sandbox, and permission host stays in place.
 
@@ -75,7 +91,7 @@ The base bundle mounts the native DeepSeek adapter, settings and credential prov
 
 Session telemetry stays local by default. `SHRES_TELEMETRY_MODE=FULL` streams every projected session event as OTLP/HTTP logs, while `SHRES_TELEMETRY_MODE=FEEDBACK_ONLY` uploads a session-log suffix only when feedback is recorded. `SHRES_TELEMETRY_OTLP_URL` selects another collector, and any non-empty `SHRES_TELEMETRY_DISABLED` remains an authoritative hard opt-out. The shipped base has no telemetry redaction rule, so explicitly enabled exports can contain message text, tool arguments and results, and workspace paths; the [default-off Agent Note](../../../.agents/notes/implemented/feature/2026-08-10-telemetry-default-off.md) owns that deployment decision.
 
-Install external plugin bundles through `shres plugin --profile <name> add <package-or-git-spec>`. The installed package owns its dependencies and contributes its declared `cordis.patch.yml` layer. The CLI also ships `@shres-code/shres-code-mcp-client` as a dependency for patch layers, but no MCP server is enabled by default because each server command is trusted executable code outside the agent sandbox.
+Install compatible external bundles through `shres plugin --profile <name> install-plugin <package-or-git-spec>`; the expert pnpm path bypasses its consent and validation. The installed package owns its dependencies and contributes its declared `cordis.patch.yml` layer. The CLI also ships `@shres-code/shres-code-mcp-client` as a dependency for patch layers, but no MCP server is enabled by default because each server command is trusted executable code outside the agent sandbox.
 
 ## Source execution
 

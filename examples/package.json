@@ -21,6 +21,7 @@
     "@shres-code/shres-code-attachment-local": "workspace:*",
     "@shres-code/shres-code-bash-local": "workspace:*",
     "@shres-code/shres-code-bash-sandbox": "workspace:*",
+    "@shres-code/shres-code-browserskill": "workspace:*",
     "@shres-code/shres-code-code-runtime-worker-thread": "workspace:*",
     "@shres-code/shres-code-command-feedback": "workspace:*",
     "@shres-code/shres-code-command-goal": "workspace:*",

@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import InvariantRegistry from '@shres-code/shres-code-invariants'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import * as ModelRouterInvariant from '../src/invariant.ts'
@@ -228,6 +229,55 @@ describe('model-router invariant companion', () => {
     // The same provider with another model is not the failed route.
     expect(() => { header(valid, 'cheap-provider', 'cheap-model-2') }).not.toThrow()
     expect(() => { header(valid, 'strong', 'strong-model', 'You are the strong-model model.') }).not.toThrow()
+  })
+
+  it('requires an agent/route-base to agree with its step\'s downgraded decision', async () => {
+    const ctx = await setup()
+    const entry = { provider: 'strong', model: 'strong-model' }
+    const routed = { provider: 'cheap-provider', model: 'cheap-model' }
+    const downgrade = (): ModelRoutingDecision => decision({
+      sticky: { active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 1, entryBase: entry },
+    })
+    const unpaired = /an agent\/route-base must follow its step's downgraded decision with an entry base and a selection/
+
+    // The step's downgrade, with the record's manual route as its entry base and
+    // its routed route as its selection, admits the record.
+    const valid = ctx.sessions.create()
+    valid.append('turn/start', { turn: 1 })
+    valid.append('step/start', { turn: 1, step: 0 })
+    valid.append('model-routing/decision', downgrade())
+    expect(() => { valid.append('agent/route-base', { manual: entry, routed }) }).not.toThrow()
+
+    // No decision, a step boundary after it, a decision that did not downgrade,
+    // or a downgrade with no entry base leaves the record unpaired.
+    const none = ctx.sessions.create()
+    expect(() => { none.append('agent/route-base', { manual: entry, routed }) }).toThrow(unpaired)
+    const stepped = ctx.sessions.create()
+    stepped.append('model-routing/decision', downgrade())
+    stepped.append('step/start', { turn: 1, step: 1 })
+    expect(() => { stepped.append('agent/route-base', { manual: entry, routed }) }).toThrow(unpaired)
+    const kept = ctx.sessions.create()
+    kept.append('model-routing/decision', decision({
+      outcome: 'kept-strong', reason: 'current-preferred', selection: undefined,
+      sticky: { active: false, stepsElapsed: 0, entryBase: entry },
+    }))
+    expect(() => { kept.append('agent/route-base', { manual: entry, routed }) }).toThrow(unpaired)
+    const baseless = ctx.sessions.create()
+    baseless.append('model-routing/decision', decision())
+    expect(() => { baseless.append('agent/route-base', { manual: entry, routed }) }).toThrow(unpaired)
+
+    // A manual route other than the entry base, or a routed route other than the
+    // selection, including its effort, contradicts the decision.
+    const mismatched = ctx.sessions.create()
+    mismatched.append('model-routing/decision', downgrade())
+    expect(() => { mismatched.append('agent/route-base', { manual: { provider: 'strong', model: 'other-model' }, routed }) })
+      .toThrow(/agent\/route-base manual route \(strong\/other-model\) differs from the downgrade's entry base \(strong\/strong-model\)/)
+    expect(() => { mismatched.append('agent/route-base', { manual: entry, routed: { ...routed, model: 'other-model' } }) })
+      .toThrow(/agent\/route-base routed route \(cheap-provider\/other-model\) differs from the downgrade's selection/)
+    expect(() => { mismatched.append('agent/route-base', { manual: entry, routed: { ...routed, reasoningEffort: ReasoningEffortId('low') } }) })
+      .toThrow(/differs from the downgrade's selection/)
+    expect(() => { mismatched.append('agent/route-base', { manual: { provider: 'other', model: 'strong-model' }, routed }) })
+      .toThrow(/differs from the downgrade's entry base/)
   })
 
   it('refuses a recovery request whose decision has no recorded manual route', async () => {
