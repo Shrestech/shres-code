@@ -50,6 +50,7 @@ export type {
   JudgmentBinaryCriteria,
   JudgmentBinaryQuestion,
   JudgmentChoiceAnswer,
+  JudgmentCorrelation,
   JudgmentChoiceOption,
   JudgmentChoiceQuestion,
   JudgmentConsumerId,

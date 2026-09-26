@@ -68,7 +68,7 @@ import type {
   JudgmentService,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
-import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
@@ -1034,7 +1034,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const config = this.config()
     state ??= this.buildState(session, config)
     const sticky = stickyState(session.events)
-    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request)
+    const resolved = await this.decide(config, state, sticky, base, session.id, turn, step, signal, request)
     const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
@@ -1221,6 +1221,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     state: RoutingState,
     sticky: ModelRoutingStickyState,
     base: ModelSelection,
+    sessionId: SessionId,
     turn: number,
     step: number,
     signal: AbortSignal,
@@ -1419,10 +1420,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const askStarted = Date.now()
     let result: JudgmentResult
     try {
+      const correlation = { sessionId, consultKey: `turn:${turn}/step:${step}` }
       if (fitting === undefined) {
-        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer })
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer, correlation })
       } else {
-        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer })
+        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer, correlation })
         signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
           facts.judgmentRejection = { limits: fitted.limits, reason: fitted.reason }
