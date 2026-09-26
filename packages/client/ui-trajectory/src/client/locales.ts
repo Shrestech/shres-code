@@ -25,6 +25,9 @@ export type TrajectoryKey =
   | 'toolbar.searchPlaceholder'
   | 'thinking.label'
   | 'thinking.segments'
+  | 'routing.child.routed'
+  | 'routing.child.kept'
+  | 'routing.child.shadow'
   | 'routing.outcome.downgraded'
   | 'routing.outcome.keptStrong'
   | 'routing.outcome.skipped'
@@ -96,6 +99,9 @@ export const en: Record<TrajectoryKey, string> = {
   'toolbar.searchPlaceholder': 'Search',
   'thinking.label': 'Thinking',
   'thinking.segments': '{count} segments',
+  'routing.child.routed': 'Subagent routed to {model}',
+  'routing.child.kept': 'Subagent kept your model: {reason}',
+  'routing.child.shadow': '(shadow)',
   'routing.outcome.downgraded': 'downgraded',
   'routing.outcome.keptStrong': 'kept strong',
   'routing.outcome.skipped': 'skipped',

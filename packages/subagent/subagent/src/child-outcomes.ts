@@ -58,7 +58,9 @@ export async function childTurnOutcomes(
   signal?: AbortSignal,
 ): Promise<ChildTurnOutcomesResult> {
   signal?.throwIfAborted()
-  const live = ctx.sessions.get(childId)
+  const sessions = ctx.get('sessions')
+  if (sessions === undefined) return { unavailable: 'no-persistence' }
+  const live = sessions.get(childId)
   if (live !== undefined) {
     if (!isDirectChild(parent, live.header)) return { unavailable: 'not-a-child' }
     return foldChildTurns(live.events, signal)
@@ -74,7 +76,7 @@ export async function childTurnOutcomes(
   }
   signal?.throwIfAborted()
   if (!isDirectChild(parent, inspected.meta)) return { unavailable: 'not-a-child' }
-  const liveWitness = ctx.sessions.get(childId)?.header
+  const liveWitness = sessions.get(childId)?.header
   if (liveWitness !== undefined && !sameLifecycle(inspected.meta, liveWitness)) {
     return { unavailable: 'corrupt' }
   }

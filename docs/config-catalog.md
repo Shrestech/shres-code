@@ -2549,6 +2549,17 @@ export interface ModelRouterConfig {
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
   /**
+   * Ordered child-route rules. First match wins. An empty list (the default)
+   * never routes a child. Each `candidate` must be a pool id.
+   */
+  childPolicies?: ModelRoutingChildPolicyConfig[]
+  /** Consecutive counted child failures that suspend one pool candidate. Defaults to 2. */
+  childRouteErrors?: number
+  /**
+   * Two-option child-route question text. Required when any rule sets `judge`.
+   */
+  childRouteInstructions?: string
+  /**
    * Route confidence at or above which a candidate may be selected. Required.
    * The global default for any engine without an operating point.
    */
@@ -2671,6 +2682,16 @@ export interface ModelRoutingRouteFromConfig {
    * arms that measure per-turn entry.
    */
   allowEveryTurn?: boolean
+}
+
+/** One ordered child-route rule, as configuration states it. */
+export interface ModelRoutingChildPolicyConfig {
+  /** Match constraints; empty is a catch-all and is allowed only as the last rule. */
+  match: ModelRoutingChildPolicyMatchConfig
+  /** Pool candidate id this rule selects. */
+  candidate: string
+  /** When true, ask the selected engine keep-current vs this candidate. Defaults to false. */
+  judge?: boolean
 }
 
 /**
@@ -2808,9 +2829,17 @@ export type ModelRoutingMode = 'off' | 'on' | 'shadow'
  * `dollars` for a metered key, `latency` for a route chosen for speed.
  */
 export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+
+/** Match fields one child-route policy may constrain. An empty object is a catch-all. */
+export interface ModelRoutingChildPolicyMatchConfig {
+  /** Delegation consumer kind. */
+  kind?: 'subagent' | 'workflow'
+  /** Exact tool-facing agent type, such as `explore`. */
+  agentType?: string
+}
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:131`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:133`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

@@ -32,6 +32,7 @@ const STATS: ModelRoutingWorkspaceStats = {
   counts: {
     decisions: 12, consults: 9, downgradedSteps: 7, steps: 40, streaks: 3, keptStrong: 2,
     routeFailed: 1, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 8, warmSkipped: 1,
+    childRouted: 0, childFailures: 0, childSuccesses: 0, childNeutral: 0,
   },
   reasons: [
     { reason: 'gate-passed', group: 'switched', count: 6 },

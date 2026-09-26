@@ -40,7 +40,7 @@ interface Arm {
   /** Fixture holding the prompt both arms run. */
   readonly promptFixture: string
   /** Fixture driver that owns an explicit create/dispose/resume or select lifecycle, instead of the headless driver. */
-  readonly driver?: 'model-router-resume-driver' | 'model-router-unmount-driver' | 'model-router-select-driver'
+  readonly driver?: 'model-router-resume-driver' | 'model-router-unmount-driver' | 'model-router-select-driver' | 'model-router-subagent-driver'
 }
 
 /** One arm's harvested, normalized outputs. */
@@ -162,9 +162,23 @@ async function runArm(arm: Arm, server: MockLlmServer): Promise<ArmOutput> {
     prepare: (cwd) => { runCwd = cwd },
     inspect: async (cwd) => {
       const root = join(cwd, '.sessions')
-      const logs = (await readdir(root, { recursive: true })).filter(name => name.endsWith('.jsonl'))
-      expect(logs).toHaveLength(1)
-      rawSession = await readFile(join(root, logs[0]!), 'utf8')
+      const logs = (await readdir(root, { recursive: true })).filter(name => name.endsWith('.jsonl')).sort()
+      if (arm.driver === 'model-router-subagent-driver') {
+        expect(logs.length).toBeGreaterThanOrEqual(2)
+        let parent: string | undefined
+        for (const name of logs) {
+          const content = await readFile(join(root, name), 'utf8')
+          if (content.includes('model-routing/child-decision')) {
+            parent = content
+            break
+          }
+        }
+        if (parent === undefined) throw new Error(`${arm.promptFixture} persisted no parent child-decision log`)
+        rawSession = parent
+      } else {
+        expect(logs).toHaveLength(1)
+        rawSession = await readFile(join(root, logs[0]!), 'utf8')
+      }
     },
   })
   expect(result.stderr).toBe('')
@@ -874,6 +888,33 @@ describe('headless model-routing snapshots', () => {
       expect(headers.length).toBeGreaterThan(0)
       expect(headers.every(model => model === 'deepseek-v4-pro')).toBe(true)
       await expectArmFixtures('model-router-shadow', output)
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('routes a spawn child through childPolicies and keeps a fork on the inherited model', async () => {
+    const server = await startMockLlmServer({
+      sequence: ['success'],
+      repeatLast: true,
+      chunkSize: 4096,
+      successText: SUCCESS_TEXT,
+    })
+    try {
+      const output = await runArm({
+        configPath: join(exampleDir, 'model-router-subagent.cordis.snapshot.yml'),
+        promptFixture: 'model-router-subagent',
+        driver: 'model-router-subagent-driver',
+      }, server)
+      const events = parseJsonl(output.session)
+      const childDecisions = events.filter(event => event['type'] === 'model-routing/child-decision')
+      expect(childDecisions.length).toBeGreaterThanOrEqual(1)
+      expect(childDecisions.some(event => (event['data'] as { outcome?: string; shadow?: boolean }).outcome === 'routed'
+        && (event['data'] as { shadow?: boolean }).shadow !== true)).toBe(true)
+      const models = server.requests.map((_, index) => requestedModel(server, index))
+      expect(models).toContain('deepseek-v4-flash')
+      expect(models).toContain('deepseek-v4-pro')
+      await expectArmFixtures('model-router-subagent', output)
     } finally {
       await server.close()
     }

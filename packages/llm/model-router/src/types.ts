@@ -850,7 +850,46 @@ export interface ModelRoutingStatsSnapshot {
     turnsWithDecisions: number
     /** Decisions a warm quota prefix skipped: reason `warm-prefix`, no judgment call. */
     warmSkipped: number
+    /** Routed `model-routing/child-decision` events. */
+    childRouted: number
+    /** Child outcomes counted as failure. */
+    childFailures: number
+    /** Child outcomes counted as success. */
+    childSuccesses: number
+    /** Child outcomes counted as neutral. */
+    childNeutral: number
   }
+  /**
+   * Child-route decisions and classified outcomes on this parent session.
+   * Child tokens are not included; the workspace rollup sums `counts`.
+   */
+  children: {
+    /** `model-routing/child-decision` events, routed or kept. */
+    decided: number
+    /** Decisions whose outcome is `routed`. */
+    routed: number
+    /** Decisions whose outcome is `kept`. */
+    kept: number
+    /** Child-decision reasons, largest first. */
+    byReason: { reason: string; count: number }[]
+    /** Routed selections, largest first. */
+    byModel: { candidateId: string; count: number }[]
+    /** Child outcomes counted as failure. */
+    failures: number
+    /** Distinct candidate ids currently at the breaker limit in this fold. */
+    suspended: number
+  }
+  /** Most recent child-decisions, newest first, at most 100. */
+  recentChildren: {
+    seq: number
+    t: number
+    outcome: 'routed' | 'kept'
+    reason: string
+    candidateId: string | null
+    agentType: string | null
+    shadow: boolean
+    latencyMs: number | null
+  }[]
   /** Reason histogram over all decisions, largest first. */
   reasons: { reason: string; group: ModelRoutingReasonGroup; count: number }[]
   /** Kept-strong reason histogram, largest first. */

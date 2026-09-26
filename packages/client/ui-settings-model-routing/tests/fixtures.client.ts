@@ -89,6 +89,8 @@ export function namespace(ns: string, value: unknown, revision = 3): SettingsNam
 
 /** The shipped model-router section, routing off by default. */
 export const ROUTER = namespace('model-router', { initialMode: 'off', state: { maxChars: 12000, maxFitCandidates: 4 } }, 7)
+/** A router section whose schema declares childPolicies (13b capability). */
+export const ROUTER_CHILD = { ...ROUTER, schema: { childPolicies: {} } }
 /** The judgment section selecting TypeSafe. */
 export const JUDGMENT = namespace('judgment', { enabled: true, engine: 'typesafe' }, 4)
 

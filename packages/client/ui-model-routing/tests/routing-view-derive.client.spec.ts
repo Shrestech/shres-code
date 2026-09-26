@@ -114,6 +114,7 @@ describe('routingKpis', () => {
       ['latency', '1000', 'P95 1 s · deadline 1.5 s · 1 s per turn'],
       ['moved', '0', '0 moved − 0 return re-prefill · quota'],
       ['switch-cost', '235k', 'cold prefills after model changes (routed + manual)'],
+      ['subagents', 'none decided', 'decided at spawn'],
       ['egress', '≤ 264k', '22 asks to a remote engine · at most'],
     ])
     expect(tiles.find(tile => tile.id === 'egress')?.unit).toBe('chars')
@@ -173,6 +174,17 @@ describe('routingKpis', () => {
     expect(tiles.find(tile => tile.id === 'kept-strong')?.detail).toBe('—')
     expect(tiles.find(tile => tile.id === 'latency')).toMatchObject({ value: '—', detail: 'no answered consults' })
     expect(tiles.find(tile => tile.id === 'latency')?.unit).toBeUndefined()
+    expect(tiles.find(tile => tile.id === 'subagents')).toMatchObject({ value: 'none decided', detail: 'decided at spawn' })
+  })
+
+  it('reports routed/decided for child-route consults', () => {
+    const stats = {
+      ...emptyStats(),
+      children: { decided: 4, routed: 3, kept: 1, byReason: [], byModel: [], failures: 0, suspended: 0 },
+    }
+    expect(routingKpis(stats, GATE, () => 'local', t).find(tile => tile.id === 'subagents')).toMatchObject({
+      value: '3/4', detail: 'decided at spawn',
+    })
   })
 })
 

@@ -90,6 +90,7 @@ function historySnapshot(
     decisions: [],
     jspace: [],
     routing: [],
+    routingChildren: [],
     ...inspection,
   }
   return {

@@ -12,7 +12,7 @@ The controller registers `subagent/child-route` (next() first). Off and unmatche
 
 Live `subagent/end` and parent attach reconcile missing outcomes via `SubagentRuntime.childTurnOutcomes`. Classification uses the route in force, not stopReason: completed-on-selection is success; LlmError codes other than UNKNOWN on-selection are failure; max-tokens, abort, interrupt, blocked, UNKNOWN, and off-selection errors are neutral. Neutral never resets. Dedupe key is `(routeRequestId, childTurn)`. Events are required-on-read.
 
-This chunk does not include stats rollup, Settings/Routing UI, keyless snapshot, or Web e2e.
+Stats fold `children`/`recentChildren`, Settings Subagent routing (schema-gated), parent Routing KPI/card, child-session notice, and Trajectory CHILD-ROUTE rows ship with the consumer. A routed child's first `request/header` must match the parent `model-routing/child-decision` selection (runtime-owned join via the live session store and `childTurnOutcomes`; missing/corrupt/no-persistence/not-a-child stay unavailable). The keyless `model-router-subagent` snapshot starts a real spawn (routed) and fork (inherited) through `resolveChildRoute` + `ctx.subagents.start`. Web GIF remains Lead-only.
 
 ## Alternatives considered
 

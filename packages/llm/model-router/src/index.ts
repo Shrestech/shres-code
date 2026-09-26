@@ -48,6 +48,7 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
+import { childTurnOutcomes } from '@shres-code/shres-code-subagent'
 import type { SubagentChildRoute, SubagentChildRouteRequest, SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
 import { logChildDecision, resolveChildRouteConsult } from './child-route.ts'
 import { outcomesFromChildTurns, recordedChildOutcomes, routedChildDecisions, suspendedChildCandidates } from './child-outcomes.ts'
@@ -723,8 +724,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         view: viewStats,
         // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency,
         // plus the per-model cache lifetimes and shadow figures decisions record, and nothing sent
-        // for a call the dispatcher refused before dispatching it.
-        stateVersion: 5,
+        // for a call the dispatcher refused before dispatching it, and child-route counts.
+        stateVersion: 6,
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
@@ -1356,13 +1357,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     reconciled?: true,
   ): Promise<void> {
     if (routeRequestId === undefined) return
-    const child = this.ctx.sessions.get(childId)
+    const child = this.ctx.get('sessions')?.get(childId)
     const parentId = child?.header.parentSession
     const parentAgent = parentId === undefined ? undefined : [...this.liveAgents].find(agent => agent.id === parentId)
     if (parentAgent === undefined) return
-    const runtime = this.ctx.get('subagents')
-    if (runtime === undefined) return
-    const result = await runtime.childTurnOutcomes(parentAgent, childId)
+    if (this.ctx.get('subagents') === undefined) return
+    const result = await childTurnOutcomes(this.ctx, parentAgent, childId)
     const recorded = recordedChildOutcomes(parentAgent.session.events)
     const decision = routedChildDecisions(parentAgent.session.events).find(row => row.decision.routeRequestId === routeRequestId)?.decision
     if (decision === undefined) return

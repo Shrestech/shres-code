@@ -133,6 +133,8 @@ interface SpineOptions {
   readonly subagents?: boolean
   /** Router `hold` as a YAML flow mapping, replacing the default `{ minSteps: 3 }`. */
   readonly hold?: string
+  /** Extra YAML lines under the model-router config, indented four spaces. */
+  readonly routerExtra?: readonly string[]
   /** Compose storage, session persistence, the persisted projection cache, and the workspace registry. */
   readonly workspaceStats?: boolean
 }
@@ -181,6 +183,7 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     '  config:',
     ...ROUTER_CONFIG.map(line => options.hold !== undefined && line.startsWith('    hold:') ? `    hold: ${options.hold}` : line),
     ...options.inTurnFallback === undefined ? [] : [`    inTurnFallback: ${options.inTurnFallback}`],
+    ...options.routerExtra ?? [],
     ...options.invariants === true
       ? [
         "- name: '@shres-code/shres-code-invariants'",
@@ -978,6 +981,68 @@ describe('children of a parent on a held downgrade', () => {
     expect(effectiveAgentRoute(agent)).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
     return { loaded, agent }
   }
+
+  it('a childPolicies explore spawn runs the pool model and logs a child-decision', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const tool = { name: 'subagent', arguments: JSON.stringify({ description: 'scan', prompt: 'list the files', subagent_type: 'explore' }) }
+    const loaded = await boot('ROUTED_OK', ['tool_call_success', 'success'], {
+      subagents: true,
+      invariants: true,
+      routerExtra: [
+        '    childPolicies:',
+        `      - { match: { kind: subagent }, candidate: ${SCRIPTED_CANDIDATE} }`,
+      ],
+    }, tool)
+    const agent = createAgent(loaded, 'router-child-policies-explore')
+    await turn(agent, 'First easy turn.')
+    const decision = eventsOfType(agent.session.events, 'model-routing/child-decision')[0]
+    expect(decision?.data).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-policy',
+      selection: { candidateId: SCRIPTED_CANDIDATE, provider: PROVIDER, model: CANDIDATE_MODEL },
+      effortApplied: false,
+    })
+    const childRequest = server?.requests.find(request => (request.body as { model?: unknown }).model === CANDIDATE_MODEL)
+    expect(childRequest).toBeDefined()
+  })
+
+  it('rejects a routed child whose first header differs from the child-decision selection', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], {
+      subagents: true,
+      invariants: true,
+      routerExtra: [
+        '    childPolicies:',
+        `      - { match: { kind: subagent }, candidate: ${SCRIPTED_CANDIDATE} }`,
+      ],
+    })
+    const parent = createAgent(loaded, 'router-child-join-parent')
+    await turn(parent, 'First easy turn.')
+    parent.session.append('model-routing/child-decision', {
+      outcome: 'routed',
+      reason: 'child-policy',
+      routeRequestId: 'poison-route',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: { provider: PROVIDER, model: MANUAL_MODEL },
+      selection: { candidateId: SCRIPTED_CANDIDATE, provider: PROVIDER, model: CANDIDATE_MODEL },
+      effortApplied: false,
+      promptChars: 4,
+    })
+    const child = loaded.sessions.create(SessionId('router-child-join-poison'), {
+      meta: { parentSession: parent.id, origin: 'subagent', cwd: process.cwd() },
+    })
+    child.append('subagent/descriptor', {
+      version: 2,
+      mode: 'one-shot',
+      provider: 'spawn',
+      agentRouteRequestId: 'poison-route',
+    })
+    expect(() => {
+      child.append('request/header', {
+        header: { config: { provider: PROVIDER, model: MANUAL_MODEL } },
+        reason: 'initial',
+      })
+    }).toThrow(/first header .+ differs from/)
+  })
 
   it('a fresh child the parent spawns runs the manual route, and the child-route listener is told that route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     // Step 1 asks for one subagent call; the child and the parent's step 2 answer with text.

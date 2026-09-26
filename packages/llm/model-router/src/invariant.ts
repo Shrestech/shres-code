@@ -7,7 +7,7 @@ import type { Context } from '@shres-code/cordis'
 import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type {} from '@shres-code/shres-code-agent/types'
 import type { Session, SessionEvent, SessionEventMap } from '@shres-code/shres-code-session'
-import type { ModelRoutingDecision } from './types.ts'
+import type { ModelRoutingChildDecision, ModelRoutingChildOutcome, ModelRoutingDecision } from './types.ts'
 
 const PACKAGE_NAME = '@shres-code/shres-code-model-router'
 
@@ -27,6 +27,10 @@ export const inject = ['invariants']
  * An `agent/route-base` the model-selection hook records follows its step's
  * downgraded decision: the record's manual route has that decision's entry
  * base provider and model, and its routed route is that decision's selection.
+ * A routed `model-routing/child-decision` is joined to the child's first
+ * `request/header` through the live session store (parent id + origin, the
+ * descriptor's `agentRouteRequestId`, never a router filesystem reader). An
+ * unmatched decision for a cancelled start that never opens a child passes.
  *
  * That relation is the whole point of the feature — the decision is only
  * meaningful if the loop actually ran the downgraded route — and it is owned
@@ -76,21 +80,21 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       if (data.outcome === 'routed' && data.selection === undefined) {
         fail('a routed model-routing/child-decision must record a selection')
       }
+      if (data.outcome === 'kept' && data.selection !== undefined) {
+        fail('a kept model-routing/child-decision must not record a selection')
+      }
       return
     }
     if (event.type === 'model-routing/child-outcome') {
-      const data = event.data
-      if (data.countedAs === 'failure' && data.failureCode === undefined) {
-        fail('a failure model-routing/child-outcome must record failureCode')
-      }
-      if (data.countedAs === 'neutral' && data.failureCode !== undefined && data.failureCode !== 'UNKNOWN') {
-        // Neutral may record UNKNOWN; a counted LlmError is a failure.
-      }
+      checkChildOutcome(session.events, event.data, fail)
       return
     }
     if (event.type === 'agent/route-base') {
       checkRouteBase(session.events, event.data, fail)
       return
+    }
+    if (event.type === 'request/header' && session.header.origin === 'subagent') {
+      checkChildFirstHeader(ctx, session, event.data.header.config, fail)
     }
     if (event.type !== 'request/header') return
     let turnStartSeq = -1
@@ -202,6 +206,74 @@ function checkRouteFailed(events: readonly SessionEvent[], decision: ModelRoutin
  * @param record - the `agent/route-base` being appended.
  * @param fail - the reporter that rejects the append.
  */
+function routedDecisionFor(
+  events: readonly SessionEvent[],
+  routeRequestId: string,
+): ModelRoutingChildDecision | undefined {
+  for (const event of events) {
+    if (event.type !== 'model-routing/child-decision') continue
+    if (event.data.routeRequestId !== routeRequestId) continue
+    return event.data
+  }
+  return undefined
+}
+
+function checkChildOutcome(
+  events: readonly SessionEvent[],
+  data: ModelRoutingChildOutcome,
+  fail: InvariantFailure,
+): void {
+  if (data.countedAs === 'failure' && data.failureCode === undefined) {
+    fail('a failure model-routing/child-outcome must record failureCode')
+  }
+  if (data.countedAs === 'failure' && data.failureCode === 'UNKNOWN') {
+    fail('a failure model-routing/child-outcome must not use failureCode UNKNOWN')
+  }
+  const decision = routedDecisionFor(events, data.routeRequestId)
+  if (decision === undefined || decision.outcome !== 'routed' || decision.selection === undefined) {
+    fail(`model-routing/child-outcome ${data.routeRequestId} has no routed child-decision`)
+    return
+  }
+  if (data.candidateId !== decision.selection.candidateId) {
+    fail(`model-routing/child-outcome candidateId ${data.candidateId} differs from the decision selection`)
+  }
+  if (data.countedAs === 'failure'
+    && (data.route.provider !== decision.selection.provider || data.route.model !== decision.selection.model)) {
+    fail('a failure model-routing/child-outcome must record the selection route')
+  }
+  const duplicate = events.some(event =>
+    event.type === 'model-routing/child-outcome'
+    && event.data.routeRequestId === data.routeRequestId
+    && event.data.childTurn === data.childTurn)
+  if (duplicate) fail(`duplicate model-routing/child-outcome for ${data.routeRequestId} turn ${String(data.childTurn)}`)
+}
+
+function checkChildFirstHeader(
+  ctx: Context,
+  session: Session,
+  config: { provider: string; model: string },
+  fail: InvariantFailure,
+): void {
+  const parentId = session.header.parentSession
+  if (parentId === undefined) return
+  if (session.events.some(event => event.type === 'request/header')) return
+  const parent = ctx.get('sessions')?.get(parentId)
+  if (parent === undefined) return
+  const descriptor = session.events.find(event => event.type === 'subagent/descriptor')
+  const routeRequestId = descriptor?.type === 'subagent/descriptor'
+    ? (descriptor.data as { agentRouteRequestId?: string }).agentRouteRequestId
+    : undefined
+  if (routeRequestId === undefined) return
+  const decision = routedDecisionFor(parent.events, routeRequestId)
+  if (decision === undefined || decision.outcome !== 'routed' || decision.selection === undefined) return
+  if (config.provider !== decision.selection.provider || config.model !== decision.selection.model) {
+    fail(
+      `routed child ${routeRequestId} first header ${config.provider}/${config.model}`
+      + ` differs from ${decision.selection.provider}/${decision.selection.model}`,
+    )
+  }
+}
+
 function checkRouteBase(events: readonly SessionEvent[], record: SessionEventMap['agent/route-base'], fail: InvariantFailure): void {
   let downgraded: ModelRoutingDecision | undefined
   for (const candidate of events) {
