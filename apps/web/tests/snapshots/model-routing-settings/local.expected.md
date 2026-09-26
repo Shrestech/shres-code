@@ -28,3 +28,460 @@
     - paragraph: Turns every judgment consumer off at once, such as routing, worker escalation, and compaction. Moved here from Models.
     - switch "Turn the classifier off" [checked]
     - text: Enabled
+  - region "Candidate pool":
+    - heading "Candidate pool" [level=3]
+    - paragraph: Models routing may switch to. One shared pool for every strong model you route from. Descriptions are sent to the judge on every consult; keep each to one short clause.
+    - button "Add model…"
+    - paragraph: The pool is empty, so routing keeps the strong model on every turn.
+  - region "Route from":
+    - heading "Route from" [level=3]
+    - paragraph: "Routing runs only while one of these strong models is selected. Each needs an objective: what switching is meant to save."
+    - paragraph: No strong model is enabled, so routing never runs.
+    - text: Strong model to add
+    - combobox "Strong model to add":
+      - option "Add strong model…" [disabled] [selected]
+      - option "Cursor (subscription) · GPT-5.2"
+      - option "Cursor (subscription) · Sonnet 4.5"
+      - option "Cursor (subscription) · Grok 4.6 (high)"
+      - option "Cursor (subscription) · Grok 4.6 (high, fast)"
+      - option "Cursor (subscription) · Fable 5.1 Thinking (high)"
+      - option "Cursor (subscription) · Gemini 3.8 Flash (high)"
+      - option "Ollama (local) · Llama 3.2"
+      - option "Ollama Cloud · DeepSeek V4 Flash (cloud)"
+      - option "Ollama Cloud · DeepSeek V4 Pro (cloud)"
+      - option "openai · GPT-4"
+      - option "openai · GPT-4 Turbo"
+      - option "openai · GPT-4.1"
+      - option "openai · GPT-4.1 mini"
+      - option "openai · GPT-4.1 nano"
+      - option "openai · GPT-4o"
+      - option "openai · GPT-4o (2024-05-13)"
+      - option "openai · GPT-4o (2024-08-06)"
+      - option "openai · GPT-4o (2024-11-20)"
+      - option "openai · GPT-4o mini"
+      - option "openai · GPT-5"
+      - option "openai · GPT-5 Chat Latest"
+      - option "openai · GPT-5 Mini"
+      - option "openai · GPT-5 Nano"
+      - option "openai · GPT-5 Pro"
+      - option "openai · GPT-5.1"
+      - option "openai · GPT-5.2"
+      - option "openai · GPT-5.2 Chat"
+      - option "openai · GPT-5.2 Pro"
+      - option "openai · GPT-5.3 Chat (latest)"
+      - option "openai · GPT-5.3 Codex"
+      - option "openai · GPT-5.3 Codex Spark"
+      - option "openai · GPT-5.4"
+      - option "openai · GPT-5.4 mini"
+      - option "openai · GPT-5.4 nano"
+      - option "openai · GPT-5.4 Pro"
+      - option "openai · GPT-5.5"
+      - option "openai · GPT-5.5 Pro"
+      - option "openai · GPT-5.6 Luna"
+      - option "openai · GPT-5.6 Sol"
+      - option "openai · GPT-5.6 Terra"
+      - option "openai · GPT-Realtime-2.1"
+      - option "openai · o1"
+      - option "openai · o1-pro"
+      - option "openai · o3"
+      - option "openai · o3-mini"
+      - option "openai · o3-pro"
+      - option "openai · o4-mini"
+      - option "anthropic · Claude Fable 5"
+      - option "anthropic · Claude Haiku 4.5 (latest)"
+      - option "anthropic · Claude Haiku 4.5"
+      - option "anthropic · Claude Opus 4.5 (latest)"
+      - option "anthropic · Claude Opus 4.5"
+      - option "anthropic · Claude Opus 4.6"
+      - option "anthropic · Claude Opus 4.7"
+      - option "anthropic · Claude Opus 4.8"
+      - option "anthropic · Claude Opus 5"
+      - option "anthropic · Claude Sonnet 4.5 (latest)"
+      - option "anthropic · Claude Sonnet 4.5"
+      - option "anthropic · Claude Sonnet 4.6"
+      - option "anthropic · Claude Sonnet 5"
+      - option "xai · Grok 4.3"
+      - option "xai · Grok Build 0.1"
+      - option "xai · Grok 4.5"
+      - option "moonshotai · Kimi K2 0711"
+      - option "moonshotai · Kimi K2 0905"
+      - option "moonshotai · Kimi K2 Thinking"
+      - option "moonshotai · Kimi K2 Thinking Turbo"
+      - option "moonshotai · Kimi K2 Turbo"
+      - option "moonshotai · Kimi K2.5"
+      - option "moonshotai · Kimi K2.6"
+      - option "moonshotai · Kimi K2.7 Code"
+      - option "moonshotai · Kimi K2.7 Code HighSpeed"
+      - option "moonshotai · Kimi K3"
+      - 'option "openrouter · AI21: Jamba Large 1.7"'
+      - 'option "openrouter · AionLabs: Aion-2.0"'
+      - 'option "openrouter · AionLabs: Aion-3.0"'
+      - 'option "openrouter · AionLabs: Aion-3.0-Mini"'
+      - 'option "openrouter · Amazon: Nova 2 Lite"'
+      - 'option "openrouter · Amazon: Nova Lite 1.0"'
+      - 'option "openrouter · Amazon: Nova Micro 1.0"'
+      - 'option "openrouter · Amazon: Nova Premier 1.0"'
+      - 'option "openrouter · Amazon: Nova Pro 1.0"'
+      - 'option "openrouter · Anthropic: Claude 3 Haiku"'
+      - 'option "openrouter · Anthropic: Claude Fable 5"'
+      - 'option "openrouter · Anthropic: Claude Fable 5 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Haiku 4.5"'
+      - 'option "openrouter · Anthropic: Claude Haiku 4.5 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.1"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.1 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.5"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.5 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.6"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.6 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.7"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.7 (Fast)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.7 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.8"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.8 (Fast)"'
+      - 'option "openrouter · Anthropic: Claude Opus 4.8 (batch)"'
+      - option "openrouter · Claude Opus 5"
+      - option "openrouter · Claude Opus 5 (Fast)"
+      - option "openrouter · Claude Opus 5 (batch)"
+      - 'option "openrouter · Anthropic: Claude Sonnet 4"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 4.5"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 4.5 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 4.6"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 4.6 (batch)"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 5"'
+      - 'option "openrouter · Anthropic: Claude Sonnet 5 (batch)"'
+      - 'option "openrouter · Arcee AI: Trinity Large Thinking"'
+      - 'option "openrouter · Arcee AI: Virtuoso Large"'
+      - option "openrouter · Auto"
+      - 'option "openrouter · ByteDance Seed: Seed 1.6"'
+      - 'option "openrouter · ByteDance Seed: Seed 1.6 Flash"'
+      - 'option "openrouter · ByteDance Seed: Seed-2.0-Lite"'
+      - 'option "openrouter · ByteDance Seed: Seed-2.0-Mini"'
+      - 'option "openrouter · Cohere: Command R (08-2024)"'
+      - 'option "openrouter · Cohere: Command R+ (08-2024)"'
+      - 'option "openrouter · Cohere: North Mini Code (free)"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3 0324"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3.1"'
+      - 'option "openrouter · DeepSeek: R1"'
+      - 'option "openrouter · DeepSeek: R1 0528"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3.1 Terminus"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3.2"'
+      - 'option "openrouter · DeepSeek: DeepSeek V3.2 Exp"'
+      - 'option "openrouter · DeepSeek: DeepSeek V4 Flash 0423"'
+      - 'option "openrouter · DeepSeek: DeepSeek V4 Flash 0731"'
+      - 'option "openrouter · DeepSeek: DeepSeek V4 Pro"'
+      - 'option "openrouter · Google: Gemini 2.5 Flash"'
+      - 'option "openrouter · Google: Gemini 2.5 Flash Lite"'
+      - 'option "openrouter · Google: Gemini 2.5 Flash Lite (batch)"'
+      - 'option "openrouter · Google: Gemini 2.5 Flash (batch)"'
+      - 'option "openrouter · Google: Gemini 2.5 Pro"'
+      - 'option "openrouter · Google: Gemini 2.5 Pro Preview 06-05"'
+      - 'option "openrouter · Google: Gemini 2.5 Pro Preview 05-06"'
+      - 'option "openrouter · Google: Gemini 2.5 Pro (batch)"'
+      - 'option "openrouter · Google: Gemini 3 Flash Preview"'
+      - 'option "openrouter · Google: Gemini 3 Flash Preview (batch)"'
+      - 'option "openrouter · Google: Nano Banana Pro (Gemini 3 Pro Image)"'
+      - 'option "openrouter · Google: Gemini 3.1 Flash Lite"'
+      - 'option "openrouter · Google: Gemini 3.1 Flash Lite Preview"'
+      - 'option "openrouter · Google: Gemini 3.1 Flash Lite (batch)"'
+      - 'option "openrouter · Google: Gemini 3.1 Pro Preview"'
+      - 'option "openrouter · Google: Gemini 3.1 Pro Preview Custom Tools"'
+      - 'option "openrouter · Google: Gemini 3.1 Pro Preview (batch)"'
+      - 'option "openrouter · Google: Gemini 3.5 Flash"'
+      - 'option "openrouter · Google: Gemini 3.5 Flash Lite"'
+      - 'option "openrouter · Google: Gemini 3.5 Flash Lite (batch)"'
+      - 'option "openrouter · Google: Gemini 3.5 Flash (batch)"'
+      - 'option "openrouter · Google: Gemini 3.6 Flash"'
+      - 'option "openrouter · Google: Gemini 3.6 Flash (batch)"'
+      - 'option "openrouter · Google: Gemma 3 12B"'
+      - 'option "openrouter · Google: Gemma 3 27B"'
+      - 'option "openrouter · Google: Gemma 4 26B A4B"'
+      - 'option "openrouter · Google: Gemma 4 26B A4B (free)"'
+      - 'option "openrouter · Google: Gemma 4 31B"'
+      - 'option "openrouter · Google: Gemma 4 31B (free)"'
+      - 'option "openrouter · IBM: Granite 4.1 8B"'
+      - 'option "openrouter · Inception: Mercury 2"'
+      - 'option "openrouter · inclusionAI: Ling-2.6-1T"'
+      - 'option "openrouter · inclusionAI: Ling-2.6-flash"'
+      - option "openrouter · Ling-3.0-flash"
+      - 'option "openrouter · inclusionAI: Ling 3.0 Tiny (free)"'
+      - 'option "openrouter · inclusionAI: Ring-2.6-1T"'
+      - 'option "openrouter · Kwaipilot: KAT-Coder-Air V2.5"'
+      - 'option "openrouter · Kwaipilot: KAT-Coder-Pro V2"'
+      - 'option "openrouter · Kwaipilot: KAT-Coder-Pro V2.5"'
+      - 'option "openrouter · Meituan: LongCat 2.0"'
+      - 'option "openrouter · Meta: Llama 3.1 70B Instruct"'
+      - 'option "openrouter · Meta: Llama 3.1 8B Instruct"'
+      - 'option "openrouter · Meta: Llama 3.3 70B Instruct"'
+      - 'option "openrouter · Meta: Llama 4 Maverick"'
+      - 'option "openrouter · Meta: Llama 4 Scout"'
+      - 'option "openrouter · Meta: Muse Spark 1.1"'
+      - 'option "openrouter · Meta: Muse Spark 1.2"'
+      - 'option "openrouter · MiniMax: MiniMax M1"'
+      - 'option "openrouter · MiniMax: MiniMax M2"'
+      - 'option "openrouter · MiniMax: MiniMax M2.1"'
+      - 'option "openrouter · MiniMax: MiniMax M2.5"'
+      - 'option "openrouter · MiniMax: MiniMax M2.7"'
+      - 'option "openrouter · MiniMax: MiniMax M3"'
+      - 'option "openrouter · MiniMax: MiniMax M3 (batch)"'
+      - 'option "openrouter · Mistral: Codestral 2508"'
+      - 'option "openrouter · Mistral: Ministral 3 14B 2512"'
+      - 'option "openrouter · Mistral: Ministral 3 3B 2512"'
+      - 'option "openrouter · Mistral: Ministral 3 8B 2512"'
+      - option "openrouter · Mistral Large"
+      - option "openrouter · Mistral Large 2407"
+      - 'option "openrouter · Mistral: Mistral Large 3 2512"'
+      - 'option "openrouter · Mistral: Mistral Medium 3"'
+      - 'option "openrouter · Mistral: Mistral Medium 3.5"'
+      - 'option "openrouter · Mistral: Mistral Medium 3.1"'
+      - 'option "openrouter · Mistral: Mistral Nemo"'
+      - 'option "openrouter · Mistral: Saba"'
+      - 'option "openrouter · Mistral: Mistral Small 4"'
+      - 'option "openrouter · Mistral: Mistral Small 3.2 24B"'
+      - 'option "openrouter · Mistral: Mixtral 8x22B Instruct"'
+      - 'option "openrouter · Mistral: Voxtral Small 24B 2507"'
+      - 'option "openrouter · MoonshotAI: Kimi K2 0711"'
+      - 'option "openrouter · MoonshotAI: Kimi K2 0905"'
+      - 'option "openrouter · MoonshotAI: Kimi K2 Thinking"'
+      - 'option "openrouter · MoonshotAI: Kimi K2.5"'
+      - 'option "openrouter · MoonshotAI: Kimi K2.6"'
+      - 'option "openrouter · MoonshotAI: Kimi K2.7 Code"'
+      - 'option "openrouter · MoonshotAI: Kimi K2.7 Code (batch)"'
+      - 'option "openrouter · MoonshotAI: Kimi K3"'
+      - 'option "openrouter · Nex AGI: Nex-N2-Mini"'
+      - 'option "openrouter · Nex AGI: Nex-N2-Pro"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Nano 30B A3B"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Nano 30B A3B (free)"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Nano Omni (free)"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Super"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Super (free)"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Ultra"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Ultra (batch)"'
+      - 'option "openrouter · NVIDIA: Nemotron 3 Ultra (free)"'
+      - 'option "openrouter · NVIDIA: Nemotron Nano 12B 2 VL (free)"'
+      - 'option "openrouter · NVIDIA: Nemotron Nano 9B V2 (free)"'
+      - 'option "openrouter · OpenAI: GPT-3.5 Turbo"'
+      - 'option "openrouter · OpenAI: GPT-3.5 Turbo (older v0613)"'
+      - 'option "openrouter · OpenAI: GPT-3.5 Turbo 16k"'
+      - 'option "openrouter · OpenAI: GPT-3.5 Turbo (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4"'
+      - 'option "openrouter · OpenAI: GPT-4 Turbo"'
+      - 'option "openrouter · OpenAI: GPT-4 Turbo Preview"'
+      - 'option "openrouter · OpenAI: GPT-4 Turbo (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4.1"'
+      - 'option "openrouter · OpenAI: GPT-4.1 Mini"'
+      - 'option "openrouter · OpenAI: GPT-4.1 Mini (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4.1 Nano"'
+      - 'option "openrouter · OpenAI: GPT-4.1 Nano (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4.1 (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4o"'
+      - 'option "openrouter · OpenAI: GPT-4o (2024-05-13)"'
+      - 'option "openrouter · OpenAI: GPT-4o (2024-08-06)"'
+      - 'option "openrouter · OpenAI: GPT-4o (2024-11-20)"'
+      - 'option "openrouter · OpenAI: GPT-4o-mini"'
+      - 'option "openrouter · OpenAI: GPT-4o-mini (2024-07-18)"'
+      - 'option "openrouter · OpenAI: GPT-4o-mini (batch)"'
+      - 'option "openrouter · OpenAI: GPT-4o (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5"'
+      - 'option "openrouter · OpenAI: GPT-5 Codex (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5 Mini"'
+      - 'option "openrouter · OpenAI: GPT-5 Mini (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5 Nano"'
+      - 'option "openrouter · OpenAI: GPT-5 Nano (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5 Pro"'
+      - 'option "openrouter · OpenAI: GPT-5 Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.1"'
+      - 'option "openrouter · OpenAI: GPT-5.1-Codex"'
+      - 'option "openrouter · OpenAI: GPT-5.1-Codex-Max"'
+      - 'option "openrouter · OpenAI: GPT-5.1-Codex-Mini"'
+      - 'option "openrouter · OpenAI: GPT-5.1 (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.2"'
+      - 'option "openrouter · OpenAI: GPT-5.2 Chat"'
+      - 'option "openrouter · OpenAI: GPT-5.2-Codex"'
+      - 'option "openrouter · OpenAI: GPT-5.2 Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.2 Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.2 (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.3 Chat"'
+      - 'option "openrouter · OpenAI: GPT-5.3-Codex"'
+      - 'option "openrouter · OpenAI: GPT-5.4"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Mini"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Mini (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Nano"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Nano (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.4 Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.4 (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.5"'
+      - 'option "openrouter · OpenAI: GPT-5.5 Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.5 Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.5 (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Luna"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Luna Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Luna Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Luna (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Sol"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Sol Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Sol Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Sol (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Terra"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Terra Pro"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Terra Pro (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5.6 Terra (batch)"'
+      - 'option "openrouter · OpenAI: GPT-5 (batch)"'
+      - 'option "openrouter · OpenAI: GPT Audio"'
+      - 'option "openrouter · OpenAI: GPT Audio Mini"'
+      - 'option "openrouter · OpenAI: GPT Chat Latest"'
+      - 'option "openrouter · OpenAI: gpt-oss-120b"'
+      - 'option "openrouter · OpenAI: gpt-oss-20b"'
+      - 'option "openrouter · OpenAI: gpt-oss-20b (free)"'
+      - 'option "openrouter · OpenAI: gpt-oss-safeguard-20b"'
+      - 'option "openrouter · OpenAI: o1"'
+      - 'option "openrouter · OpenAI: o1 (batch)"'
+      - 'option "openrouter · OpenAI: o3"'
+      - 'option "openrouter · OpenAI: o3 Mini"'
+      - 'option "openrouter · OpenAI: o3 Mini High"'
+      - 'option "openrouter · OpenAI: o3 Mini High (batch)"'
+      - 'option "openrouter · OpenAI: o3 Mini (batch)"'
+      - 'option "openrouter · OpenAI: o3 Pro"'
+      - 'option "openrouter · OpenAI: o3 Pro (batch)"'
+      - 'option "openrouter · OpenAI: o3 (batch)"'
+      - 'option "openrouter · OpenAI: o4 Mini"'
+      - 'option "openrouter · OpenAI: o4 Mini High"'
+      - 'option "openrouter · OpenAI: o4 Mini High (batch)"'
+      - 'option "openrouter · OpenAI: o4 Mini (batch)"'
+      - option "openrouter · Auto Router"
+      - option "openrouter · Auto Router (Beta)"
+      - option "openrouter · Free Models Router"
+      - 'option "openrouter · OpenRouter: Fusion"'
+      - 'option "openrouter · Poolside: Laguna S 2.1"'
+      - 'option "openrouter · Poolside: Laguna S 2.1 (free)"'
+      - 'option "openrouter · Poolside: Laguna XS 2.1"'
+      - 'option "openrouter · Poolside: Laguna XS 2.1 (free)"'
+      - option "openrouter · Qwen2.5 72B Instruct"
+      - 'option "openrouter · Qwen: Qwen2.5 7B Instruct"'
+      - 'option "openrouter · Qwen: Qwen-Plus"'
+      - 'option "openrouter · Qwen: Qwen Plus 0728"'
+      - 'option "openrouter · Qwen: Qwen Plus 0728 (thinking)"'
+      - 'option "openrouter · Qwen: Qwen3 14B"'
+      - 'option "openrouter · Qwen: Qwen3 235B A22B"'
+      - 'option "openrouter · Qwen: Qwen3 235B A22B Instruct 2507"'
+      - 'option "openrouter · Qwen: Qwen3 235B A22B Thinking 2507"'
+      - 'option "openrouter · Qwen: Qwen3 30B A3B"'
+      - 'option "openrouter · Qwen: Qwen3 30B A3B Instruct 2507"'
+      - 'option "openrouter · Qwen: Qwen3 30B A3B Thinking 2507"'
+      - 'option "openrouter · Qwen: Qwen3 32B"'
+      - 'option "openrouter · Qwen: Qwen3 8B"'
+      - 'option "openrouter · Qwen: Qwen3 Coder 480B A35B"'
+      - 'option "openrouter · Qwen: Qwen3 Coder 30B A3B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 Coder Flash"'
+      - 'option "openrouter · Qwen: Qwen3 Coder Next"'
+      - 'option "openrouter · Qwen: Qwen3 Coder Plus"'
+      - 'option "openrouter · Qwen: Qwen3 Max"'
+      - 'option "openrouter · Qwen: Qwen3 Max Thinking"'
+      - 'option "openrouter · Qwen: Qwen3 Next 80B A3B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 Next 80B A3B Thinking"'
+      - 'option "openrouter · Qwen: Qwen3 VL 235B A22B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 VL 235B A22B Thinking"'
+      - 'option "openrouter · Qwen: Qwen3 VL 30B A3B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 VL 30B A3B Thinking"'
+      - 'option "openrouter · Qwen: Qwen3 VL 32B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 VL 8B Instruct"'
+      - 'option "openrouter · Qwen: Qwen3 VL 8B Thinking"'
+      - 'option "openrouter · Qwen: Qwen3.5-122B-A10B"'
+      - 'option "openrouter · Qwen: Qwen3.5-27B"'
+      - 'option "openrouter · Qwen: Qwen3.5-35B-A3B"'
+      - 'option "openrouter · Qwen: Qwen3.5 397B A17B"'
+      - 'option "openrouter · Qwen: Qwen3.5-9B"'
+      - 'option "openrouter · Qwen: Qwen3.5-Flash"'
+      - 'option "openrouter · Qwen: Qwen3.5 Plus 2026-02-15"'
+      - 'option "openrouter · Qwen: Qwen3.5 Plus 2026-04-20"'
+      - 'option "openrouter · Qwen: Qwen3.6 27B"'
+      - 'option "openrouter · Qwen: Qwen3.6 35B A3B"'
+      - 'option "openrouter · Qwen: Qwen3.6 Flash"'
+      - 'option "openrouter · Qwen: Qwen3.6 Max Preview"'
+      - 'option "openrouter · Qwen: Qwen3.6 Plus"'
+      - 'option "openrouter · Qwen: Qwen3.7 Flash"'
+      - 'option "openrouter · Qwen: Qwen3.7 Max"'
+      - 'option "openrouter · Qwen: Qwen3.7 Plus"'
+      - 'option "openrouter · Qwen: Qwen3.8 Max"'
+      - option "openrouter · Reka Edge"
+      - 'option "openrouter · Relace: Relace Search"'
+      - 'option "openrouter · Sakana: Fugu Ultra"'
+      - 'option "openrouter · Sao10K: Llama 3.1 Euryale 70B v2.2"'
+      - 'option "openrouter · StepFun: Step 3.5 Flash"'
+      - 'option "openrouter · StepFun: Step 3.7 Flash"'
+      - 'option "openrouter · Tencent: Hy3"'
+      - 'option "openrouter · Tencent: Hy3 preview"'
+      - 'option "openrouter · TheDrummer: UnslopNemo 12B"'
+      - 'option "openrouter · Thinking Machines: Inkling"'
+      - 'option "openrouter · Thinking Machines: Inkling Small"'
+      - 'option "openrouter · Thinking Machines: Inkling (batch)"'
+      - 'option "openrouter · Upstage: Solar Pro 3"'
+      - 'option "openrouter · SpaceXAI: Grok 4.20"'
+      - 'option "openrouter · SpaceXAI: Grok 4.3"'
+      - 'option "openrouter · SpaceXAI: Grok 4.5"'
+      - 'option "openrouter · SpaceXAI: Grok Build 0.1"'
+      - 'option "openrouter · Xiaomi: MiMo-V2.5"'
+      - 'option "openrouter · Xiaomi: MiMo-V2.5-Pro"'
+      - 'option "openrouter · Z.ai: GLM 4.5"'
+      - 'option "openrouter · Z.ai: GLM 4.5 Air"'
+      - 'option "openrouter · Z.ai: GLM 4.5V"'
+      - 'option "openrouter · Z.ai: GLM 4.6"'
+      - 'option "openrouter · Z.ai: GLM 4.6V"'
+      - 'option "openrouter · Z.ai: GLM 4.7"'
+      - 'option "openrouter · Z.ai: GLM 4.7 Flash"'
+      - 'option "openrouter · Z.ai: GLM 5"'
+      - 'option "openrouter · Z.ai: GLM 5 Turbo"'
+      - 'option "openrouter · Z.ai: GLM 5.1"'
+      - 'option "openrouter · Z.ai: GLM 5.2"'
+      - 'option "openrouter · Z.ai: GLM 5.2 (batch)"'
+      - 'option "openrouter · Z.ai: GLM 5V Turbo"'
+      - 'option "openrouter · Anthropic: Claude Fable Latest"'
+      - option "openrouter · Anthropic Claude Haiku Latest"
+      - 'option "openrouter · Anthropic: Claude Opus Latest"'
+      - option "openrouter · Anthropic Claude Sonnet Latest"
+      - option "openrouter · DeepSeek V4 Flash Latest"
+      - option "openrouter · Google Gemini Flash Latest"
+      - option "openrouter · Google Gemini Pro Latest"
+      - option "openrouter · MoonshotAI Kimi Latest"
+      - option "openrouter · OpenAI GPT Latest"
+      - option "openrouter · OpenAI GPT Mini Latest"
+      - 'option "openrouter · xAI: Grok Latest"'
+      - option "groq · Llama 3.1 8B"
+      - option "groq · Llama 3.3 70B"
+      - option "groq · GPT OSS 120B"
+      - option "groq · GPT OSS 20B"
+      - option "groq · Safety GPT OSS 20B"
+      - option "groq · Qwen3.6 27B"
+      - option "zai · GLM-4.7"
+      - option "zai · GLM-5-Turbo"
+      - option "zai · GLM-5.2"
+      - option "zai · GLM-5.2 Highspeed"
+      - option "Grok (subscription) · Grok 4.6"
+      - option "Grok (subscription) · Grok 4.5"
+      - option "Claude (subscription) · Claude Opus 5.5"
+      - option "Claude (subscription) · Claude Opus 5"
+      - option "Claude (subscription) · Claude Sonnet 5"
+      - option "Codex (subscription) · GPT-6 Astra"
+      - option "Codex (subscription) · GPT-5.6 Luna"
+      - option "DeepSeek · DeepSeek-V4-Flash"
+  - region "Thresholds":
+    - heading "Thresholds" [level=3]
+    - paragraph: Read-only. The values routing gates each consult with now; editing them is not offered here.
+    - text: "Uncalibrated: global thresholds Confidence threshold 0.80 Margin threshold 0.10 Difficulty: enter below / exit at 2 / 3 Judge deadline 1,500 ms Hold: min / max steps 20 / 40 State sent per consult 12,000 characters"
+    - table "Operating points":
+      - rowgroup:
+        - row "Engine Confidence / margin Routing":
+          - columnheader "Engine"
+          - columnheader "Confidence / margin"
+          - columnheader "Routing"
+      - rowgroup:
+        - 'row "Jev (TypeSafe) 0.80 / 0.10 (global) Uncalibrated: global thresholds"':
+          - rowheader "Jev (TypeSafe)"
+          - cell "0.80 / 0.10 (global)"
+          - 'cell "Uncalibrated: global thresholds"'
+        - 'row "Shield (local gateway) 0.80 / 0.10 (global) Uncalibrated: global thresholds"':
+          - rowheader "Shield (local gateway)"
+          - cell "0.80 / 0.10 (global)"
+          - 'cell "Uncalibrated: global thresholds"'

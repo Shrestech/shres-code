@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-client-ui-settings-model-routing",
-  "description": "Settings › Model routing: the judgment engine selector, Laya gateway controls, the default routing mode, the classifier switch, and read-only thresholds",
+  "description": "Settings › Model routing: the judgment engine selector, Laya gateway controls, the default routing mode, the classifier switch, the shared candidate pool and Route from editor, and read-only thresholds",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -35,7 +35,8 @@
         "@shres-code/shres-code-api-remotes",
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-client-ui-settings",
-        "@shres-code/shres-code-client-locale"
+        "@shres-code/shres-code-client-locale",
+        "@shres-code/shres-code-model-router"
       ],
       "platform": "web"
     }
@@ -56,6 +57,7 @@
     "@shres-code/shres-code-client-ui-settings": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
     "react": "^19.2.8"
   },
   "devDependencies": {
@@ -68,6 +70,7 @@
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-client-web-react": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~19.2.18",
     "react": "^19.2.8",

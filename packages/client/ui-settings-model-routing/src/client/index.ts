@@ -10,8 +10,8 @@ import type { ConnectionHandle } from '@shres-code/shres-code-api-remotes/client
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@shres-code/shres-code-client-locale/client'
-// Type-only: pulls the ctx.remote merge, the generated judgmentEngines and laya
-// namespaces, and the forwarded-event key face into this program.
+// Type-only: pulls the ctx.remote merge, the generated judgmentEngines, laya,
+// and modelRouting namespaces, and the forwarded-event key face into this program.
 import type {} from '@shres-code/shres-code-api-remotes/client'
 import { ModelRoutingSection } from './ModelRoutingSection.tsx'
 import type { ModelRoutingSectionInjected } from './ModelRoutingSection.tsx'
@@ -20,7 +20,7 @@ import { en, type ModelRoutingKey } from './locales.ts'
 
 export type { ModelRoutingSectionInjected, ModelRoutingSectionProps } from './ModelRoutingSection.tsx'
 export type { ModelRoutingKey } from './locales.ts'
-export type { ModelRoutingController, ModelRoutingState, WriteFailure } from './model.ts'
+export type { ModelRoutingController, ModelRoutingState, PoolCandidateDraft, RouteFromDraft, WriteFailure } from './model.ts'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -33,11 +33,11 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 const NS = 'settings.modelRouting'
 
 /**
- * Required services (cordis fiber inject). The generated `judgmentEngines` and
- * `laya` namespaces are mounted by the api-remotes Client assembly; whether the
- * Host serves them is read at run time.
+ * Required services (cordis fiber inject). The generated `judgmentEngines`,
+ * `laya`, and `modelRouting` namespaces are mounted by the api-remotes Client
+ * assembly; whether the Host serves them is read at run time.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.judgmentEngines', 'remote.laya']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.judgmentEngines', 'remote.laya', 'remote.modelRouting']
 
 /**
  * Probe the Host's engine view, register the Settings entry while it is
@@ -54,6 +54,8 @@ export function apply(ctx: ClientContext): void {
     layaStatus: () => ctx.remote.laya.gatewayStatus(),
     layaInstall: () => ctx.remote.laya.installGateway(),
     layaRestart: () => ctx.remote.laya.restartGateway(),
+    gate: () => ctx.remote.modelRouting.gate(),
+    poolStatus: () => ctx.remote.modelRouting.poolStatus(),
   })
   const t = ctx.locale.bind(NS)
   const injected = (): ModelRoutingSectionInjected => ({ controller, hooks: { snapshot: controller.store } })
@@ -93,6 +95,8 @@ export function apply(ctx: ClientContext): void {
       ctx.remote.$on('settings/document-updated', (ns) => {
         if (ns === JUDGMENT_NS || ns === MODEL_ROUTER_NS) refresh()
       }),
+      // Registered routes and their models decide the pool notes and the catalog the editor offers.
+      ctx.remote.$on('llm/adapters-updated', refresh),
       ctx.on('connection/reset', refresh),
     ]
     void controller.probe()

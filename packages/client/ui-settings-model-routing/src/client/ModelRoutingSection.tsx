@@ -1,8 +1,9 @@
 /**
  * Settings › Model routing: the global routing configuration page. It holds
  * the deployment-wide judgment engine, the routing mode new sessions start in,
- * and the classifier switch; per-session routing stays with each session's
- * Auto chip.
+ * the classifier switch, the shared candidate pool with the Route from
+ * allowlist, and the read-only thresholds; per-session routing stays with each
+ * session's Auto chip.
  */
 
 import { useEffect } from 'react'
@@ -12,6 +13,8 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-co
 import type { ModelRoutingController, ModelRoutingState } from './model.ts'
 import { EngineCard } from './EngineCard.tsx'
 import { ClassifierCard, DefaultModeCard } from './ConfigCards.tsx'
+import { PoolEditor } from './PoolEditor.tsx'
+import { ThresholdsCard } from './ThresholdsCard.tsx'
 import css from './ModelRoutingSection.module.css'
 
 /** Injected dependencies of {@link ModelRoutingSection} (slot `inject`). */
@@ -69,6 +72,9 @@ export function ModelRoutingSection({ controller, useSnapshot, t }: ModelRouting
               : <ClassifierCard section={state.judgment} writable={state.writable} controller={controller} t={t} />}
           </div>
         )}
+      {state.routingError === null ? null : <p className={css['fieldError']} role="alert">{t('poolLoadFailed', { message: state.routingError })}</p>}
+      <PoolEditor state={state} controller={controller} t={t} />
+      <ThresholdsCard state={state} t={t} />
     </section>
   )
 }

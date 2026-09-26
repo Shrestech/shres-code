@@ -8,6 +8,8 @@ import type {
   SettingsNamespaceView,
 } from '@shres-code/shres-code-api-remotes/client'
 import type { ModelRoutingRemotes, RemoteOutcome } from '../src/client/model.ts'
+import type { ModelProviderGroup } from '@shres-code/shres-code-api-remotes/client'
+import type { ModelRoutingGateView, ModelRoutingPoolStatus } from '@shres-code/shres-code-model-router/client'
 
 /** TypeSafe as judgment-typesafe registers it with the vendor defaults. */
 export const TYPESAFE: JudgmentEngineView = {
@@ -121,8 +123,74 @@ export function remoteFail<T>(code: string, message: string): RemoteOutcome<T> {
   return { ok: false, error: { code, message } }
 }
 
+/** The router's gate as it reports the TypeSafe and Laya engines with no operating point. */
+export const GATE: ModelRoutingGateView = {
+  downgradeThreshold: 0.8,
+  downgradeMargin: 0.1,
+  operatingPoints: [],
+  engines: [
+    { engine: 'typesafe', calibration: { kind: 'global' } },
+    { engine: 'laya', calibration: { kind: 'global' } },
+  ],
+  judgmentDeadlineMs: 1500,
+  entryScoreCeiling: 2,
+  escalateBackScoreThreshold: 3,
+  difficultyLevels: ['trivial', 'easy', 'moderate', 'hard', 'expert'],
+  hold: { minSteps: 20, maxSteps: 40 },
+  stateMaxChars: 12000,
+}
+
+const OPUS = { provider: 'claude-session', model: 'claude-opus-5-5' }
+const FLASH = { provider: 'ollama-cloud', model: 'deepseek-v4.1-flash:cloud' }
+const GLM = { provider: 'zai', model: 'glm-5.3' }
+
+/** The live pool: Flash eligible from Opus, GLM too small a context and reporting no cache counts. */
+export const POOL: ModelRoutingPoolStatus = {
+  routeFrom: [{ ...OPUS, objective: 'quota', allowEveryTurn: true, registered: true, contextWindow: 1_000_000 }],
+  candidates: [
+    {
+      id: 'flash', ...FLASH, description: 'small, well-scoped edits in familiar code', registered: true,
+      contextWindow: 1_000_000, efforts: ['low', 'high'], cacheUsage: 'reported', alsoRouteFrom: false,
+      eligibility: [{ ...OPUS, reason: 'eligible' }],
+    },
+    {
+      id: 'glm', ...GLM, description: 'routine code edits', registered: true,
+      contextWindow: 200_000, cacheUsage: 'unreported', alsoRouteFrom: false,
+      eligibility: [{ ...OPUS, reason: 'context-too-small' }],
+    },
+  ],
+}
+
+/** The model-router section matching {@link POOL}. */
+export const POOL_ROUTER = namespace('model-router', {
+  initialMode: 'off',
+  state: { maxChars: 12000, maxFitCandidates: 4 },
+  candidates: [
+    { id: 'flash', ...FLASH, description: 'small, well-scoped edits in familiar code' },
+    { id: 'glm', ...GLM, description: 'routine code edits' },
+  ],
+  routeFrom: [{ ...OPUS, objective: 'quota', allowEveryTurn: true }],
+}, 9)
+
+/** The model catalog, as `llm.models` groups it. */
+export const MODELS: ModelProviderGroup[] = [
+  { id: 'claude-session', name: 'Claude', models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }] },
+  {
+    id: 'ollama-cloud', name: 'Ollama Cloud', models: [
+      {
+        id: 'deepseek-v4.1-flash:cloud', name: 'DeepSeek V4.1 Flash',
+        reasoning: { efforts: [{ id: 'low', name: 'Low' }, { id: 'high', name: 'High' }] },
+      },
+      { id: 'kimi-k3:cloud', name: 'Kimi K3' },
+    ],
+  },
+  { id: 'zai', name: 'Z.ai', models: [{ id: 'glm-5.3', name: 'GLM-5.3' }] },
+]
+
 /** Scripted settings face and Remote methods. */
-export function scripted(initial: { engines?: JudgmentEnginesSnapshot; namespaces?: SettingsNamespaceView[] } = {}) {
+export function scripted(
+  initial: { engines?: JudgmentEnginesSnapshot; namespaces?: SettingsNamespaceView[]; models?: ModelProviderGroup[] } = {},
+) {
   const namespaces = initial.namespaces ?? [JUDGMENT, ROUTER]
   const describe = vi.fn(() => Promise.resolve(ok({ writable: true, hasDocument: true, namespaces })))
   const mutate = vi.fn((_request: { ns: string; ops: unknown[]; expectedRevision?: number }) => Promise.resolve(ok(JUDGMENT)))
@@ -131,6 +199,9 @@ export function scripted(initial: { engines?: JudgmentEnginesSnapshot; namespace
     layaStatus: vi.fn<ModelRoutingRemotes['layaStatus']>(() => Promise.resolve(remoteOk(LAYA_VIEW))),
     layaInstall: vi.fn<ModelRoutingRemotes['layaInstall']>(() => Promise.resolve(remoteOk({ modelDir: '/m', manifestSha256: 'a'.repeat(64), lockSha256: 'b'.repeat(64) }))),
     layaRestart: vi.fn<ModelRoutingRemotes['layaRestart']>(() => Promise.resolve(remoteOk({ ...LAYA_VIEW, state: 'starting' as const }))),
+    gate: vi.fn<ModelRoutingRemotes['gate']>(() => Promise.resolve(remoteOk(GATE))),
+    poolStatus: vi.fn<ModelRoutingRemotes['poolStatus']>(() => Promise.resolve(remoteOk(POOL))),
   }
-  return { api: { settings: { describe, mutate } } as never, describe, mutate, remotes }
+  const models = vi.fn((_request: object) => Promise.resolve(ok({ groups: initial.models ?? MODELS, failures: [] })))
+  return { api: { settings: { describe, mutate }, llm: { models } } as never, describe, mutate, models, remotes }
 }

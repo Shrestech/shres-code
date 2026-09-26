@@ -13,7 +13,7 @@ import { LAYA_VIEW, remoteFail, remoteOk, scripted, snapshot } from './fixtures.
 
 usePinnedBrowserLanguages('en-US')
 
-/** A client root with the slot registry, locale, remote double, the two Remote namespaces, and a scripted settings wire. */
+/** A client root with the slot registry, locale, remote double, the three Remote namespaces, and a scripted settings wire. */
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
@@ -23,9 +23,11 @@ async function bench() {
   // The generated namespaces hang off `ctx.remote` and are also inject keys of their own.
   const judgmentEngines = { snapshot: s.remotes.snapshot }
   const laya = { gatewayStatus: s.remotes.layaStatus, installGateway: s.remotes.layaInstall, restartGateway: s.remotes.layaRestart }
-  Object.assign(remote, { judgmentEngines, laya })
+  const modelRouting = { gate: s.remotes.gate, poolStatus: s.remotes.poolStatus }
+  Object.assign(remote, { judgmentEngines, laya, modelRouting })
   ctx.provide('remote.judgmentEngines', judgmentEngines)
   ctx.provide('remote.laya', laya)
+  ctx.provide('remote.modelRouting', modelRouting)
   ctx.provide('connection', { api: s.api, isLoopback: true } as never)
   const slots = ctx.get('slots') as SlotRegistry
   const declare = (): (() => void) => slots.register({
@@ -42,7 +44,7 @@ async function settle(): Promise<void> {
 
 describe('ui-settings-model-routing browser apply', () => {
   it('declares the services it binds, and its node half does nothing', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.judgmentEngines', 'remote.laya'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.judgmentEngines', 'remote.laya', 'remote.modelRouting'])
     nodeApply()
   })
 
@@ -81,7 +83,7 @@ describe('ui-settings-model-routing browser apply', () => {
     expect(b.slots.entries('settings.section')).toHaveLength(0)
   })
 
-  it('refreshes a loaded page on engine, judgment, model-router, and connection invalidations only', async () => {
+  it('refreshes a loaded page on engine, judgment, model-router, adapter, and connection invalidations only', async () => {
     const b = await bench()
     b.declare()
     await b.ctx.plugin({ inject: [...inject], apply }).await()
@@ -101,9 +103,11 @@ describe('ui-settings-model-routing browser apply', () => {
     await settle()
     b.remote.$dispatch('judgment/engines-updated', [])
     await settle()
+    b.remote.$dispatch('llm/adapters-updated', [])
+    await settle()
     b.ctx.emit('connection/reset')
     await settle()
-    expect(reads()).toBe(before + 4)
+    expect(reads()).toBe(before + 5)
   })
 
   it('withdraws the page and every listener when the plugin unloads (HMR), and registers again on reload', async () => {
@@ -151,6 +155,11 @@ describe('ui-settings-model-routing browser apply', () => {
     expect(b.s.remotes.layaStatus).toHaveBeenCalled()
     expect(b.s.remotes.layaInstall).toHaveBeenCalledTimes(1)
     expect(b.s.remotes.layaRestart).toHaveBeenCalledTimes(1)
+    // The router's gate and pool status, and the model catalog, are read with the page.
+    expect(b.s.remotes.gate).toHaveBeenCalled()
+    expect(b.s.remotes.poolStatus).toHaveBeenCalled()
+    expect(b.s.models).toHaveBeenCalled()
+    expect(controller.store.getSnapshot()).toMatchObject({ gate: { downgradeThreshold: 0.8 }, pool: { candidates: [{ id: 'flash' }, { id: 'glm' }] } })
     void vi
   })
 })
