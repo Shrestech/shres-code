@@ -58,7 +58,7 @@ import { drawGaps, trialGapSeed } from './gaps.js'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
@@ -121,6 +121,10 @@ Options:
   --calibration         mark the run as a calibration run: the confirmatory-run
                         registration checks (replay gate passed, overlay equality,
                         matched N rate) are enforced only without this flag
+  --confirmatory-overlays <dir>
+                        directory holding the replay writer's generated R and N
+                        overlays; required for confirmatory routing runs, whose
+                        overlays render from these files, pinned by sha256
   --resume               continue an interrupted experiment: reuse its manifest and
                         skip (task, trial, arm) triples already recorded with a
                         delivered verdict (status success); retried provider-error
@@ -188,6 +192,9 @@ export class UsageError extends Error {
  * @property {number} [gapSeed] - 32-bit seed of the per-trial gap streams; multiturn tasks require it.
  * @property {boolean} [calibration] - mark the run as a calibration run, exempt from the
  *   confirmatory registration checks.
+ * @property {string} [confirmatoryOverlays] - directory holding the replay writer's generated R and
+ *   N overlays; required for confirmatory routing runs, whose trial overlays are rendered from
+ *   these files instead of the committed provisional ones.
  */
 
 /**
@@ -218,6 +225,7 @@ export function parseArgs(argv) {
     nonce: false,
     gapCapMs: undefined,
     gapSeed: undefined,
+    confirmatoryOverlays: undefined,
     calibration: false,
   }
   let armsSeen = false
@@ -295,6 +303,12 @@ export function parseArgs(argv) {
         const id = value()
         if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) throw new UsageError('--price-snapshot must be a YYYY-MM-DD snapshot id')
         options.priceSnapshot = id
+        break
+      }
+      case '--confirmatory-overlays': {
+        const dir = value()
+        if (dir.trim() === '') throw new UsageError('--confirmatory-overlays requires a directory path')
+        options.confirmatoryOverlays = dir
         break
       }
       case '--resume':
@@ -419,11 +433,18 @@ export function assertRoutesPriced({ benchRoot, arms, accountingContext }) {
  * @param {object} options
  * @param {string} options.benchRoot - the bench directory the registration resolves in.
  * @param {string[]} options.arms - selected arm names.
+ * @param {string} [options.confirmatoryOverlaysDir] - directory holding the replay writer's
+ *   generated R and N overlays; required for every confirmatory run, because the committed
+ *   provisional overlays never confirm one.
  * @returns {void}
- * @throws UsageError on a missing, inconsistent, not replay-qualified, or mismatching registration.
+ * @throws UsageError on a missing directory, a missing, inconsistent, not replay-qualified, or
+ *   mismatching registration, or generated overlays that differ from it.
  */
-export function assertConfirmatoryRegistration({ benchRoot, arms }) {
+export function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOverlaysDir }) {
   if (!arms.some(name => CONFIRMATORY_ARMS.has(name))) return
+  if (confirmatoryOverlaysDir === undefined) {
+    throw new UsageError("confirmatory routing runs require --confirmatory-overlays <dir> naming the replay writer's generated R and N overlays; the committed provisional overlays never confirm a run")
+  }
   let reg
   try {
     reg = JSON.parse(readFileSync(join(benchRoot, 'routing', 'prereg-2026-10.registration.json'), 'utf8'))
@@ -443,13 +464,21 @@ export function assertConfirmatoryRegistration({ benchRoot, arms }) {
     throw new UsageError('confirmatory routing runs require a replay-qualified registration; the replay gate failed, so routing stays shadow-only (pass --calibration for a calibration run)')
   }
   const enforced = reg.enforced ?? {}
-  const rOverlay = readFileSync(join(benchRoot, 'routing', 'route-coldpoint.patch.yml'), 'utf8')
+  const generatedOverlay = (name) => {
+    const path = join(confirmatoryOverlaysDir, name)
+    try {
+      return readFileSync(path, 'utf8')
+    } catch (error) {
+      throw new UsageError(`confirmatory routing runs require the generated overlay ${name} in --confirmatory-overlays ${confirmatoryOverlaysDir}: ${/** @type {Error} */ (error).message}`)
+    }
+  }
+  const rOverlay = generatedOverlay('route-coldpoint.patch.yml')
   const point = rOverlay.match(/"engine":"laya","downgradeThreshold":([\d.]+),"downgradeMargin":([\d.]+),"calibratedBy":"([^"]+)"/)
   if (!point) throw new UsageError('confirmatory route-coldpoint overlay carries no calibrated operating point; the replay must write it before any confirmatory trial')
   if (Number(point[1]) !== enforced.downgradeThreshold || Number(point[2]) !== enforced.downgradeMargin || point[3] !== enforced.calibratedBy) {
     throw new UsageError('confirmatory route-coldpoint overlay differs from the registration (threshold, margin, or calibratedBy)')
   }
-  const nOverlay = readFileSync(join(benchRoot, 'routing', 'random-matched.patch.yml'), 'utf8')
+  const nOverlay = generatedOverlay('random-matched.patch.yml')
   const rate = nOverlay.match(/entryRate: ([\d.]+)/)
   const seed = nOverlay.match(/seed: (\d+)/)
   if (!rate || !seed) throw new UsageError('confirmatory route-random overlay is missing its entryRate or seed')
@@ -459,6 +488,34 @@ export function assertConfirmatoryRegistration({ benchRoot, arms }) {
   if (typeof enforced.realizedREntryRate !== 'number' || Number(rate[1]) !== enforced.realizedREntryRate) {
     throw new UsageError('confirmatory N rate must equal the realized R entry rate the registration records')
   }
+}
+
+/**
+ * Load the replay writer's generated R and N overlays for a confirmatory run:
+ * one body per confirmatory arm (rendered in place of the committed provisional
+ * file) and one sha256 per file (pinned in run.json so a resume refuses a
+ * changed overlay source).
+ * @param {string} dir - the --confirmatory-overlays directory.
+ * @returns {{ dir: string, bodies: Map<string, string>, sha256s: Record<string, string> }} bodies keyed by arm name, sha256s keyed by overlay file name.
+ * @throws UsageError when a confirmatory arm's generated overlay is missing or unreadable.
+ */
+export function loadConfirmatoryOverlays(dir) {
+  const bodies = new Map()
+  const sha256s = {}
+  for (const armName of CONFIRMATORY_ARMS) {
+    const pinnedOverlay = /** @type {string} */ (getArm(armName).pinnedOverlay)
+    const name = basename(pinnedOverlay)
+    const path = join(dir, name)
+    let text
+    try {
+      text = readFileSync(path, 'utf8').trimEnd()
+    } catch (error) {
+      throw new UsageError(`--confirmatory-overlays ${dir} is missing the generated overlay ${name} for arm ${armName}: ${/** @type {Error} */ (error).message}`)
+    }
+    bodies.set(armName, text)
+    sha256s[name] = createHash('sha256').update(text).digest('hex')
+  }
+  return { dir, bodies, sha256s }
 }
 
 /**
@@ -781,10 +838,10 @@ function spawnFailureDetail(outcome, execution, where = '') {
  *   with the prior bytes is reported as a byte-prefix violation.
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null, accounting: import('./accounting.js').TrialAccounting, prefixViolation: boolean }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, sessionArgs = [], priorLog = null }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, sessionArgs = [], priorLog = null, pinnedBody = undefined }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
-  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
+  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot, pinnedBody }))
   const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, sessionArgs, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens })
   let logText = execution.sessionLogPath === null ? null : await readFile(execution.sessionLogPath, 'utf8')
   let prefixViolation = false
@@ -982,7 +1039,7 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  *   value rides the trial record.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null, pinnedBody = undefined }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   if (task.setup !== null) {
     await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
@@ -1003,6 +1060,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     signal,
     maxTotalTokens,
     accountingContext,
+    pinnedBody,
   })
   const outcome = classifySpawn(execution)
   const executionEvidence = {
@@ -1097,7 +1155,7 @@ function lastSeqOf(logText) {
  * @param {string | null} [options.nonce] - per-trial nonce appended to the first turn's user message.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runMultiturnTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null, gaps }) {
+async function runMultiturnTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null, gaps, pinnedBody = undefined }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const sessionId = `session-${randomUUID().slice(0, 8)}`
   const definitions = /** @type {string[]} */ (task.turns)
@@ -1132,6 +1190,7 @@ async function runMultiturnTrial({ task, entry, arm, armDir, scratchDir, session
       accountingContext,
       sessionArgs: index === 0 ? ['--session-id', sessionId] : ['--resume', sessionId],
       priorLog,
+      pinnedBody,
     })
     if (prefixViolation) violations.push(`turn ${index}: the session file did not grow byte-prefix from the previous turn`)
     phases.push({
@@ -1229,7 +1288,7 @@ async function runMultiturnTrial({ task, entry, arm, armDir, scratchDir, session
  * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, pinnedBody = undefined }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -1252,6 +1311,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       signal,
       maxTotalTokens,
       accountingContext,
+      pinnedBody,
     })
     phases.push({
       phaseIndex: index,
@@ -1462,6 +1522,12 @@ export async function main(argv, io = {}) {
     ...(options.armSeed === undefined ? {} : { armRandom: mulberry32(options.armSeed) }),
   })
   const experimentDir = join(benchRoot, 'runs', options.experiment)
+  // A confirmatory run adopts the replay writer's generated R and N overlays:
+  // their bodies replace the committed provisional files in every rendered arm
+  // overlay, and their hashes pin the run manifest.
+  const confirmatory = options.confirmatoryOverlays === undefined
+    ? null
+    : loadConfirmatoryOverlays(options.confirmatoryOverlays)
 
   /** @type {import('./accounting.js').AccountingContext} */
   let accountingContext
@@ -1495,7 +1561,7 @@ export async function main(argv, io = {}) {
       const entry = /** @type {PlanEntry} */ (plan.find(candidate => candidate.arm === armName))
       const sessionLogRoot = join(experimentDir, armName, 'sessions', entry.taskId, String(entry.trialIndex))
       print(`overlay [${armName}] ${sessionLogRoot}`)
-      for (const line of renderArmOverlay(getArm(armName), { sessionLogRoot }).trimEnd().split('\n')) {
+      for (const line of renderArmOverlay(getArm(armName), { sessionLogRoot, pinnedBody: confirmatory?.bodies.get(armName) }).trimEnd().split('\n')) {
         print(`  ${line}`)
       }
     }
@@ -1515,7 +1581,7 @@ export async function main(argv, io = {}) {
   // refuse the run (aegis §10.3), and confirmatory routing runs require the
   // replay-passed registration with matching overlays (aegis §10.4).
   assertRoutesPriced({ benchRoot, arms: options.arms, accountingContext })
-  if (!options.calibration) assertConfirmatoryRegistration({ benchRoot, arms: options.arms })
+  if (!options.calibration) assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
 
   if (apiKeyEnv !== 'none') {
     const fromEnv = env[apiKeyEnv]
@@ -1580,6 +1646,7 @@ export async function main(argv, io = {}) {
         maxDollars, priceSnapshot, accountingConfigSha256: accountingContext.configSha256,
         armSeed: options.armSeed ?? null, gapSeed: options.gapSeed ?? null, gapCapMs: options.gapCapMs ?? null,
         nonce: options.nonce, armApiKeyEnv: getArm(armName).apiKeyEnv ?? null,
+        confirmatoryOverlays: confirmatory === null ? null : { dir: confirmatory.dir, sha256s: confirmatory.sha256s },
       })
       if (mismatches.length > 0) {
         throw new UsageError(
@@ -1625,6 +1692,7 @@ export async function main(argv, io = {}) {
       gapCapMs: options.gapCapMs ?? null,
       nonce: options.nonce,
       armApiKeyEnv: getArm(armName).apiKeyEnv ?? null,
+      confirmatoryOverlays: confirmatory === null ? null : { dir: confirmatory.dir, sha256s: confirmatory.sha256s },
       startedAt,
       endedAt: '',
     }
@@ -1668,6 +1736,7 @@ export async function main(argv, io = {}) {
     if ((stored.gapCapMs ?? null) !== pins.gapCapMs) diffs.push('gapCapMs')
     if ((stored.nonce ?? false) !== pins.nonce) diffs.push('nonce')
     if ((stored.armApiKeyEnv ?? null) !== pins.armApiKeyEnv) diffs.push('armApiKeyEnv')
+    if (JSON.stringify(stored.confirmatoryOverlays ?? null) !== JSON.stringify(pins.confirmatoryOverlays ?? null)) diffs.push('confirmatoryOverlays')
     if (stored.priceSnapshot !== undefined && stored.priceSnapshot !== pins.priceSnapshot) diffs.push('priceSnapshot')
     if (stored.accountingConfigSha256 !== undefined && stored.accountingConfigSha256 !== pins.accountingConfigSha256) {
       diffs.push('accountingConfigSha256')
@@ -1754,6 +1823,7 @@ export async function main(argv, io = {}) {
             count: /** @type {string[]} */ (task.turns).length - 1,
             capMs: options.gapCapMs ?? null,
           }),
+          pinnedBody: confirmatory?.bodies.get(armName),
         })
       } else if (task.phases === null) {
         trial = await runSingleSessionTrial({
@@ -1765,6 +1835,7 @@ export async function main(argv, io = {}) {
           maxTotalTokens: options.maxTotalTokens,
           accountingContext,
           nonce: options.nonce ? randomUUID().slice(0, 8) : null,
+          pinnedBody: confirmatory?.bodies.get(armName),
         })
       } else {
         chainPhases = []
@@ -1777,6 +1848,7 @@ export async function main(argv, io = {}) {
           maxTotalTokens: options.maxTotalTokens,
           signal,
           accountingContext,
+          pinnedBody: confirmatory?.bodies.get(armName),
         })
       }
     } catch (error) {

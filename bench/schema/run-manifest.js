@@ -47,6 +47,7 @@
  * @property {number | null} [gapCapMs] - `--gap-cap-ms` pin; null when gaps ran uncapped.
  * @property {boolean} [nonce] - whether trials carry a per-trial nonce line.
  * @property {string | null} [armApiKeyEnv] - the arm's own base-route credential variable; null when it dials the experiment key.
+ * @property {{ dir: string, sha256s: Record<string, string> } | null} [confirmatoryOverlays] - the adopted generated-overlay pin: directory and per-file sha256; null when the run mounted no generated overlays.
  * @property {BudgetStop} [budgetStop] - why the runner stopped launching trials before the plan finished.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601, empty string while running.
@@ -97,6 +98,23 @@ export function validateRunManifest(value) {
   if (m.nonce !== undefined && typeof m.nonce !== 'boolean') throw new Error('manifest.nonce must be a boolean')
   if (m.armApiKeyEnv !== undefined && m.armApiKeyEnv !== null && typeof m.armApiKeyEnv !== 'string') {
     throw new Error('manifest.armApiKeyEnv must be a string or null')
+  }
+  // The adopted confirmatory-overlay pin: absent or null on runs without
+  // --confirmatory-overlays; otherwise the directory and each generated file's
+  // sha256, so a resume refuses a changed overlay source.
+  if (m.confirmatoryOverlays !== undefined && m.confirmatoryOverlays !== null) {
+    const adopted = /** @type {Record<string, unknown>} */ (m.confirmatoryOverlays)
+    if (typeof adopted !== 'object' || Array.isArray(adopted) || typeof adopted.dir !== 'string' || adopted.dir.length === 0) {
+      throw new Error('manifest.confirmatoryOverlays must be a record with a non-empty dir')
+    }
+    if (typeof adopted.sha256s !== 'object' || adopted.sha256s === null || Array.isArray(adopted.sha256s)) {
+      throw new Error('manifest.confirmatoryOverlays.sha256s must be a record')
+    }
+    for (const [name, hash] of Object.entries(/** @type {Record<string, unknown>} */ (adopted.sha256s))) {
+      if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) {
+        throw new Error(`manifest.confirmatoryOverlays.sha256s[${name}] must be a hex sha256`)
+      }
+    }
   }
   if (m.budgetStop !== undefined) {
     const stop = /** @type {Record<string, unknown>} */ (m.budgetStop)

@@ -110,13 +110,14 @@ test('a resume that does not grow the session byte-prefix flags an integrity vio
   assert.ok(trials[0].integrity.violations.some(v => v.includes('byte-prefix')), JSON.stringify(trials[0].integrity))
 })
 
-test('confirmatory arms refuse without a passed registration, before keys', async () => {
+test('confirmatory arms refuse before keys without adopted generated overlays', async () => {
   const root = await tempDir('bench-multiturn-reg-')
   const benchRoot = await writeWorld(root, [{
     taskId: 'mt-reg',
     definition: { instruction: 'single turn' },
   }])
-  // main rejects with the UsageError; the bin wrapper maps it to exit 2.
+  // main rejects with the UsageError; the bin wrapper maps it to exit 2. The
+  // flag requirement fires first: no run may confirm on the provisional files.
   await assert.rejects(
     main(['--experiment', 'mt-reg', '--arms', 'route-coldpoint', '--repeats', '1'], {
       benchRoot,
@@ -125,8 +126,7 @@ test('confirmatory arms refuse without a passed registration, before keys', asyn
     }),
     error => {
       assert.ok(error instanceof UsageError, 'the refusal is a UsageError')
-      assert.match(error.message, /registration/)
-      assert.match(error.message, /--calibration/)
+      assert.match(error.message, /--confirmatory-overlays/)
       return true
     },
   )

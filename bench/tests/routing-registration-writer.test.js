@@ -100,12 +100,6 @@ function fixtureTree() {
   return { root, benchRoot }
 }
 
-/** Place the generated confirmatory overlays where the runner reads them. */
-function adoptOverlays(benchRoot, overlays) {
-  copyFileSync(overlays.routeColdpoint, join(benchRoot, 'routing', R_OVERLAY))
-  copyFileSync(overlays.randomMatched, join(benchRoot, 'routing', N_OVERLAY))
-}
-
 /** Every path whose `calibratedBy` key carries a non-null value. */
 function nonNullCalibratedBy(value, path = '$', found = []) {
   if (Array.isArray(value)) {
@@ -149,8 +143,7 @@ test('a passed gate finalizes the registration and the runner accepts the genera
   assert.equal(finalized.status, 'preregistered', 'the static status survives the finalize untouched')
   assert.equal(finalized.authorizes, 'confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval')
   assert.ok(!('replayMetrics' in finalized), 'a passed gate embeds no metrics blob')
-  adoptOverlays(benchRoot, result.overlays)
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] })
+  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: join(root, 'out') })
   const nText = readFileSync(result.overlays.randomMatched, 'utf8')
   assert.match(nText, /entryRate: 0\.5\n/)
   assert.match(nText, /seed: 20261016\n/)
@@ -182,16 +175,26 @@ test('a failed gate records no calibration, and the runner refuses the registrat
   assert.deepEqual(nonNullCalibratedBy(finalized), [], 'no calibratedBy value is fabricated anywhere')
   assert.deepEqual(finalized.replayMetrics, JSON.parse(JSON.stringify(metrics)), 'the metrics are embedded for the record')
   assert.ok(!existsSync(join(root, 'out')), 'a failed gate generates no confirmatory overlays')
+  // With a directory adopted, the guard reaches the phase check and names the
+  // failed gate; without it, the flag requirement refuses first.
   assert.throws(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
+    /--confirmatory-overlays/,
+  )
+  const emptyDir = join(root, 'adopted')
+  mkdirSync(emptyDir, { recursive: true })
+  assert.throws(
+    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: emptyDir }),
     /replay gate failed, so routing stays shadow-only/,
   )
 })
 
 test('the runner names the phase: a provisional registration is refused, a replay-qualified one accepted', () => {
-  const { benchRoot } = fixtureTree()
+  const { root, benchRoot } = fixtureTree()
+  const emptyDir = join(root, 'adopted')
+  mkdirSync(emptyDir, { recursive: true })
   assert.throws(
-    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
+    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: emptyDir }),
     /still provisional/,
   )
 })
@@ -238,18 +241,18 @@ test('a finalized registration is never overwritten', () => {
 
 test('a tampered overlay value is refused by the runner', () => {
   const { root, benchRoot } = fixtureTree()
+  const outDir = join(root, 'out')
   const result = writeRegistration({
     registrationPath: join(benchRoot, 'routing', REGISTRATION),
     metrics: passingMetrics(benchRoot),
     seed: 20261016,
-    outDir: join(root, 'out'),
+    outDir,
   })
-  adoptOverlays(benchRoot, result.overlays)
-  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] })
-  const rPath = join(benchRoot, 'routing', R_OVERLAY)
+  assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir })
+  const rPath = join(outDir, R_OVERLAY)
   writeFileSync(rPath, readFileSync(rPath, 'utf8').replace(String(result.enforced.downgradeThreshold), '0.85'))
   assert.throws(
-    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
+    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: outDir }),
     /differs from the registration/,
   )
 })
