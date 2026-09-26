@@ -76,7 +76,7 @@ async function fixture(kind, run) {
       '--extra-overlay', overlayPath, '--judge-fixture', REPLAY_SCRIPTED_FITTING_JUDGE_PATH,
       '--judge-fixture-config', judgeConfigPath, '--judge-fixture-engine', 'scripted-fitting',
     ]
-    await run({ root, args, outDir, registrationPath, experimentDir, registration })
+    await run({ root, args, outDir, registrationPath, experimentDir, registration, overlayPath })
   } finally {
     assert.equal(digest(await readFile(registrationUrl)), realHash, 'committed registration is untouched')
     await rm(root, { recursive: true, force: true })
@@ -120,6 +120,8 @@ test('answered S rows retain unknown labels, publish evidence and refuse registr
     assert.ok(rows.some(row => row.arm === 'S' && row.answered))
     for (const [index, row] of rows.entries()) validateReplayRow(row, `CLI row ${index}`)
     const manifest = JSON.parse(await readFile(join(outDir, 'run.json'), 'utf8'))
+    assert.equal(manifest.judgeMode, 'fixture')
+    assert.equal(typeof manifest.judgeFixtureConfigSha256, 'string')
     assert.equal(manifest.counts.discovered, 4)
     assert.equal(manifest.counts.hosted, 4)
     assert.equal(manifest.counts.refused, 0)
@@ -154,6 +156,16 @@ test('all-unfit replay writes an evaluated failed gate once without overlays', a
     const again = await invoke(writing)
     assert.equal(again.code, 2)
     assert.match(again.errors.join('\n'), /already finalized/)
+  })
+})
+
+test('a judgment-mutating overlay refuses after method validation without publishing output', async () => {
+  await fixture('unfit', async ({ args, outDir, overlayPath }) => {
+    await writeFile(overlayPath, '- id: judgment-dispatch\n  config:\n    defaultEngine: another-engine\n')
+    const result = await invoke(args)
+    assert.equal(result.code, 2, result.errors.join('\n'))
+    assert.ok(result.errors.join('\n').includes('judgment'))
+    await assert.rejects(access(outDir), { code: 'ENOENT' })
   })
 })
 
