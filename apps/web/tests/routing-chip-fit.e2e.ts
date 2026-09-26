@@ -187,7 +187,10 @@ describe('web e2e: routing chip idle warnings fit the composer row', () => {
       const warning = page.getByText(variant.warning, { exact: true })
       await warning.waitFor({ timeout: 30_000 })
       expect(await warning.getAttribute('title')).toBe(variant.full)
-      expect(await warning.getAttribute('aria-description')).toBe(variant.full)
+      expect(await warning.evaluate((element) => {
+        const id = element.getAttribute('aria-describedby')
+        return id === null ? null : document.getElementById(id)?.textContent
+      })).toBe(variant.full)
 
       for (const width of WIDTHS) {
         await page.setViewportSize({ width: width.width, height: 1000 })

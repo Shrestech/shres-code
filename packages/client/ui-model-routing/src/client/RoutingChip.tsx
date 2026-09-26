@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
@@ -55,6 +55,8 @@ export function RoutingChip({
   const [pending, setPending] = useState<ChipAction | null>(null)
   const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
+  const idleDescriptionId = useId()
+  const failureDescriptionId = useId()
 
   useEffect(() => {
     aliveRef.current = true
@@ -142,13 +144,18 @@ export function RoutingChip({
       {idle && (
         // The visible copy is short and truncates in a narrow composer; the full
         // sentence stays in the tooltip and the accessible description.
-        <span
-          className={css.idle}
-          title={t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
-          aria-description={t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
-        >
-          {t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}
-        </span>
+        <>
+          <span
+            className={css.idle}
+            title={t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
+            aria-describedby={idleDescriptionId}
+          >
+            {t(reason === 'base-unlisted' ? 'idle.unlisted' : 'idle.warning')}
+          </span>
+          <span id={idleDescriptionId} className={css.visuallyHidden}>
+            {t(reason === 'base-unlisted' ? 'idle.unlisted.title' : 'idle.warning.title')}
+          </span>
+        </>
       )}
       {strong !== undefined && (
         <button
@@ -208,14 +215,17 @@ export function RoutingChip({
       )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
       {failure !== null && (
-        <span
-          className={css.error}
-          role="status"
-          title={`${FAILURE_LABEL[failure.action]}: ${failure.detail}`}
-          aria-description={failure.detail}
-        >
-          {FAILURE_LABEL[failure.action]}
-        </span>
+        <>
+          <span
+            className={css.error}
+            role="status"
+            title={`${FAILURE_LABEL[failure.action]}: ${failure.detail}`}
+            aria-describedby={failureDescriptionId}
+          >
+            {FAILURE_LABEL[failure.action]}
+          </span>
+          <span id={failureDescriptionId} className={css.visuallyHidden}>{failure.detail}</span>
+        </>
       )}
     </span>
   )
