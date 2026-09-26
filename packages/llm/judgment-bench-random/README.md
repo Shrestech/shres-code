@@ -13,14 +13,23 @@ Unknown keys fail the load by name.
 
 ## Semantics
 
-Each consult that holds a choice question consumes exactly one uniform draw from a mulberry32 stream, in ask order. A draw below `entryRate` selects the non-`keep-current` option; a draw at or above it selects `keep-current`. The answered distribution is fixed (0.98 on the selected option, the remainder spread evenly, confidence 0.98), so the consumer's thresholds see a gate-passing answer whenever the draw selects the candidate and the draw stays the only decision variable. Consults without a choice question consume no draw; score questions return the lowest level and binary questions return 0, so a difficulty gate can never block the entry the draw selected.
+One consult that holds a choice question consumes exactly one uniform draw `u = hashDraw(seed, correlation)`, an FNV-1a mix of the seed with `JudgmentInput.correlation` (`sessionId` plus the consumer's `consultKey`) normalized to `[0, 1)`. The same correlation always yields the same draw, and every input is reconstructable from the decision log, so any draw replays from the log alone. A draw below `entryRate` selects the non-`keep-current` option; a draw at or above it selects `keep-current`. The selected answer carries probability 1 and confidence 1 on the chosen option, so the consumer's thresholds always see a gate-passing answer whenever the draw selects the candidate and the draw stays the only decision variable. Consults without a choice question consume no draw: score questions return the lowest level and binary questions return 0, so a difficulty gate can never block the entry the draw selected.
 
-Each draw is logged at debug level with its consult index. Every draw is also recoverable by replaying the stream from the seed, which is what the analysis does when it audits a run's realized entry rate.
+The engine requires the correlation: without it the consult fails with `UNAVAILABLE`, which the router logs as `engine-unavailable`, rather than falling back to any stream or global. Each draw is logged at debug level as a diagnostic. Egress is `none`: no credential, no model request, no state serialization — the asked state is never decoded and the correlation never leaves this machine — and usage is absent, so judge accounting prices it at zero like the other local engines.
 
-The engine answers from the stream alone: no credential, no model request, no state serialization. Its egress is `none` and its usage is absent, so judge accounting prices it at zero like the other local engines.
+## Model Experience
+
+### Judgment ask
+
+#### What the model sees
+
+Nothing reaches a model. The engine is not a model and makes no request: it reads only the ask's correlation facts and its question list, answers deterministically from the draw, and never decodes the state text. A composed session shows arm N's judge answering in the same answer shapes the real judge uses — a choice answer with probabilities and confidence 1, a lowest-level score, a zero binary — so the router's decision log is shape-identical across arms while the selection is pure chance at the matched rate.
+
+#### Token effect
+
+Zero. The engine reports no usage, bills nothing, and adds no tokens to any arm's accounting; the contrast between arms R and N is the judge's discrimination, not spend.
 
 ## Known Limitations and Deferred Work
 
-- **Draw source deviates from the ruling until the session correlation lands** — the ruling (`design/pr16-measurement.md` §10.4) is `u = hash(seed, sessionId, turn, step)`, stateless and replayable from the log. This implementation draws from a sequential mulberry32 stream in ask order, which replays only from a fresh process with the same consult sequence. The rework needs the session-correlation source (the seam's `JudgmentInput` carries no session or turn identity); until it lands, do not treat N-trial draws as statelessly replayable.
 - **Bench-only posture** — the engine answers a Bernoulli draw, not the asked state. It exists for the random-matched contrast and must not be composed outside a registered experiment.
 - **No fitting** — the engine declares `supportsFitting: false`; a consumer that requires tokenizer fitting is refused rather than approximated.
