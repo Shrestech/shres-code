@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { KEEP_CURRENT_OPTION_ID, REPLAY_ROW_SEMANTICS_VERSION, auroc, computeReplayMetrics as computeMetrics, ece, parseLabelledScores } from '../analysis/replay-metrics.js'
+import { KEEP_CURRENT_OPTION_ID, REPLAY_ROW_SEMANTICS_VERSION, auroc, computeReplayMetrics as computeMetrics, ece, parseLabelledScores, validateReplayRow } from '../analysis/replay-metrics.js'
 import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 import { parseReplayMethod } from '../routing/replay-method.js'
 
@@ -97,6 +97,29 @@ test('parseLabelledScores: rows parse, and malformed input names its line', () =
   const duplicate = `${JSON.stringify(row({ task: 'a', coldPointId: 'c1' }))}\n${JSON.stringify(row({ task: 'a', coldPointId: 'c1' }))}\n`
   assert.throws(() => parseLabelledScores(duplicate), /duplicate cold-point row/)
   assert.throws(() => parseLabelledScores('\n\n'), /no rows/)
+})
+
+test('repeated trials keep separate rows and true duplicates still refuse', () => {
+  const repeats = [row({ trialIndex: 0 }), row({ trialIndex: 1 })]
+  assert.equal(parseLabelledScores(repeats.map(value => JSON.stringify(value)).join('\n')).length, 2)
+  const options = { eceBins: 2, gate: gateBounds, entry, tieBreak }
+  const metrics = computeReplayMetrics(repeats, options)
+  assert.equal(metrics.counts.rows, 2)
+  assert.equal(metrics.counts.eligible, 2)
+  assert.equal(metrics.counts.answered, 2)
+  const duplicate = [repeats[0], { ...repeats[0] }]
+  assert.throws(() => parseLabelledScores(duplicate.map(value => JSON.stringify(value)).join('\n')), /duplicate cold-point row/)
+  assert.throws(() => computeReplayMetrics(duplicate, options), /duplicate cold-point row/)
+})
+
+test('replay rows require an explicit non-negative safe trial index', () => {
+  const missing = row({})
+  delete missing.trialIndex
+  assert.throws(() => validateReplayRow(missing, 'missing'), /trialIndex/)
+  for (const trialIndex of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, null, '0']) {
+    assert.throws(() => validateReplayRow(row({ trialIndex }), 'invalid'), /trialIndex/)
+  }
+  assert.equal(validateReplayRow(row({ trialIndex: 0 }), 'zero').trialIndex, 0)
 })
 
 test('excluded classes never route at any operating point', () => {

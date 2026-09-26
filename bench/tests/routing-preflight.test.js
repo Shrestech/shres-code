@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { PREFLIGHT_ARMS, PREFLIGHT_PLUGIN_PATH, assertPreflightArms, assertArmOverlayPurity, assertFixturesCarryNoLauncherConfig, extractArmRoutes, renderPreflightOverlay, runPreflight, spawnPreflight } from '../runner/preflight-models.js'
+import { PREFLIGHT_ARMS, PREFLIGHT_PLUGIN_PATH, assertArmOverlayPurity, assertFixturesCarryNoLauncherConfig, extractArmRoutes, renderPreflightOverlay, runPreflight, spawnPreflight } from '../runner/preflight-models.js'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const repo = join(here, '..', '..')
@@ -66,7 +66,7 @@ test('the launcher resolves the trial rendering from an empty cwd with zero requ
   })
   syncBuiltinESMExports()
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports() })
-  for (const arm of ['route-strong', 'route-cheap', 'route-coldpoint', 'route-random']) {
+  for (const arm of ['route-strong', 'route-cheap', 'route-coldpoint', 'route-random', 'route-static']) {
     const records = await runPreflight({ repoRoot: repo, benchRoot: bench, arms: [arm], env: process.env, confirmatory: false })
     assert.equal(records.length, 1)
     assert.equal(records[0].arm, arm)
@@ -80,8 +80,8 @@ test('the launcher resolves the trial rendering from an empty cwd with zero requ
     assert.deepEqual(launched.entries, [])
     assert.equal(launched.pin, join(repo, 'tsconfig.json'))
   }
-  assert.equal(writes.length, 4)
-  assert.equal(launches.length, 4)
+  assert.equal(writes.length, 5)
+  assert.equal(launches.length, 5)
 })
 
 test('arm C refuses worker-escalation composition before spawning', async () => {
@@ -171,14 +171,13 @@ test('the generated overlay always disables both one-shot rows, and without them
   }
 })
 
-test('arm T is refused by name until the PR 13b consumer lands, before any spawn', async () => {
+test('static T refuses an omitted required router field at real composition', async () => {
+  const body = await fs.readFile(join(bench, 'routing/static-tier.patch.yml'), 'utf8')
+  const invalid = body.replace('        downgradeThreshold: 0.8' + String.fromCharCode(10), '')
+  assert.notEqual(invalid, body)
   await assert.rejects(
-    assertPreflightArms(['route-static']),
-    /route-static[\s\S]*PR 13b/,
-  )
-  await assert.rejects(
-    runPreflight({ repoRoot: repo, benchRoot: bench, arms: ['route-static'], env: process.env }),
-    /route-static/,
+    runPreflight({ repoRoot: repo, benchRoot: bench, arms: ['route-static'], env: process.env, pinnedBodies: new Map([['route-static', invalid]]) }),
+    /downgradeThreshold.*missing required value/,
   )
 })
 

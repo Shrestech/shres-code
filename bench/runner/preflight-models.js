@@ -38,17 +38,8 @@ const benchRootOf = dirname(dirname(fileURLToPath(import.meta.url)))
 /** The preflight plugin the generated overlay inserts by absolute path. */
 export const PREFLIGHT_PLUGIN_PATH = join(benchRootOf, 'routing', 'preflight-plugin.mjs')
 
-/** The routing-measurement arms the preflight covers today (prereg §8: S, C, R, N). */
-export const PREFLIGHT_ARMS = new Set(['route-strong', 'route-cheap', 'route-coldpoint', 'route-random'])
-
-/**
- * Arms the preflight refuses by name instead of skipping: a silent skip would
- * let an unmeasured composition reach a spend.
- * @type {ReadonlyMap<string, string>}
- */
-export const REFUSED_ARMS = new Map([
-  ['route-static', 'arm T (route-static) pins childPolicies from PR 13b, which this branch has not integrated; the preflight refuses it by name until then'],
-])
+/** Routing-measurement arms with composed-metadata preflight coverage. */
+export const PREFLIGHT_ARMS = new Set(['route-strong', 'route-cheap', 'route-coldpoint', 'route-random', 'route-static'])
 
 /** Per-arm cap on the spawned launcher, generous enough for cold profile provisioning. */
 export const PREFLIGHT_TIMEOUT_MS = 120_000
@@ -166,20 +157,6 @@ export function renderPreflightOverlay({ pluginPath, sinkUrl, routes, armOverlay
     ...routes.map(route => `          - provider: ${JSON.stringify(route.provider)}\n            model: ${JSON.stringify(route.model)}`),
   )
   return rows.join('\n') + '\n'
-}
-
-/**
- * Refuse the preflight's named refusals before any spawn.
- * @param {string[]} arms - selected arm names.
- * @returns {Promise<void>}
- * @throws {Error} naming the refused arm and its reason, as a UsageError.
- */
-export async function assertPreflightArms(arms) {
-  const { UsageError } = await import('./run.js')
-  for (const armName of arms) {
-    const reason = REFUSED_ARMS.get(armName)
-    if (reason !== undefined) throw new UsageError(`composed-metadata preflight refused: ${reason}`)
-  }
 }
 
 /**
@@ -314,11 +291,10 @@ export async function assertFixturesCarryNoLauncherConfig(tasks) {
  * @param {boolean} input.confirmatory - selected R/N arms require adopted bodies.
  * @param {ReadonlyMap<string, string>} [input.pinnedBodies] - adopted confirmatory overlay bodies.
  * @returns {Promise<{ arm: string, routes: number }[]>} one record per covered arm.
- * @throws {Error} when a refused arm is selected, an arm overlay fails its purity check, a route
+ * @throws {Error} when an arm overlay fails its purity check, a route
  *   does not resolve, the sink observed a request, or a session log exists.
  */
 export async function runPreflight({ repoRoot, benchRoot, arms, env, confirmatory, pinnedBodies }) {
-  await assertPreflightArms(arms)
   const targets = arms.filter(name => PREFLIGHT_ARMS.has(name))
   if (targets.length === 0) return []
   const { UsageError } = await import('./run.js')
@@ -354,7 +330,7 @@ export async function runPreflight({ repoRoot, benchRoot, arms, env, confirmator
         routes,
         armOverlayText,
       }))
-      const { line, exitCode } = await spawnPreflight({ repoRoot, scratchDir, armOverlayPath, overlayPath, homeDir, env })
+      const { line, exitCode, stderr } = await spawnPreflight({ repoRoot, scratchDir, armOverlayPath, overlayPath, homeDir, env })
       const routeLines = /** @type {{ reason?: string, routes?: { provider: string, model: string, resolved?: boolean, error?: string }[] }} */ (line)
       const unresolved = (routeLines.routes ?? [])
         .filter(route => route.resolved !== true)
@@ -363,7 +339,8 @@ export async function runPreflight({ repoRoot, benchRoot, arms, env, confirmator
         ? routeLines.reason ?? `launcher exited ${exitCode}`
         : unresolved.length > 0 ? unresolved.join('; ') : undefined
       if (failure !== undefined) {
-        throw new UsageError(`composed-metadata preflight failed for arm ${armName}: ${failure}`)
+        const bootDetail = exitCode !== 0 && stderr.trim() ? `; launcher stderr: ${stderr.trim()}` : ''
+        throw new UsageError(`composed-metadata preflight failed for arm ${armName}: ${failure}${bootDetail}`)
       }
       records.push({
         arm: armName,

@@ -31,7 +31,7 @@ export function fixtureMethod(overrides = {}) {
 export function fixtureRow(fields, method = fixtureMethod()) {
   const { cheapSufficient = true, ...rest } = fields
   return {
-    arm: 'C', methodSha256: parseReplayMethod(method, { require: [] }).methodSha256,
+    arm: 'C', trialIndex: 0, methodSha256: parseReplayMethod(method, { require: [] }).methodSha256,
     label: { status: 'labelled', cheapSufficient, source: 'c-trajectory', triggerTableId: method.triggerTableId },
     ...rest,
   }
