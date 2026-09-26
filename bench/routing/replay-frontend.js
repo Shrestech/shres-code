@@ -215,7 +215,6 @@ export async function replayTrialLog({
     : resolveConfig(routerConfig)
   const coldPoints = []
   const consults = []
-  const resolveModelInfo = runtime.resolveModelInfo.bind(runtime)
   for (const start of events.filter(event => event.type === 'step/start')) {
     const at = { turn: start.data.turn, step: start.data.step, now, seedLength: header.seedLength }
     const result = await replayConsultInput(
@@ -225,8 +224,6 @@ export async function replayTrialLog({
       routeBase,
       trialOwnRoute,
       requestConfig,
-      resolveModelInfo,
-      undefined,
       runtime,
     )
     consults.push({ turn: start.data.turn, step: start.data.step, result: serializableConsult(result) })
