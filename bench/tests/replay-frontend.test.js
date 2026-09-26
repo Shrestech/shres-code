@@ -256,6 +256,36 @@ test('proposalFromHeader named S cases', () => {
   assert.notDeepEqual(proposalFromHeader(drift), selection)
 })
 
+const sPreparedMatch = {
+  provider: 'deepseek-official',
+  model: 'deepseek-v4-pro',
+  reasoningEffort: 'high',
+  maxTokens: 256000,
+}
+
+test('S sPrepared accepts unmodified fixture headers at seq 10 and 28', async () => {
+  const bytes = await readFile(fixture)
+  const { events } = decodePhysicalJsonl(bytes, 'fixture')
+  const headers = events.filter(event => event.type === 'request/header')
+  const seq10 = headers.find(event => event.seq === 10)
+  const seq28 = headers.find(event => event.seq === 28)
+  assert.ok(seq10 && seq28)
+  assert.equal(seq10.data.header.config.reasoningEffort, 'high')
+  assert.equal(seq28.data.header.config.reasoningEffort, 'high')
+  assert.deepEqual(seq10.data.header.adapterDefaults, { reasoningEffort: true, maxTokens: true })
+  assert.deepEqual(seq28.data.header.adapterDefaults, { maxTokens: true })
+  await withPersistence(bytes, async ({ persistence, path }) => {
+    const result = await replayTrialLog({
+      trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+      path, persistence, runtime: passthroughRuntime(), ...composedFields,
+      requestConfig: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+      method, arm: 'S', sPrepared: sPreparedMatch,
+    })
+    assert.equal(result.artifact, 'complete')
+    assert.ok(result.rows.length > 0)
+  })
+})
+
 test('S request-config-mismatch refuses the whole trial', async () => {
   const bytes = await readFile(fixture)
   await withPersistence(bytes, async ({ persistence, path }) => {
@@ -263,8 +293,17 @@ test('S request-config-mismatch refuses the whole trial', async () => {
       () => replayTrialLog({
         trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
         path, persistence, runtime: passthroughRuntime(), ...composedFields,
-        requestConfig: { provider: 'anthropic', model: 'claude-opus-5-5' },
-        method, arm: 'S',
+        requestConfig: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        method, arm: 'S', sPrepared: { ...sPreparedMatch, maxTokens: 1 },
+      }),
+      error => error instanceof TrialInputIncompleteError && error.message === 'request-config-mismatch',
+    )
+    await assert.rejects(
+      () => replayTrialLog({
+        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+        path, persistence, runtime: passthroughRuntime(), ...composedFields,
+        requestConfig: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        method, arm: 'S', sPrepared: { ...sPreparedMatch, reasoningEffort: 'low' },
       }),
       error => error instanceof TrialInputIncompleteError && error.message === 'request-config-mismatch',
     )
@@ -341,6 +380,8 @@ test('arm R (route-coldpoint) hosted consults replayTrialLog through the live pl
     assert.equal('adapterDefaults' in hosted.summary.requestConfig, false)
     assert.equal('maxTokens' in hosted.summary.requestConfig, false)
     const judged = hosted.summary.kinds.ask + hosted.summary.kinds.ineligible
+    assert.equal(hosted.summary.counts.byPhase['s-validation'].prepareCall, 0)
+    assert.equal(hosted.summary.counts.byPhase.consult.prepareCall, judged * 2)
     assert.equal(hosted.summary.counts.prepareCall, judged * 2)
     assert.equal(hosted.consults.length > 0, true)
     const events = decodePhysicalJsonl(bytes, path).events
@@ -366,6 +407,41 @@ test('arm R (route-coldpoint) hosted consults replayTrialLog through the live pl
   }
 })
 
+
+test('hosted S trial records one s-validation prepareCall and unchanged consult counts', async () => {
+  const bytes = await readFile(fixture)
+  const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
+  const plant = await mkdtemp(join(tmpdir(), 'bench-replay-s-'))
+  const dir = join(plant, projectKey(header.cwd), encodeSegment(header.id))
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, 'session.jsonl')
+  await writeFile(path, bytes)
+  const extraOverlay = [
+    '- id: agent-default-model',
+    '  config:',
+    '    provider: deepseek-official',
+    '    model: deepseek-v4-pro',
+    '',
+  ].join('\n')
+  try {
+    const hosted = await hostReplayTrial({
+      repoRoot: repo,
+      trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+      path,
+      arm: 'S',
+      method,
+      trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'high' },
+      extraOverlay,
+    })
+    assert.equal(hosted.status.ok, true)
+    const judged = hosted.summary.kinds.ask + hosted.summary.kinds.ineligible
+    assert.equal(hosted.summary.counts.byPhase['s-validation'].prepareCall, 1)
+    assert.equal(hosted.summary.counts.byPhase.consult.prepareCall, judged * 2)
+    assert.equal(hosted.summary.counts.prepareCall, judged * 2 + 1)
+  } finally {
+    await rm(plant, { recursive: true, force: true })
+  }
+})
 
 test('corrupt input publishes no accepted out file or rows', async () => {
   const bytes = await readFile(fixture)
