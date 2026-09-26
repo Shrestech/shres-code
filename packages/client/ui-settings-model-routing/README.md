@@ -26,4 +26,4 @@ None; this package neither assembles nor sends a provider request.
 - **Overrides are read-only** — the Consumers list shows `judgment.overrides` but offers no editor; they are edited in `settings.yaml`.
 - **Laya install progress is a state line** — the `laya` Remote reports whether an install is running, not how far it got; the row shows "Installing…" until the gateway state changes.
 - **The Shadow mode is not offered** — the default-mode control shows only the modes that exist, Off and On.
-- **The judge hint states the checkpoint context, not a measured head** — the load-time head check that would report the head-token figure of the last fitting limits has no Host surface yet; the hint names the Laya checkpoint context until one exists.
+- **The description hint shows the installed Laya checkpoint context, not a measured head size** — fitted decisions record exact per-consult token counts (`judgmentInput`, and `judgmentRejection { reason: 'head' }` for an oversized head), so no host-wide head figure exists to show; a per-question figure belongs to the Routing view's decision details.

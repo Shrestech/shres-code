@@ -251,6 +251,17 @@ describe('the candidate pool editor', () => {
     fireEvent.click(within(form).getByRole('button', { name: en.poolCancel }))
     cleanup()
 
+    // The hint shows the installed checkpoint context whatever it is: 512 stays 512.
+    mount(double(ready()), {
+      router: POOL_ROUTER, pool: POOL, models: MODELS,
+      engines: snapshot([TYPESAFE, layaReady], 'laya'),
+      laya: { ...LAYA_VIEW, state: 'ready', detail: undefined, checkpointContext: 512 } as never,
+    })
+    const small = openEdit('DeepSeek V4.1 Flash')
+    expect(within(small).getByText(t('poolDescriptionHintLaya', { tokens: '512' }))).toBeTruthy()
+    fireEvent.click(within(small).getByRole('button', { name: en.poolCancel }))
+    cleanup()
+
     // Laya routed without its gateway view leaves the hint generic too.
     mount(double(ready()), {
       router: POOL_ROUTER, pool: POOL, models: MODELS,

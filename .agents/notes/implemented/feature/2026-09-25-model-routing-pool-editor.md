@@ -18,7 +18,7 @@ Settings › Model routing gained the shared pool editor, the Route from allowli
 
 **One calibration source.** The router serves its gate through the `modelRouting.gate()` Remote read (`downgradeThreshold`, `downgradeMargin`, operating points with `calibratedBy`, deadline, difficulty band, hold, state cap, and per-engine calibration). Both the engine card's router badge and the thresholds card render that one read through the shared `engineCalibration` helper, so the two cards cannot disagree. This replaces the 9a reading of the resolved `model-router` section for the badge ([the settings page note](2026-09-25-model-routing-settings-page.md)); the section remains the source for the mode control and the egress bound.
 
-**The judge hint degrades honestly.** The description editor's hint names the judge's token budget while the routed engine is the local Laya gateway and its gateway view is known, and stays generic otherwise. The load-time head check (plan R2.5) has no Host surface yet, so the hint states the checkpoint context rather than a measured head-token figure.
+**The judge hint degrades honestly.** The description editor's hint names the judge's token budget while the routed engine is the local Laya gateway and its gateway view is known, and stays generic otherwise. The description hint shows the installed Laya checkpoint context, not a measured head size: head size is a per-consult measurement — the route question, the instructions, and every pool description, tokenized by the pinned checkpoint — so no host-wide figure exists to show. Fitted decisions record the exact per-consult counts (`judgmentInput` = `JudgmentTokenFit`), and an oversized head is already logged as `judgmentRejection { reason: 'head' }` with the router keeping the strong model; a per-question head figure belongs to the Routing view's decision details.
 
 ## Alternatives considered
 
@@ -28,7 +28,7 @@ Settings › Model routing gained the shared pool editor, the Route from allowli
 
 **Deriving eligibility notes from the catalog client-side.** The catalog lists models but not capability floors, thinking modes, or hosted tools; only the router's eligibility check knows why a pair fails. Recomputing it in the page would duplicate the router's fail-closed logic in presentation code.
 
-**Showing the head-token figure from `JudgmentTokenLimits.maxHeadTokens` now.** The fitting limits exist on the wire, but no Host surface exposes the selected engine's limits or the load-time head check to a client, and inventing one was outside this change; the hint names the checkpoint context until the head check ships.
+**A count-only fitting API or a startup head probe.** Head size is a per-consult measurement, not a host-wide constant: it depends on the route question, the instructions, and every pool description, tokenized by the pinned checkpoint, so no single number exists without running the tokenizer. The measured facts are already logged on each fitted decision (`judgmentInput`), and the oversized-head case is already recorded as `judgmentRejection { reason: 'head', limits }` — fail-safe and durable. New infrastructure for a hint is rejected; a per-question figure belongs to the Routing view's decision details.
 
 ## Consequences
 
