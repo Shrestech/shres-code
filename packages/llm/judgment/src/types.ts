@@ -9,7 +9,7 @@
 
 import type { Branded } from '@shres-code/shres-code-brand'
 import type { TokenUsage } from '@shres-code/shres-code-llm/types'
-import type { SessionId } from '@shres-code/shres-code-session'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 declare module '@shres-code/cordis' {
   interface Events {

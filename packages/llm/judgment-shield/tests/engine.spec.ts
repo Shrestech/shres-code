@@ -291,6 +291,9 @@ describe('ShieldJudgmentEngine', () => {
     expect(server.requests).toHaveLength(1)
     expect(server.requests[0]?.method).toBe('POST')
     expect(server.requests[0]?.path).toBe('/v1/judgments')
+    // The seam's correlation facts are local-only: they must never reach the wire.
+    expect(JSON.stringify(server.requests[0]?.body)).not.toContain('sessionId')
+    expect(JSON.stringify(server.requests[0]?.body)).not.toContain('consultKey')
     expect(server.requests[0]?.body).toEqual({
       state: '[redacted] route state',
       model: MODELS.fast,

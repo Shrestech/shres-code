@@ -47,7 +47,7 @@ The capability is optional. Consumers that require atomic state selection check 
 
 ## Correlation
 
-An ask may carry `correlation` — the consult's `sessionId` and a consumer-defined `consultKey` that is unique per consult within the session (the model router sends `turn:<n>/step:<n>`; the 13b child listener sends `child:<routeRequestId>`). The field is informational: an engine may use it for local determinism — a stateless per-consult draw that replays from the log — or diagnostics, and must never transmit it in any request, credentialed call, or log sent off-machine; it is not part of any serialized model input. It is optional: non-session consumers omit it, and an engine that requires it treats its absence as a failed ask rather than falling back to another identity.
+An ask may carry `correlation` — the consult's `sessionId` and a consumer-defined `consultKey` that is unique per consult within the session (the model router sends `turn:<n>/step:<n>`; the 13b child listener sends `child:<routeRequestId>`). The field is informational: an engine may use it for local determinism — a stateless per-consult draw that replays from the log — or diagnostics, and must never transmit it in any request, credentialed call, or log sent off-machine; it is not part of any serialized model input. It is optional: non-session consumers omit it, and an engine that requires it treats its absence as a failed ask rather than falling back to another identity. The `SessionId` type comes type-only from the client-safe face `@shres-code/shres-code-session/types` — never the package root, whose index merges host-plane context augmentations into the client face.
 
 ## Engines
 
