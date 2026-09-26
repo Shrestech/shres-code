@@ -201,7 +201,11 @@ export function routerEngine(snapshot: JudgmentEnginesSnapshot | null): string |
   return consumerRoutes(snapshot).find(route => route.consumer === ROUTER_CONSUMER)?.engineId ?? snapshot.selection.engine
 }
 
-/** Whether the host's model-router schema declares `childPolicies`. */
+/**
+ * Whether the host's model-router schema declares `childPolicies`.
+ * @param schema - the resolved host schema, or a nested object inside it.
+ * @returns true when `childPolicies` is present at any nesting depth.
+ */
 export function hasChildPoliciesCapability(schema: unknown): boolean {
   if (typeof schema !== 'object' || schema === null) return false
   if (Object.prototype.hasOwnProperty.call(schema, 'childPolicies')) return true
@@ -223,7 +227,11 @@ export interface ChildPoliciesSection {
   readonly childRouteInstructions?: string
 }
 
-/** Read child-route rules from the resolved `model-router` section. */
+/**
+ * Read child-route rules from the resolved `model-router` section.
+ * @param router - the resolved `model-router` settings namespace.
+ * @returns the editor's child-policy list, error limit, and optional judge text.
+ */
 export function childPoliciesSection(router: SettingsNamespaceView): ChildPoliciesSection {
   const value = typeof router.value === 'object' && router.value !== null ? router.value as Record<string, unknown> : {}
   const list = Array.isArray(value['childPolicies']) ? value['childPolicies'] : []

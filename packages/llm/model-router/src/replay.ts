@@ -62,9 +62,12 @@ export interface ReplayConsultAsk {
   readonly consultKey: string
 }
 
+/** Shared producer result: warm-prefix, ineligible, or ask. */
 export type ReplayConsultInput = ReplayConsultWarm | ReplayConsultIneligible | ReplayConsultAsk
 
+/** Replay-only refusal from {@link consultPrefix} or {@link replayConsultInput}. */
 export class ReplayConsultError extends Error {
+  /** Stable refusal class the wrapper throws. */
   readonly code: 'missing-step' | 'held-streak' | 'reentry-cooldown' | 'mixed-route' | 'mode-off'
   constructor(code: ReplayConsultError['code'], message: string) {
     super(message)
@@ -93,6 +96,10 @@ export interface ConsultInputSource {
  * step's `step/start` and claimed user messages, excluding this request's
  * `agent/route-base`, `request/header`, `model-routing/decision`, and
  * `assistant/*` for the same step.
+ * @param events - the session log to slice.
+ * @param turn - consult turn.
+ * @param step - consult step.
+ * @returns the prefix through that step's `step/start` and claimed user messages.
  */
 export function consultPrefix(events: readonly SessionEvent[], turn: number, step: number): readonly SessionEvent[] {
   let startSeq: number | undefined
@@ -217,6 +224,8 @@ async function cacheTtl(
  * Shared producer: coldPoint, eligibility, states, questions, consultKey, cache.
  * No slicing and no replay refusals. Live `decide()` supplies the live log and
  * request messages; the replay wrapper slices first.
+ * @param src - live or replay consult inputs.
+ * @returns warm, ineligible, or ask.
  */
 export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
   const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal } = src
@@ -270,6 +279,16 @@ export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayC
  * Offline reconstruction of the entry-path consult. Applies {@link consultPrefix}
  * and replay-only refusals, then {@link consultInputFrom}. Live `decide()` does
  * not call this.
+ * @param config - resolved router configuration.
+ * @param events - the session log to slice.
+ * @param at - consult coordinates and clock.
+ * @param routeBase - manual route the consult compares against.
+ * @param coldPointBase - route whose prompt-cache lifetime is folded.
+ * @param requestConfig - live request config; never read from the log.
+ * @param resolveModelInfo - adapter metadata lookup for TTL and eligibility.
+ * @param signal - optional cancellation.
+ * @param runtime - optional live LLM runtime so eligibility can call prepareCall.
+ * @returns the shared producer result after replay-only refusals.
  */
 export async function replayConsultInput(
   config: ResolvedModelRouterConfig,

@@ -119,6 +119,7 @@ export function logChildDecision(session: Session, decision: ModelRoutingChildDe
 /**
  * Whether an agent is a live parent this controller should consult for.
  * @param agent - the waterfall parent.
+ * @returns true when the agent has a session that can append events.
  */
 export function isChildRouteParent(agent: Agent): boolean {
   return typeof agent.session?.append === 'function'

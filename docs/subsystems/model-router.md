@@ -718,6 +718,17 @@ interface ModelRouterConfig {
    */
   routeFrom?: ModelRoutingRouteFromConfig[]
   /**
+   * Ordered child-route rules. First match wins. An empty list (the default)
+   * never routes a child. Each `candidate` must be a pool id.
+   */
+  childPolicies?: ModelRoutingChildPolicyConfig[]
+  /** Consecutive counted child failures that suspend one pool candidate. Defaults to 2. */
+  childRouteErrors?: number
+  /**
+   * Two-option child-route question text. Required when any rule sets `judge`.
+   */
+  childRouteInstructions?: string
+  /**
    * Route confidence at or above which a candidate may be selected. Required.
    * The global default for any engine without an operating point.
    */
@@ -915,6 +926,15 @@ get(agent: Agent): { mode: ModelRoutingMode; pending?: ModelRoutingMode }
 modeOf(session: Session, end: number = session.events.length): ModelRoutingMode
 
 /**
+ * Answer one `subagent/child-route` consult. `next()` runs first so another
+ * listener's answer wins and this policy records nothing.
+ * @param request - the waterfall request, including the minted routeRequestId.
+ * @param next - remaining listeners.
+ * @returns the route to start the child with, or undefined to keep inherited.
+ */
+async onChildRoute( request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>
+
+/**
  * Switch routing on, off, or to shadow. Between turns the change is appended
  * immediately; a changed value during an open turn waits for the next
  * accepted pre-step. An explicit choice equal to the current value records
@@ -964,7 +984,7 @@ async resolveRequest( agent: Agent, turn: number, step: number, base: ModelSelec
 stickySelection(agent: Agent): ModelSelection | undefined
 ```
 
-Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
+Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md) · [SubagentChildRoute](subagent.md) · [SubagentChildRouteRequest](subagent.md)
 
-Source: [`packages/llm/model-router/src/index.ts:501`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:519`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

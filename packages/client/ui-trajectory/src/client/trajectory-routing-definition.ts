@@ -84,6 +84,10 @@ const trajectoryChildRoutingDefinition: ConversationNodeDefinition<{
     }),
 }
 
+/**
+ * Register Trajectory folding for parent and child routing decisions.
+ * @param ctx - plugin context receiving the conversation-event Definitions.
+ */
 export function registerTrajectoryRoutingDefinition(ctx: Context): void {
   ctx.conversationEvents.register(trajectoryRoutingDefinition)
   ctx.conversationEvents.register(trajectoryChildRoutingDefinition)

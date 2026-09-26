@@ -45,7 +45,12 @@ export function classifyChildTurn(
   return { countedAs: 'neutral' }
 }
 
-/** Dedup key for one accounting turn of one dispatch. */
+/**
+ * Dedup key for one accounting turn of one dispatch.
+ * @param routeRequestId - the parent child-route request id.
+ * @param childTurn - the child's accounting turn number.
+ * @returns `routeRequestId:childTurn`.
+ */
 export function outcomeKey(routeRequestId: string, childTurn: number): string {
   return `${routeRequestId}:${String(childTurn)}`
 }
@@ -53,6 +58,7 @@ export function outcomeKey(routeRequestId: string, childTurn: number): string {
 /**
  * Outcomes already recorded for one parent log, keyed by routeRequestId/childTurn.
  * @param events - the parent session events.
+ * @returns a map from {@link outcomeKey} to each recorded outcome.
  */
 export function recordedChildOutcomes(
   events: readonly SessionEvent[],
@@ -68,6 +74,7 @@ export function recordedChildOutcomes(
 /**
  * Routed child-decisions in the parent log, in seq order.
  * @param events - the parent session events.
+ * @returns each routed decision with the seq it was logged at.
  */
 export function routedChildDecisions(
   events: readonly SessionEvent[],
@@ -90,6 +97,7 @@ export function routedChildDecisions(
  * @param recorded - existing outcomes by key.
  * @param runId - live Activation run id, when known.
  * @param reconciled - mark post-restart appends.
+ * @returns outcomes that are not already recorded and whose route is present.
  */
 export function outcomesFromChildTurns(
   decision: ModelRoutingChildDecision,

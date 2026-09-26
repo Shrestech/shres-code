@@ -209,6 +209,9 @@ export function buildRoutingStateCandidates(
 /**
  * The same alternatives as {@link buildRoutingStateCandidates}, assembled from
  * a log prefix via the public surface fold (no live Session required).
+ * @param events - the session-event prefix to fold.
+ * @param config - character budget, context window, and maximum alternatives.
+ * @returns most context first, with complete selected and omitted sequence lists.
  */
 export function buildRoutingStateCandidatesFromEvents(
   events: readonly SessionEvent[],
