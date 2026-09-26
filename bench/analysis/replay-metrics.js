@@ -31,7 +31,8 @@ export const KEEP_CURRENT_OPTION_ID = 'keep-current'
  * @property {'S' | 'C'} arm - source trial arm.
  * @property {string} methodSha256 - canonical hash of the producing method.
  * @property {'routine' | 'moderate' | 'hard'} stratum - the task's preregistered stratum.
- * @property {string} coldPointId - the cold point within the task's replay.
+ * @property {number} trialIndex - the non-negative safe-integer repeat index within the task and arm.
+ * @property {string} coldPointId - the cold point within one trial.
  * @property {boolean} eligible - at least one pool candidate passes the router's deterministic
  *   eligibility for this state; false means no ask was made.
  * @property {boolean} answered - the engine answered, and the fitting neither returned `unfit`
@@ -65,6 +66,9 @@ export function validateReplayRow(row, where) {
   }
   for (const key of ['task', 'stratum', 'coldPointId']) {
     if (typeof row[key] !== 'string' || row[key] === '') throw new TypeError(`${where}: ${key} must be a non-empty string`)
+  }
+  if (!Number.isSafeInteger(row.trialIndex) || row.trialIndex < 0) {
+    throw new TypeError(`${where}: trialIndex must be a non-negative safe integer`)
   }
   if (Object.hasOwn(row, 'cheapSufficient')) throw new TypeError(`${where}: cheapSufficient must be represented by label`)
   if (row.artifact !== undefined && row.artifact !== 'open-final-turn') {
@@ -171,8 +175,8 @@ function verifyProvenance(row, method, methodSha256) {
 
 /**
  * Parse the labelled-scores JSONL: one {@link ReplayRow} per line, blank lines
- * skipped. Rows must be unique per (task, coldPointId); the calibration run is
- * one repeat, so a repeat dimension would be a new row schema.
+ * skipped. Rows must be unique per (task, arm, trialIndex, coldPointId);
+ * repeated trials retain their separate observations.
  * @param {string} text - the JSONL document.
  * @returns {ReplayRow[]} the validated rows in file order.
  */
@@ -189,7 +193,7 @@ export function parseLabelledScores(text) {
       throw new SyntaxError(`${where}: not valid JSON (${error.message})`)
     }
     const row = validateReplayRow(parsed, where)
-    const key = JSON.stringify([row.task, row.arm, row.coldPointId])
+    const key = JSON.stringify([row.task, row.arm, row.trialIndex, row.coldPointId])
     if (seen.has(key)) throw new TypeError(`${where}: duplicate cold-point row for task ${JSON.stringify(row.task)}`)
     seen.add(key)
     rows.push(row)
@@ -333,7 +337,7 @@ export function computeReplayMetrics(rows, options) {
   const seen = new Set()
   for (const [index, row] of rows.entries()) {
     validateReplayRow(row, 'row ' + index)
-    const key = JSON.stringify([row.task, row.arm, row.coldPointId])
+    const key = JSON.stringify([row.task, row.arm, row.trialIndex, row.coldPointId])
     if (seen.has(key)) throw new TypeError('duplicate cold-point row: ' + key)
     seen.add(key)
     verifyProvenance(row, method, methodSha256)
