@@ -62,6 +62,7 @@
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
@@ -72,6 +73,7 @@
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   }
 }
