@@ -98,6 +98,9 @@ import { fileURLToPath } from 'node:url'
  * @property {string} [judgmentKeyEnv] - credential environment variable the arm's judgment engine resolves through
  *   the credentials seam. The runner resolves it exactly like `--api-key-env` (exported value first, else the
  *   harness store) but tolerates absence: the consumers' documented degradation is not a usage error.
+ * @property {string} [apiKeyEnv] - credential environment variable the arm's own base route dials. The runner
+ *   resolves it exactly like `--api-key-env` and treats absence as a usage error, because the arm's base route
+ *   is its core condition rather than an optional engine.
  * @property {boolean} [expectsModelRouting] - whether every session with at least one turn must log at least one
  *   `model-routing/decision` event (routing adoption).
  * @property {boolean} [expectsCompactionVerification] - whether every session that compacted must log at least one
@@ -351,6 +354,69 @@ export const ARMS = Object.freeze({
     expectsSessionQuery: false,
     expectsJspace: false,
     expectsCompactionVerification: true,
+  }),
+  // Routing-measurement ladder (PR 16). All five arms are opt-in: a level's
+  // run names its arms explicitly (prereg §8), and the default ladder must not
+  // grow arms that require an Anthropic key. Each arm's treatment rows are
+  // pinned in bench/routing/ and emitted verbatim. The strong arms each name
+  // their own metered Anthropic key variable (prereg §3 cache isolation); the
+  // runner resolves it like --api-key-env and fails the launch of a selected
+  // arm when that variable resolves to nothing, because the strong route is
+  // the arm's core condition. route-coldpoint and route-random additionally
+  // depend on PR 12 and route-static on PR 13b: their pinned overlays pin
+  // config fields those PRs introduce, and the harness refuses them, by name,
+  // until the integrating branch carries both.
+  'route-strong': Object.freeze({
+    name: 'route-strong',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/route-strong.patch.yml',
+    apiKeyEnv: 'ANTHROPIC_API_KEY_S',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+  }),
+  'route-cheap': Object.freeze({
+    name: 'route-cheap',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/route-cheap.patch.yml',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+  }),
+  'route-coldpoint': Object.freeze({
+    name: 'route-coldpoint',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/route-coldpoint.patch.yml',
+    apiKeyEnv: 'ANTHROPIC_API_KEY_R',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsModelRouting: true,
+  }),
+  'route-random': Object.freeze({
+    name: 'route-random',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/random-matched.patch.yml',
+    apiKeyEnv: 'ANTHROPIC_API_KEY_N',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsModelRouting: true,
+  }),
+  'route-static': Object.freeze({
+    name: 'route-static',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/static-tier.patch.yml',
+    apiKeyEnv: 'ANTHROPIC_API_KEY_T',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsModelRouting: true,
   }),
 })
 

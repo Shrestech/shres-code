@@ -1,0 +1,22 @@
+# Pinned treatment rows for the route-cheap arm — arm C, always-cheap.
+#
+# This file is the source of the arm's rows: ArmEntry.pinnedOverlay names it and
+# bench/runner/arms.js reads it and emits its content verbatim into the arm's
+# per-trial --patch overlay. Nothing restates these values, so the pinned
+# posture and the applied composition cannot drift. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# The arm runs the cheap route end to end on the metered DeepSeek key the
+# experiment's --api-key-env names. It mounts neither the judgment engine nor
+# the router. It exists for the discrimination filter of prereg §3 and, at
+# level L3, as the always-cheap contrast; it is never part of the H1–H5 pairs.
+#
+# The route id is the proven deepseek-official/deepseek-v4-flash (aegis §10.3):
+# the adapter declares only v4-flash, pi-ai's catalog has no v4.1-flash, and
+# v4.1 stays unresolved until a live models call proves it. Billing is priced
+# at V4.1-Flash rates through the price-snapshot alias row (2026-09-26
+# snapshot, notes cite the ruling).
+- id: agent-default-model
+  config:
+    provider: "deepseek-official"
+    model: "deepseek-v4-flash"

@@ -1,0 +1,87 @@
+# Pinned treatment rows for the route-coldpoint arm — arm R, the router
+# treatment of the PR 16 routing measurement (bench/routing/prereg-2026-10.md).
+#
+# ArmEntry.pinnedOverlay names this file and bench/runner/arms.js emits its
+# content verbatim into the arm's per-trial --patch overlay, so this file is
+# the single source of the measured composition. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# Depends on the PR 12 composition surface: the quota route below carries no
+# allowEveryTurn, which is what makes cold-point entry the only entry path,
+# and that config check exists only after PR 12 lands. Until then the router
+# refuses this config at load, by name.
+#
+# The strong route is the metered Anthropic key named below; every strong arm
+# of the measurement uses its own key (prereg §3 cache isolation) and the
+# runner fails the launch when it resolves to nothing. cacheRetention "long"
+# is the 1-hour TTL posture of prereg §2; the report states the realized TTL
+# posture per the §2.1.1 probe outcome.
+#
+# The judgment engine (local Laya), the dispatcher, and the router are
+# INSERTED, never patched: the base headless composition mounts none of them,
+# and a patch against a missing entry no-ops silently, which would leave the
+# arm measuring its own baseline. The candidate is the weak route of the
+# deepseek adapter the base profile already mounts, so the credential and
+# endpoint the strong route runs on are not shared across arms.
+#
+# The router posture below restates the frozen gate of bench/jev-preregistration.md;
+# the operating point is the one difference. The point shipped here is
+# PROVISIONAL and deliberately carries NO calibratedBy: in the router that key's
+# presence alone marks a point calibrated, so writing the preregistration id
+# here would misrepresent an enforced gate that has not run. The offline replay
+# (bench/routing/replay-judges.mjs) is the only writer of calibratedBy and of
+# this point's threshold and margin; the runner refuses confirmatory trials
+# unless the registration records a passed Laya gate and the overlay equals it.
+# Until then this point logs as an uncalibrated point and the router keeps the
+# strong route, fail-closed.
+#
+# The metered-route model entry is hand-declared from the spec metadata
+# (1,000,000 context / 128,000 output, adaptive thinking, no temperature),
+# mirroring the claude-session SHIPPED_MODELS figure; the API accepting this id
+# on a metered key is UNPROVEN until the owner-approved first real run.
+- id: agent-default-model
+  config:
+    provider: "anthropic"
+    model: "claude-opus-5-5"
+- id: llm-pi-ai
+  config:
+    providers:
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY_R
+        cacheRetention: "long"
+        models:
+          - id: claude-opus-5-5
+            name: Claude Opus 5.5
+            contextWindow: 1000000
+            maxTokens: 128000
+            compat:
+              forceAdaptiveThinking: true
+              supportsTemperature: false
+- insert:
+    - id: judgment-laya
+      name: "@shres-code/shres-code-judgment-laya"
+      config:
+        model: {"repo":"convaiinnovations/laya-typed-decisions","revision":"f9ab0b228f0fc0f14d873dbc99038f135c2da1b2","manifestSha256":"028fa5c43482cf63c5d1ef8725c9cf9b196def71e39b8ea85647b3bddcf8f3bc"}
+        checkpointContext: 1024
+    - id: judgment-dispatch
+      name: "@shres-code/shres-code-judgment-dispatch"
+      config:
+        defaultEngine: "laya"
+    - id: model-router
+      name: "@shres-code/shres-code-model-router"
+      config:
+        initialMode: "on"
+        tier: "fast"
+        candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
+        routeFrom: [{"provider":"anthropic","model":"claude-opus-5-5","objective":"quota"}]
+        operatingPoints: [{"engine":"laya","downgradeThreshold":0.8,"downgradeMargin":0.1}]
+        hold: {"minSteps":20,"maxSteps":40}
+        difficulty: {"entryScoreCeiling":2}
+        reentryCooldownTurns: 2
+        escalateBack: {"scoreThreshold":4}
+        maxRouteErrors: 2
+        onUnavailable: "fallback"
+        judgmentDeadlineMs: 1500
+        judgmentFailures: {"holdTolerance":2,"breakerThreshold":3,"breakerOpenTurns":5}
+        routeInstructions: "Which route should handle this turn? Choose the cheapest route that is still a safe fit, or the strong route when the turn is ambiguous or its work is not yet known."
+        difficultyInstructions: "How hard is this turn for the model handling it? Score it on the levels below."

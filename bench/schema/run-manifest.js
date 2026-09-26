@@ -42,6 +42,11 @@
  *   written before the flag existed.
  * @property {string} [priceSnapshot] - `bench/prices` snapshot id every trial is priced under.
  * @property {string} [accountingConfigSha256] - hex SHA-256 of `bench/accounting.json` at experiment start.
+ * @property {number | null} [armSeed] - `--arm-seed` pin; null when arm order ran in registry order.
+ * @property {number | null} [gapSeed] - `--gap-seed` pin; null when no multiturn task ran.
+ * @property {number | null} [gapCapMs] - `--gap-cap-ms` pin; null when gaps ran uncapped.
+ * @property {boolean} [nonce] - whether trials carry a per-trial nonce line.
+ * @property {string | null} [armApiKeyEnv] - the arm's own base-route credential variable; null when it dials the experiment key.
  * @property {BudgetStop} [budgetStop] - why the runner stopped launching trials before the plan finished.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601, empty string while running.
@@ -79,6 +84,19 @@ export function validateRunManifest(value) {
   }
   if (m.accountingConfigSha256 !== undefined && (typeof m.accountingConfigSha256 !== 'string' || m.accountingConfigSha256.length === 0)) {
     throw new Error('manifest.accountingConfigSha256 must be a non-empty string')
+  }
+  for (const field of ['armSeed', 'gapSeed']) {
+    const seed = m[field]
+    if (seed != null && !(Number.isSafeInteger(seed) && seed >= 0 && seed <= 0xffffffff)) {
+      throw new Error(`manifest.${field} must be an integer from 0 to 4294967295 or null`)
+    }
+  }
+  if (m.gapCapMs != null && !(Number.isSafeInteger(m.gapCapMs) && /** @type {number} */ (m.gapCapMs) >= 1)) {
+    throw new Error('manifest.gapCapMs must be a positive integer or null')
+  }
+  if (m.nonce !== undefined && typeof m.nonce !== 'boolean') throw new Error('manifest.nonce must be a boolean')
+  if (m.armApiKeyEnv !== undefined && m.armApiKeyEnv !== null && typeof m.armApiKeyEnv !== 'string') {
+    throw new Error('manifest.armApiKeyEnv must be a string or null')
   }
   if (m.budgetStop !== undefined) {
     const stop = /** @type {Record<string, unknown>} */ (m.budgetStop)

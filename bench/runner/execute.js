@@ -223,12 +223,14 @@ function startBudgetWatch(child, sessionLogRoot, maxTotalTokens, onExceeded, isS
  * @param {number} [options.maxTotalTokens] - live cap on observed root+descendant usage; exceeding it
  *   terminates the child and marks the result `budgetExceeded`. Undefined disables the watch.
  * @param {AbortSignal} [options.signal] - abort kills the child (SIGTERM, then SIGKILL) and waits for exit.
+ * @param {string[]} [options.sessionArgs] - app-level session flags (`--session-id`/`--resume`),
+ *   placed after the launcher flags and before the task positional.
  * @returns {Promise<ExecutionResult>} the execution record.
  */
-export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens }) {
+export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], sessionArgs = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens }) {
   const launch = resolveHarnessLaunch(repoRoot)
   const patchArgs = ['--patch', overlayPath, ...extraPatchPaths.flatMap(p => ['--patch', p])]
-  const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, taskText]
+  const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, ...sessionArgs, taskText]
   const startedAt = Date.now()
 
   if (signal?.aborted) {

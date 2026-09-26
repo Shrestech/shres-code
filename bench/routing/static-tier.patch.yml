@@ -1,0 +1,60 @@
+# Pinned treatment rows for the route-static arm — arm T, static tier, L3 only.
+#
+# ArmEntry.pinnedOverlay names this file and bench/runner/arms.js emits its
+# content verbatim into the arm's per-trial --patch overlay, so this file is
+# the single source of the measured composition. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# Depends on the PR 13b composition surface: childPolicies and
+# childRouteErrors are 13b config fields and do not exist before it lands, so
+# the router refuses this config at load, by name, until then. T versus S is
+# the exploratory subagent-routing contrast of prereg §8 (L3).
+#
+# The main conversation stays on the strong route with NO shadow: shadow means
+# no request in the session is rewritten, children included, so a shadow parent
+# with live child routing is rejected (aegis §10.2). Instead the router composes
+# initialMode on with NO judgment service: main-conversation consults keep with
+# engine-absent (or warm-prefix at warm quota turns after PR 12), static child
+# policies need no engine, and delegated children take the cheap route. The
+# arm-integrity audit requires zero downgraded main-conversation decisions and
+# at least one routed child-decision per task that delegated.
+#
+# The strong route is the metered Anthropic key named below (prereg §3 cache
+# isolation); the runner fails the launch when it resolves to nothing. The
+# metered-route model entry is hand-declared from the spec metadata; the API
+# accepting this id on a metered key is UNPROVEN until the owner-approved
+# first real run. hold.minSteps is 0 so the sticky fold needs no difficulty
+# ask; with no engine every judge-kept path is engine-absent anyway.
+- id: agent-default-model
+  config:
+    provider: "anthropic"
+    model: "claude-opus-5-5"
+- id: llm-pi-ai
+  config:
+    providers:
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY_T
+        cacheRetention: "long"
+        models:
+          - id: claude-opus-5-5
+            name: Claude Opus 5.5
+            contextWindow: 1000000
+            maxTokens: 128000
+            compat:
+              forceAdaptiveThinking: true
+              supportsTemperature: false
+- insert:
+    - id: model-router
+      name: "@shres-code/shres-code-model-router"
+      config:
+        initialMode: "on"
+        tier: "fast"
+        candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
+        routeFrom: [{"provider":"anthropic","model":"claude-opus-5-5","objective":"quota"}]
+        hold: {"minSteps":0,"maxSteps":40}
+        maxRouteErrors: 2
+        onUnavailable: "fallback"
+        judgmentDeadlineMs: 1500
+        judgmentFailures: {"holdTolerance":2,"breakerThreshold":3,"breakerOpenTurns":5}
+        childPolicies: [{"match":{"kind":"subagent","agentType":"explore"},"candidate":"flash","judge":false},{"match":{"kind":"subagent","agentType":"search"},"candidate":"flash","judge":false}]
+        childRouteErrors: 2

@@ -321,7 +321,7 @@ describe('arms registry', () => {
   it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'route-shield', 'compact-basic', 'compact-jev'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'route-shield', 'compact-basic', 'compact-jev', 'route-strong', 'route-cheap', 'route-coldpoint', 'route-random', 'route-static'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -348,7 +348,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['route-shield'].optIn, true)
     assert.equal(ARMS['route-shield'].judgmentKeyEnv, undefined)
     assert.equal(ARMS['route-shield'].expectsModelRouting, true)
-    assert.deepEqual(listDefaultArms(), listArms().filter(name => name !== 'route-shield'))
+    assert.deepEqual(listDefaultArms(), listArms().filter(name => ARMS[name].optIn !== true))
     assert.equal(getArm('off'), ARMS.off)
   })
 

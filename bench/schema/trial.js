@@ -329,6 +329,22 @@ export function validateTrial(value) {
   if (t.score !== undefined && (typeof t.score !== 'number' || t.score < 0 || t.score > 1)) {
     throw new Error('trial.score must be in [0, 1] when present')
   }
+  if (t.nonce !== undefined && (typeof t.nonce !== 'string' || t.nonce.length === 0)) {
+    throw new Error('trial.nonce must be a non-empty string when present')
+  }
+  if (t.gaps !== undefined) {
+    if (!Array.isArray(t.gaps)) throw new Error('trial.gaps must be an array when present')
+    t.gaps.forEach((gap, index) => {
+      const g = /** @type {Record<string, unknown>} */ (gap)
+      if (typeof g !== 'object' || g === null || Array.isArray(g)) throw new Error(`trial.gaps[${index}] must be a record`)
+      if (g.index !== index) throw new Error(`trial.gaps[${index}].index must be ${index}`)
+      for (const field of ['drawnMs', 'gapMs']) {
+        if (!Number.isSafeInteger(g[field]) || /** @type {number} */ (g[field]) < 0) {
+          throw new Error(`trial.gaps[${index}].${field} must be a non-negative integer`)
+        }
+      }
+    })
+  }
   if (t.execution !== undefined) validateExecution(t.execution, 'trial.execution')
   const v = /** @type {Record<string, unknown>} */ (t.verifier)
   if (typeof v !== 'object' || v === null) throw new Error('trial.verifier must be a record')
