@@ -44,8 +44,28 @@ export function proposalFromHeader(header) {
   return config
 }
 
+const LLM_CALL_CONFIG_FIELDS = ['provider', 'model', 'reasoningEffort', 'maxTokens', 'temperature', 'stop']
+
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function presentCallConfig(config) {
+  const out = {}
+  for (const field of LLM_CALL_CONFIG_FIELDS) {
+    if (Object.hasOwn(config ?? {}, field) && config[field] !== undefined) out[field] = config[field]
+  }
+  return out
+}
+
+function sameEffectiveCallConfig(logged, prepared) {
+  const left = presentCallConfig(logged)
+  const right = presentCallConfig(prepared)
+  const fields = new Set([...Object.keys(left), ...Object.keys(right)])
+  for (const field of fields) {
+    if (!sameJson(left[field], right[field])) return false
+  }
+  return true
 }
 
 function consultHeaders(events) {
@@ -178,11 +198,11 @@ export function classifyArtifact({ header, events, readFrom, inspected }) {
   return { artifact: 'complete' }
 }
 
-function assertRequestConfig(arm, requestConfig, events) {
+function assertRequestConfig(arm, events, sPrepared) {
   if (arm !== 'S') return
+  if (sPrepared === undefined) throw new TypeError('S request-config check requires sPrepared from one prepareCall')
   for (const event of consultHeaders(events)) {
-    const proposal = proposalFromHeader(event.data.header)
-    if (!sameJson(proposal, requestConfig)) {
+    if (!sameEffectiveCallConfig(event.data.header.config, sPrepared)) {
       throw new TrialInputIncompleteError('request-config-mismatch')
     }
   }
@@ -198,7 +218,7 @@ function serializableConsult(result) {
  * @returns {Promise<{ artifact: string, rows: object[], consults: object[] }>}
  */
 export async function replayTrialLog({
-  trial, path, persistence, runtime, routerConfig, routeBase, trialOwnRoute, requestConfig, ttl, method, arm,
+  trial, path, persistence, runtime, routerConfig, routeBase, trialOwnRoute, requestConfig, ttl, method, arm, sPrepared,
 }) {
   parseReplayMethod(method, { require: FRONTEND_METHOD_FIELDS })
   if (persistence === undefined || typeof persistence.readFrom !== 'function' || typeof persistence.inspect !== 'function') {
@@ -210,7 +230,7 @@ export async function replayTrialLog({
   const readFrom = await persistence.readFrom(id, 0)
   const inspected = await persistence.inspect(id)
   const { artifact } = classifyArtifact({ header, events, readFrom, inspected })
-  assertRequestConfig(arm, requestConfig, events)
+  assertRequestConfig(arm, events, sPrepared)
   const config = 'coldPoints' in routerConfig && 'candidates' in routerConfig
     ? routerConfig
     : resolveConfig(routerConfig)

@@ -23,26 +23,40 @@ export const internals = {
 }
 
 function countingRuntime(llm) {
-  const counts = { prepareCall: 0, resolveModelInfo: 0 }
+  const counts = {
+    prepareCall: 0,
+    resolveModelInfo: 0,
+    byPhase: {
+      's-validation': { prepareCall: 0, resolveModelInfo: 0 },
+      consult: { prepareCall: 0, resolveModelInfo: 0 },
+    },
+  }
+  let phase = 'consult'
   const runtime = new Proxy(llm, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver)
       if (property === 'prepareCall' && typeof value === 'function') {
         return function prepareCallCounted(...args) {
           counts.prepareCall++
+          counts.byPhase[phase].prepareCall++
           return value.apply(target, args)
         }
       }
       if (property === 'resolveModelInfo' && typeof value === 'function') {
         return function resolveModelInfoCounted(...args) {
           counts.resolveModelInfo++
+          counts.byPhase[phase].resolveModelInfo++
           return value.apply(target, args)
         }
       }
       return typeof value === 'function' ? value.bind(target) : value
     },
   })
-  return { runtime, counts }
+  return {
+    runtime,
+    counts,
+    setPhase(next) { phase = next },
+  }
 }
 
 function consultKindCounts(consults) {
@@ -96,7 +110,13 @@ export function apply(ctx, config) {
     const ttl = ttlInfo.promptCacheTtlMs === undefined
       ? { ttlMs: resolved.coldPoints.unknownTtlMs, ttlSource: 'fallback' }
       : { ttlMs: ttlInfo.promptCacheTtlMs, ttlSource: 'adapter' }
-    const { runtime, counts } = countingRuntime(llm)
+    const { runtime, counts, setPhase } = countingRuntime(llm)
+    let sPrepared
+    if (job.arm === 'S') {
+      setPhase('s-validation')
+      sPrepared = (await runtime.prepareCall(structuredClone(defaults.currentSelection()))).config
+    }
+    setPhase('consult')
     const result = await replayTrialLog({
       trial: job.trial,
       path: job.path,
@@ -109,6 +129,7 @@ export function apply(ctx, config) {
       ttl,
       method: job.method,
       arm: job.arm,
+      sPrepared,
     })
     const kinds = consultKindCounts(result.consults)
     const summary = {
