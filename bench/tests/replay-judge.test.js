@@ -14,8 +14,16 @@ import {
   KEEP_CURRENT_OPTION_ID,
   MODEL_ROUTER_JUDGMENT_CONSUMER,
 } from '../../packages/llm/model-router/lib/index.js'
-import { hostReplayRun, hostReplayTrial } from '../routing/replay-frontend-host.js'
+import {
+  assertExtraOverlayAvoidsJudgment,
+  dumpReplayFrontendConfig,
+  hostLaunchStats,
+  hostReplayRun,
+  hostReplayTrial,
+  judgmentRowIdsFromDump,
+} from '../routing/replay-frontend-host.js'
 import { REPLAY_SCRIPTED_FITTING_JUDGE_PATH } from '../routing/replay-frontend-overlay.js'
+import { UsageError } from '../runner/run.js'
 import { validateReplayRow } from '../analysis/replay-metrics.js'
 import { fixtureMethod } from './replay-fixture-method.js'
 import { projectKey, encodeSegment } from '../runner/session-layout.js'
@@ -42,22 +50,6 @@ async function plant(bytes, label) {
   const path = join(dir, 'session.jsonl')
   await writeFile(path, bytes)
   return { root, path, header }
-}
-
-function yamlScript(obj, indent) {
-  return JSON.stringify(obj)
-}
-
-function fittingOverlay(config) {
-  return [
-    '- id: bench-replay-scripted-judge',
-    '  disabled: true',
-    '- insert:',
-    '    - id: bench-replay-scripted-fitting-judge',
-    '      name: ' + JSON.stringify(REPLAY_SCRIPTED_FITTING_JUDGE_PATH),
-    '      config: ' + yamlScript(config),
-    '',
-  ].join('\n')
 }
 
 function routerOverlay(overrides) {
@@ -100,15 +92,14 @@ function noDifficultyOverlay() {
   return routerOverlay({ hold: { minSteps: 0 }, difficultyInstructions: undefined })
 }
 
-function disabledJudgmentOverlay() {
-  return [
-    '- id: settings',
-    '  config:',
-    '    judgment:',
-    '      enabled: false',
-    '      engine: scripted-fitting',
-    '',
-  ].join('\n')
+function fixtureJudge(opts = {}) {
+  return {
+    mode: 'fixture',
+    fittingJudgePath: opts.fittingJudgePath ?? REPLAY_SCRIPTED_FITTING_JUDGE_PATH,
+    fittingJudgeConfig: opts.fittingJudgeConfig ?? { defaultScript: { kind: 'answered' } },
+    engineId: opts.engineId ?? 'scripted-fitting',
+    judgmentEnabled: opts.judgmentEnabled !== false,
+  }
 }
 
 async function hostJudge(label, opts = {}) {
@@ -122,11 +113,8 @@ async function hostJudge(label, opts = {}) {
       arm: 'C',
       method,
       trialOwnRoute: ownRoute,
-      judge: opts.judge !== false,
       extraOverlay: opts.extraOverlay,
-      fittingJudgePath: opts.fittingJudgePath ?? REPLAY_SCRIPTED_FITTING_JUDGE_PATH,
-      fittingJudgeConfig: opts.fittingJudgeConfig ?? { defaultScript: { kind: 'answered' } },
-      judgmentEnabled: opts.judgmentEnabled,
+      judge: fixtureJudge(opts),
     })
     return { hosted, planted }
   } catch (error) {
@@ -146,9 +134,7 @@ test('prepare-only records zero asks and leaves every prepared row unanswered', 
     const judged = await hostReplayRun({
       repoRoot: repo, method, tasks,
       trials: [trialOf('good', planted.path)],
-      judge: true,
-      fittingJudgePath: REPLAY_SCRIPTED_FITTING_JUDGE_PATH,
-      fittingJudgeConfig: { defaultScript: { kind: 'answered' } },
+      judge: fixtureJudge(),
     })
     assert.equal((prepared.summaries[0].summary.asks ?? []).length, 0)
     assert.equal((prepared.asks ?? []).length, 0)
@@ -321,6 +307,7 @@ test('non-fitting engine refuses with UsageError and no asks', async () => {
     () => hostJudge('nonfit', {
       fittingJudgePath: enginePath,
       fittingJudgeConfig: {},
+      engineId: 'scripted-nonfitting',
     }),
     error => /fitting judgment engine/.test(error.message),
   )
@@ -331,4 +318,141 @@ test('missing difficultyInstructions refuses with UsageError and no asks', async
     () => hostJudge('nodiff', { extraOverlay: noDifficultyOverlay(), fittingJudgeConfig: { defaultScript: { kind: 'answered' } } }),
     error => /difficulty question/.test(error.message),
   )
+})
+test('off mode records zero asks and rows identical to omitted judge', async () => {
+  const bytes = await readFile(fixture)
+  const planted = await plant(bytes, 'off')
+  try {
+    const omitted = await hostReplayRun({ repoRoot: repo, method, tasks, trials: [trialOf('good', planted.path)] })
+    const off = await hostReplayRun({
+      repoRoot: repo, method, tasks, trials: [trialOf('good', planted.path)],
+      judge: { mode: 'off' },
+    })
+    assert.equal((omitted.asks ?? []).length, 0)
+    assert.equal((off.asks ?? []).length, 0)
+    assert.equal(off.summaries[0].summary.judgeMode, 'off')
+    assert.deepEqual(omitted.rows, off.rows)
+  } finally {
+    await rm(planted.root, { recursive: true, force: true })
+  }
+})
+
+test('composition dump leaves laya enabled, inserts no scripted engine, writes no settings.yaml', async () => {
+  const dumped = await dumpReplayFrontendConfig({ repoRoot: repo, judge: { mode: 'composition' } })
+  try {
+    assert.match(dumped.yaml, /id: judgment-laya/)
+    assert.doesNotMatch(dumped.yaml, /id: judgment-laya[\s\S]{0,80}disabled: true/)
+    assert.doesNotMatch(dumped.yaml, /bench-replay-scripted/)
+    assert.equal(dumped.homeFiles.some(name => name === 'settings.yaml' || name.endsWith('/settings.yaml')), false)
+    assert.equal(dumped.homeFiles.some(name => name.includes('laya-gateway')), false)
+    assert.ok(dumped.overlay.includes('judgment-laya') === false || !/id: judgment-laya\n  disabled: true/.test(dumped.overlay))
+  } finally {
+    await rm(dumped.root, { recursive: true, force: true })
+  }
+})
+
+test('composition mode refuses when Laya is not ready and does not install', async () => {
+  const bytes = await readFile(fixture)
+  const planted = await plant(bytes, 'comp')
+  try {
+    await assert.rejects(
+      () => hostReplayTrial({
+        repoRoot: repo,
+        trial: trialOf('comp', planted.path).trial,
+        path: planted.path,
+        arm: 'C',
+        method,
+        trialOwnRoute: ownRoute,
+        judge: { mode: 'composition' },
+      }),
+      error => /fitted engine laya not ready:/.test(error.message)
+        && !(error.homeFiles ?? []).some(name => name.includes('laya-gateway')),
+    )
+  } finally {
+    await rm(planted.root, { recursive: true, force: true })
+  }
+})
+
+test('invalid judge mode or missing fixture field is TypeError before spawn', async () => {
+  hostLaunchStats.count = 0
+  await assert.rejects(
+    () => hostReplayTrial({ repoRoot: repo, trial: {}, path: '/nope', arm: 'C', method, trialOwnRoute: ownRoute, judge: { mode: 'scripted' } }),
+    error => error instanceof TypeError,
+  )
+  await assert.rejects(
+    () => hostReplayTrial({ repoRoot: repo, trial: {}, path: '/nope', arm: 'C', method, trialOwnRoute: ownRoute, judge: { mode: 'fixture', engineId: 'x' } }),
+    error => error instanceof TypeError,
+  )
+  assert.equal(hostLaunchStats.count, 0)
+})
+
+test('judgmentRowIdsFromDump returns composed judgment ids from a recorded dump', async () => {
+  const dumped = await dumpReplayFrontendConfig({ repoRoot: repo, judge: { mode: 'composition' } })
+  try {
+    const ids = judgmentRowIdsFromDump(dumped.yaml)
+    assert.ok(ids.includes('judgment-laya'))
+    assert.ok(ids.includes('judgment-dispatch'))
+  } finally {
+    await rm(dumped.root, { recursive: true, force: true })
+  }
+})
+
+test('assertExtraOverlayAvoidsJudgment refuses judgment patches and accepts others', async () => {
+  const ids = ['judgment-laya', 'judgment-dispatch']
+  await assert.rejects(
+    () => assertExtraOverlayAvoidsJudgment('- id: judgment-dispatch\n  config:\n    defaultEngine: typesafe\n', ids),
+    error => error instanceof UsageError && /judgment-dispatch/.test(error.message),
+  )
+  await assert.rejects(
+    () => assertExtraOverlayAvoidsJudgment('- id: judgment-laya\n  disabled: true\n', ids),
+    error => error instanceof UsageError && /judgment-laya/.test(error.message),
+  )
+  await assert.rejects(
+    () => assertExtraOverlayAvoidsJudgment('- insert:\n    - id: typesafe\n      name: "@shres-code/shres-code-judgment-typesafe"\n', ids),
+    error => error instanceof UsageError && /judgment-typesafe/.test(error.message),
+  )
+  await assert.rejects(
+    () => assertExtraOverlayAvoidsJudgment('- id: other\n  insert:\n    - insert:\n        - id: nested\n          name: "@shres-code/shres-code-judgment-shield"\n', ids),
+    error => error instanceof UsageError && /judgment-shield/.test(error.message),
+  )
+  await assert.rejects(
+    () => assertExtraOverlayAvoidsJudgment('not: an-array\n', ids),
+    error => error instanceof UsageError && /top-level YAML array/.test(error.message),
+  )
+  await assertExtraOverlayAvoidsJudgment('- id: llm-deepseek\n  config:\n    baseURL: !!js process.env.X\n', ids)
+  await assertExtraOverlayAvoidsJudgment('- id: model-router\n  config:\n    initialMode: on\n', ids)
+})
+
+test('hostReplayRun refuses a judgment extraOverlay after one dump and no trial child', async () => {
+  const bytes = await readFile(fixture)
+  const planted = await plant(bytes, 'guard')
+  hostLaunchStats.count = 0
+  try {
+    await assert.rejects(
+      () => hostReplayRun({
+        repoRoot: repo, method, tasks, trials: [trialOf('good', planted.path)],
+        extraOverlay: '- id: judgment-laya\n  disabled: true\n',
+      }),
+      error => error instanceof UsageError && /judgment-laya/.test(error.message)
+        && !(error.homeFiles ?? []).some(name => name.includes('laya-gateway')),
+    )
+    assert.equal(hostLaunchStats.count, 1)
+  } finally {
+    await rm(planted.root, { recursive: true, force: true })
+  }
+})
+
+test('hostReplayRun with a benign extraOverlay still hosts the trial', async () => {
+  const bytes = await readFile(fixture)
+  const planted = await plant(bytes, 'benign')
+  try {
+    const hosted = await hostReplayRun({
+      repoRoot: repo, method, tasks, trials: [trialOf('good', planted.path)],
+      extraOverlay: '- id: llm-deepseek\n  config:\n    timeout: 1\n',
+    })
+    assert.equal(hosted.rows.length > 0, true)
+    assert.equal((hosted.asks ?? []).length, 0)
+  } finally {
+    await rm(planted.root, { recursive: true, force: true })
+  }
 })

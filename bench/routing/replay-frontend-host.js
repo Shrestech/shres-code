@@ -14,12 +14,62 @@ import { entryListSchema } from '../../vendor/include/lib/index.js'
 import { getArm, renderArmOverlay } from '../runner/arms.js'
 import { resolveHarnessLaunch } from '../runner/execute.js'
 import { startRequestSink } from '../runner/preflight-models.js'
+import { loadOverlayPatches } from '../../packages/boot/app-boot/lib/index.js'
 import { renderReplayFrontendOverlay } from './replay-frontend-overlay.js'
 import { TrialInputIncompleteError } from './replay-frontend.js'
 import { validateReplayRow } from '../analysis/replay-metrics.js'
+import { UsageError } from '../runner/run.js'
+
+/** Launcher spawns from this module in the current hostReplayRun/Trial. */
+export const hostLaunchStats = { count: 0 }
+const JUDGMENT_PACKAGE = '@shres-code/shres-code-judgment'
 
 const PREFLIGHT_TIMEOUT_MS = 120_000
 const ROUTER_NAME = '@shres-code/shres-code-model-router'
+const DISPATCH_NAME = '@shres-code/shres-code-judgment-dispatch'
+
+function normalizeJudge(judge) {
+  const value = judge === undefined ? { mode: 'off' } : judge
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('judge must be { mode: off|composition|fixture, ... }')
+  }
+  if (value.mode === 'off') return { mode: 'off' }
+  if (value.mode === 'composition') return { mode: 'composition' }
+  if (value.mode === 'fixture') {
+    for (const field of ['fittingJudgePath', 'fittingJudgeConfig', 'engineId', 'judgmentEnabled']) {
+      if (!Object.hasOwn(value, field) || value[field] === undefined) {
+        throw new TypeError('judge fixture mode requires ' + field)
+      }
+    }
+    if (typeof value.fittingJudgePath !== 'string' || value.fittingJudgePath === '') {
+      throw new TypeError('judge.fittingJudgePath must be a non-empty string')
+    }
+    if (typeof value.engineId !== 'string' || value.engineId === '') {
+      throw new TypeError('judge.engineId must be a non-empty string')
+    }
+    if (typeof value.judgmentEnabled !== 'boolean') throw new TypeError('judge.judgmentEnabled must be a boolean')
+    return value
+  }
+  throw new TypeError('judge.mode must be off, composition, or fixture')
+}
+
+function findNamedRow(nodes, name, into = []) {
+  if (!Array.isArray(nodes)) return into
+  for (const node of nodes) {
+    if (node === null || typeof node !== 'object') continue
+    if (Array.isArray(node.insert)) findNamedRow(node.insert, name, into)
+    if (Array.isArray(node.patches)) findNamedRow(node.patches, name, into)
+    if (node.name === name && node.disabled !== true) into.push(node)
+  }
+  return into
+}
+
+function dispatchDefaultEngine(yamlText) {
+  const doc = loadYaml(yamlText, { schema: entryListSchema })
+  const rows = findNamedRow(Array.isArray(doc) ? doc : doc?.plugins ?? [], DISPATCH_NAME)
+  const id = rows[0]?.config?.defaultEngine
+  return typeof id === 'string' && id !== '' ? id : undefined
+}
 
 function scrubEnv(env) {
   const childEnv = { ...env }
@@ -79,15 +129,86 @@ export function assertUnchangedSnapshots(before, after) {
   }
 }
 
-function countEnabledRouters(nodes, into = []) {
-  if (!Array.isArray(nodes)) return into
+function isJudgmentPackage(name) {
+  return typeof name === 'string' && (name === JUDGMENT_PACKAGE || name.startsWith(JUDGMENT_PACKAGE + '-'))
+}
+
+function walkEntries(nodes, visit) {
+  if (!Array.isArray(nodes)) return
   for (const node of nodes) {
     if (node === null || typeof node !== 'object') continue
-    if (Array.isArray(node.insert)) countEnabledRouters(node.insert, into)
-    if (Array.isArray(node.patches)) countEnabledRouters(node.patches, into)
-    if (node.name === ROUTER_NAME && node.disabled !== true) into.push(node)
+    visit(node)
+    if (Array.isArray(node.insert)) walkEntries(node.insert, visit)
+    if (Array.isArray(node.patches)) walkEntries(node.patches, visit)
   }
+}
+
+function countEnabledRouters(nodes, into = []) {
+  walkEntries(nodes, (node) => {
+    if (node.name === ROUTER_NAME && node.disabled !== true) into.push(node)
+  })
   return into
+}
+
+/**
+ * Composed judgment row ids from a --dump-config YAML document.
+ * @param {string} yamlText
+ * @returns {string[]}
+ */
+export function judgmentRowIdsFromDump(yamlText) {
+  const doc = loadYaml(yamlText, { schema: entryListSchema })
+  const ids = []
+  walkEntries(Array.isArray(doc) ? doc : doc?.plugins ?? [], (node) => {
+    if (isJudgmentPackage(node.name) && typeof node.id === 'string' && node.id !== '') ids.push(node.id)
+  })
+  return ids
+}
+
+function refuseOverlay(path, reason) {
+  throw new UsageError(path + ': ' + reason)
+}
+
+function checkInsertedEntries(list, idSet, path) {
+  list.forEach((entry, index) => {
+    const here = path + '.insert[' + String(index) + ']'
+    if (isJudgmentPackage(entry?.name)) {
+      refuseOverlay(here, 'inserts judgment package ' + entry.name)
+    }
+    if (typeof entry?.id === 'string' && idSet.has(entry.id)) {
+      refuseOverlay(here, 'reuses composed judgment id ' + entry.id)
+    }
+    if (Array.isArray(entry?.insert)) checkInsertedEntries(entry.insert, idSet, here)
+  })
+}
+
+/**
+ * Refuse an extra overlay that patches or inserts composed judgment rows.
+ * Operator-trusted; not a sandbox. !!js stays unevaluated.
+ * @param {string} extraOverlayText
+ * @param {string[]} judgmentIds
+ */
+export async function assertExtraOverlayAvoidsJudgment(extraOverlayText, judgmentIds) {
+  const idSet = new Set(judgmentIds)
+  const dir = await mkdtemp(join(tmpdir(), 'bench-replay-extra-overlay-'))
+  const file = join(dir, 'extra.patch.yml')
+  try {
+    await writeFile(file, extraOverlayText)
+    let patches
+    try {
+      patches = loadOverlayPatches('replay-host', file)
+    } catch (error) {
+      throw new UsageError(error instanceof Error ? error.message : String(error))
+    }
+    patches.forEach((entry, index) => {
+      const here = 'extraOverlay[' + String(index) + ']'
+      if (typeof entry?.id === 'string' && idSet.has(entry.id)) {
+        refuseOverlay(here, 'patches composed judgment row ' + entry.id)
+      }
+      if (Array.isArray(entry?.insert)) checkInsertedEntries(entry.insert, idSet, here)
+    })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 }
 
 /**
@@ -105,6 +226,7 @@ async function spawnLauncher({ repoRoot, scratchDir, armOverlayPath, overlayPath
   const launch = resolveHarnessLaunch(repoRoot)
   const childEnv = { ...scrubEnv(env), ...launch.env, SHRES_HOME: homeDir }
   const argv = [...launch.argsPrefix, '--profile', 'headless', '--patch', armOverlayPath, '--patch', overlayPath, ...extraArgs]
+  hostLaunchStats.count += 1
   const child = spawn(launch.command, argv, { cwd: scratchDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = ''
   let stderr = ''
@@ -125,24 +247,66 @@ async function spawnLauncher({ repoRoot, scratchDir, armOverlayPath, overlayPath
 }
 
 /**
+ * One boot-free --dump-config of the arm + replay overlay for this judge mode.
+ * Caller must `rm` the returned root.
+ * @param {object} input
+ */
+export async function dumpReplayFrontendConfig({
+  repoRoot, env = process.env, judge, extraOverlay = '', sessionLogRoot,
+}) {
+  const judgeSpec = normalizeJudge(judge)
+  const root = await mkdtemp(join(tmpdir(), 'bench-replay-dump-'))
+  const home = join(root, 'home')
+  const scratchDir = join(root, 'cwd')
+  const logRoot = sessionLogRoot ?? join(root, 'sessions')
+  await mkdir(home)
+  await mkdir(scratchDir)
+  await mkdir(logRoot)
+  const armPath = join(root, 'arm.patch.yml')
+  const overlayPath = join(root, 'replay.patch.yml')
+  const overlay = renderReplayFrontendOverlay({
+    sinkUrl: 'http://127.0.0.1:9',
+    sessionLogRoot: logRoot,
+    job: join(root, 'job.json'),
+    out: join(root, 'out.jsonl'),
+    judgeMode: judgeSpec.mode,
+    fittingJudgePath: judgeSpec.mode === 'fixture' ? judgeSpec.fittingJudgePath : undefined,
+    fittingJudgeConfig: judgeSpec.mode === 'fixture' ? judgeSpec.fittingJudgeConfig : undefined,
+  }) + extraOverlay
+  await writeFile(armPath, renderArmOverlay(getArm('route-coldpoint'), { sessionLogRoot: logRoot }))
+  await writeFile(overlayPath, overlay)
+  const dumped = await spawnLauncher({
+    repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
+    extraArgs: ['--dump-config'],
+  })
+  if (dumped.exitCode !== 0) {
+    await rm(root, { recursive: true, force: true })
+    throw new Error('replay host: --dump-config failed: ' + dumped.stderr)
+  }
+  const homeFiles = Object.keys(await snapshotSessionLogRoot(home))
+  return { yaml: dumped.stdout, overlay, home, homeFiles, root, stderr: dumped.stderr }
+}
+
+/**
  * Host one trial's replay inside a launcher child.
  * @param {object} input
  */
 export async function hostReplayTrial({
   repoRoot, trial, path, arm, method, trialOwnRoute, env = process.env,
-  extraOverlay, judge = false, fittingJudgePath, fittingJudgeConfig, judgmentEnabled = true,
+  extraOverlay, judge,
 }) {
+  const judgeSpec = normalizeJudge(judge)
   const root = await mkdtemp(join(tmpdir(), 'bench-replay-host-'))
   const home = join(root, 'home')
   const scratchDir = join(root, 'cwd')
   const sessionLogRoot = dirname(dirname(dirname(path)))
   await mkdir(home)
   await mkdir(scratchDir)
-  if (judge === true) {
+  if (judgeSpec.mode === 'fixture') {
     await writeFile(join(home, 'settings.yaml'), [
       'judgment:',
-      '  enabled: ' + (judgmentEnabled === false ? 'false' : 'true'),
-      '  engine: scripted-fitting',
+      '  enabled: ' + (judgeSpec.judgmentEnabled ? 'true' : 'false'),
+      '  engine: ' + JSON.stringify(judgeSpec.engineId),
       '',
     ].join('\n'))
   }
@@ -157,9 +321,9 @@ export async function hostReplayTrial({
     await writeFile(armPath, armOverlay)
     await writeFile(overlayPath, renderReplayFrontendOverlay({
       sinkUrl: sink.sinkUrl, sessionLogRoot, job: jobPath, out: outPath,
-      omitScriptedJudge: judge === true,
-      fittingJudgePath,
-      fittingJudgeConfig,
+      judgeMode: judgeSpec.mode,
+      fittingJudgePath: judgeSpec.mode === 'fixture' ? judgeSpec.fittingJudgePath : undefined,
+      fittingJudgeConfig: judgeSpec.mode === 'fixture' ? judgeSpec.fittingJudgeConfig : undefined,
     }) + (extraOverlay ?? ''))
     const dumped = await spawnLauncher({
       repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
@@ -172,9 +336,17 @@ export async function hostReplayTrial({
     if (routers.count !== 1) {
       throw new TrialInputIncompleteError('router-count:' + String(routers.count))
     }
+    const expectedEngineId = judgeSpec.mode === 'composition'
+      ? dispatchDefaultEngine(dumped.stdout)
+      : judgeSpec.mode === 'fixture' ? judgeSpec.engineId : undefined
+    if (judgeSpec.mode === 'composition' && expectedEngineId === undefined) {
+      throw new UsageError('composition dump is missing judgment-dispatch.defaultEngine')
+    }
     await writeFile(jobPath, JSON.stringify({
       trial, path, arm, method, trialOwnRoute, routerRowConfig: routers.row?.config,
-      ...judge === true ? { judge: true } : {},
+      judgeMode: judgeSpec.mode,
+      ...judgeSpec.mode === 'off' ? {} : { judge: true },
+      ...expectedEngineId === undefined ? {} : { expectedEngineId },
     }))
     const spawned = await spawnLauncher({
       repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
@@ -187,8 +359,11 @@ export async function hostReplayTrial({
     const line = spawned.stdout.split('\n').map((candidate) => {
       try { return JSON.parse(candidate) } catch { return undefined }
     }).find(candidate => candidate !== undefined && typeof candidate === 'object' && typeof candidate.ok === 'boolean')
+    const homeFiles = Object.keys(await snapshotSessionLogRoot(home))
     if (line === undefined) {
-      throw new Error('replay host: child emitted no status line; stderr: ' + spawned.stderr)
+      const error = new Error('replay host: child emitted no status line; stderr: ' + spawned.stderr)
+      error.homeFiles = homeFiles
+      throw error
     }
     if (line.classC === true) {
       let published = true
@@ -202,7 +377,9 @@ export async function hostReplayTrial({
       throw new TrialInputIncompleteError(line.reason, { path })
     }
     if (line.ok !== true) {
-      throw new Error('replay host: child refused: ' + line.reason + '\n' + spawned.stderr)
+      const error = new Error('replay host: child refused: ' + line.reason + '\n' + spawned.stderr)
+      error.homeFiles = homeFiles
+      throw error
     }
     const text = await readFile(outPath, 'utf8')
     const records = text.trimEnd().split('\n').map(lineText => JSON.parse(lineText))
@@ -210,7 +387,7 @@ export async function hostReplayTrial({
     const rows = records.filter(record => record.kind === 'row').map(record => record.row)
     const consults = records.filter(record => record.kind === 'consult').map(record => record.consult)
     const asks = records.filter(record => record.kind === 'ask').map(record => record.ask)
-    return { rows, consults, asks, summary, status: line, sink: 0, routerCount: routers.count }
+    return { rows, consults, asks, summary, status: line, sink: 0, routerCount: routers.count, homeFiles }
   } finally {
     await sink.close()
     await rm(root, { recursive: true, force: true })
@@ -263,8 +440,20 @@ function prepareRows(hosted, { id, taskId, arm, stratum, trialIndex }) {
  */
 export async function hostReplayRun({
   repoRoot, method, tasks, trials, env = process.env, extraOverlay,
-  preRefused = [], discovered, judge = false, fittingJudgePath, fittingJudgeConfig,
+  preRefused = [], discovered, judge,
 }) {
+  const judgeSpec = normalizeJudge(judge)
+  if (extraOverlay !== undefined && extraOverlay !== '') {
+    const baseline = await dumpReplayFrontendConfig({ repoRoot, env, judge: judgeSpec })
+    try {
+      await assertExtraOverlayAvoidsJudgment(extraOverlay, judgmentRowIdsFromDump(baseline.yaml))
+    } catch (error) {
+      if (error && typeof error === 'object') error.homeFiles = baseline.homeFiles
+      throw error
+    } finally {
+      await rm(baseline.root, { recursive: true, force: true })
+    }
+  }
   if (!Array.isArray(preRefused)) throw new TypeError('preRefused must be an array')
   if (!Array.isArray(trials)) throw new TypeError('hostReplayRun requires a trials array')
   if (trials.length === 0 && preRefused.length === 0) throw new TypeError('hostReplayRun requires a non-empty trials array')
@@ -325,9 +514,7 @@ export async function hostReplayRun({
         trialOwnRoute: item.trialOwnRoute,
         env,
         extraOverlay,
-        judge,
-        fittingJudgePath,
-        fittingJudgeConfig,
+        judge: judgeSpec,
       })
     } catch (error) {
       if (error instanceof TrialInputIncompleteError) {

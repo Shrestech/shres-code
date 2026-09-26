@@ -6,7 +6,8 @@
  */
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import Schema from '../../vendor/schemastery/lib/index.mjs'
-import { resolveConfig } from '../../packages/llm/model-router/lib/index.js'
+import { MODEL_ROUTER_JUDGMENT_CONSUMER, resolveConfig } from '../../packages/llm/model-router/lib/index.js'
+import { UsageError } from '../runner/run.js'
 import { replayTrialLog, TrialInputIncompleteError } from './replay-frontend.js'
 import { judgeReplayRows } from './replay-judge.js'
 
@@ -134,11 +135,28 @@ export function apply(ctx, config) {
     })
     let rows = result.rows
     let asks = []
-    if (job.judge === true) {
+    const judgeMode = job.judgeMode ?? 'off'
+    const engine = ctx.get('judgment')
+    const askedId = engine?.selectedEngine?.(MODEL_ROUTER_JUDGMENT_CONSUMER)
+    if (judgeMode === 'off') {
+      if (asks.length !== 0) throw new UsageError('prepare-only replay recorded judgment asks')
+    } else {
+      if (askedId === undefined) throw new UsageError('calibration replay requires a selected judgment engine')
+      if (job.expectedEngineId !== undefined && askedId !== job.expectedEngineId) {
+        throw new UsageError('asked engine ' + askedId + ' is not expected ' + job.expectedEngineId)
+      }
+      if (engine.fittingFor(MODEL_ROUTER_JUDGMENT_CONSUMER) === undefined) {
+        throw new UsageError('calibration replay requires a fitting judgment engine; the selected engine has none')
+      }
+      const entry = ctx.get('judgmentEngines')?.get(askedId)
+      const state = entry?.status()?.state
+      if (state !== 'ready') {
+        throw new UsageError('fitted engine ' + askedId + ' not ready: ' + String(state ?? 'missing'))
+      }
       const judged = await judgeReplayRows({
         rows: result.rows,
         consults: result.consults,
-        engine: ctx.get('judgment'),
+        engine,
         config: resolved,
         sessionId: result.sessionId,
       })
@@ -146,6 +164,9 @@ export function apply(ctx, config) {
       asks = judged.asks
     }
     const kinds = consultKindCounts(result.consults)
+    const recordedAsks = judgeMode === 'fixture'
+      ? (await import('./replay-scripted-fitting-judge.mjs')).internals.asks.slice()
+      : []
     const summary = {
       kind: 'summary',
       artifact: result.artifact,
@@ -156,9 +177,9 @@ export function apply(ctx, config) {
       counts,
       kinds,
       asks,
-      recordedAsks: job.judge === true
-        ? (await import('./replay-scripted-fitting-judge.mjs')).internals.asks.slice()
-        : [],
+      recordedAsks,
+      judgeMode,
+      engineId: askedId ?? null,
       http: internals.http,
     }
     structuredClone(result.consults)
