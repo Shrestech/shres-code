@@ -1,6 +1,6 @@
 # @shres-code/shres-code-judgment-shield
 
-Local engine for the typed-judgment seam, registered in `ctx.judgmentEngines` as `shield` for [judgment-dispatch](../judgment-dispatch/README.md) to route asks to. Each ask posts the consumer's state and typed questions to an explicitly configured local `/v1/judgments` gateway. The gateway owns the model runtime and artifact provenance; this package owns tier-to-artifact selection, cancellation, response-size limits, and response validation.
+Local engine for the typed-judgment seam, registered in `ctx.judgmentEngines` as `shield` for [judgment-dispatch](../judgment-dispatch/README.md) to route asks to. Each ask posts the consumer's state and typed questions to an explicitly configured local `/v1/judgments` gateway. `toWireRequest` selects only `state`, `model`, and `questions`; an ask's optional `correlation` (`sessionId`, `consultKey`) is local-only and never reaches that JSON. The gateway owns the model runtime and artifact provenance; this package owns tier-to-artifact selection, cancellation, response-size limits, and response validation.
 
 This provider is separate from the `shres-shield` host seat. The host seat exposes the paid Shield security service through `ctx.shield`; this package does not import that service or reinterpret its binary injection score as a choice or score judgment.
 

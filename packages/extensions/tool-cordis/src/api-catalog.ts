@@ -4270,6 +4270,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JudgmentConsumerId = Branded<\'JudgmentConsumerId\'>;',
   },
   {
+    name: 'JudgmentCorrelation',
+    declaration: 'export interface JudgmentCorrelation {\n    sessionId: SessionId;\n    consultKey: string;\n}',
+  },
+  {
     name: 'JudgmentEngine',
     declaration: 'export interface JudgmentEngine {\n    readonly fitting?: JudgmentFittingEngine;\n    ask(input: JudgmentInput): Promise<JudgmentResult>;\n}',
   },
@@ -4327,7 +4331,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentInput',
-    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n}',
+    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n    correlation?: JudgmentCorrelation;\n}',
   },
   {
     name: 'JudgmentQuestion',

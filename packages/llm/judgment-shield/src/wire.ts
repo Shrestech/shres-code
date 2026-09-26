@@ -101,6 +101,8 @@ export interface ReadShieldWireResponse {
 
 /**
  * Map one typed ask to the provider-neutral local wire vocabulary.
+ * Correlation facts stay off this object: only `state`, `model`, and
+ * `questions` are selected, so a later `JSON.stringify` cannot leak them.
  *
  * @param state - redacted state text.
  * @param model - pinned artifact id.

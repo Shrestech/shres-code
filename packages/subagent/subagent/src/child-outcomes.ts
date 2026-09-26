@@ -87,14 +87,6 @@ function isDirectChild(parent: Agent, header: SessionHeader): boolean {
 }
 
 /**
- * When the child is live elsewhere in the store, use that header as the
- * lifecycle witness; a persistence row that no longer matches it is corrupt.
- */
-/**
- * Fold accounting turns and the route in force for each.
- * A malformed descriptor is `corrupt`; cancellation rejects.
- */
-/**
  * Fold accounting turns from one child log. Exported for unit coverage of turn kinds.
  * @param events - the child's session events in seq order.
  * @param signal - caller cancellation; abort rejects rather than returning unavailable.

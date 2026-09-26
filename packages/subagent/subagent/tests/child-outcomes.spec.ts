@@ -12,7 +12,7 @@ import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process
 import { LlmError } from '@shres-code/shres-code-llm'
 import { MockAdapter, maxTokensResponse, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime from '../src/index.ts'
-import { foldChildTurns } from '../src/child-outcomes.ts'
+import { childTurnOutcomes, foldChildTurns } from '../src/child-outcomes.ts'
 
 const roots: string[] = []
 afterEach(() => {
@@ -58,6 +58,33 @@ describe('SubagentRuntime.childTurnOutcomes', () => {
     expect(await ctx.subagents.childTurnOutcomes(parent, stranger.id)).toEqual({ unavailable: 'not-a-child' })
   })
 
+  it('reports corrupt when a persistence header no longer matches the live witness', async () => {
+    const { ctx, parent } = await setup()
+    const run = await ctx.subagents.start('spawn', {
+      prompt: [{ type: 'text', text: 'hello' }],
+      parent,
+      signal: new AbortController().signal,
+    })
+    await run.result
+    const live = ctx.sessions.get(run.id)
+    if (live === undefined) throw new Error('expected live child')
+    const persistence = ctx.get('sessionPersistence')!
+    const originalInspect = persistence.inspect.bind(persistence)
+    let gets = 0
+    const originalGet = ctx.sessions.get.bind(ctx.sessions)
+    ctx.sessions.get = ((id: SessionId) => {
+      gets += 1
+      if (id === run.id && gets === 1) return undefined
+      return originalGet(id)
+    }) as typeof ctx.sessions.get
+    persistence.inspect = async (id, signal) => {
+      const inspected = await originalInspect(id, signal)
+      return { ...inspected, meta: { ...inspected.meta, createdAt: inspected.meta.createdAt + 1 } }
+    }
+    expect(await childTurnOutcomes(ctx, parent, run.id)).toEqual({ unavailable: 'corrupt' })
+    await run.dispose()
+  })
+
   it('reports missing when persistence has no such child and the child is not live', async () => {
     const { ctx, parent } = await setup()
     expect(await ctx.subagents.childTurnOutcomes(parent, SessionId('absent-child'))).toEqual({ unavailable: 'missing' })
@@ -73,6 +100,21 @@ describe('SubagentRuntime.childTurnOutcomes', () => {
     const parent = ctx.agentLoop.create(SessionId('parent-live-only'), { ...STRONG })
     expect(await ctx.subagents.childTurnOutcomes(parent, SessionId('cold-child'))).toEqual({ unavailable: 'no-persistence' })
   })
+
+  it('reports not-a-child for a persisted session whose parent is not the caller', async () => {
+    const { ctx, parent } = await setup()
+    const stranger = ctx.agentLoop.create(SessionId('stranger-parent'), { ...STRONG })
+    const run = await ctx.subagents.start('spawn', {
+      prompt: [{ type: 'text', text: 'hello' }],
+      parent: stranger,
+      signal: new AbortController().signal,
+    })
+    await run.result
+    await run.dispose()
+    expect(ctx.sessions.get(run.id)).toBeUndefined()
+    expect(await ctx.subagents.childTurnOutcomes(parent, run.id)).toEqual({ unavailable: 'not-a-child' })
+  })
+
 
   it('rejects when the caller cancels', async () => {
     const { ctx, parent } = await setup()
@@ -197,12 +239,37 @@ describe('accounting-turn fold over real child-shaped logs', () => {
       start(17, 6), step(18, 6), turn(19, 6, { kind: 'max-tokens' }),
     ]
     // A completed turn that claimed no step and no inbox is not accounting work.
+    const headerWithoutRoute = (seq: number): SessionEvent<'request/header'> => ({
+      type: 'request/header',
+      seq,
+      time: seq,
+      data: { header: { config: { provider: 1, model: 2 } as never }, reason: 'initial' },
+    })
     const noWork: SessionEvent[] = [start(0, 1), turn(1, 1, { kind: 'completed' })]
+    const noRoute = foldChildTurns([start(0, 1), step(1, 1), headerWithoutRoute(2), turn(3, 1, { kind: 'completed' })])
+    if ('unavailable' in noRoute) throw new Error('expected turns')
+    expect(noRoute.turns[0]?.route).toBeUndefined()
+    const noHeader = foldChildTurns([start(0, 1), step(1, 1), turn(2, 1, { kind: 'completed' })])
+    if ('unavailable' in noHeader) throw new Error('expected turns')
+    expect(noHeader.turns[0]?.route).toBeUndefined()
     const empty = foldChildTurns(noWork)
     if ('unavailable' in empty) throw new Error('expected empty turns')
     expect(empty.turns).toEqual([])
     const result = foldChildTurns(events)
     if ('unavailable' in result) throw new Error('expected turns')
+    const corrupt = foldChildTurns([
+      { type: 'subagent/descriptor', seq: 0, time: 0, data: { version: 2, mode: 'one-shot', provider: 'spawn', extra: true } } as SessionEvent,
+    ])
+    expect(corrupt).toEqual({ unavailable: 'corrupt' })
+    const routed = foldChildTurns([
+      { type: 'subagent/descriptor', seq: 0, time: 0, data: { version: 2, mode: 'one-shot', provider: 'spawn', agentRouteRequestId: 'route-fold' } } as SessionEvent,
+      start(1, 1), step(2, 1), header(3), turn(4, 1, { kind: 'completed' }),
+    ])
+    if ('unavailable' in routed) throw new Error('expected routed turns')
+    expect(routed.routeRequestId).toBe('route-fold')
+    const cancelled = new AbortController()
+    cancelled.abort(new Error('fold cancelled'))
+    expect(() => foldChildTurns(events, cancelled.signal)).toThrow('fold cancelled')
     expect(result.turns.map(row => [row.turn, row.reason.kind, row.route?.model])).toEqual([
       [1, 'completed', 'strong'],
       [2, 'error', 'flash'],

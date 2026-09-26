@@ -808,7 +808,8 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
  * routes, when no listener answers, or when the answer equals the inherited
  * route. A dispatch that reaches listeners mints one `routeRequestId` on the
  * request. That id is copied onto the returned `agentOptions` only when a
- * listener changed the route; every other path returns `requested` unchanged. A throwing listener is logged and the child keeps its inherited
+ * listener changed the route; every other path returns `requested` unchanged.
+ * A throwing listener is logged and the child keeps its inherited
  * route: routing is an optional cost policy, and a broken policy must not
  * fail the delegation it would only have made cheaper. An `InvariantError`
  * raised during the dispatch is not contained: a violated invariant means
