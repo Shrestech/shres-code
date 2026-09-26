@@ -73,18 +73,18 @@ async function readArmTrials(armName, runnerName, armDir) {
  * arms: locate each arm by its registration runnerName, validate every trial
  * line, and decode each trial's own route from its session log. Every trial
  * is included regardless of status, resolution or failure mode; chain trials
- * are refused outright. Trials with unusable session inputs (no session log,
- * missing file, corrupt log, mixed routes, no request/header) are never
- * dropped: the whole read refuses with one aggregated class-C
- * TrialInputIncompleteError whose `trials` detail names each refused trial,
- * the same records `hostReplayRun` aggregates for hosted refusals.
+ * are a population defect and fail the read outright.
  *
- * A chain trial is outside the replay population: the registration carries no
- * replay-task naming that would include one, so the read fails with a
- * UsageError at the first chain trial.
+ * Trials with unusable session inputs (no session log, missing file, corrupt
+ * log, mixed routes, no request/header) are never dropped and never given a
+ * fabricated route: they are returned in `refused` as named class-C records
+ * — the same identities `hostReplayRun` aggregates — while `trials` holds
+ * only the hostable descriptors. `discovered` names every trial found, so a
+ * caller can refuse the whole run after all trials instead of returning a
+ * partial one.
  *
  * @param {{ experimentDir: string, registration: { arms: Record<string, { runnerName: string }> }, taskRoot: string }} input
- * @returns {Promise<{ trials: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C', path: string, trialOwnRoute: { provider: unknown, model: unknown, reasoningEffort?: unknown }, trial: object }[], tasks: Record<string, object> }>}
+ * @returns {Promise<{ trials: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C', path: string, trialOwnRoute: { provider: unknown, model: unknown, reasoningEffort?: unknown }, trial: object }[], tasks: Record<string, object>, refused: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C', path?: string, trialId?: string, reason: string }[], discovered: { id: string, taskId: string, trialIndex: number, arm: 'S' | 'C' }[] }>}
  */
 export async function readReplayRun({ experimentDir, registration, taskRoot }) {
   const armDirs = REPLAY_ARMS.map((armName) => {
@@ -96,15 +96,17 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
   })
 
   const trials = []
-  const refusals = []
+  const refused = []
+  const discovered = []
   for (const { armName, runnerName, dir } of armDirs) {
     const records = await readArmTrials(armName, runnerName, dir)
     for (const trial of records) {
       const id = `${armName}/${trial.taskId}/${trial.trialIndex}`
+      discovered.push({ id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName })
       if (trial.phases !== undefined) {
         throw new UsageError(`chain trials are not in the replay population: ${id}`)
       }
-      const refusal = (reason, extra = {}) => refusals.push({
+      const refusal = (reason, extra = {}) => refused.push({
         id, taskId: trial.taskId, trialIndex: trial.trialIndex, arm: armName, ...extra, reason,
       })
       if (trial.sessionFile === null) {
@@ -141,13 +143,6 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
     }
   }
 
-  if (refusals.length > 0) {
-    throw new TrialInputIncompleteError(
-      `replay run reader: ${String(refusals.length)} trial input(s) class C`,
-      { trials: refusals },
-    )
-  }
-
   const tasks = {}
   for (const taskId of new Set(trials.map(trial => trial.taskId))) {
     const taskPath = join(taskRoot, taskId, 'task.json')
@@ -161,5 +156,5 @@ export async function readReplayRun({ experimentDir, registration, taskRoot }) {
     tasks[taskId] = task
   }
 
-  return { trials, tasks }
+  return { trials, tasks, refused, discovered }
 }

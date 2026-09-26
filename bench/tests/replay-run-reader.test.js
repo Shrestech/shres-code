@@ -9,7 +9,6 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { TrialInputIncompleteError } from '../routing/replay-frontend.js'
 import { readReplayRun } from '../routing/replay-run-reader.js'
 import { emptyMetrics } from '../runner/metrics.js'
 import { UsageError } from '../runner/run.js'
@@ -139,10 +138,12 @@ async function withRun(options, fn) {
 
 test('reads both registration arms, includes every trial regardless of status, and decodes each own route', async () => {
   await withRun({}, async ({ input }) => {
-    const { trials, tasks } = await readReplayRun(input)
+    const { trials, tasks, refused, discovered } = await readReplayRun(input)
     assert.deepEqual(trials.map(trial => trial.id), [
       `S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`,
     ])
+    assert.deepEqual(refused, [])
+    assert.deepEqual(discovered, trials.map(trial => ({ id: trial.id, taskId: TASK_ID, trialIndex: trial.trialIndex, arm: trial.arm })))
     for (const trial of trials) {
       assert.equal(trial.taskId, TASK_ID)
       assert.ok(trial.arm === 'S' || trial.arm === 'C')
@@ -181,23 +182,22 @@ test('an arm directory without trials.jsonl is a UsageError', async () => {
   })
 })
 
-test('a null sessionFile aggregates a named class-C refusal instead of returning a partial run', async () => {
+test('a null sessionFile is a named class-C refusal and never a fabricated route', async () => {
   await withRun({
     sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : `sessions/${TASK_ID}/${trialIndex}/session.jsonl`),
   }, async ({ input }) => {
-    await assert.rejects(readReplayRun(input), (error) => {
-      assert.ok(error instanceof TrialInputIncompleteError, 'the channel hostReplayRun aggregates')
-      assert.match(error.message, /1 trial input\(s\) class C/)
-      assert.deepEqual(error.trials, [{
-        id: `C/${TASK_ID}/1`,
-        taskId: TASK_ID,
-        trialIndex: 1,
-        arm: 'C',
-        trialId: `C/${TASK_ID}/1`,
-        reason: 'no session log',
-      }])
-      return true
-    })
+    const { trials, refused, discovered } = await readReplayRun(input)
+    assert.deepEqual(refused, [{
+      id: `C/${TASK_ID}/1`,
+      taskId: TASK_ID,
+      trialIndex: 1,
+      arm: 'C',
+      trialId: `C/${TASK_ID}/1`,
+      reason: 'no session log',
+    }])
+    assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`])
+    for (const trial of trials) assert.ok(trial.trialOwnRoute !== undefined)
+    assert.equal(discovered.length, 4)
   })
 })
 
@@ -205,14 +205,12 @@ test('a mixed-route log is a named class-C refusal carrying the path', async () 
   await withRun({
     bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('mixed') : sessionBytes('normalized')),
   }, async ({ input }) => {
-    await assert.rejects(readReplayRun(input), (error) => {
-      assert.ok(error instanceof TrialInputIncompleteError)
-      assert.equal(error.trials.length, 1)
-      assert.equal(error.trials[0].id, `S/${TASK_ID}/0`)
-      assert.equal(error.trials[0].reason, 'mixed-route trial')
-      assert.match(error.trials[0].path, /session\.jsonl$/)
-      return true
-    })
+    const { trials, refused } = await readReplayRun(input)
+    assert.equal(refused.length, 1)
+    assert.equal(refused[0].id, `S/${TASK_ID}/0`)
+    assert.equal(refused[0].reason, 'mixed-route trial')
+    assert.match(refused[0].path, /session\.jsonl$/)
+    assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`])
   })
 })
 
@@ -220,12 +218,27 @@ test('a corrupt session log is a named class-C refusal, not a crash or a drop', 
   await withRun({
     bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('torn') : sessionBytes('normalized')),
   }, async ({ input }) => {
-    await assert.rejects(readReplayRun(input), (error) => {
-      assert.ok(error instanceof TrialInputIncompleteError)
-      assert.equal(error.trials.length, 1)
-      assert.match(error.trials[0].reason, /does not end with a newline/)
-      return true
-    })
+    const { trials, refused } = await readReplayRun(input)
+    assert.equal(refused.length, 1)
+    assert.match(refused[0].reason, /does not end with a newline/)
+    assert.equal(trials.length, 3)
+  })
+})
+
+test('refusals from both arms are collected together instead of short-circuiting the read', async () => {
+  await withRun({
+    sessionFile: (arm, trialIndex) => (arm === 'C' && trialIndex === 1 ? null : `sessions/${TASK_ID}/${trialIndex}/session.jsonl`),
+    bytesFor: (arm, trialIndex) => (arm === 'S' && trialIndex === 0 ? sessionBytes('mixed') : sessionBytes('normalized')),
+  }, async ({ input }) => {
+    const { trials, refused, discovered } = await readReplayRun(input)
+    assert.deepEqual(refused.map(record => [record.id, record.reason]), [
+      [`S/${TASK_ID}/0`, 'mixed-route trial'],
+      [`C/${TASK_ID}/1`, 'no session log'],
+    ])
+    assert.deepEqual(trials.map(trial => trial.id), [`S/${TASK_ID}/1`, `C/${TASK_ID}/0`])
+    assert.deepEqual(discovered.map(entry => entry.id), [
+      `S/${TASK_ID}/0`, `S/${TASK_ID}/1`, `C/${TASK_ID}/0`, `C/${TASK_ID}/1`,
+    ])
   })
 })
 
