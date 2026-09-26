@@ -2,7 +2,10 @@
  * Guarantee tests for the tool-schema catalog generator (`scripts/gen-tool-catalog.ts`).
  */
 
-import { describe, expect, it } from 'vitest'
+import { existsSync } from 'node:fs'
+import { describe, expect, it, vi } from 'vitest'
+import fileSystem from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import {
   assertManifestComplete,
   assertToolsHarvested,
@@ -22,10 +25,31 @@ interface JsonSchema {
 }
 
 describe('gen-tool-catalog collectToolCatalog', () => {
+  it('isolates the browser plugin home and restores the caller environment', async () => {
+    const previous = process.env.SHRES_HOME
+    const spy = vi.spyOn(fileSystem, 'readFile')
+    syncBuiltinESMExports()
+    try {
+      const catalog = await collectToolCatalog()
+      expect(catalog.find(entry => entry.pkg === '@shres-code/shres-code-browserskill')?.schemas).toHaveLength(4)
+      const suffix = '/browserskill/artifacts/state.json'
+      const homes = spy.mock.calls.flatMap(([path]) =>
+        typeof path === 'string' && path.endsWith(suffix) ? [path.slice(0, -suffix.length)] : [])
+      expect(homes).toHaveLength(1)
+      expect(homes[0]).toContain('shres-catalog-home-')
+      expect(homes[0]).not.toBe(previous)
+      expect(homes.every(home => !existsSync(home))).toBe(true)
+      expect(process.env.SHRES_HOME).toBe(previous)
+    } finally {
+      spy.mockRestore()
+      syncBuiltinESMExports()
+    }
+  })
+
   it('boots every shipped tool package and harvests its model-facing schemas', async () => {
     const catalog = await collectToolCatalog()
     const names = catalog.flatMap(entry => entry.schemas.map(s => s.name)).sort()
-    expect(names).toEqual(['ask_user_question', 'bash', 'bash', 'cordis_define', 'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'create_goal', 'deep_research', 'edit', 'exit_plan_mode', 'experiment_log_metrics', 'experiment_log_run', 'experiment_query', 'experiment_verify_decision_rule', 'get_goal', 'glob', 'grep', 'image_gen', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'jspace_charter_amend', 'jspace_checkpoint', 'jspace_note', 'jspace_open', 'jspace_ship', 'ledger_query', 'ledger_record_decision', 'list_agents', 'lsp', 'pwsh', 'ralph', 'read', 'read_image', 'report', 'run_code', 'schedule_create', 'schedule_delete', 'schedule_list', 'send_message', 'session_event_read', 'session_event_search', 'session_event_trace', 'session_search', 'session_trace', 'skill', 'str_replace_editor', 'subagent', 'terminal_close', 'terminal_list', 'terminal_open', 'terminal_read', 'terminal_send', 'terminal_signal', 'todo_write', 'update_goal', 'web_fetch', 'web_search', 'wiki_log', 'wiki_read', 'wiki_search', 'wiki_write', 'workflow', 'write'])
+    expect(names).toEqual(['ask_user_question', 'bash', 'bash', 'browser_act', 'browser_navigate', 'browser_observe', 'browser_session', 'cordis_define', 'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'create_goal', 'deep_research', 'edit', 'exit_plan_mode', 'experiment_log_metrics', 'experiment_log_run', 'experiment_query', 'experiment_verify_decision_rule', 'get_goal', 'glob', 'grep', 'image_gen', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'jspace_charter_amend', 'jspace_checkpoint', 'jspace_note', 'jspace_open', 'jspace_ship', 'ledger_query', 'ledger_record_decision', 'list_agents', 'lsp', 'pwsh', 'ralph', 'read', 'read_image', 'report', 'run_code', 'schedule_create', 'schedule_delete', 'schedule_list', 'send_message', 'session_event_read', 'session_event_search', 'session_event_trace', 'session_search', 'session_trace', 'skill', 'str_replace_editor', 'subagent', 'terminal_close', 'terminal_list', 'terminal_open', 'terminal_read', 'terminal_send', 'terminal_signal', 'todo_write', 'update_goal', 'web_fetch', 'web_search', 'wiki_log', 'wiki_read', 'wiki_search', 'wiki_write', 'workflow', 'write', 'x_keyword_search', 'x_semantic_search', 'x_thread_fetch', 'x_user_search'])
     // Every tool carries a JSON-Schema `parameters` object (what the model sees).
     for (const entry of catalog) {
       for (const schema of entry.schemas) {
@@ -49,6 +73,8 @@ describe('gen-tool-catalog collectToolCatalog', () => {
     const catalog = await collectToolCatalog()
     const bash = catalog.find(entry => entry.pkg === '@shres-code/shres-code-tool-bash')
     expect(bash?.sources.bash).toBe('packages/shell/tool-bash/src/index.ts')
+    const browser = catalog.find(entry => entry.pkg === '@shres-code/shres-code-browserskill')
+    expect(browser?.sources.browser_observe).toBe('packages/browser/browserskill/src/tools.ts')
     const control = catalog.find(entry => entry.pkg === '@shres-code/shres-code-tool-subagent-control')
     expect(control?.sources).toEqual({
       interrupt_agent: 'packages/subagent/tool-subagent-control/src/index.ts',
@@ -90,6 +116,7 @@ describe('gen-tool-catalog assertManifestComplete', () => {
     // is unlisted, so the guard must fire and name them.
     expect(() => { assertManifestComplete([]) }).toThrow(/not in the boot manifest/)
     expect(() => { assertManifestComplete([]) }).toThrow(/tool-bash/)
+    expect(() => { assertManifestComplete([]) }).toThrow(/browserskill/)
   })
 })
 

@@ -1,0 +1,53 @@
+- region "Customize":
+  - complementary:
+    - heading "Customize" [level=2]
+    - button "Close":
+      - img
+      - text: Close
+    - img
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Customize":
+      - button "Plugins":
+        - img
+        - text: Plugins
+      - button "Agent presets":
+        - img
+        - text: Agent presets
+  - text: Customize
+  - heading "Plugins" [level=1]
+  - paragraph: Shape your agent with presets and plugins.
+  - paragraph: Configure and inspect the plugins installed in this deployment.
+  - tablist "Plugin views":
+    - tab "Plugin configuration"
+    - tab "Plugin list"
+    - tab "Manage" [selected]
+  - tabpanel "Manage":
+    - status:
+      - paragraph:
+        - text: Skill installed.
+        - strong: web-install-probe
+    - heading "Install plugin" [level=3]
+    - text: Package spec
+    - textbox "Package spec":
+      - /placeholder: Package name or path
+    - button "Install" [disabled]
+    - paragraph: Installing a plugin adds third-party code to this profile, and that code runs with full access on every future start. Confirming an install authorizes the operation; it does not prove that a person made the request.
+    - heading "Profile plugins" [level=3]
+    - list:
+      - listitem:
+        - strong: "@shres-code/shres-code-base"
+        - text: Active
+      - listitem:
+        - strong: "@shres-code/shres-code-web-app"
+        - text: Active
+    - heading "Installed skills" [level=3]
+    - text: Skill directory
+    - textbox "Skill directory":
+      - /placeholder: Path to a skill directory
+    - button "Add skill" [disabled]
+    - list:
+      - listitem:
+        - strong: web-install-probe
+        - text: Keyless installed skill probe.
+        - 'button "Remove: web-install-probe"': Remove

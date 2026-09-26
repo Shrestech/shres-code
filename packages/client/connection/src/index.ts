@@ -135,6 +135,27 @@ const PRIVILEGED_METHODS = new Set([
   'remoteAdmin/edit',
   'remoteAdmin/removeEntry',
   'remoteAdmin/status',
+  // The plugin-admin plane: status reads the profile's plugin and skill
+  // inventory, and every mutation installs or removes code that the next
+  // boot executes, or copies content into the shared skills root. The
+  // gesture gate lives inside the namespace; this pin keeps the whole plane
+  // loopback-same-origin like the rest of the configuration surface.
+  'pluginAdmin/status',
+  'pluginAdmin/begin',
+  'pluginAdmin/stageInstall',
+  'pluginAdmin/confirm',
+  'pluginAdmin/cancel',
+  'pluginAdmin/removePlugin',
+  'pluginAdmin/skillAdd',
+  'pluginAdmin/skillRemove',
+  // BrowserSkill provisions host executables and controls an owned local browser.
+  'browserSkill/status',
+  'browserSkill/begin',
+  'browserSkill/provision',
+  'browserSkill/open',
+  'browserSkill/close',
+  'browserSkill/reset',
+  'browserSkill/uninstall',
 ])
 
 /**

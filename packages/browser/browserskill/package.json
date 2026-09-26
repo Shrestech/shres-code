@@ -1,0 +1,90 @@
+{
+  "name": "@shres-code/shres-code-browserskill",
+  "description": "Managed BrowserSkill integration: verified provisioning of the pinned bsk daemon and extension into an owned root, with an owned Chrome profile and owner-scoped session commands",
+  "version": "0.1.0-rc.5",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/browser/browserskill"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "fflate": "0.8.3",
+    "puppeteer-core": "25.12.0",
+    "tar": "7.5.22",
+    "@shres-code/schemastery": "workspace:^",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-atomic-write": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-host-remote-control": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-skill": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-untrusted-frame": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-atomic-write": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-host-remote-control": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-skill": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-untrusted-frame": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

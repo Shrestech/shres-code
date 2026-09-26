@@ -13,8 +13,8 @@ Requires `ctx.skills` (`inject: ['skills']`).
 | Field | Default | Meaning |
 |---|---|---|
 | `providerName` | `filesystem` | Unique name used to register this provider on `ctx.skills`. |
-| `includeDefaultRoots` | `true` | Include project and user roots around `customSkillDirs`; set false for an isolated custom-root provider. |
-| `shresHome` | `$SHRES_HOME` or `~/.shres` | Shres Code config root resolved by [`@shres-code/shres-code-home-paths`](../../util/home-paths/README.md); scans `skills` under this directory. |
+| `includeDefaultRoots` | `true` | Include project, user, and installed roots around `customSkillDirs`; set false for an isolated custom-root provider. |
+| `shresHome` | `$SHRES_HOME` or `~/.shres` | Shres Code config root resolved by [`@shres-code/shres-code-home-paths`](../../util/home-paths/README.md); scans `skills` and `skills-installed` under this directory. |
 | `agentsHome` | `$SHRES_AGENTS_HOME` or `~/.agents` | Shared agent config root scanned for compatible skills. |
 | `customSkillDirs` | `[]` | Additional local skill roots scanned after project roots and before user roots. |
 | `watch` | `true` | Watch host-local roots and invalidate the local provider when catalog membership or frontmatter may have changed. |
@@ -35,8 +35,9 @@ Default roots are resolved in this provider's rank order:
 | 300 | `custom` | `Config.customSkillDirs` |
 | 400 | `user-shres` | `<shresHome>/skills` |
 | 500 | `user-agents` | `<agentsHome>/skills` |
+| 700 | `installed` | `<shresHome>/skills-installed` |
 
-The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. The user Shres root skips its `.system` child so system-owned directories are not treated as normal user skills. `includeDefaultRoots: false` omits the project and user rows and the `$SHRES_BUNDLED_SKILL_DIR` environment default while retaining explicitly configured custom and bundled roots, allowing several uniquely named isolated providers to see only their own roots. This provider supplies project and user skills; another provider may supply built-in system skills.
+The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. The user Shres root skips its `.system` child so system-owned directories are not treated as normal user skills. The installed root receives skills added by plugin installation; it is an ordinary watched root with no trusted-host shortcut, and because its rank is the lowest tier, an installed skill never wins a same-name race against the roots above. `includeDefaultRoots: false` omits the project and user rows and the `$SHRES_BUNDLED_SKILL_DIR` environment default while retaining explicitly configured custom and bundled roots, allowing several uniquely named isolated providers to see only their own roots. This provider supplies project and user skills; another provider may supply built-in system skills.
 
 When `ctx.fs` is available, discovery lists roots through `ctx.fs.listDir`, reads skill files through `ctx.fs.readText`, and probes `.git` through the filesystem service. Full skill loads forward the lookup abort signal to filesystem metadata and content reads. Without a filesystem service, the provider falls back to abortable Node filesystem I/O so minimal local contexts can still load skills. Confirmed missing paths are valid empty state, malformed or non-text entries warn and skip, and unexpected discovery/read failures make the registry snapshot incomplete rather than replacing a last-good model catalog with a misleading deletion.
 
@@ -50,11 +51,15 @@ The first-party filesystem `write` and `edit` tools also synchronously invalidat
 
 ## Skill Format
 
-Skills can be single-level directory bundles (`<name>/SKILL.md`) or flat Markdown files (`<name>.md`). Nested `**/SKILL.md` discovery is deliberately excluded. Frontmatter is parsed as an open YAML object with the `yaml` package; this provider interprets required `name` and `description`, plus optional `whenToUse`, `metadata`, `disable-model-invocation`, and `user-invocable`. Names must be kebab-case.
+Skills can be single-level directory bundles (`<name>/SKILL.md`) or flat Markdown files (`<name>.md`). Nested `**/SKILL.md` discovery is deliberately excluded. Frontmatter is parsed as an open YAML object with the `yaml` package; this provider interprets required `name` and `description`, plus optional `whenToUse`, `metadata`, `disable-model-invocation`, and `user-invocable`. Names must be kebab-case. The exported `parseSkillDocument(text)` is the shared parser for this format: local discovery and plugin skill installation both go through it, so they accept and reject exactly the same documents, and discovery logs a thrown message as its skip warning.
 
 The two invocation fields accept YAML booleans and the case-insensitive forms `true`/`false`, `yes`/`no`, `on`/`off`, and `1`/`0`. `disable-model-invocation: true` excludes the skill from model-facing catalogs and loaders; `user-invocable: false` excludes it from human-facing commands. Each omitted field defaults to permitting its surface, and the provider always emits both positive internal policy values, including when both keys are absent. A rejected camel-case spelling or a non-boolean invocation value drops the entire skill from discovery with a warning instead of discarding only that field or falling back to a permissive default. Invocation policy fails closed because ignoring invalid data could expose a skill on a disabled surface; wrong-typed optional `whenToUse` and `metadata` values are omitted because neither currently grants invocation.
 
 The catalog and body have separate lifecycles. Discovery parses frontmatter to produce the summary. Every `skill(name)` load rereads and reparses the current file, so body edits need no hash, revision, cache invalidation, or proactive model notification. A frontmatter rename between discovery and loading rejects the stale name and invalidates the provider; the next catalog observation publishes the new name.
+
+## Install Helpers
+
+The [`./install`](src/install.ts) subpath owns the `skills-installed` root for plugin skill installation over plain Node filesystem access, without Cordis, so the CLI and the host admin namespace can call it outside a booted context. `defaultSkillInstallRoots(cwd)` resolves the same roots discovery scans; `addInstalledSkill(sourceDir, roots, { signal })` copies a source directory into `<shresHome>/skills-installed/<frontmatter-name>`; `removeInstalledSkill(name, roots)` and `listInstalledSkills(roots)` manage what installs created. Both mutations run under `withFileLock` from [`shres-atomic-write`](../../util/atomic-write/README.md); the add fills a private staging directory under `<shresHome>/.skills-installed-staging` — a sibling of the discovered root on the same filesystem, so discovery and the watcher never see it — and publishes it with one atomic rename. The writer lock serializes installers, so each add first sweeps residue an interrupted install left in that staging parent. Every refusal (`invalid-skill`, `name-taken` with the owning filesystem source, `escaping-symlink`) cleans its staging residue and leaves existing skills untouched. There is no force flag: names already provided by any filesystem root are refused, while runtime and bundled skills are invisible to this offline scan and stay the caller's check. Removal deletes only real directories carrying valid `.shres-skill.json` provenance (`origin`, `digest`, `installedAt`); anything else — hand-placed directories, links, flat files, unprovenanced entries — is refused as not-managed. The digest is a `sha256-`prefixed hash over the copied files' relative paths and bytes.
 
 ## Model Experience
 

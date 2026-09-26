@@ -1208,7 +1208,7 @@
     {
       "doc": "docs/subsystems/skills.md",
       "symbol": "SkillSource",
-      "source": "packages/skill/skill/src/index.ts"
+      "source": "packages/skill/skill/src/types.ts"
     },
     {
       "doc": "docs/subsystems/skills.md",
@@ -2619,6 +2619,246 @@
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRouterConfig",
       "source": "packages/llm/model-router/src/config.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ProfileRuntime",
+      "source": "packages/boot/app-boot/src/profile-runtime.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstallPreview",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ParkedInstall",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstallBegin",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstallCommitted",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstallRefused",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstallRefusal",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "RollbackReport",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "RemoveOutcome",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginStateEntry",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginGestureToken",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginTransactionId",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginConfirmToken",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginMutations",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginAdminStatusResult",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ParkedTransactionView",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "InstalledSkillView",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginAdminInstallOutcome",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginAdminConfirmOutcome",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserInstanceId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BskSessionId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "ExtensionId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillToken",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillOperationId",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "SessionOwner",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillState",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillRefusal",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillConsentDownload",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillConsent",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillVerb",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillOperation",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStatus",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartOptions",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartResult",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillControl",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillCommandFailure",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillCommandResult",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BskOutput",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserAction",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillGestureVerb",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillGestureGrant",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillBeginRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillFlowRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillUninstallRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillStartOutcome",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillErrorCode",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/skills.md",
+      "symbol": "SkillInstallRoots",
+      "source": "packages/skill/skill-filesystem/src/install.ts"
+    },
+    {
+      "doc": "docs/subsystems/skills.md",
+      "symbol": "SkillAddRefused",
+      "source": "packages/skill/skill-filesystem/src/install.ts"
     }
   ]
 }

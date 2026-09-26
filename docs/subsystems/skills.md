@@ -2,7 +2,7 @@
 
 The [skill capability family](../../packages/skill) includes the Service Definition ([shres-skill](../../packages/skill/skill), `ctx.skills`), the local Service Provider ([shres-skill-filesystem](../../packages/skill/skill-filesystem)), the optional packaged badge provider ([shres-skill-badge](../../packages/skill/skill-badge)), and the Consumer ([shres-tool-skill](../../packages/skill/tool-skill)). The registry merges provider catalogs across its host and per-scope layers; providers contribute local or packaged skills; the Consumer owns the initial and replacement catalogs plus the model-facing `skill` tool. Skills are optional instructions, not session events, so their vocabulary lives here rather than in [core.md](core.md).
 
-Source: [`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts), [`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts), [`packages/skill/skill-badge/src/index.ts`](../../packages/skill/skill-badge/src/index.ts), and [`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts).
+Source: [`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts), [`packages/skill/skill/src/types.ts`](../../packages/skill/skill/src/types.ts), [`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts), [`packages/skill/skill-filesystem/src/install.ts`](../../packages/skill/skill-filesystem/src/install.ts), [`packages/skill/skill-badge/src/index.ts`](../../packages/skill/skill-badge/src/index.ts), and [`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts).
 
 ## Provider registry
 
@@ -71,8 +71,9 @@ The shipped local provider scans roots in rank order:
 | 400 | `user-shres` | `<shresHome>/skills` |
 | 500 | `user-agents` | `<agentsHome>/skills` |
 | 600 | `bundled` | `Config.bundledSkillDir` when configured |
+| 700 | `installed` | `<shresHome>/skills-installed` |
 
-The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. When `ctx.fs` is available, the git-root walk probes `.git` through the filesystem service so remote or sandboxed workspaces do not fall back to the host filesystem boundary. The user Shres root skips its `.system` child. The local provider does not synthesize built-in system skills; deployments supply packaged skills through configured bundled roots or dedicated providers.
+The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. When `ctx.fs` is available, the git-root walk probes `.git` through the filesystem service so remote or sandboxed workspaces do not fall back to the host filesystem boundary. The user Shres root skips its `.system` child. The `installed` root is scanned only with the default roots, so an isolated provider never sees it. The local provider does not synthesize built-in system skills; deployments supply packaged skills through configured bundled roots or dedicated providers.
 
 `shres-skill-badge` registers one immutable `bundled` candidate at `BUNDLED_SKILL_RANK` and exposes its packaged asset directory through `resourceBase`. The shipped CLI declares the plugin disabled, so enabling its composition row is an explicit opt-in.
 
@@ -80,16 +81,17 @@ Chokidar watches existing roots for direct bundle/flat-entry additions and remov
 
 ## Skill identity
 
-Skill names are kebab-case (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). The local provider accepts directory bundles (`<name>/SKILL.md`) and flat Markdown files (`<name>.md`). Nested recursive `**/SKILL.md` discovery is not supported.
+Skill names are kebab-case (`^[a-z0-9]+(?:-[a-z0-9]+)*$`); the dependency-free `@shres-code/shres-code-skill/name` subpath exports that grammar for offline callers. The local provider accepts directory bundles (`<name>/SKILL.md`) and flat Markdown files (`<name>.md`). Nested recursive `**/SKILL.md` discovery is not supported.
 
 ```ts type-equiv
 /**
  * Origin bucket for a skill contribution. The value is prompt-visible
  * metadata, not precedence by itself. `renderSkillContent` treats only
  * `bundled`, `user-*`, `runtime`, and `custom` as trusted local content;
- * `project-*` and every other label, including a missing source, are untrusted.
+ * `project-*`, `installed`, and every other label, including a missing
+ * source, are untrusted.
  */
-type SkillSource = 'project-shres' | 'project-agents' | 'runtime' | 'user-shres' | 'user-agents' | 'custom' | 'bundled' | (string & {})
+type SkillSource = 'project-shres' | 'project-agents' | 'runtime' | 'user-shres' | 'user-agents' | 'custom' | 'bundled' | 'installed' | (string & {})
 ```
 
 ## Summaries, candidates, and complete definitions
@@ -229,13 +231,43 @@ interface Config {
 }
 ```
 
+## Installed skills
+
+The `@shres-code/shres-code-skill-filesystem/install` subpath adds, removes, and lists copies of third-party skills in the `installed` root without loading the registry or Cordis; the `shres skill` CLI and the host `pluginAdmin` namespace both call it. The [package README](../../packages/skill/skill-filesystem/README.md) owns staging, locking, provenance, and removal rules. An installed skill is readable through `ctx.fs` like any user root but always renders untrusted, and its lowest rank means any same-named skill wins.
+
+```ts type-equiv
+/** Filesystem locations the install helpers scan for already-used skill names. */
+interface SkillInstallRoots {
+  /** Shres Code config root holding `skills` and `skills-installed`. */
+  readonly shresHome: string
+  /** Shared agent config root holding `skills`. */
+  readonly agentsHome: string
+  /** Project root holding `.shres/skills` and `.agents/skills`. */
+  readonly projectRoot?: string
+  /** Additional skill roots scanned before the user roots. */
+  readonly customSkillDirs?: readonly string[]
+}
+```
+
+```ts type-equiv
+/** Rejected {@link addInstalledSkill} outcome. */
+interface SkillAddRefused {
+  readonly kind: 'refused'
+  readonly code: 'invalid-skill' | 'name-taken' | 'escaping-symlink'
+  /** Human-readable reason, safe to print. */
+  readonly detail: string
+  /** Filesystem source that already owns the name; set for `name-taken`. */
+  readonly owner?: SkillSource
+}
+```
+
 ## Session catalog and tool contract
 
 `shres-tool-skill` injects the initial durable user-role `<system-reminder>` at the first `agent/pre-step` of a live session that observes a non-empty complete view. The catalog contains sorted skill `name` and normalized, XML-escaped `description` only; it omits bodies, paths, sources, providers, and routing hints. Discovery forwards the step's abort signal through `SkillLookupOptions`. `catalogDescriptionMaxLength` is the consumer config for the description bound, with default `500` and integer minimum `3`.
 
 Before each later model step, the consumer applies exact tool visibility and digests the exact rendered entries between the `<available_skills>` tags from a complete snapshot. It derives the comparison baseline from the same entries in the newest recognizable visible catalog message sourced by the plugin. A changed digest appends a durable full replacement through `agent.inject()`; deleting every skill appends an explicit empty replacement. Incomplete snapshots preserve the last-good model view. If compaction hides every historical catalog message, the next complete snapshot re-establishes the current catalog; an empty view with no prior catalog emits nothing. These catalog messages are session history, not World State.
 
-The model-facing `skill({ name })` tool validates the kebab-case name, finds the summary in the invocation-neutral catalog, rejects it before loading unless `isModelInvocable` permits access, then rereads the complete definition for the calling agent cwd and rechecks the policy before returning content. It reports an unresolved skill as unknown or no longer available and returns a tool result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body; every other source, including `project-*`, places the untrusted-frame header inside `<skill_content>` and escapes every `<` in the body. The catalog remains summary-only. `resourceBase` resolves explicitly referenced scripts, references, and assets only as needed; the loaded result does not enumerate a skill directory. Body-only edits therefore change later tool calls without producing catalog messages or rewriting earlier tool results.
+The model-facing `skill({ name })` tool validates the kebab-case name, finds the summary in the invocation-neutral catalog, rejects it before loading unless `isModelInvocable` permits access, then rereads the complete definition for the calling agent cwd and rechecks the policy before returning content. It reports an unresolved skill as unknown or no longer available and returns a tool result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body; every other source, including `project-*` and `installed`, places the untrusted-frame header inside `<skill_content>` and escapes every `<` in the body. The catalog remains summary-only. `resourceBase` resolves explicitly referenced scripts, references, and assets only as needed; the loaded result does not enumerate a skill directory. Body-only edits therefore change later tool calls without producing catalog messages or rewriting earlier tool results.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -307,7 +339,7 @@ async snapshot(options: SkillViewOptions = {}): Promise<SkillCatalogSnapshot>
 async get(name: string, options: SkillViewOptions = {}): Promise<SkillDefinition | undefined>
 ```
 
-Source: [`packages/skill/skill/src/index.ts:393`](../../packages/skill/skill/src/index.ts)
+Source: [`packages/skill/skill/src/index.ts:388`](../../packages/skill/skill/src/index.ts)
 
 <a id="skills-events"></a>
 
@@ -330,5 +362,5 @@ A skill provider, runtime contribution, or provider-backed catalog may have chan
 'skills/change'(): void
 ```
 
-Source: [`packages/skill/skill/src/index.ts:333`](../../packages/skill/skill/src/index.ts)
+Source: [`packages/skill/skill/src/index.ts:328`](../../packages/skill/skill/src/index.ts)
 <!-- END GENERATED cordis-surface -->

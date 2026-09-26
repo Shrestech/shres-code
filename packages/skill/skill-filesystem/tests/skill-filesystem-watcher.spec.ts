@@ -173,7 +173,7 @@ describe('skill-filesystem watcher failures', () => {
       watchPollIntervalMs: 10,
     })
     expect(await ctx.skills.snapshot()).toEqual({ skills: [], complete: true })
-    expect(watcherHarness.watchFiles).toHaveLength(2)
+    expect(watcherHarness.watchFiles).toHaveLength(3)
     let invalidations = 0
     ctx.on('skills/change', () => { invalidations += 1 })
 
@@ -183,7 +183,7 @@ describe('skill-filesystem watcher failures', () => {
     await settle()
 
     expect(invalidations).toBe(0)
-    expect(watcherHarness.watchFiles).toHaveLength(2)
+    expect(watcherHarness.watchFiles).toHaveLength(3)
     await fiber.dispose()
   })
 
@@ -440,5 +440,76 @@ describe('skill-filesystem watcher failures', () => {
     await expect(discovery).rejects.toThrow('opening failed during disposal')
     await disposal
     disposeProvider()
+  })
+
+  it('watches an existing installed skill root and applies additions live', async () => {
+    const home = await tempDir('skill-watch-installed')
+    const installed = join(home, '.shres/skills-installed')
+    await writeSkill(installed, 'first-installed')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    const fiber = await ctx.plugin(SkillFileSystem, {
+      shresHome: join(home, '.shres'),
+      agentsHome: join(home, '.agents'),
+      watch: true,
+      watchPollIntervalMs: 10,
+      watchStabilityThresholdMs: 20,
+    })
+
+    expect((await ctx.skills.list()).map(skill => [skill.name, skill.source])).toEqual([['first-installed', 'installed']])
+    const realInstalled = await realpath(installed)
+    const watcher = watcherHarness.watchers.find(control => control.path === realInstalled)
+    expect(watcher).toBeDefined()
+
+    let invalidations = 0
+    ctx.on('skills/change', () => { invalidations += 1 })
+    await writeSkill(installed, 'second-installed')
+    watcher!.emitter.emit('addDir', join(realInstalled, 'second-installed'))
+    watcher!.emitter.emit('add', join(realInstalled, 'second-installed/SKILL.md'))
+    await vi.waitFor(() => { expect(invalidations).toBeGreaterThan(0) })
+
+    expect((await ctx.skills.list()).map(skill => skill.name)).toEqual(['first-installed', 'second-installed'])
+
+    await fiber.dispose()
+    expect(watcher!.closeCalls).toBeGreaterThan(0)
+    const changesAfterDispose = invalidations
+    watcher!.emitter.emit('change', join(realInstalled, 'first-installed/SKILL.md'))
+    await settle()
+    expect(invalidations).toBe(changesAfterDispose)
+  })
+
+  it('attaches to the installed root once the missing directory appears', async () => {
+    const home = await tempDir('skill-watch-installed-missing')
+    const installed = join(home, '.shres/skills-installed')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    const fiber = await ctx.plugin(SkillFileSystem, {
+      shresHome: join(home, '.shres'),
+      agentsHome: join(home, '.agents'),
+      watch: true,
+      watchPollIntervalMs: 10,
+      watchStabilityThresholdMs: 20,
+    })
+    expect(await ctx.skills.snapshot()).toEqual({ skills: [], complete: true })
+
+    // The missing installed root is probed one segment at a time from its
+    // nearest existing ancestor, so the first probe watches the next missing
+    // segment (home/.shres), not the root itself. Both .shres-rooted probes
+    // (the user root and the installed root) share that spelling.
+    const expectedProbe = join(await realpath(home), '.shres')
+    const probes = watcherHarness.watchFiles.filter(control => control.path === expectedProbe)
+    expect(probes.length).toBeGreaterThanOrEqual(2)
+
+    await writeSkill(installed, 'late-installed')
+    for (const probe of probes) {
+      probe.listener({} as Stats, {} as Stats)
+    }
+    const expectedWatcher = await realpath(installed)
+    await vi.waitFor(() => {
+      expect(watcherHarness.watchers.some(control => control.path === expectedWatcher)).toBe(true)
+    })
+
+    expect((await ctx.skills.list()).map(skill => [skill.name, skill.source])).toEqual([['late-installed', 'installed']])
+    await fiber.dispose()
   })
 })

@@ -45,6 +45,41 @@ describe('parseShresArgs', () => {
       .toEqual({ mode: 'profile', profile: 'tui', patches: ['a.yml'], args: ['--resume', 'b', '--patch', 'late.yml'] })
   })
 
+  it('routes managed plugin operations with explicit consent flags', () => {
+    expect(parse(['plugin', '--profile', 'web', 'install-plugin', './plugin']))
+      .toEqual({ mode: 'plugin-management', command: { kind: 'install', profile: 'web', target: './plugin', yes: false } })
+    expect(parse(['plugin', '--profile', 'web', 'install-plugin', '@example/plugin@1', '--yes']))
+      .toEqual({ mode: 'plugin-management', command: { kind: 'install', profile: 'web', target: '@example/plugin@1', yes: true } })
+    expect(parse(['plugin', '--profile', 'web', 'remove-plugin', '--yes', '@example/plugin']))
+      .toEqual({ mode: 'plugin-management', command: { kind: 'remove', profile: 'web', target: '@example/plugin', yes: true } })
+  })
+
+  it.each([
+    ['install-plugin'],
+    ['install-plugin', '--yes'],
+    ['install-plugin', ''],
+    ['install-plugin', 'one', 'two'],
+    ['install-plugin', 'one', '--yes', '--yes'],
+    ['install-plugin', 'one', '--ignore-scripts'],
+    ['remove-plugin'],
+    ['remove-plugin', '--unknown'],
+  ])('rejects malformed managed plugin arguments %j', (...args) => {
+    expect(exitCode(['plugin', '--profile', 'web', ...args])).toBe(1)
+  })
+
+  it('routes local skill operations independently of profiles', () => {
+    expect(parse(['skill', 'add', './browser-skill']))
+      .toEqual({ mode: 'skill', command: { kind: 'add', directory: './browser-skill' } })
+    expect(parse(['skill', 'list']))
+      .toEqual({ mode: 'skill', command: { kind: 'list' } })
+    expect(parse(['skill', 'remove', 'browser-skill']))
+      .toEqual({ mode: 'skill', command: { kind: 'remove', name: 'browser-skill' } })
+    expect(exitCode(['skill', 'add'])).toBe(1)
+    expect(exitCode(['skill', 'remove'])).toBe(1)
+    expect(exitCode(['skill', 'add', './one', '--force'])).toBe(1)
+    expect(exitCode(['--profile', 'web', 'skill', 'list'])).toBe(1)
+  })
+
   it('routes the plugin pnpm forwarder', () => {
     expect(parse(['plugin', '--profile', 'tui', 'add', 'turtle-ui']))
       .toEqual({ mode: 'plugin', profile: 'tui', args: ['add', 'turtle-ui'] })

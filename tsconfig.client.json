@@ -99,6 +99,7 @@
     { "path": "./packages/client/ui-settings-jspace" },
     { "path": "./packages/client/ui-jspace" },
     { "path": "./packages/client/ui-settings-plugin-inventory" },
+    { "path": "./packages/client/ui-browserskill" },
     { "path": "./packages/client/locale" },
     { "path": "./packages/client/web" },
     { "path": "./apps/web" }
