@@ -14,8 +14,8 @@ import {
   type ModelSelection,
   type ModelSelectionRef,
 } from '../src/index.ts'
-import { ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
-import { Session, SessionId } from '@shres-code/shres-code-session'
+import { createUserMessage, ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
 function requestContent(): AgentRequestContent {
@@ -523,6 +523,38 @@ describe('the agent/route-base record', () => {
     expect(routing.calls.map(call => call.base)).toEqual([{ provider: 'gamma', model: 'g1' }, MANUAL])
     await bare.fiber.dispose()
     await routedCtx.fiber.dispose()
+  })
+
+  it('a fork seeded from a routed parent restores the manual route with no router and no provided selection', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    const parent = ctx.sessions.create(SessionId('route-base-fork-parent'))
+    parent.append('turn/start', { turn: 1 })
+    parent.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'easy turn' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    parent.append('agent/route-base', { manual: MANUAL, routed: CHEAP })
+    parent.append('request/header', { header: { config: CHEAP }, reason: 'initial' })
+    parent.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    const childSession = ctx.sessions.fork(parent, undefined, SessionId('route-base-fork-child'))
+    expect(childSession.header.parentSession).toBe(parent.id)
+    expect(childSession.events.filter(event => event.type === 'agent/route-base').map(event => event.data))
+      .toEqual([{ manual: MANUAL, routed: CHEAP }])
+    expect(childSession.requestHeader()?.config).toEqual(CHEAP)
+
+    const child = { id: childSession.id, ctx, session: childSession } as unknown as Agent
+    installModelSelection(child)
+    expect(modelSelectionInstalled(child)).toBe(true)
+    expect(selectionInForce(child)).toEqual(MANUAL)
+    const seededFromCandidate: LlmCallConfig = { ...CHEAP, temperature: 0.1 }
+    await expect(agentEvents(ctx, child).waterfall(
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal: new AbortController().signal },
+      () => Promise.resolve(seededFromCandidate),
+    )).resolves.toEqual({ ...MANUAL, temperature: 0.1 })
+    await ctx.fiber.dispose()
   })
 })
 
