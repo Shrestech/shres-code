@@ -10,6 +10,7 @@ import { Context } from '../../vendor/cordis/lib/index.js'
 import { SessionId, SessionStore } from '../../packages/core/session/lib/index.js'
 import { JsonlSessionPersistence } from '../../packages/session/session-persistence-jsonl/lib/index.js'
 import { classifyArtifact, decodePhysicalJsonl, proposalFromHeader, replayTrialLog, TrialInputIncompleteError } from '../routing/replay-frontend.js'
+import { coldPointAt } from '../../packages/llm/model-router/lib/index.js'
 import { assertUnchangedSnapshots, countRoutersInDump, hostReplayTrial } from '../routing/replay-frontend-host.js'
 import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metrics.js'
 import { FRONTEND_METHOD_FIELDS, MethodUnpinnedError, parseReplayMethod } from '../routing/replay-method.js'
@@ -313,7 +314,7 @@ test('seeded headers are refused', () => {
   )
 })
 
-test('launcher-hosted consults run inside the live plugin with real prepareCall', async () => {
+test('arm R (route-coldpoint) hosted consults replayTrialLog through the live plugin', async () => {
   const bytes = await readFile(fixture)
   const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
   const plant = await mkdtemp(join(tmpdir(), 'bench-replay-plant-'))
@@ -365,11 +366,6 @@ test('launcher-hosted consults run inside the live plugin with real prepareCall'
   }
 })
 
-test('named R coverage: dump-config of route-coldpoint composition has exactly one router', async () => {
-  const one = '- name: "@shres-code/shres-code-model-router"\n  config:\n    initialMode: on\n'
-  assert.equal(countRoutersInDump(one).count, 1)
-  assert.equal(countRoutersInDump(one).row.name, '@shres-code/shres-code-model-router')
-})
 
 test('corrupt input publishes no accepted out file or rows', async () => {
   const bytes = await readFile(fixture)
@@ -395,6 +391,45 @@ test('corrupt input publishes no accepted out file or rows', async () => {
   } finally {
     await rm(plant, { recursive: true, force: true })
   }
+})
+
+test('step/start missing time is malformed-event and publishes no rows', async () => {
+  const bytes = await readFile(fixture)
+  const lines = bytes.toString('utf8').trimEnd().split('\n')
+  const patched = lines.map((line) => {
+    const parsed = JSON.parse(line)
+    if (parsed.type === 'step/start') {
+      const copy = { ...parsed }
+      delete copy.time
+      return JSON.stringify(copy)
+    }
+    return line
+  }).join('\n') + '\n'
+  await withPersistence(Buffer.from(patched), async ({ persistence, path }) => {
+    await assert.rejects(
+      () => replayTrialLog({
+        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+        path, persistence, runtime: passthroughRuntime(), ...composedFields, method, arm: 'C',
+      }),
+      error => error instanceof TrialInputIncompleteError && /malformed-event/.test(error.message),
+    )
+  })
+})
+
+test('coldPointAt public result is warm at TTL and TTL-1, idle only after TTL', () => {
+  const selection = { provider: 'anthropic', model: 'claude-opus-5-5' }
+  const ttl = { ttlMs: 300_000, ttlSource: 'adapter' }
+  const t0 = 1_000_000
+  const events = [
+    { type: 'turn/start', seq: 0, time: t0, data: { turn: 1 } },
+    { type: 'step/start', seq: 1, time: t0, data: { turn: 1, step: 1 } },
+    { type: 'assistant/message', seq: 2, time: t0 + 1, data: { turn: 1, step: 1, message: { source: selection } } },
+  ]
+  assert.equal(coldPointAt(events, selection, ttl, t0 + ttl.ttlMs - 1, false), undefined)
+  assert.equal(coldPointAt(events, selection, ttl, t0 + ttl.ttlMs, false), undefined)
+  const idle = coldPointAt(events, selection, ttl, t0 + ttl.ttlMs + 1, false)
+  assert.equal(idle?.kind, 'idle')
+  assert.equal(idle?.idleMs, ttl.ttlMs + 1)
 })
 
 test('quota consults use each step/start.time so a job-wide clock cannot hide expiry', async () => {

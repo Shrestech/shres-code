@@ -130,6 +130,9 @@ export function decodePhysicalJsonl(bytes, path) {
         { path },
       )
     }
+    if (event.type === 'step/start' && !Number.isFinite(event.time)) {
+      throw new TrialInputIncompleteError('malformed-event: step/start missing finite time', { path })
+    }
   }
   return { header, events }
 }
