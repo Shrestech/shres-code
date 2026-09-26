@@ -130,3 +130,17 @@ test('a repeat chain only fires a later window when that chain extends there', (
   assert.deepEqual(labels(calls([true, true]), points(1, 6), oneTrigger('repeatRunLength')), [false, true])
   assert.deepEqual(labels(calls([true, true, true]), points(1, 6), oneTrigger('repeatRunLength')), [false, false])
 })
+
+test('a skipped verifier yields unlabelled task-outcome-unknown rows, not resolved:false', async () => {
+  const { events } = await decodeFixture()
+  const coldPoints = boundaries(events)
+  const result = labelColdPoints({ events, coldPoints, taskPassed: 'unknown', arm: 'C', method })
+  assert.equal(result.rows.length, 3)
+  for (const row of result.rows) {
+    assert.deepEqual(row.label, { status: 'unlabelled', reason: 'task-outcome-unknown' })
+  }
+  assert.throws(
+    () => labelColdPoints({ events, coldPoints, taskPassed: undefined, arm: 'C', method }),
+    /taskPassed must be a boolean or 'unknown'/
+  )
+})
