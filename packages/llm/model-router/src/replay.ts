@@ -6,7 +6,7 @@
  */
 
 import type { ModelSelection } from '@shres-code/shres-code-agent'
-import type { LlmCallConfig, LlmResolvedModelInfo, LlmRuntime, Message } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig, LlmRuntime, Message } from '@shres-code/shres-code-llm'
 import type { JudgmentQuestion } from '@shres-code/shres-code-judgment'
 import { deriveEventMessage, foldSurface } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
@@ -76,7 +76,19 @@ export class ReplayConsultError extends Error {
   }
 }
 
-/** Inputs the shared producer reads. Live and replay both fill this. */
+/**
+ * How the shared producer obtains the manual base's prompt-cache lifetime and
+ * `cache.base`. Internal; live and replay each pass an explicit kind.
+ */
+export type ConsultCachePolicy =
+  | { readonly kind: 'live-given'; readonly ttl: ModelRoutingCacheTtl }
+  | { readonly kind: 'live-eligibility' }
+  | { readonly kind: 'replay-resolve' }
+
+/** Composed model lookup and preparation used by one consult. */
+type ConsultRuntime = Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
+
+/** Inputs the shared producer reads. Live and replay supply the composed runtime. */
 export interface ConsultInputSource {
   readonly config: ResolvedModelRouterConfig
   readonly prefix: readonly SessionEvent[]
@@ -85,10 +97,11 @@ export interface ConsultInputSource {
   readonly routeBase: ModelSelection
   readonly coldPointBase: ModelSelection
   readonly at: ReplayConsultAt
-  readonly resolveModelInfo: (provider: string, model: string, signal?: AbortSignal) => Promise<LlmResolvedModelInfo>
-  /** Live LLM runtime when present so eligibility uses prepareCall; replay may omit it. */
-  readonly runtime?: Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>
+  /** Metadata and preparation share the same provider registrations. */
+  readonly runtime: ConsultRuntime
   readonly signal?: AbortSignal
+  /** Required TTL / cache.base policy; no default. */
+  readonly cachePolicy: ConsultCachePolicy
 }
 
 /**
@@ -206,12 +219,12 @@ function difficultyQuestion(config: ResolvedModelRouterConfig, instructions: str
 async function cacheTtl(
   config: ResolvedModelRouterConfig,
   base: ModelSelection,
-  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
+  runtime: ConsultRuntime,
   signal?: AbortSignal,
 ): Promise<ModelRoutingCacheTtl> {
   let declared: number | undefined
   try {
-    declared = (await resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
+    declared = (await runtime.resolveModelInfo(base.provider, base.model, signal)).promptCacheTtlMs
   } catch {
     signal?.throwIfAborted()
   }
@@ -220,22 +233,96 @@ async function cacheTtl(
     : { ttlMs: declared, ttlSource: 'adapter' }
 }
 
+/** Report the manual base with the already-resolved cache lifetime. */
+function cacheBaseFromTtl(routeBase: ModelSelection, ttl: ModelRoutingCacheTtl): ReplayConsultCache {
+  return {
+    base: { provider: routeBase.provider, model: routeBase.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource },
+  }
+}
+
+function cacheBaseFromEligibility(
+  config: ResolvedModelRouterConfig,
+  routeBase: ModelSelection,
+  eligibility: ModelRoutingCandidateEligibility,
+): ReplayConsultCache {
+  return {
+    base: {
+      provider: routeBase.provider,
+      model: routeBase.model,
+      ...eligibility.requirements.promptCacheTtlMs === undefined
+        ? { ttlMs: config.coldPoints.unknownTtlMs, source: 'fallback' as const }
+        : { ttlMs: eligibility.requirements.promptCacheTtlMs, source: 'adapter' as const },
+    },
+  }
+}
+
 /**
  * Shared producer: coldPoint, eligibility, states, questions, consultKey, cache.
  * No slicing and no replay refusals. Live `decide()` supplies the live log and
  * request messages; the replay wrapper slices first.
- * @param src - live or replay consult inputs.
+ * @param src - live or replay consult inputs, including a required cachePolicy.
  * @returns warm, ineligible, or ask.
  */
 export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayConsultInput> {
-  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, resolveModelInfo, signal } = src
+  const { config, prefix, messages, requestConfig, routeBase, coldPointBase, at, runtime, signal, cachePolicy } = src
   const from = routeFromFor(config, routeBase)
   const consultKey = `turn:${at.turn}/step:${at.step}`
-  const ttl = await cacheTtl(config, routeBase, resolveModelInfo, signal)
-  const cache: ReplayConsultCache = {
-    base: { provider: routeBase.provider, model: routeBase.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource },
-  }
   const quotaGate = from?.objective === 'quota' && from.allowEveryTurn !== true
+  const runEligibility = () => assessModelRoutingCandidates(
+    runtime,
+    requestConfig,
+    messages,
+    config.candidates,
+    config.difficultyToEffort,
+    signal,
+  )
+  const finish = async (coldPoint: ModelRoutingColdPoint | null, cache: ReplayConsultCache): Promise<ReplayConsultInput> => {
+    const eligibility = await runEligibility()
+    if (eligibility.eligibleCandidates.length === 0) {
+      return { kind: 'ineligible', coldPoint, cache, eligibility }
+    }
+    const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
+    const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
+    const questions: JudgmentQuestion[] = [
+      routeQuestion(eligibleConfig, routeBase),
+      ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+    ]
+    return {
+      kind: 'ask',
+      coldPoint,
+      cache,
+      eligibility,
+      states: alternatives.map(candidate => candidate.text),
+      questions,
+      consultKey,
+    }
+  }
+  if (cachePolicy.kind === 'live-eligibility') {
+    const eligibility = await runEligibility()
+    const cache = cacheBaseFromEligibility(config, routeBase, eligibility)
+    if (eligibility.eligibleCandidates.length === 0) {
+      return { kind: 'ineligible', coldPoint: null, cache, eligibility }
+    }
+    const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
+    const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
+    const questions: JudgmentQuestion[] = [
+      routeQuestion(eligibleConfig, routeBase),
+      ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+    ]
+    return {
+      kind: 'ask',
+      coldPoint: null,
+      cache,
+      eligibility,
+      states: alternatives.map(candidate => candidate.text),
+      questions,
+      consultKey,
+    }
+  }
+  const ttl = cachePolicy.kind === 'live-given'
+    ? cachePolicy.ttl
+    : await cacheTtl(config, routeBase, runtime, signal)
+  const cache = cacheBaseFromTtl(routeBase, ttl)
   const observedCold = quotaGate
     ? coldPointAt(prefix, coldPointBase, ttl, at.now, at.seedLength !== undefined)
     : undefined
@@ -243,51 +330,23 @@ export async function consultInputFrom(src: ConsultInputSource): Promise<ReplayC
   if (quotaGate && observedCold === undefined) {
     return { kind: 'warm', coldPoint: undefined, cache }
   }
-  const eligibilityRuntime = src.runtime ?? {
-    resolveModelInfo,
-    prepareCall: async (callConfig: LlmCallConfig) => ({ config: callConfig }),
-  }
-  const eligibility = await assessModelRoutingCandidates(
-    eligibilityRuntime as never,
-    requestConfig,
-    messages,
-    config.candidates,
-    config.difficultyToEffort,
-    signal,
-  )
-  const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
-  if (eligibility.eligibleCandidates.length === 0) {
-    return { kind: 'ineligible', coldPoint, cache, eligibility }
-  }
-  const alternatives = buildRoutingStateCandidatesFromEvents(prefix, config.state)
-  const questions: JudgmentQuestion[] = [
-    routeQuestion(eligibleConfig, routeBase),
-    ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
-  ]
-  return {
-    kind: 'ask',
-    coldPoint,
-    cache,
-    eligibility,
-    states: alternatives.map(candidate => candidate.text),
-    questions,
-    consultKey,
-  }
+  return finish(coldPoint, cache)
 }
 
 /**
  * Offline reconstruction of the entry-path consult. Applies {@link consultPrefix}
  * and replay-only refusals, then {@link consultInputFrom}. Live `decide()` does
- * not call this.
+ * not call this. `cache.base` reports the independently resolved lifetime; the
+ * live decision reports the lifetime eligibility retained, which is the fallback
+ * when base preparation fails.
  * @param config - resolved router configuration.
  * @param events - the session log to slice.
  * @param at - consult coordinates and clock.
  * @param routeBase - manual route the consult compares against.
  * @param coldPointBase - route whose prompt-cache lifetime is folded.
  * @param requestConfig - live request config; never read from the log.
- * @param resolveModelInfo - adapter metadata lookup for TTL and eligibility.
+ * @param runtime - composed LLM runtime; prepares base and candidate calls as live routing does.
  * @param signal - optional cancellation.
- * @param runtime - optional live LLM runtime so eligibility can call prepareCall.
  * @returns the shared producer result after replay-only refusals.
  */
 export async function replayConsultInput(
@@ -297,9 +356,8 @@ export async function replayConsultInput(
   routeBase: ModelSelection,
   coldPointBase: ModelSelection,
   requestConfig: LlmCallConfig,
-  resolveModelInfo: ConsultInputSource['resolveModelInfo'],
+  runtime: ConsultRuntime,
   signal?: AbortSignal,
-  runtime?: ConsultInputSource['runtime'],
 ): Promise<ReplayConsultInput> {
   const prefix = consultPrefix(events, at.turn, at.step)
   if (!sameRoute(routeBase, coldPointBase)) conversationRoute(events)
@@ -323,8 +381,8 @@ export async function replayConsultInput(
     routeBase,
     coldPointBase,
     at,
-    resolveModelInfo,
+    runtime,
+    cachePolicy: { kind: 'replay-resolve' },
     ...signal === undefined ? {} : { signal },
-    ...runtime === undefined ? {} : { runtime },
   })
 }

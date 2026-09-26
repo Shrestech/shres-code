@@ -1128,8 +1128,6 @@ describe('children of a parent on a held downgrade', () => {
         MANUAL,
         MANUAL,
         { provider: PROVIDER, model: MANUAL_MODEL },
-        (provider, model, signal) => llm.resolveModelInfo(provider, model, signal),
-        undefined,
         llm,
       )
       expect(replayed.kind).toBe('ask')
