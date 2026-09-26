@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import type { ModelSelection } from '@shres-code/shres-code-agent'
-import { createAssistantMessage, createUserMessage, type LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
+import { createAssistantMessage, createUserMessage, ReasoningEffortId, type LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import {
@@ -12,6 +12,7 @@ import {
 } from '../src/index.ts'
 import { consultInputFrom } from '../src/replay.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
+import { passthroughRuntime } from './passthrough-runtime.ts'
 
 const STRONG: ModelSelection = { provider: 'strong-provider', model: 'strong-model' }
 const CHEAP = { provider: 'cheap-provider', model: 'cheap-model' }
@@ -64,7 +65,7 @@ describe('consultInputFrom (live producer)', () => {
       routeBase: STRONG,
       coldPointBase: STRONG,
       at: { turn: 1, step: 1, now: 1, seedLength: undefined },
-      resolveModelInfo: resolve,
+      runtime: passthroughRuntime(resolve),
       cachePolicy: { kind: 'live-eligibility' },
     })
     expect(['ask', 'ineligible', 'warm']).toContain(result.kind)
@@ -72,6 +73,41 @@ describe('consultInputFrom (live producer)', () => {
 })
 
 describe('replayConsultInput wrapper', () => {
+  it('uses runtime-prepared adapter defaults in candidate assessments', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    try {
+      const session = ctx.sessions.create()
+      open(session, 1)
+      user(session, 'prepare this request')
+      const passthrough = passthroughRuntime(resolve)
+      const preparedModels: string[] = []
+      const runtime: typeof passthrough = {
+        ...passthrough,
+        async prepareCall(config, signal) {
+          preparedModels.push(config.model)
+          const prepared = await passthrough.prepareCall(config, signal)
+          return {
+            ...prepared,
+            config: { ...prepared.config, reasoningEffort: ReasoningEffortId('high'), maxTokens: 4096 },
+            adapterDefaults: { reasoningEffort: true, maxTokens: true },
+          }
+        },
+      }
+      const result = await replayConsultInput(
+        resolveConfig(CONFIG), session.events,
+        { turn: 1, step: 1, now: 1, seedLength: undefined },
+        STRONG, STRONG, STRONG, runtime,
+      )
+      expect(result.kind).toBe('ask')
+      if (result.kind !== 'ask') throw new Error('expected an eligible consult')
+      expect(preparedModels).toEqual([STRONG.model, CHEAP.model])
+      expect(result.eligibility.assessments[0]).toMatchObject({ reasoningEffort: 'high', effectiveMaxTokens: 4096 })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('refuses a missing step/start by name', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
@@ -81,7 +117,7 @@ describe('replayConsultInput wrapper', () => {
     await expect(replayConsultInput(
       resolveConfig(CONFIG), session.events,
       { turn: 1, step: 1, now: 1, seedLength: undefined },
-      STRONG, STRONG, STRONG, resolve,
+      STRONG, STRONG, STRONG, passthroughRuntime(resolve),
     )).rejects.toMatchObject({ code: 'missing-step' })
   })
 
@@ -102,7 +138,7 @@ describe('replayConsultInput wrapper', () => {
     await expect(replayConsultInput(
       resolveConfig(CONFIG), mixed.events,
       { turn: 1, step: 1, now: 1, seedLength: undefined },
-      STRONG, CHEAP, STRONG, resolve,
+      STRONG, CHEAP, STRONG, passthroughRuntime(resolve),
     )).rejects.toMatchObject({ code: 'mixed-route' })
 
     const held = ctx.sessions.create()
@@ -121,7 +157,7 @@ describe('replayConsultInput wrapper', () => {
     await expect(replayConsultInput(
       resolveConfig(CONFIG), held.events,
       { turn: 2, step: 1, now: 1, seedLength: undefined },
-      STRONG, STRONG, STRONG, resolve,
+      STRONG, STRONG, STRONG, passthroughRuntime(resolve),
     )).rejects.toMatchObject({ code: 'held-streak' })
     expect(ReplayConsultError).toBeDefined()
   })
@@ -144,7 +180,7 @@ describe('replayConsultInput wrapper', () => {
     const replayed = await replayConsultInput(
       resolveConfig(CONFIG), session.events,
       { turn: 2, step: 1, now: 1, seedLength: undefined },
-      STRONG, STRONG, STRONG, resolve,
+      STRONG, STRONG, STRONG, passthroughRuntime(resolve),
     )
     expect(replayed.kind).toBe('ask')
     if (replayed.kind !== 'ask') return
@@ -177,10 +213,10 @@ describe('replayConsultInput wrapper', () => {
       STRONG,
       STRONG,
       STRONG,
-      async () => {
+      passthroughRuntime(async () => {
         lookups += 1
         return resolve()
-      },
+      }),
     )
     expect(replayed.kind).toBe('warm')
     expect(lookups).toBe(1)
@@ -210,13 +246,13 @@ describe('replayConsultInput wrapper', () => {
     const correct = await replayConsultInput(
       resolveConfig(QUOTA), session.events,
       { turn: 2, step: 1, now: Date.now(), seedLength: undefined },
-      STRONG, CHEAP, STRONG, resolve,
+      STRONG, CHEAP, STRONG, passthroughRuntime(resolve),
     )
     expect(correct.kind).toBe('warm')
     const manufactured = await replayConsultInput(
       resolveConfig(QUOTA), session.events,
       { turn: 2, step: 1, now: Date.now(), seedLength: undefined },
-      STRONG, STRONG, STRONG, resolve,
+      STRONG, STRONG, STRONG, passthroughRuntime(resolve),
     )
     expect(manufactured.kind === 'ask' || manufactured.kind === 'ineligible' ? manufactured.coldPoint?.kind : undefined)
       .toBe('session-start')

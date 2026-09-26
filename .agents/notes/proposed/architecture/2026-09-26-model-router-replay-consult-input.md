@@ -8,11 +8,13 @@ Offline replay must reconstruct the same consult input live `decide()` builds, w
 
 ## Proposal
 
-Export `replayConsultInput`, `consultPrefix`, and `coldPointAt` from the package root. Live `decide()` calls the same producer on the entry path with the live log and request messages. Messages for the wrapper are derived with public `foldSurface` + `deriveEventMessage`. `requestConfig` is an explicit argument. `routeBase` and `coldPointBase` are split so a cheap-only log does not manufacture session-start cold points against a strong base. Live `decide()` assigns `facts.cache` immediately after `facts.candidateEligibility`; fact insertion order is part of the persisted decision bytes.
+Export `replayConsultInput`, `consultPrefix`, and `coldPointAt` from the package root. Live `decide()` calls the same producer on the entry path with the live log and request messages. Messages for the wrapper are derived with public `foldSurface` + `deriveEventMessage`. `requestConfig` and the composed LLM runtime are explicit arguments: `replayConsultInput(config, events, at, routeBase, coldPointBase, requestConfig, runtime, signal?)`. The same runtime supplies metadata and prepares base/candidate calls, preserving adapter defaults and preparation failures. `routeBase` and `coldPointBase` are split so a cheap-only log does not manufacture session-start cold points against a strong base. Live `decide()` assigns `facts.cache` immediately after `facts.candidateEligibility`; fact insertion order is part of the persisted decision bytes.
 
 ## Alternatives considered
 
 **Caller-supplied messages.** Rejected: the loop already sends `session.deriveMessages()`, which is the same fold.
+
+**Metadata-only preparation fallback.** Rejected: returning the requested config without adapter preparation hides defaults and preparation failures, changing eligibility. Replay requires the composed runtime; passthrough behavior belongs only in explicit test doubles.
 
 ## Acceptance criteria
 
@@ -22,4 +24,4 @@ Export `replayConsultInput`, `consultPrefix`, and `coldPointAt` from the package
 
 ## Risks
 
-Held streaks, cooldown, and breaker stay inside `decide()`. Replay cannot reconstruct a held-step consult. Splitting `routeBase` and `coldPointBase` is required for counterfactual cheap-only logs; using one base would invent cold points against the wrong model. The producer still looks up prompt-cache TTL through `resolveModelInfo` on every consult, including dollars routes that never use a cold point.
+Held streaks, cooldown, and breaker stay inside `decide()`. Replay cannot reconstruct a held-step consult. Splitting `routeBase` and `coldPointBase` is required for counterfactual cheap-only logs; using one base would invent cold points against the wrong model. Replay resolves the cache lifetime independently through its runtime; live routing reuses its precomputed lifetime or eligibility metadata. When preparation fails after metadata succeeds, replay can retain an adapter lifetime while a non-quota live decision reports the fallback lifetime. That consult remains ineligible.

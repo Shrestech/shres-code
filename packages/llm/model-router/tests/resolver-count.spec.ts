@@ -20,6 +20,7 @@ import ModelRoutingController, {
 } from '../src/index.ts'
 import { consultInputFrom } from '../src/replay.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
+import { passthroughRuntime } from './passthrough-runtime.ts'
 
 /** Measured at P 7ad0ea21de with /tmp/routing-review/resolver-cleanup-live-capture.mts. */
 const P_DOLLARS = { publicResolves: 2, prepareCalls: 2 } as const
@@ -252,7 +253,7 @@ describe('prepareCall-failure edge', () => {
     const replayed = await replayConsultInput(
       resolveConfig(CONFIG), session.events,
       { turn: 1, step: 1, now: 1, seedLength: undefined },
-      STRONG, STRONG, STRONG, resolveModelInfo, undefined,
+      STRONG, STRONG, STRONG,
       { resolveModelInfo, prepareCall: async () => { throw new Error('prepareCall failed after metadata') } },
     )
     expect(replayed.kind).toBe('ineligible')
@@ -283,7 +284,7 @@ describe('consult cachePolicy branches', () => {
       routeBase: STRONG,
       coldPointBase: STRONG,
       at: { turn: 1, step: 1, now: 1, seedLength: undefined },
-      resolveModelInfo,
+      runtime: passthroughRuntime(resolveModelInfo),
     }
     resolves = 0
     const given = await consultInputFrom({
