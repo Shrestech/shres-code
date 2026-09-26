@@ -9,7 +9,7 @@ export type Behavior =
   | { kind: 'partial'; status: number; head: string }
 
 /** One request the stub server received. */
-export interface RecordedRequest {
+interface RecordedRequest {
   method: string
   path: string
   headers: IncomingMessage['headers']
