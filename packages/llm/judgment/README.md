@@ -45,6 +45,10 @@ An answered result reports the selected index and exact redacted state, state an
 
 The capability is optional. Consumers that require atomic state selection check `ctx.judgment.fitting` and handle `unfit` explicitly; a provider that only implements `ask()` leaves input sizing to the consumer. Both methods share the same questions, tier, cancellation, answer ordering, and provider failure classes.
 
+## Correlation
+
+An ask may carry `correlation` — the consult's `sessionId` and a consumer-defined `consultKey` that is unique per consult within the session (the model router sends `turn:<n>/step:<n>`; the 13b child listener sends `child:<routeRequestId>`). The field is informational: an engine may use it for local determinism — a stateless per-consult draw that replays from the log — or diagnostics, and must never transmit it in any request, credentialed call, or log sent off-machine; it is not part of any serialized model input. It is optional: non-session consumers omit it, and an engine that requires it treats its absence as a failed ask rather than falling back to another identity.
+
 ## Engines
 
 `ctx.judgmentEngines` is a `JudgmentEngineRegistry` that [judgment-dispatch](../judgment-dispatch/README.md) provides. An engine provider injects `judgmentEngines` and registers one engine from its constructor with `registerJudgmentEngine(ctx, entry)`; the registration is released with the provider's fiber, and the returned function announces a status change to the registry's subscribers. An engine honours `input.signal` at every await: `throwIfJudgmentAborted(signal, message)` is the check before each step, and `abortableJudgmentStep(operation, signal, message)` races same-process work that cannot be cancelled, such as a credential lookup or the redaction hook, so the ask fails `ABORTED` at once.
