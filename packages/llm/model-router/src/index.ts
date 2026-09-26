@@ -48,6 +48,8 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
+import type { SubagentChildRoute, SubagentChildRouteRequest } from '@shres-code/shres-code-subagent'
+import { logChildDecision, resolveChildRouteConsult } from './child-route.ts'
 import {
   declareJudgmentConsumer,
   JudgmentError,
@@ -724,6 +726,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
     this.reportUnregisteredOperatingPoints(ctx)
+    ctx.effect(() => ctx.on('subagent/child-route', (request, next) => this.onChildRoute(request, next)))
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
@@ -1171,6 +1174,28 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    */
   modeOf(session: Session, end: number = session.events.length): ModelRoutingMode {
     return foldModelRouting(session.events, end)
+  }
+
+  /**
+   * Answer one `subagent/child-route` consult. `next()` runs first so another
+   * listener's answer wins and this policy records nothing.
+   * @param request - the waterfall request, including the minted routeRequestId.
+   * @param next - remaining listeners.
+   * @returns the route to start the child with, or undefined to keep inherited.
+   */
+  async onChildRoute(
+    request: SubagentChildRouteRequest,
+    next: () => Promise<SubagentChildRoute | undefined>,
+  ): Promise<SubagentChildRoute | undefined> {
+    const answered = await next()
+    if (answered !== undefined) return answered
+    const consult = resolveChildRouteConsult({
+      config: this.config(),
+      mode: this.modeOf(request.parent.session),
+      suspended: new Set(),
+    }, request)
+    if (consult.decision !== undefined) logChildDecision(request.parent.session, consult.decision)
+    return consult.route
   }
 
   /**

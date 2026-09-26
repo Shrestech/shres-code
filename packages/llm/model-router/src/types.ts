@@ -1194,6 +1194,77 @@ export interface ModelRoutingWorkspaceStats {
   rows: ModelRoutingWorkspaceSession[]
 }
 
+/** One child's routing decision, recorded on the parent before the child exists. */
+export interface ModelRoutingChildDecision {
+  /** Whether a pool candidate was returned to the waterfall. */
+  outcome: 'routed' | 'kept'
+  /** Why the child was routed or kept. */
+  reason:
+    | 'child-policy'
+    | 'child-judged'
+    | 'base-unlisted'
+    | 'candidate-equals-base'
+    | 'child-route-errors'
+    | 'engine-absent'
+    | 'engine-uncalibrated'
+    | 'engine-unavailable'
+    | 'invalid-answer'
+    | 'low-confidence'
+    | 'thin-margin'
+  /** Dispatch identity minted by resolveChildRoute. */
+  routeRequestId: string
+  /** Delegation consumer kind. */
+  childKind: 'subagent' | 'workflow'
+  /** Tool-facing agent type, when a tool delegates. */
+  agentType?: string
+  /** Index of the matching childPolicies rule. */
+  policyIndex: number
+  /** Inherited parent route. */
+  inherited: { provider?: string; model?: string }
+  /** Routed pool selection. */
+  selection?: { candidateId: string; provider: string; model: string }
+  /** Child-route never applies pool reasoningEffort. */
+  effortApplied: false
+  /** Character length of the child's task text. */
+  promptChars: number
+  /** Judgment engine identity, when a rule judged. */
+  engine?: string
+  engineId?: string
+  model?: string
+  latencyMs?: number
+  /** Whether this consult only recorded what live would do. */
+  shadow?: true
+  /** Parent routeFrom objective, when the base is listed. */
+  objective?: ModelRoutingObjective
+}
+
+/** How one child accounting turn counts toward the per-candidate breaker. */
+export type ModelRoutingChildCountedAs = 'failure' | 'success' | 'neutral'
+
+/** One classified child-turn outcome on the parent log. */
+export interface ModelRoutingChildOutcome {
+  /** Dispatch identity joining this outcome to a routed child-decision. */
+  routeRequestId: string
+  /** Pool candidate the decision selected. */
+  candidateId: string
+  /** Durable child session id. */
+  childSessionId: string
+  /** Accounting turn number on the child log. */
+  childTurn: number
+  /** Route in force for that turn. */
+  route: { provider: string; model: string }
+  /** Child turn/end kind. */
+  turnEnd: string
+  /** LlmError code when the turn ended in error. */
+  failureCode?: string
+  /** Breaker classification. */
+  countedAs: ModelRoutingChildCountedAs
+  /** Live Activation run id, when known. */
+  runId?: string
+  /** Set when this outcome was appended after a parent restart. */
+  reconciled?: true
+}
+
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
@@ -1214,6 +1285,16 @@ declare module '@shres-code/shres-code-session/types' {
      * records the route it selected.
      */
     'model-routing/decision': ModelRoutingDecision
+    /**
+     * One child's routing decision at spawn: log-only, append-only, written on
+     * the parent session before the child exists. Not ignorable.
+     */
+    'model-routing/child-decision': ModelRoutingChildDecision
+    /**
+     * One accounting turn's classified outcome for a routed child: log-only,
+     * append-only, on the parent session. Not ignorable.
+     */
+    'model-routing/child-outcome': ModelRoutingChildOutcome
   }
 }
 
