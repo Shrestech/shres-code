@@ -8,6 +8,7 @@
 import { Command } from 'commander'
 import type { Context } from '@shres-code/cordis'
 import { parseCmdline } from '@shres-code/shres-code-cmdline'
+import { SessionId } from '@shres-code/shres-code-session'
 
 /** Stable Cordis plugin name. */
 export const name = 'headless-startup'
@@ -22,6 +23,10 @@ export const HEADLESS_STARTUP_SERVICE = 'headlessStartup'
 export interface HeadlessStartupValues {
   /** The task text this invocation asked for. */
   task: string
+  /** Explicit id for the fresh session this invocation creates; absent means a generated id. */
+  sessionId?: SessionId
+  /** Persisted session id this invocation continues; absent means a fresh session. */
+  resume?: SessionId
 }
 
 /**
@@ -34,9 +39,13 @@ function headlessCommand(): Command {
     .description('Answer one task, print the final assistant message, and exit.')
     .helpOption('-h, --help', 'show this help')
     .argument('[task...]', 'the task text; multiple words are joined by spaces')
+    .option('--session-id <id>', "create this invocation's fresh session under the given id")
+    .option('--resume <id>', 'continue the persisted session with the given id')
     .addHelpText('after', `
 Examples:
-  shres --profile headless "run the tests"     answer one task and exit
+  shres --profile headless "run the tests"                      answer one task and exit
+  shres --profile headless --session-id my-id "run the tests"   answer under a chosen session id
+  shres --profile headless --resume my-id "keep going"          continue a persisted session
 `)
 }
 
@@ -49,9 +58,17 @@ Examples:
 export function apply(ctx: Context): void {
   const program = headlessCommand()
   program.action(() => {
+    const options = program.opts() as { sessionId?: string; resume?: string }
+    if (options.sessionId !== undefined && options.resume !== undefined) {
+      program.error('error: --session-id and --resume are mutually exclusive')
+    }
     const task = program.args.join(' ')
     if (task.trim() === '') program.error('error: a task is required, for example: shres --profile headless "run the tests"')
-    ctx.provide(HEADLESS_STARTUP_SERVICE, { task } satisfies HeadlessStartupValues)
+    ctx.provide(HEADLESS_STARTUP_SERVICE, {
+      task,
+      ...options.sessionId === undefined ? {} : { sessionId: SessionId(options.sessionId) },
+      ...options.resume === undefined ? {} : { resume: SessionId(options.resume) },
+    } satisfies HeadlessStartupValues)
   })
   parseCmdline(ctx, program)
 }
