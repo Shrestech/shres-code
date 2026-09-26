@@ -90,7 +90,7 @@ describe('web e2e: Settings › Model routing workspace overview', () => {
     const table = overview.getByRole('table', { name: 'Sessions, most recent decision first' })
     await table.waitFor({ timeout: 10_000 })
     expect(await table.getByRole('row').count()).toBe(2)
-    await expect.poll(async () => overview.locator('p', { hasText: '1 of 1 sessions in range' }).count()).toBe(1)
+    await expect.poll(async () => overview.locator('p', { hasText: '1 of 1 session in range' }).count()).toBe(1)
     // The footer states the cadence this scenario never waits out.
     expect(await overview.locator('p', { hasText: 'refreshes every 60 s while visible.' }).count()).toBe(1)
     expect(await overview.getByText(/most recently routed sessions are included/).count()).toBe(0)
@@ -106,7 +106,7 @@ describe('web e2e: Settings › Model routing workspace overview', () => {
     const reopened = await openRoutingSettings(page)
     const reopenedOverview = reopened.locator('section:has(h3:text("Workspace overview"))')
     await reopenedOverview.getByRole('radio', { name: 'All' }).click()
-    await expect.poll(async () => reopenedOverview.locator('p', { hasText: '1 of 1 sessions in range' }).count(), { timeout: 15_000 }).toBe(1)
+    await expect.poll(async () => reopenedOverview.locator('p', { hasText: '1 of 1 session in range' }).count(), { timeout: 15_000 }).toBe(1)
     await reopenedOverview.getByRole('radio', { name: '7d' }).click()
     await expect.poll(async () => reopenedOverview.getByRole('radio', { name: '7d' }).getAttribute('aria-checked'), { timeout: 10_000 }).toBe('true')
     expect(tripwire.pageErrors).toEqual([])

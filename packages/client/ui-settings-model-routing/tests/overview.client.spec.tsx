@@ -291,6 +291,22 @@ describe('OverviewCard', () => {
     render(<MountCard {...cardProps(controller)} />)
     await screen.findByText(t('overview.kpi.sessions'))
     expect(screen.getByText('Only the 2 most recently routed sessions are included.')).toBeTruthy()
-    expect(screen.getByText('1 sessions in this workspace have no statistics until they are opened.')).toBeTruthy()
+    expect(screen.getByText('1 session in this workspace has no statistics until it is opened.')).toBeTruthy()
+  })
+
+  it('uses singular count copy for a one-session workspace', async () => {
+    const one = {
+      ...STATS,
+      sessions: { members: 1, summarized: 1, inRange: 1, included: 1, capped: false },
+      routedSwitches: { count: 1, tokens: 1200 },
+      rows: [STATS.rows[0]!],
+    }
+    const controller = createOverviewController(() => Promise.resolve({ ok: true as const, value: one }))
+    render(<MountCard {...cardProps(controller)} />)
+    await screen.findByText(t('overview.kpi.sessions'))
+    expect(screen.getByText('of 1 session in this workspace')).toBeTruthy()
+    expect(screen.getByText('tokens re-prefilled after 1 routed switch and return')).toBeTruthy()
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent.includes('1 of 1 session in range'))).toBeTruthy()
+    expect(screen.queryByText(/sessions in this workspace have no statistics/)).toBeNull()
   })
 })

@@ -774,6 +774,19 @@ config(): ResolvedModelRouterConfig
 @Remote('decision') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail
 
 /**
+ * Routing statistics across one workspace's unarchived sessions, for the
+ * Settings overview: each session's `modelRoutingStats` value, rolled up
+ * over the sessions whose latest decision falls in the range. An attached
+ * session's value is its live one and a cold session's is the persisted
+ * projection cache's; no session log is read, so a cold session without a
+ * cached value on the current unit version is counted as not summarized.
+ * @param request - the workspace and the range.
+ * @returns the workspace statistics.
+ * @throws when this host composes no workspace registry or the workspace is unknown.
+ */
+@Remote('stats') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>
+
+/**
  * Read the logged mode and any selection awaiting the next accepted pre-step.
  * @param agent - the agent to read.
  * @returns the mode in force plus a pending selection, when present.
@@ -841,5 +854,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:443`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:452`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

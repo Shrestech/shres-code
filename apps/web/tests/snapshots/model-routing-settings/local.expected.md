@@ -485,3 +485,11 @@
           - rowheader "Shield (local gateway)"
           - cell "0.80 / 0.10 (global)"
           - 'cell "Uncalibrated: global thresholds"'
+  - region "Workspace overview":
+    - heading "Workspace overview" [level=3]
+    - paragraph: "Across sessions in one workspace: use it to judge the pool and thresholds. Per-session detail is in each session's Routing view."
+    - radiogroup "Range":
+      - radio "24h" [checked]
+      - radio "{{duration}}"
+      - radio "All"
+    - paragraph: Open a session in a workspace to see its overview.

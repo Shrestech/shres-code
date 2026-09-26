@@ -148,7 +148,9 @@ function OverviewBody({ stats, titles, open, t }: {
       key: 'sessions',
       label: t('overview.kpi.sessions'),
       value: COUNT.format(sessions.included),
-      detail: t('overview.kpi.sessionsDetail', { members: COUNT.format(sessions.members) }),
+      detail: sessions.members === 1
+        ? t('overview.kpi.sessionsDetailOne')
+        : t('overview.kpi.sessionsDetail', { members: COUNT.format(sessions.members) }),
     },
     {
       key: 'decisions',
@@ -166,7 +168,9 @@ function OverviewBody({ stats, titles, open, t }: {
       key: 'cold',
       label: t('overview.kpi.cold'),
       value: TOKENS.format(stats.routedSwitches.tokens),
-      detail: t('overview.kpi.coldDetail', { count: COUNT.format(stats.routedSwitches.count) }),
+      detail: stats.routedSwitches.count === 1
+        ? t('overview.kpi.coldDetailOne')
+        : t('overview.kpi.coldDetail', { count: COUNT.format(stats.routedSwitches.count) }),
     },
   ]
   return (
@@ -189,7 +193,7 @@ function OverviewBody({ stats, titles, open, t }: {
           </div>
         )}
       <p className={css['sub']}>
-        {t('overview.footer', {
+        {t(sessions.inRange === 1 ? 'overview.footerOne' : 'overview.footer', {
           time: clockOf(stats.computedAt),
           included: COUNT.format(sessions.included),
           inRange: COUNT.format(sessions.inRange),
@@ -198,7 +202,13 @@ function OverviewBody({ stats, titles, open, t }: {
       </p>
       {sessions.capped ? <p className={css['sub']}>{t('overview.capped', { included: COUNT.format(sessions.included) })}</p> : null}
       {sessions.summarized < sessions.members
-        ? <p className={css['sub']}>{t('overview.unsummarized', { count: COUNT.format(sessions.members - sessions.summarized) })}</p>
+        ? (
+          <p className={css['sub']}>
+            {sessions.members - sessions.summarized === 1
+              ? t('overview.unsummarizedOne')
+              : t('overview.unsummarized', { count: COUNT.format(sessions.members - sessions.summarized) })}
+          </p>
+        )
         : null}
     </>
   )

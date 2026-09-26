@@ -195,12 +195,14 @@ export const en = {
   'overview.openFailed': 'The Routing view could not be opened: {message}',
   'overview.kpi.sessions': 'Sessions with routing',
   'overview.kpi.sessionsDetail': 'of {members} sessions in this workspace',
+  'overview.kpi.sessionsDetailOne': 'of 1 session in this workspace',
   'overview.kpi.decisions': 'Decisions',
   'overview.kpi.decisionsDetail': '{consults} answered by the judge',
   'overview.kpi.pool': 'Steps on pool models',
   'overview.kpi.poolDetail': '{pool} of {steps} steps',
   'overview.kpi.cold': 'Cache-write cost of routed switches',
   'overview.kpi.coldDetail': 'tokens re-prefilled after {count} routed switches and returns',
+  'overview.kpi.coldDetailOne': 'tokens re-prefilled after 1 routed switch and return',
   'overview.empty': 'No session in this workspace made a routing decision in this range.',
   'overview.reasons.title': 'Decision reasons across sessions',
   'overview.reasons.alt': 'Decision reasons across sessions: {summary}',
@@ -220,8 +222,10 @@ export const en = {
   'overview.sessions.open': 'Routing view →',
   'overview.sessions.openNamed': 'Open the Routing view of {session}',
   'overview.footer': 'Updated {time} · {included} of {inRange} sessions in range · refreshes every {seconds} s while visible.',
+  'overview.footerOne': 'Updated {time} · 1 of 1 session in range · refreshes every {seconds} s while visible.',
   'overview.capped': 'Only the {included} most recently routed sessions are included.',
   'overview.unsummarized': '{count} sessions in this workspace have no statistics until they are opened.',
+  'overview.unsummarizedOne': '1 session in this workspace has no statistics until it is opened.',
 } satisfies Record<string, string>
 
 /** Keys of the Model routing dictionary. */

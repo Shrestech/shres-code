@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { ModelRoutingSection } from '../src/client/ModelRoutingSection.tsx'
 import type { ModelRoutingController } from '../src/client/model.ts'
 import { createModelRoutingController } from '../src/client/model.ts'
@@ -11,11 +12,6 @@ import { GATE, LAYA, LAYA_VIEW, TYPESAFE, namespace, remoteFail, remoteOk, scrip
 import { double, ready, t } from './helpers.client.tsx'
 
 afterEach(cleanup)
-
-/** Resolve a key the way the locale runtime does, filling {name} placeholders. */
-function t(key: keyof typeof en, params?: Record<string, unknown>): string {
-  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => String(params?.[name]))
-}
 
 /** Session list and workspace hooks over an empty client: no workspace, so the overview reads nothing. */
 const useSessions = bindSnapshotSelector(createSnapshotStore({ current: undefined, byId: {} })) as never
