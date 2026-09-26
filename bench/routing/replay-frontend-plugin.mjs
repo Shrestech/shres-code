@@ -4,7 +4,7 @@
  * rows plus a summary, then exits. A counting proxy forwards to ctx.llm.
  * @module
  */
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, unlink, writeFile } from 'node:fs/promises'
 import Schema from '../../vendor/schemastery/lib/index.mjs'
 import { resolveConfig } from '../../packages/llm/model-router/lib/index.js'
 import { replayTrialLog, TrialInputIncompleteError } from './replay-frontend.js'
@@ -109,7 +109,6 @@ export function apply(ctx, config) {
       ttl,
       method: job.method,
       arm: job.arm,
-      now: job.now,
     })
     const kinds = consultKindCounts(result.consults)
     const summary = {
@@ -130,9 +129,14 @@ export function apply(ctx, config) {
     ]
     await writeFile(config.out, lines.join('\n') + '\n')
     finish({ ok: true, artifact: result.artifact, out: config.out, http: internals.http }, 0)
-  })().catch((error) => {
+  })().catch(async (error) => {
     const reason = error instanceof Error ? error.message : String(error)
     const classC = error instanceof TrialInputIncompleteError
+    try {
+      await unlink(config.out)
+    } catch (unlinkError) {
+      if (!(unlinkError && unlinkError.code === 'ENOENT')) throw unlinkError
+    }
     finish({
       ok: false,
       classC,

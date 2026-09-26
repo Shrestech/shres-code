@@ -5,6 +5,7 @@
  */
 import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { access } from 'node:fs/promises'
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
@@ -127,7 +128,7 @@ async function spawnLauncher({ repoRoot, scratchDir, armOverlayPath, overlayPath
  * @param {object} input
  */
 export async function hostReplayTrial({
-  repoRoot, trial, path, arm, method, trialOwnRoute, now = Date.now(), env = process.env,
+  repoRoot, trial, path, arm, method, trialOwnRoute, env = process.env,
   extraOverlay,
 }) {
   const root = await mkdtemp(join(tmpdir(), 'bench-replay-host-'))
@@ -160,7 +161,7 @@ export async function hostReplayTrial({
       throw new TrialInputIncompleteError('router-count:' + String(routers.count))
     }
     await writeFile(jobPath, JSON.stringify({
-      trial, path, arm, method, trialOwnRoute, now, routerRowConfig: routers.row?.config,
+      trial, path, arm, method, trialOwnRoute, routerRowConfig: routers.row?.config,
     }))
     const spawned = await spawnLauncher({
       repoRoot, scratchDir, armOverlayPath: armPath, overlayPath, homeDir: home, env,
@@ -177,6 +178,14 @@ export async function hostReplayTrial({
       throw new Error('replay host: child emitted no status line; stderr: ' + spawned.stderr)
     }
     if (line.classC === true) {
+      let published = true
+      try {
+        await access(outPath)
+      } catch (error) {
+        if (error && error.code === 'ENOENT') published = false
+        else throw error
+      }
+      if (published) throw new TrialInputIncompleteError('partial-accepted-output', { path })
       throw new TrialInputIncompleteError(line.reason, { path })
     }
     if (line.ok !== true) {

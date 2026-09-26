@@ -194,14 +194,11 @@ function serializableConsult(result) {
  * @returns {Promise<{ artifact: string, rows: object[], consults: object[] }>}
  */
 export async function replayTrialLog({
-  trial, path, persistence, runtime, routerConfig, routeBase, trialOwnRoute, requestConfig, ttl, method, arm, now = Date.now(),
+  trial, path, persistence, runtime, routerConfig, routeBase, trialOwnRoute, requestConfig, ttl, method, arm,
 }) {
   parseReplayMethod(method, { require: FRONTEND_METHOD_FIELDS })
   if (persistence === undefined || typeof persistence.readFrom !== 'function' || typeof persistence.inspect !== 'function') {
     throw new TypeError('replayTrialLog requires persistence.readFrom and persistence.inspect')
-  }
-  if (runtime === undefined || typeof runtime.resolveModelInfo !== 'function' || typeof runtime.prepareCall !== 'function') {
-    throw new TypeError('replayTrialLog requires runtime.resolveModelInfo and runtime.prepareCall')
   }
   const bytes = await readFile(path)
   const { header, events } = decodePhysicalJsonl(bytes, path)
@@ -216,7 +213,8 @@ export async function replayTrialLog({
   const coldPoints = []
   const consults = []
   for (const start of events.filter(event => event.type === 'step/start')) {
-    const at = { turn: start.data.turn, step: start.data.step, now, seedLength: header.seedLength }
+    const consultNow = start.time
+    const at = { turn: start.data.turn, step: start.data.step, now: consultNow, seedLength: header.seedLength }
     const result = await replayConsultInput(
       config,
       events,
@@ -226,10 +224,10 @@ export async function replayTrialLog({
       requestConfig,
       runtime,
     )
-    consults.push({ turn: start.data.turn, step: start.data.step, result: serializableConsult(result) })
+    consults.push({ turn: start.data.turn, step: start.data.step, now: consultNow, result: serializableConsult(result) })
     if (result.kind === 'warm') continue
     const point = result.coldPoint ?? coldPointAt(
-      events, trialOwnRoute, ttl, now, header.seedLength !== undefined,
+      events, trialOwnRoute, ttl, consultNow, header.seedLength !== undefined,
     )
     if (point === undefined || point === null) continue
     coldPoints.push({

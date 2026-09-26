@@ -332,7 +332,7 @@ test('launcher-hosted consults run inside the live plugin with real prepareCall'
       trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
     })
     assert.equal(hosted.status.ok, true)
-    assert.equal(hosted.routerCount, 1)
+    assert.equal(hosted.routerCount, 1, 'named R coverage: route-coldpoint dump-config has exactly one model-router')
     assert.equal(hosted.sink, 0)
     assert.equal(hosted.summary.http, 0)
     assert.equal(hosted.summary.artifact, 'complete')
@@ -341,8 +341,15 @@ test('launcher-hosted consults run inside the live plugin with real prepareCall'
     assert.equal('maxTokens' in hosted.summary.requestConfig, false)
     const judged = hosted.summary.kinds.ask + hosted.summary.kinds.ineligible
     assert.equal(hosted.summary.counts.prepareCall, judged * 2)
+    assert.equal(hosted.consults.length > 0, true)
+    const events = decodePhysicalJsonl(bytes, path).events
+    const starts = events.filter(event => event.type === 'step/start')
+    assert.equal(hosted.consults.length, starts.length)
+    for (const [index, entry] of hosted.consults.entries()) {
+      assert.equal(entry.now, starts[index].time)
+    }
     const judgedConsults = hosted.consults.filter(entry => entry.result.kind === 'ask' || entry.result.kind === 'ineligible')
-    assert.ok(judgedConsults.length > 0)
+    assert.equal(judgedConsults.length, judged)
     for (const entry of judgedConsults) {
       const assessments = entry.result.eligibility?.assessments ?? []
       const flash = assessments.find(item => item.candidateId === 'flash' || item.id === 'flash' || item.model === 'deepseek-v4-flash')
@@ -356,4 +363,93 @@ test('launcher-hosted consults run inside the live plugin with real prepareCall'
   } finally {
     await rm(plant, { recursive: true, force: true })
   }
+})
+
+test('named R coverage: dump-config of route-coldpoint composition has exactly one router', async () => {
+  const one = '- name: "@shres-code/shres-code-model-router"\n  config:\n    initialMode: on\n'
+  assert.equal(countRoutersInDump(one).count, 1)
+  assert.equal(countRoutersInDump(one).row.name, '@shres-code/shres-code-model-router')
+})
+
+test('corrupt input publishes no accepted out file or rows', async () => {
+  const bytes = await readFile(fixture)
+  const header = JSON.parse(bytes.toString('utf8').split('\n')[0])
+  const plant = await mkdtemp(join(tmpdir(), 'bench-replay-corrupt-'))
+  const dir = join(plant, projectKey(header.cwd), encodeSegment(header.id))
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, 'session.jsonl')
+  const torn = Buffer.from(bytes.toString('utf8').trimEnd().slice(0, -10))
+  await writeFile(path, torn)
+  try {
+    await assert.rejects(
+      () => hostReplayTrial({
+        repoRoot: repo,
+        trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+        path,
+        arm: 'C',
+        method,
+        trialOwnRoute: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      }),
+      TrialInputIncompleteError,
+    )
+  } finally {
+    await rm(plant, { recursive: true, force: true })
+  }
+})
+
+test('quota consults use each step/start.time so a job-wide clock cannot hide expiry', async () => {
+  const t0 = 1_000_000
+  const ttlMs = 300_000
+  const warmAt = t0 + 60_000
+  const expiredAt = t0 + 400_000
+  const selection = { provider: 'anthropic', model: 'claude-opus-5-5' }
+  const header = { type: 'session', version: 0, id: 'bench-quota-clock', createdAt: t0, cwd: '/tmp/quota-clock', delegationDepth: 0 }
+  const user = (text, id) => ({ role: 'user', id, content: [{ type: 'text', text }], source: { kind: 'user' } })
+  const events = [
+    { type: 'turn/start', seq: 0, time: t0, data: { turn: 1 } },
+    { type: 'step/start', seq: 1, time: t0, data: { turn: 1, step: 1 } },
+    { type: 'user/message', seq: 2, time: t0 + 1, data: user('one', 'u1'), surfaceOp: 'append' },
+    { type: 'assistant/message', seq: 3, time: t0 + 2, data: { turn: 1, step: 1, message: { role: 'assistant', id: 'a1', content: [{ type: 'text', text: 'done' }], source: { kind: 'model', ...selection } } }, surfaceOp: 'append' },
+    { type: 'turn/end', seq: 4, time: t0 + 3, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/start', seq: 5, time: warmAt, data: { turn: 2 } },
+    { type: 'step/start', seq: 6, time: warmAt, data: { turn: 2, step: 1 } },
+    { type: 'user/message', seq: 7, time: warmAt + 1, data: user('two', 'u2'), surfaceOp: 'append' },
+    { type: 'turn/end', seq: 8, time: warmAt + 2, data: { turn: 2, reason: { kind: 'completed' } } },
+    { type: 'turn/start', seq: 9, time: expiredAt, data: { turn: 3 } },
+    { type: 'step/start', seq: 10, time: expiredAt, data: { turn: 3, step: 1 } },
+    { type: 'user/message', seq: 11, time: expiredAt + 1, data: user('three', 'u3'), surfaceOp: 'append' },
+  ]
+  const body = [JSON.stringify(header), ...events.map(event => JSON.stringify(event)), ''].join('\n')
+  await withPersistence(Buffer.from(body), async ({ persistence, path }) => {
+    const quotaConfig = {
+      ...composedFields.routerConfig,
+      routeFrom: [{ provider: selection.provider, model: selection.model, objective: 'quota' }],
+    }
+    const result = await replayTrialLog({
+      trial: { resolved: true, verifier: { command: 'node verify.mjs', exitCode: 0 } },
+      path,
+      persistence,
+      runtime: {
+        resolveModelInfo: async (provider, model) => ({
+          provider, id: model, name: model, context: { contextWindow: 128_000 }, promptCacheTtlMs: ttlMs,
+        }),
+        prepareCall: async (config) => ({ config }),
+      },
+      routerConfig: quotaConfig,
+      routeBase: selection,
+      trialOwnRoute: selection,
+      requestConfig: selection,
+      ttl: { ttlMs, ttlSource: 'adapter' },
+      method,
+      arm: 'C',
+    })
+    assert.equal(result.consults.length, 3)
+    assert.equal(result.consults[0].now, t0)
+    assert.equal(result.consults[1].now, warmAt)
+    assert.equal(result.consults[2].now, expiredAt)
+    assert.equal(result.consults[1].result.kind, 'warm')
+    assert.notEqual(result.consults[2].result.kind, 'warm')
+    const constantKinds = result.consults.map(entry => entry.result.kind)
+    assert.notDeepEqual(constantKinds, ['ask', 'warm', 'warm'])
+  })
 })
