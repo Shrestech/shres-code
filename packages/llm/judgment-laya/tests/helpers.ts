@@ -11,7 +11,7 @@ import type { LaunchPreflight, SupervisorLogger } from '../src/supervisor.ts'
 import type { LayaGatewayStatus, LayaJudgmentConfig } from '../src/types.ts'
 
 /** Absolute path of the fake gateway script. */
-export const FAKE_GATEWAY = fileURLToPath(new URL('./fixtures/fake-gateway.mjs', import.meta.url))
+const FAKE_GATEWAY = fileURLToPath(new URL('./fixtures/fake-gateway.mjs', import.meta.url))
 /** Pinned revision used by every test configuration. */
 export const REVISION = 'f'.repeat(40)
 /** Manifest digest used by every test configuration. */

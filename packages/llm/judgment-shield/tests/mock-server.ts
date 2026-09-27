@@ -8,7 +8,7 @@ export type MockResponse =
   | { kind: 'stall' }
 
 /** One request received by the local gateway stand-in. */
-export interface RecordedRequest {
+interface RecordedRequest {
   method: string
   path: string
   body: unknown
