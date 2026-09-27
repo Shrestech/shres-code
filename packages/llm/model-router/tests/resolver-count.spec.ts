@@ -26,8 +26,6 @@ import { passthroughRuntime } from './passthrough-runtime.ts'
 const P_DOLLARS = { publicResolves: 2, prepareCalls: 2 } as const
 const P_QUOTA_COLD = { publicResolves: 3, prepareCalls: 2 } as const
 const P_QUOTA_WARM = { publicResolves: 1, prepareCalls: 0 } as const
-const P_HELD_STEP1 = { publicResolves: 3, prepareCalls: 2 } as const
-const P_HELD_STEP2 = { publicResolves: 2, prepareCalls: 2 } as const
 /** Live P prepareCall-failure after metadata TTL success. */
 const P_LIVE_EDGE_SOURCE = 'fallback' as const
 /** Pre-change C 3298dbec40 replayConsultInput on the same edge. */
@@ -203,7 +201,7 @@ describe('live resolveModelInfo counts equal preserved P', () => {
     }
   })
 
-  it('held quota step 1 / step > 1 match preserved P', async () => {
+  it('held quota returns at the next cold point before later steps', async () => {
     const { ctx, session, agent, signal } = await mount(QUOTA)
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
@@ -211,7 +209,7 @@ describe('live resolveModelInfo counts equal preserved P', () => {
     publicResolves = 0
     prepareCalls = 0
     expect(await resolveTurn(ctx, agent, session, signal, 1)).toEqual(CHEAP)
-    expect({ publicResolves, prepareCalls }).toEqual(P_HELD_STEP1)
+    expect({ publicResolves, prepareCalls }).toEqual(P_QUOTA_COLD)
     session.append('assistant/message', {
       turn: 1, step: 1,
       message: createAssistantMessage({
@@ -225,13 +223,17 @@ describe('live resolveModelInfo counts equal preserved P', () => {
     user(session, 'b')
     publicResolves = 0
     prepareCalls = 0
-    expect(await resolveTurn(ctx, agent, session, signal, 2)).toEqual(CHEAP)
-    expect({ publicResolves, prepareCalls }).toEqual(P_HELD_STEP1)
+    expect(await resolveTurn(ctx, agent, session, signal, 2)).toBeUndefined()
+    expect({ publicResolves, prepareCalls }).toEqual({ publicResolves: 1, prepareCalls: 0 })
+    expect(session.events.findLast(event => event.type === 'model-routing/decision')?.data).toMatchObject({
+      reason: 'cold-point-return',
+      coldPoint: { kind: 'session-start' },
+    })
     session.append('step/start', { turn: 2, step: 2 })
     publicResolves = 0
     prepareCalls = 0
-    expect(await resolveTurn(ctx, agent, session, signal, 2, 2)).toEqual(CHEAP)
-    expect({ publicResolves, prepareCalls }).toEqual(P_HELD_STEP2)
+    expect(await resolveTurn(ctx, agent, session, signal, 2, 2)).toBeUndefined()
+    expect({ publicResolves, prepareCalls }).toEqual({ publicResolves: 0, prepareCalls: 0 })
     await ctx.fiber.dispose()
   })
 })
