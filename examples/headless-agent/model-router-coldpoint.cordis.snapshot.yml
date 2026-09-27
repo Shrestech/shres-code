@@ -3,8 +3,10 @@
 # fallback lifetime because the adapter declares none. The fixture jumps the
 # process clock an hour forward before turn 3, so turn 1 starts cold at session
 # start, turn 2 finds the prefix warm after the manual model answered turn 1's
-# second step, turn 3 measures the recorded idle gap and downgrades again, and
-# turn 4 returns the held streak at that cold point without judging.
+# second step, turn 3 measures the recorded idle gap and downgrades again. The
+# fixture then lengthens the fallback lifetime for turn 4, so the held candidate
+# stays selected through a warm turn without another judgment; turn 5 restores
+# the original lifetime and returns the held streak at that cold point.
 
 - id: base
   name: '@shres-code/cordis-plugin-include'
@@ -67,3 +69,8 @@
               lowConfidenceAsk: 1
               clockJumpTurn: 3
               clockJumpMs: 3600000
+              cacheTtlUpdates:
+                - turn: 4
+                  unknownTtlMs: 86400000
+                - turn: 5
+                  unknownTtlMs: 300000

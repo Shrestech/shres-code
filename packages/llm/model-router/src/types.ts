@@ -262,7 +262,7 @@ export type ModelRoutingOutcome = 'downgraded' | 'kept-strong' | 'skipped' | 'er
 export type ModelRoutingReason =
   /** An allowlisted candidate passed the gate (or re-affirmed a held streak). */
   | 'gate-passed'
-  /** The gate failed while the streak is below its amortization horizon. */
+  /** The held selection continues below its horizon, or through a warm quota turn without a fresh judgment. */
   | 'sticky-hold'
   /** No judgment engine is composed. */
   | 'engine-absent'
@@ -331,7 +331,8 @@ export type ModelRoutingReason =
   | 'judgment-error'
   /**
    * The manual route is a `quota` route and its prompt-cache prefix is still
-   * warm, so no switch is attempted and no judgment runs this turn.
+   * warm, so no switch is attempted and no judgment runs this turn. A held
+   * selection uses `sticky-hold` with `coldPoint: null` instead.
    */
   | 'warm-prefix'
   /**
@@ -817,7 +818,7 @@ export interface ModelRoutingStatsSnapshot {
     warmUps: number
     /** Turns with at least one decision. */
     turnsWithDecisions: number
-    /** Decisions a warm quota prefix skipped: reason `warm-prefix`, no judgment call. */
+    /** Decisions whose warm quota prefix skipped judgment: `warm-prefix`, or `sticky-hold` with `coldPoint: null`. */
     warmSkipped: number
   }
   /** Reason histogram over all decisions, largest first. */

@@ -50,6 +50,8 @@ export interface Config {
   deploymentModes?: ('on' | 'off')[]
   /** Turn on which the fixture records an explicit manual `on` choice. */
   manualModeTurn?: number
+  /** Fallback cache lifetimes to write before selected turns. */
+  cacheTtlUpdates?: { turn: number; unknownTtlMs: number }[]
   /**
    * Turn from whose accepted pre-step on, the process clock reads this many
    * milliseconds later than it really is: the recorded idle gap the cold-point
@@ -71,6 +73,10 @@ export const Config: z<Config> = z.object({
   trailingContext: z.string().default(''),
   deploymentModes: z.array(z.union(['on', 'off'] as const)).default([]),
   manualModeTurn: z.number().step(1).min(0).default(0),
+  cacheTtlUpdates: z.array(z.object({
+    turn: z.number().step(1).min(1),
+    unknownTtlMs: z.number().step(1).min(1).max(86_400_000),
+  })).default([]),
   clockJumpTurn: z.number().step(1).min(0).default(0),
   clockJumpMs: z.number().min(0).default(0),
   lowConfidenceAsk: z.number().step(1).min(-1).default(-1),
@@ -101,6 +107,7 @@ class SnapshotJudgment implements JudgmentEngine {
       trailingContext: config.trailingContext ?? '',
       deploymentModes: config.deploymentModes ?? [],
       manualModeTurn: config.manualModeTurn ?? 0,
+      cacheTtlUpdates: config.cacheTtlUpdates ?? [],
       clockJumpTurn: config.clockJumpTurn ?? 0,
       clockJumpMs: config.clockJumpMs ?? 0,
       lowConfidenceAsk: config.lowConfidenceAsk ?? -1,
@@ -211,6 +218,12 @@ export function apply(ctx: Context, config: Config): void {
     const deploymentMode = config.deploymentModes?.[turn - 1]
     if (deploymentMode !== undefined) {
       await ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: deploymentMode })
+    }
+    const cacheTtlUpdate = config.cacheTtlUpdates?.find(update => update.turn === turn)
+    if (cacheTtlUpdate !== undefined) {
+      await ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+        coldPoints: { unknownTtlMs: cacheTtlUpdate.unknownTtlMs },
+      })
     }
     const decision = await next()
     if (decision.kind === 'reject' || !config.trailingContext) return decision

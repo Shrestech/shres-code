@@ -4279,6 +4279,43 @@ describe('the quota cold-point policy', () => {
     expect(b.engine.asks).toHaveLength(asked)
   })
 
+  it.each(['on', 'shadow'] as const)('skips the judge throughout a warm held turn in %s mode', async (mode) => {
+    const b = await bench({
+      config: { ...QUOTA, initialMode: mode, hold: { minSteps: 0, maxSteps: 40 } },
+      capabilities: { [STRONG_KEY]: { promptCacheTtlMs: 1_000 } },
+    })
+    strongTurn(b.session, 1, T0)
+    stepAt(b.session, 2, T0 + 2_000)
+    user(b.session, 'a small change')
+    expect(await b.resolve(2)).toEqual(mode === 'on' ? CHEAP : undefined)
+    closeTurn(b.session, 2)
+    expect(b.engine.asks).toHaveLength(1)
+
+    b.adapter.setModelInfo(STRONG.provider, STRONG.model, { promptCacheTtlMs: 3_600_000 })
+    stepAt(b.session, 3, T0 + 3_000)
+    user(b.session, 'another small change')
+    expect(await b.resolve(3)).toEqual(mode === 'on' ? CHEAP : undefined)
+    expect(b.decision(1)).toMatchObject({ reason: 'sticky-hold', coldPoint: null, selection: CHEAP })
+    expect(b.engine.asks).toHaveLength(1)
+    for (const absent of ['candidateEligibility', 'engineId', 'route', 'latencyMs', 'inputChars']) {
+      expect(b.decision(1)).not.toHaveProperty(absent)
+    }
+
+    // Tool work may outlast the TTL; warmth is fixed for the whole turn.
+    stepAt(b.session, 3, T0 + 3_600_001, 2)
+    user(b.session, 'use the new tool evidence')
+    expect(await b.resolve(3, STRONG, b.signal, 2)).toEqual(mode === 'on' ? CHEAP : undefined)
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decision(2)).toMatchObject({ reason: 'sticky-hold', coldPoint: null })
+    closeTurn(b.session, 3)
+
+    stepAt(b.session, 4, T0 + 3_600_002)
+    user(b.session, 'a fresh turn after the cache expires')
+    expect(await b.resolve(4)).toBeUndefined()
+    expect(b.decision(3)).toMatchObject({ reason: 'cold-point-return', coldPoint: { kind: 'idle' } })
+    expect(b.engine.asks).toHaveLength(1)
+  })
+
   it('hold-cap still bounds a warm streak', async () => {
     const b = await bench({
       config: { ...QUOTA, hold: { minSteps: 0, maxSteps: 2 } },
