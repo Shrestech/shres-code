@@ -1228,6 +1228,24 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-judgment-bench-random"></a>
+
+## `@shres-code/shres-code-judgment-bench-random`
+
+Requires: `judgmentEngines`
+
+```ts config-catalog
+/** Plugin config: the matched entry rate and the draw seed. */
+export interface Config {
+  /** Probability that one consult selects the downgrade candidate. */
+  entryRate: number
+  /** 32-bit seed of the consult draw hash. */
+  seed: number
+}
+```
+
+Source: [`packages/llm/judgment-bench-random/src/index.ts:35`](../packages/llm/judgment-bench-random/src/index.ts)
+
 <a id="shres-codeshres-code-judgment-dispatch"></a>
 
 ## `@shres-code/shres-code-judgment-dispatch`

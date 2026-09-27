@@ -321,7 +321,7 @@ describe('arms registry', () => {
   it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'route-shield', 'compact-basic', 'compact-jev'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'route-shield', 'compact-basic', 'compact-jev', 'route-strong', 'route-cheap', 'route-coldpoint', 'route-random', 'route-static'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -348,7 +348,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['route-shield'].optIn, true)
     assert.equal(ARMS['route-shield'].judgmentKeyEnv, undefined)
     assert.equal(ARMS['route-shield'].expectsModelRouting, true)
-    assert.deepEqual(listDefaultArms(), listArms().filter(name => name !== 'route-shield'))
+    assert.deepEqual(listDefaultArms(), listArms().filter(name => ARMS[name].optIn !== true))
     assert.equal(getArm('off'), ARMS.off)
   })
 
@@ -1395,6 +1395,17 @@ describe('execute.findSessionLog', () => {
 })
 
 describe('execute.resolveHarnessLaunch', () => {
+  it('pins source mappings and refuses an incomplete checkout', async () => {
+    const root = await tempDir('bench-runner-tsconfig-')
+    try {
+      const { repoRoot } = await writeBenchWorld(root, [])
+      assert.deepEqual(resolveHarnessLaunch(repoRoot).env, { TSX_TSCONFIG_PATH: join(repoRoot, 'tsconfig.json') })
+      await rm(join(repoRoot, 'tsconfig.json'))
+      assert.throws(() => resolveHarnessLaunch(repoRoot), /source-launch tsconfig is missing/)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   it('fails loud when the harness repo has no installed dependencies', async () => {
     const root = await tempDir('bench-runner-norepo-')
     try {
@@ -1507,6 +1518,7 @@ async function writeBenchWorld(root, tasks) {
   const benchRoot = join(repoRoot, 'bench')
   await mkdir(join(repoRoot, 'node_modules', 'tsx'), { recursive: true })
   await writeFile(join(repoRoot, 'package.json'), '{"name":"fake-harness","type":"module"}\n')
+  await writeFile(join(repoRoot, 'tsconfig.json'), '{}\n')
   await writeFile(join(repoRoot, 'node_modules', 'tsx', 'package.json'), '{"name":"tsx","version":"0.0.0","type":"module"}\n')
   await writeFile(
     join(repoRoot, 'node_modules', 'tsx', 'esm.js'),

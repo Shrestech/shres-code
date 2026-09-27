@@ -23,8 +23,11 @@ test('the shipped catalog loads under the chain-aware loader', async () => {
   const tasks = await loadTaskCatalog(tasksDir)
   assert.ok(tasks.length >= 3, 'at least the three original tasks')
   for (const task of tasks) {
-    // Exactly one shape: single-session instruction xor chain phases.
-    assert.ok((task.instruction === null) !== (task.phases === null), `${task.taskId}: exactly one of instruction/phases`)
+    // Exactly one shape: single-session instruction, chain phases, or multiturn turns.
+    assert.ok(
+      (task.instruction === null) + (task.phases === null) + (task.turns === null) === 2,
+      `${task.taskId}: exactly one of instruction/phases/turns`,
+    )
   }
   const adoption = tasks.find(task => task.taskId === 'session-query-adoption')
   assert.ok(adoption, 'session-query-adoption is in the catalog')

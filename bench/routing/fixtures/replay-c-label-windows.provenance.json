@@ -1,0 +1,51 @@
+{
+  "source": "real-cli/off-arm/loopback-stub",
+  "sequence": "success,tool_call_success,tool_call_success,success,success",
+  "tool": {
+    "name": "read",
+    "arguments": "{\"file_path\":\"missing-replay-fixture.txt\"}"
+  },
+  "commands": {
+    "stub": [
+      "--import",
+      "file:///Users/parthmondal/git/review/shres-code-wt-c-bench/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs",
+      "/Users/parthmondal/git/review/shres-code-wt-c-bench/packages/test-support/llm-mock-server/src/bin.ts",
+      "--port",
+      "0",
+      "--api-key",
+      "bench-stub",
+      "--sequence",
+      "success,tool_call_success,tool_call_success,success,success",
+      "--tool-name",
+      "read",
+      "--tool-arguments",
+      "{\"file_path\":\"missing-replay-fixture.txt\"}"
+    ],
+    "harness": [
+      "--import",
+      "file:///Users/parthmondal/git/review/shres-code-wt-c-bench/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs",
+      "/Users/parthmondal/git/review/shres-code-wt-c-bench/apps/cli/src/bin.ts"
+    ],
+    "sessionFlags": [
+      "--session-id",
+      "--resume",
+      "--resume"
+    ]
+  },
+  "head": "d9910dea79be1d4e2590f61211d89f9458b8d0aa",
+  "node": "v26.5.0",
+  "sha256": "bf928572fa37f1461703d94477848021f21475426595a8d41ae63087d1e7b3df",
+  "summary": {
+    "turns": 3,
+    "tools": [
+      0,
+      2,
+      0
+    ],
+    "errors": [
+      0,
+      2,
+      0
+    ]
+  }
+}

@@ -27,6 +27,7 @@
     "typesafe"
   ],
   "localJudgeEngines": [
+    "bench-random",
     "laya",
     "shield"
   ]

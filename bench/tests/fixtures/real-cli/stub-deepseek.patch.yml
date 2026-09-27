@@ -1,0 +1,13 @@
+# Bench-owned test overlay: the real DeepSeek adapter over the loopback stub.
+# apiKeyEnv names a stub-only variable so no real key name is ever read.
+- id: llm-deepseek
+  config:
+    baseURL: !!js process.env.BENCH_STUB_BASE_URL
+    apiKeyEnv: BENCH_STUB_KEY
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
+# Title generation would consume a stub answer before the first user turn.
+- id: session-title-llm
+  disabled: true

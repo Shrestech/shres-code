@@ -1,0 +1,13 @@
+{
+  "taskId": "routing-multiturn-config-evolution",
+  "stratum": "routine",
+  "description": "Three scripted turns: fix a default, add a validated key, then migrate callers to the renamed field.",
+  "turns": [
+    "src/config.js loads settings from config.json but `refreshInterval` falls back to 0 when absent, which makes the poller spin. Change the default to 30 (seconds) in src/config.js and make test/config.test.js pass. Do not modify the test file.",
+    "Second request: settings now accept an optional `retries` key. Validate it in src/config.js: absent means 3, present must be an integer from 0 to 10, anything else is a thrown Error naming the key. Add tests for all three cases to test/config.test.js and make the suite pass.",
+    "Third request: rename the settings key `refreshInterval` to `pollSeconds` everywhere (config.js, config.json, and the tests), accepting the old name only as a deprecated alias that logs one warning when used. Keep the whole suite passing."
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 420000,
+  "maxTurns": 40
+}

@@ -6767,6 +6767,22 @@ importers:
         specifier: workspace:^
         version: link:../../settings/settings-file
 
+  packages/llm/judgment-bench-random:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+
   packages/llm/judgment-dispatch:
     dependencies:
       '@shres-code/schemastery':

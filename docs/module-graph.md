@@ -23,6 +23,7 @@ flowchart TD
     pkg_cursor_credential["cursor-credential"]
     pkg_grok_credential["grok-credential"]
     pkg_judgment["judgment"]
+    pkg_judgment_bench_random["judgment-bench-random"]
     pkg_judgment_dispatch["judgment-dispatch"]
     pkg_judgment_guardrails["judgment-guardrails"]
     pkg_judgment_laya["judgment-laya"]
@@ -649,6 +650,8 @@ flowchart TD
   pkg_wiki --> pkg_invariants
   pkg_wiki --> pkg_session
   pkg_wiki --> pkg_settings
+  pkg_judgment_bench_random --> pkg_invariants
+  pkg_judgment_bench_random --> pkg_judgment
   pkg_judgment_dispatch --> pkg_invariants
   pkg_judgment_dispatch --> pkg_judgment
   pkg_judgment_dispatch --> pkg_settings
@@ -1994,6 +1997,7 @@ flowchart TD
 | [`acp-snapshot`](../packages/test-support/acp-snapshot) | `test-support` | [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session) |
 | [`tracker`](../packages/tracker/tracker) | `tracker` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`wiki`](../packages/wiki/wiki) | `wiki` | [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session), [`settings`](../packages/settings/settings) |
+| [`judgment-bench-random`](../packages/llm/judgment-bench-random) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment) |
 | [`judgment-dispatch`](../packages/llm/judgment-dispatch) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
 | [`judgment-guardrails`](../packages/llm/judgment-guardrails) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`session`](../packages/core/session), [`settings`](../packages/settings/settings) |
 | [`judgment-llm`](../packages/llm/judgment-llm) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`llm`](../packages/llm/llm), [`timeout`](../packages/util/timeout) |

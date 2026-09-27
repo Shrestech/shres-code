@@ -1,0 +1,42 @@
+# Pinned treatment rows for the route-strong arm — arm S, always-strong.
+#
+# This file is the source of the arm's rows: ArmEntry.pinnedOverlay names it and
+# bench/runner/arms.js reads it and emits its content verbatim into the arm's
+# per-trial --patch overlay. Nothing restates these values, so the pinned
+# posture and the applied composition cannot drift. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# The arm's strong route is the metered Anthropic key named below. Every strong
+# arm of the routing measurement uses its own key (prereg §3 cache isolation),
+# so no provider cache carries across arms; the runner resolves the named
+# variable like --api-key-env and fails the launch when it resolves to nothing.
+# cacheRetention "long" is the 1-hour TTL posture of prereg §2; the report
+# states the realized TTL posture per the §2.1.1 probe outcome.
+#
+# A config patch replaces the llm-pi-ai entry's whole config, so the anthropic
+# profile is restated whole and the routes this arm never dials are absent. The
+# arm mounts neither the judgment engine nor the router.
+#
+# The metered-route model entry is hand-declared from the spec metadata
+# (1,000,000 context / 128,000 output, adaptive thinking, no temperature),
+# mirroring the claude-session SHIPPED_MODELS figure; the installed pi-ai
+# catalog has no such entry, and the API accepting this id on a metered key is
+# UNPROVEN until the owner-approved first real run.
+- id: agent-default-model
+  config:
+    provider: "anthropic"
+    model: "claude-opus-5-5"
+- id: llm-pi-ai
+  config:
+    providers:
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY_S
+        cacheRetention: "long"
+        models:
+          - id: claude-opus-5-5
+            name: Claude Opus 5.5
+            contextWindow: 1000000
+            maxTokens: 128000
+            compat:
+              forceAdaptiveThinking: true
+              supportsTemperature: false

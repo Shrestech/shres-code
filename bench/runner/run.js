@@ -52,15 +52,18 @@
  */
 
 import { appendFile, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { mulberry32, seededShuffle } from './seeded.js'
+import { drawGaps, trialGapSeed } from './gaps.js'
+import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
+import { assertFixturesCarryNoLauncherConfig, PREFLIGHT_ARMS, runPreflight } from './preflight-models.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
 import {
@@ -107,6 +110,22 @@ Options:
                         in-flight trials finish. Subscription and unpriced calls are not counted.
   --price-snapshot <id> bench/prices snapshot (YYYY-MM-DD) to price trials under
                         (default: the newest snapshot)
+  --arm-seed <n>        32-bit seed that randomizes arm order per task (routing
+                        measurement cache isolation); pinned in run.json
+  --nonce               append a per-trial nonce line to each first user message so
+                        provider caches cannot carry across arms; recorded on the trial
+  --gap-cap-ms <ms>     realized ceiling for a multiturn trial's seeded idle gaps; the
+                        drawn value stays logged (L1/L2: 1200000; L3 runs uncapped)
+  --gap-seed <n>        32-bit seed of the per-trial gap streams; required by multiturn
+                        tasks, pinned in run.json, shared across a trial's arms
+  --calibration         mark the run as a calibration run: the confirmatory-run
+                        registration checks (replay gate passed, overlay equality,
+                        matched N rate) are enforced only without this flag; routing
+                        measurement arms still require a frozen preregistration
+  --confirmatory-overlays <dir>
+                        directory holding the replay writer's generated R and N
+                        overlays; required for confirmatory routing runs, whose
+                        overlays render from these files, pinned by sha256
   --resume               continue an interrupted experiment: reuse its manifest and
                         skip (task, trial, arm) triples already recorded with a
                         delivered verdict (status success); retried provider-error
@@ -168,6 +187,15 @@ export class UsageError extends Error {
  * @property {number} [maxDollars] - experiment-wide cap in API-equivalent dollars; no trial
  *   launches once settled spend plus the in-flight projection would exceed it.
  * @property {string} [priceSnapshot] - `bench/prices` snapshot id; omission resolves to the newest.
+ * @property {number} [armSeed] - 32-bit seed randomizing arm order per task; pinned in run.json.
+ * @property {boolean} [nonce] - append a per-trial nonce line to each first user message.
+ * @property {number} [gapCapMs] - realized ceiling for a multiturn trial's idle gaps; draws stay logged.
+ * @property {number} [gapSeed] - 32-bit seed of the per-trial gap streams; multiturn tasks require it.
+ * @property {boolean} [calibration] - mark the run as a calibration run, exempt from the
+ *   confirmatory registration checks.
+ * @property {string} [confirmatoryOverlays] - directory holding the replay writer's generated R and
+ *   N overlays; required for confirmatory routing runs, whose trial overlays are rendered from
+ *   these files instead of the committed provisional ones.
  */
 
 /**
@@ -194,6 +222,12 @@ export function parseArgs(argv) {
     maxDollars: undefined,
     priceSnapshot: undefined,
     resume: false,
+    armSeed: undefined,
+    nonce: false,
+    gapCapMs: undefined,
+    gapSeed: undefined,
+    confirmatoryOverlays: undefined,
+    calibration: false,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -272,9 +306,39 @@ export function parseArgs(argv) {
         options.priceSnapshot = id
         break
       }
+      case '--confirmatory-overlays': {
+        const dir = value()
+        if (dir.trim() === '') throw new UsageError('--confirmatory-overlays requires a directory path')
+        options.confirmatoryOverlays = dir
+        break
+      }
       case '--resume':
         options.resume = true
         break
+      case '--arm-seed': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 0xffffffff) throw new UsageError('--arm-seed must be an integer from 0 to 4294967295')
+        options.armSeed = parsed
+        break
+      }
+      case '--nonce':
+        options.nonce = true
+        break
+      case '--calibration':
+        options.calibration = true
+        break
+      case '--gap-cap-ms': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--gap-cap-ms must be a positive integer')
+        options.gapCapMs = parsed
+        break
+      }
+      case '--gap-seed': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 0xffffffff) throw new UsageError('--gap-seed must be an integer from 0 to 4294967295')
+        options.gapSeed = parsed
+        break
+      }
       case '--dry-run':
         options.dryRun = true
         break
@@ -319,6 +383,194 @@ export function assertStuffedCompactionGuard(options) {
     + `(${compaction.join(', ')}): compaction would destroy the whole-corpus-in-the-prompt condition `
     + `(protocol rule)`,
   )
+}
+
+/** The confirmatory routing arms: a run without --calibration needs a passed registration. */
+const CONFIRMATORY_ARMS = new Set(['route-coldpoint', 'route-random'])
+
+/**
+ * Keyless pricing preflight (aegis §10.3): refuse a run when any selected arm's
+ * conversation or candidate route is unpriced under the snapshot's price-family
+ * mapping. Runs before any key resolution or spend.
+ * @param {object} options
+ * @param {string} options.benchRoot - the bench directory the overlays resolve in.
+ * @param {string[]} options.arms - selected arm names.
+ * @param {import('./accounting.js').AccountingContext} options.accountingContext - resolved snapshot and config.
+ * @returns {void}
+ * @throws UsageError naming every unpriced route.
+ */
+export function assertRoutesPriced({ benchRoot, arms, accountingContext }) {
+  const fail = []
+  for (const armName of arms) {
+    const arm = getArm(armName)
+    if (arm.pinnedOverlay === undefined) continue
+    let text
+    try {
+      text = readFileSync(join(benchRoot, arm.pinnedOverlay), 'utf8')
+    } catch {
+      // A world built for other arms has no overlay file; nothing to price.
+      continue
+    }
+    const routes = []
+    const base = text.match(/- id: agent-default-model\n  config:\n    provider: "([^"]+)"\n    model: "([^"]+)"/)
+    if (base) routes.push({ provider: base[1], model: base[2] })
+    for (const match of text.matchAll(/\{"id":"[^"]+","provider":"([^"]+)","model":"([^"]+)"/g)) {
+      routes.push({ provider: match[1], model: match[2] })
+    }
+    for (const route of routes) {
+      const family = accountingContext.config.priceProviders[route.provider]
+      const priced = family !== undefined && accountingContext.snapshot.entries.has(`${family}\u0000${route.model}`)
+      if (!priced) fail.push(`${armName}: ${route.provider}/${route.model} is unpriced in the price snapshot (family ${family ?? 'unmapped'})`)
+    }
+  }
+  if (fail.length > 0) throw new UsageError(`keyless pricing preflight failed:\n  ${fail.join('\n  ')}`)
+}
+
+/**
+ * Confirmatory-run registration guard (aegis §10.4): a run of the confirmatory
+ * routing arms without --calibration requires the replay-written registration —
+ * replay gate passed, the R overlay's calibrated point equal to the registration's,
+ * and N's rate and seed equal to the registration's and to R's realized entry rate.
+ * @param {object} options
+ * @param {string} options.benchRoot - the bench directory the registration resolves in.
+ * @param {string[]} options.arms - selected arm names.
+ * @param {string} [options.confirmatoryOverlaysDir] - directory holding the replay writer's
+ *   generated R and N overlays; required for every confirmatory run, because the committed
+ *   provisional overlays never confirm one.
+ * @returns {Promise<void>}
+ * @throws UsageError on a missing directory, a draft, missing or inconsistent,
+ *   not replay-qualified, or mismatching registration, or generated overlays
+ *   that differ from it.
+ */
+export async function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOverlaysDir }) {
+  if (!arms.some(name => CONFIRMATORY_ARMS.has(name))) return
+  if (confirmatoryOverlaysDir === undefined) {
+    throw new UsageError("confirmatory routing runs require --confirmatory-overlays <dir> naming the replay writer's generated R and N overlays; the committed provisional overlays never confirm a run")
+  }
+  let reg
+  try {
+    reg = JSON.parse(readFileSync(join(benchRoot, 'routing', 'prereg-2026-10.registration.json'), 'utf8'))
+  } catch {
+    throw new UsageError('confirmatory routing runs require bench/routing/prereg-2026-10.registration.json, which the offline replay writes after the Laya gate passes; none exists yet (pass --calibration for a calibration run)')
+  }
+  let registrationPhase
+  try {
+    ({ registrationPhase } = await import('../routing/registration-phase.js'))
+  } catch (error) {
+    if (error instanceof Error && /** @type {{ code?: string }} */ (error).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new UsageError('run `pnpm run build` (' + error.message + ')')
+    }
+    throw error
+  }
+  let phase
+  try {
+    phase = registrationPhase(reg)
+  } catch (error) {
+    throw new UsageError(`confirmatory routing runs require a consistent registration; bench/routing/prereg-2026-10.registration.json is inconsistent: ${error.message}`)
+  }
+  if (phase === 'draft') {
+    throw new UsageError('confirmatory routing runs require a frozen preregistration; the registration is still a draft pending the owner budget and method decisions')
+  }
+  if (phase === 'provisional') {
+    throw new UsageError('confirmatory routing runs require a replay-qualified registration; the registration is still provisional and the replay has not written the enforced operating point (pass --calibration for a calibration run)')
+  }
+  if (phase === 'replay-failed') {
+    throw new UsageError('confirmatory routing runs require a replay-qualified registration; the replay gate failed, so routing stays shadow-only (pass --calibration for a calibration run)')
+  }
+  const enforced = reg.enforced ?? {}
+  const generatedOverlay = (name) => {
+    const path = join(confirmatoryOverlaysDir, name)
+    try {
+      return readFileSync(path, 'utf8')
+    } catch (error) {
+      throw new UsageError(`confirmatory routing runs require the generated overlay ${name} in --confirmatory-overlays ${confirmatoryOverlaysDir}: ${/** @type {Error} */ (error).message}`)
+    }
+  }
+  const rOverlay = generatedOverlay('route-coldpoint.patch.yml')
+  const point = rOverlay.match(/"engine":"laya","downgradeThreshold":([\d.]+),"downgradeMargin":([\d.]+),"calibratedBy":"([^"]+)"/)
+  if (!point) throw new UsageError('confirmatory route-coldpoint overlay carries no calibrated operating point; the replay must write it before any confirmatory trial')
+  if (Number(point[1]) !== enforced.downgradeThreshold || Number(point[2]) !== enforced.downgradeMargin || point[3] !== enforced.calibratedBy) {
+    throw new UsageError('confirmatory route-coldpoint overlay differs from the registration (threshold, margin, or calibratedBy)')
+  }
+  const nOverlay = generatedOverlay('random-matched.patch.yml')
+  const rate = nOverlay.match(/entryRate: ([\d.]+)/)
+  const seed = nOverlay.match(/seed: (\d+)/)
+  if (!rate || !seed) throw new UsageError('confirmatory route-random overlay is missing its entryRate or seed')
+  if (Number(rate[1]) !== enforced.entryRate || Number(seed[1]) !== enforced.seed) {
+    throw new UsageError('confirmatory route-random overlay differs from the registration (entryRate or seed)')
+  }
+  if (typeof enforced.realizedREntryRate !== 'number' || Number(rate[1]) !== enforced.realizedREntryRate) {
+    throw new UsageError('confirmatory N rate must equal the realized R entry rate the registration records')
+  }
+}
+
+/**
+ * Refuse routing calibration trial collection while its preregistration is a draft.
+ *
+ * The calibration flag intentionally skips confirmatory adoption checks, but it
+ * must not turn the owner-pending draft into permission to spawn real trials.
+ * Non-routing bench arms keep the general calibration flag's existing behavior.
+ * @param {object} options
+ * @param {string} options.benchRoot - the bench directory the registration resolves in.
+ * @param {string[]} options.arms - selected arm names.
+ * @returns {Promise<void>}
+ * @throws UsageError on a missing, inconsistent, or draft registration.
+ */
+export async function assertCalibrationRegistration({ benchRoot, arms }) {
+  if (!arms.some(name => PREFLIGHT_ARMS.has(name))) return
+  const registrationPath = join(benchRoot, 'routing', 'prereg-2026-10.registration.json')
+  let registration
+  try {
+    registration = JSON.parse(readFileSync(registrationPath, 'utf8'))
+  } catch {
+    throw new UsageError(`routing calibration runs require ${registrationPath} so the frozen preregistration can be checked before trial execution`)
+  }
+  let registrationPhase
+  try {
+    ({ registrationPhase } = await import('../routing/registration-phase.js'))
+  } catch (error) {
+    if (error instanceof Error && /** @type {{ code?: string }} */ (error).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new UsageError('run `pnpm run build` (' + error.message + ')')
+    }
+    throw error
+  }
+  let phase
+  try {
+    phase = registrationPhase(registration)
+  } catch (error) {
+    throw new UsageError(`routing calibration runs require a consistent registration; ${registrationPath} is inconsistent: ${error.message}`)
+  }
+  if (phase === 'draft') {
+    throw new UsageError('routing calibration runs require a frozen preregistration; the registration is still a draft pending the owner budget and method decisions')
+  }
+}
+
+/**
+ * Load the replay writer's generated R and N overlays for a confirmatory run:
+ * one body per confirmatory arm (rendered in place of the committed provisional
+ * file) and one sha256 per file (pinned in run.json so a resume refuses a
+ * changed overlay source).
+ * @param {string} dir - the --confirmatory-overlays directory.
+ * @returns {{ dir: string, bodies: Map<string, string>, sha256s: Record<string, string> }} bodies keyed by arm name, sha256s keyed by overlay file name.
+ * @throws UsageError when a confirmatory arm's generated overlay is missing or unreadable.
+ */
+export function loadConfirmatoryOverlays(dir) {
+  const bodies = new Map()
+  const sha256s = {}
+  for (const armName of CONFIRMATORY_ARMS) {
+    const pinnedOverlay = /** @type {string} */ (getArm(armName).pinnedOverlay)
+    const name = basename(pinnedOverlay)
+    const path = join(dir, name)
+    let text
+    try {
+      text = readFileSync(path, 'utf8').trimEnd()
+    } catch (error) {
+      throw new UsageError(`--confirmatory-overlays ${dir} is missing the generated overlay ${name} for arm ${armName}: ${/** @type {Error} */ (error).message}`)
+    }
+    bodies.set(armName, text)
+    sha256s[name] = createHash('sha256').update(text).digest('hex')
+  }
+  return { dir, bodies, sha256s }
 }
 
 /**
@@ -368,16 +620,20 @@ export function matchTaskIds(taskIds, glob) {
 
 /**
  * Build the interleaved execution plan: arms alternate inside every
- * (task, trial) pair, never all-off-then-all-on.
- * @param {{ taskIds: string[], arms: string[], repeats: number }} options
+ * (task, trial) pair, never all-off-then-all-on. With `armRandom`, the arm
+ * order inside every pair is additionally shuffled from that seeded stream
+ * (the routing measurement's cache isolation): one stream advances across the
+ * whole plan in construction order, so the same seed replays the same order.
+ * @param {{ taskIds: string[], arms: string[], repeats: number, armRandom?: () => number }} options
  * @returns {PlanEntry[]} plan in execution order.
  */
-export function buildPlan({ taskIds, arms, repeats }) {
+export function buildPlan({ taskIds, arms, repeats, armRandom }) {
   /** @type {PlanEntry[]} */
   const plan = []
   for (const taskId of taskIds) {
     for (let trialIndex = 0; trialIndex < repeats; trialIndex += 1) {
-      for (const arm of arms) plan.push({ taskId, trialIndex, arm })
+      const order = armRandom === undefined ? arms : seededShuffle(arms, armRandom)
+      for (const arm of order) plan.push({ taskId, trialIndex, arm })
     }
   }
   return plan
@@ -402,11 +658,15 @@ export function looksLikeProviderError(stdout, stderr) {
 /**
  * @typedef {object} TaskDefinition
  * @property {string} taskId
- * @property {string | null} instruction - single-session prompt; null on chain tasks.
+ * @property {string | null} instruction - single-session prompt; null on chain and multiturn tasks.
  * @property {string | null} stuffedInstruction - stuffed-arm prompt with the corpus inlined; null when absent.
  * @property {Record<string, string> | null} armInstructions - per-arm prompt override (cued family); null when absent.
  * @property {TaskPhase[] | null} phases - chain phases (at least 2); null on single-session
- *   tasks. Exactly one of `instruction`/`phases` is non-null.
+ *   and multiturn tasks.
+ * @property {string[] | null} turns - multiturn scripted user turns (3-8), the routing
+ *   measurement's task form; turns[0] is the initial instruction. Exactly one of
+ *   `instruction`/`phases`/`turns` is non-null. Execution needs the headless follow-up
+ *   surface and is refused, fail-loud, until it lands.
  * @property {string} verify
  * @property {string | null} setup - optional pre-spawn command (`node setup.mjs`); null when absent.
  * @property {number} timeoutMs - per-spawn timeout; the per-phase default on chains.
@@ -426,7 +686,21 @@ export async function loadTaskCatalog(tasksRoot) {
   const tasks = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const dir = join(tasksRoot, entry.name)
+    // A suite container (no task.json of its own) groups one measurement's
+    // tasks one level below — bench/tasks/routing-multiturn/ — and is never
+    // itself a task; an empty or task.json-less leaf still fails loud.
+    const outer = join(tasksRoot, entry.name)
+    /** @type {{ name: string, nested: boolean }[]} */
+    let taskEntries = [{ name: entry.name, nested: false }]
+    if (!existsSync(join(outer, 'task.json'))) {
+      const children = await readdir(outer, { withFileTypes: true })
+      if (!children.some(item => item.isDirectory())) {
+        throw new Error(`task ${entry.name}: missing task.json`)
+      }
+      taskEntries = children.filter(item => item.isDirectory()).map(item => ({ name: item.name, nested: true }))
+    }
+    for (const taskEntry of taskEntries) {
+    const dir = taskEntry.nested ? join(outer, taskEntry.name) : outer
     /** @type {Record<string, unknown>} */
     let definition
     try {
@@ -434,36 +708,50 @@ export async function loadTaskCatalog(tasksRoot) {
     } catch (error) {
       throw new Error(`task ${entry.name}: cannot read task.json: ${/** @type {Error} */ (error).message}`)
     }
-    if (definition.taskId !== entry.name) {
-      throw new Error(`task ${entry.name}: task.json taskId must equal the directory name`)
+    if (definition.taskId !== taskEntry.name) {
+      throw new Error(`task ${taskEntry.name}: task.json taskId must equal the directory name`)
     }
     /** @type {string | null} */
     let instruction = null
     /** @type {TaskPhase[] | null} */
     let phases = null
-    if (definition.phases !== undefined) {
+    /** @type {string[] | null} */
+    let turns = null
+    if (definition.turns !== undefined) {
       if (definition.instruction !== undefined) {
-        throw new Error(`task ${entry.name}: task.json instruction is not allowed when phases is present`)
+        throw new Error(`task ${taskEntry.name}: task.json instruction is not allowed when turns is present`)
+      }
+      if (definition.phases !== undefined) {
+        throw new Error(`task ${taskEntry.name}: task.json turns and phases are mutually exclusive`)
+      }
+      if (!Array.isArray(definition.turns) || definition.turns.length < 3 || definition.turns.length > 8
+        || definition.turns.some(turn => typeof turn !== 'string' || turn.trim() === '')) {
+        throw new Error(`task ${taskEntry.name}: task.json turns must be an array of 3-8 non-empty strings`)
+      }
+      turns = /** @type {string[]} */ (definition.turns)
+    } else if (definition.phases !== undefined) {
+      if (definition.instruction !== undefined) {
+        throw new Error(`task ${taskEntry.name}: task.json instruction is not allowed when phases is present`)
       }
       if (!Array.isArray(definition.phases) || definition.phases.length < 2) {
-        throw new Error(`task ${entry.name}: task.json phases must be an array of at least 2 phases`)
+        throw new Error(`task ${taskEntry.name}: task.json phases must be an array of at least 2 phases`)
       }
       phases = definition.phases.map((phase, index) => {
         const p = /** @type {Record<string, unknown>} */ (phase)
         if (typeof p !== 'object' || p === null || Array.isArray(p)) {
-          throw new Error(`task ${entry.name}: task.json phases[${index}] must be a record`)
+          throw new Error(`task ${taskEntry.name}: task.json phases[${index}] must be a record`)
         }
         if (typeof p.instruction !== 'string' || p.instruction.trim() === '') {
-          throw new Error(`task ${entry.name}: task.json phases[${index}].instruction must be a non-empty string`)
+          throw new Error(`task ${taskEntry.name}: task.json phases[${index}].instruction must be a non-empty string`)
         }
         if (p.timeoutMs !== undefined && (!Number.isSafeInteger(p.timeoutMs) || /** @type {number} */ (p.timeoutMs) < 1)) {
-          throw new Error(`task ${entry.name}: task.json phases[${index}].timeoutMs must be a positive integer`)
+          throw new Error(`task ${taskEntry.name}: task.json phases[${index}].timeoutMs must be a positive integer`)
         }
         return { instruction: p.instruction, timeoutMs: p.timeoutMs === undefined ? null : /** @type {number} */ (p.timeoutMs) }
       })
     } else {
       if (typeof definition.instruction !== 'string' || definition.instruction.trim() === '') {
-        throw new Error(`task ${entry.name}: task.json instruction must be a non-empty string`)
+        throw new Error(`task ${taskEntry.name}: task.json instruction must be a non-empty string`)
       }
       instruction = definition.instruction
     }
@@ -471,7 +759,7 @@ export async function loadTaskCatalog(tasksRoot) {
     let stuffedInstruction = null
     if (definition.stuffedInstruction !== undefined) {
       if (typeof definition.stuffedInstruction !== 'string' || definition.stuffedInstruction.trim() === '') {
-        throw new Error(`task ${entry.name}: task.json stuffedInstruction must be a non-empty string`)
+        throw new Error(`task ${taskEntry.name}: task.json stuffedInstruction must be a non-empty string`)
       }
       stuffedInstruction = definition.stuffedInstruction
     }
@@ -483,46 +771,48 @@ export async function loadTaskCatalog(tasksRoot) {
         || definition.armInstructions === null
         || Array.isArray(definition.armInstructions)
       ) {
-        throw new Error(`task ${entry.name}: task.json armInstructions must be a record of non-empty strings`)
+        throw new Error(`task ${taskEntry.name}: task.json armInstructions must be a record of non-empty strings`)
       }
       armInstructions = {}
       for (const [name, text] of Object.entries(/** @type {Record<string, unknown>} */ (definition.armInstructions))) {
         if (typeof text !== 'string' || text.trim() === '') {
-          throw new Error(`task ${entry.name}: task.json armInstructions.${name} must be a non-empty string`)
+          throw new Error(`task ${taskEntry.name}: task.json armInstructions.${name} must be a non-empty string`)
         }
         armInstructions[name] = text
       }
     }
     if (typeof definition.verify !== 'string' || definition.verify.trim() === '') {
-      throw new Error(`task ${entry.name}: task.json verify must be a non-empty string`)
+      throw new Error(`task ${taskEntry.name}: task.json verify must be a non-empty string`)
     }
     /** @type {string | null} */
     let setup = null
     if (definition.setup !== undefined) {
       if (typeof definition.setup !== 'string' || definition.setup.trim() === '') {
-        throw new Error(`task ${entry.name}: task.json setup must be a non-empty string`)
+        throw new Error(`task ${taskEntry.name}: task.json setup must be a non-empty string`)
       }
       setup = definition.setup
     }
     if (!Number.isSafeInteger(definition.timeoutMs) || /** @type {number} */ (definition.timeoutMs) < 1) {
-      throw new Error(`task ${entry.name}: task.json timeoutMs must be a positive integer`)
+      throw new Error(`task ${taskEntry.name}: task.json timeoutMs must be a positive integer`)
     }
     try {
       await readdir(join(dir, 'fixture'))
     } catch {
-      throw new Error(`task ${entry.name}: missing fixture/ directory`)
+      throw new Error(`task ${taskEntry.name}: missing fixture/ directory`)
     }
     tasks.push({
-      taskId: entry.name,
+      taskId: taskEntry.name,
       instruction,
       stuffedInstruction,
       armInstructions,
       phases,
+      turns,
       verify: definition.verify,
       setup,
       timeoutMs: /** @type {number} */ (definition.timeoutMs),
       dir,
     })
+    }
   }
   return tasks
 }
@@ -595,16 +885,36 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {AbortSignal} [options.signal]
  * @param {number} [options.maxTotalTokens] - live per-trial token cap.
  * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
- * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null, accounting: import('./accounting.js').TrialAccounting }>}
+ * @param {string[]} [options.sessionArgs] - app-level session flags (`--session-id`/`--resume`)
+ *   placed after the launcher flags and before the task positional.
+ * @param {{ content: string, lastSeq: number }} [options.priorLog] - the session log as the
+ *   previous turn left it. When set, the spawn is a same-session resume: the metrics fold
+ *   only the appended suffix (seq above the prior last), and a log that no longer starts
+ *   with the prior bytes is reported as a byte-prefix violation.
+ * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null, accounting: import('./accounting.js').TrialAccounting, prefixViolation: boolean }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, sessionArgs = [], priorLog = null, pinnedBody = undefined }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
-  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
-  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens })
-  const metrics = execution.sessionLogPath === null
+  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot, pinnedBody }))
+  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, sessionArgs, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens })
+  let logText = execution.sessionLogPath === null ? null : await readFile(execution.sessionLogPath, 'utf8')
+  let prefixViolation = false
+  if (logText !== null && priorLog !== null) {
+    // The session file may only grow: the prior bytes must survive verbatim.
+    prefixViolation = !logText.startsWith(priorLog.content)
+    if (!prefixViolation) {
+      const kept = logText.split('\n').filter(line => {
+        if (line.trim() === '') return false
+        try { return JSON.parse(line).seq === undefined || JSON.parse(line).seq > priorLog.lastSeq }
+        catch { return true }
+      })
+      logText = kept.join('\n') + '\n'
+    }
+  }
+  const metrics = logText === null
     ? emptyMetrics()
-    : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
+    : foldSessionLog(logText, {
         expectsSessionQuery: arm.expectsSessionQuery ?? true,
         expectsJspace: arm.expectsJspace ?? true,
         expectsResearcher: arm.expectsResearcher ?? false,
@@ -627,7 +937,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
   const sessionFile = execution.sessionLogPath === null
     ? null
     : relative(armDir, execution.sessionLogPath).split(sep).join('/')
-  return { execution, metrics, sessionFile, accounting }
+  return { execution, metrics, sessionFile, accounting, prefixViolation }
 }
 
 /**
@@ -779,19 +1089,25 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {AbortSignal} [options.signal]
  * @param {number} [options.maxTotalTokens] - live per-trial token cap.
  * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
+ * @param {string | null} options.nonce - per-trial nonce appended to the first user message
+ *   (cache isolation); null records no nonce. The nonce is model-visible and logged, and its
+ *   value rides the trial record.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null, pinnedBody = undefined }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   if (task.setup !== null) {
     await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
   }
+  const taskText = nonce === null
+    ? resolveTaskInstruction(task, arm)
+    : `${resolveTaskInstruction(task, arm)}\n\nTrial nonce: ${nonce}`
   const { execution, metrics, sessionFile, accounting } = await executeSpawn({
     repoRoot,
     arm,
     armDir,
     sessionLogRoot,
-    taskText: resolveTaskInstruction(task, arm),
+    taskText,
     scratchDir,
     timeoutMs: task.timeoutMs,
     env,
@@ -799,6 +1115,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     signal,
     maxTotalTokens,
     accountingContext,
+    pinnedBody,
   })
   const outcome = classifySpawn(execution)
   const executionEvidence = {
@@ -818,6 +1135,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
       metrics,
       sessionFile,
       execution: executionEvidence,
+      ...(nonce === null ? {} : { nonce }),
       ...priced,
       endedAt,
     }
@@ -833,8 +1151,172 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     metrics,
     sessionFile,
     execution: executionEvidence,
+    ...(nonce === null ? {} : { nonce }),
     ...priced,
     endedAt,
+  }
+}
+
+/** Realtime delay that settles early on abort. */
+function delay(ms, signal) {
+  return new Promise(resolve => {
+    const timer = setTimeout(done, ms)
+    function done() {
+      signal?.removeEventListener('abort', done)
+      clearTimeout(timer)
+      resolve()
+    }
+    signal?.addEventListener('abort', done)
+  })
+}
+
+/** Highest seq in a session log, or null when no line carries one. */
+function lastSeqOf(logText) {
+  let max = null
+  for (const line of logText.split('\n')) {
+    if (line.trim() === '') continue
+    try {
+      const seq = JSON.parse(line).seq
+      if (typeof seq === 'number' && (max === null || seq > max)) max = seq
+    } catch { /* the header line carries no seq */ }
+  }
+  return max
+}
+
+/**
+ * Run one multiturn trial (aegis §10.1): one spawn per scripted user turn
+ * over ONE session — phase 0 spawns with `--session-id`, every later turn
+ * with `--resume` — with a seeded real idle gap between spawns, suffix-only
+ * metrics (seq above the previous phase's last), and a byte-prefix integrity
+ * check that the session file only ever grew. The verifier runs once, after
+ * the last turn, on the carried workspace. PROVIDER_ERROR/HARNESS_ERROR ends
+ * the trial with the turns completed so far.
+ * @param {object} options
+ * @param {TaskDefinition} options.task - the multiturn task under trial (`turns` non-null).
+ * @param {PlanEntry} options.entry - the plan entry.
+ * @param {{ name: string, jspace: Record<string, unknown> }} options.arm - the arm entry.
+ * @param {string} options.armDir - the arm's output directory.
+ * @param {string} options.scratchDir - prepared trial scratch dir (fixture already copied).
+ * @param {string} options.sessionRoot - the trial's single session root, shared by every turn.
+ * @param {string} options.repoRoot - harness repository root.
+ * @param {NodeJS.ProcessEnv} options.env - child environment.
+ * @param {string} options.startedAt - trial start, ISO 8601.
+ * @param {{ index: number, drawnMs: number, gapMs: number }[]} options.gaps - the trial's
+ *   seeded idle gaps, drawn once per (task, repeat) and shared across arms.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
+ * @param {number} [options.maxTotalTokens] - live per-turn token cap.
+ * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
+ * @param {string | null} [options.nonce] - per-trial nonce appended to the first turn's user message.
+ * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
+ */
+async function runMultiturnTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, nonce = null, gaps, pinnedBody = undefined }) {
+  const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
+  const sessionId = `session-${randomUUID().slice(0, 8)}`
+  const definitions = /** @type {string[]} */ (task.turns)
+  if (task.setup !== null) {
+    await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot: sessionRoot, signal })
+  }
+  /** @type {import('../schema/trial.js').PhaseRecord[]} */
+  const phases = []
+  /** @type {string[]} */
+  const violations = []
+  let priorLog = null
+  for (let index = 0; index < definitions.length; index += 1) {
+    if (index > 0) {
+      await delay(gaps[index - 1].gapMs, signal)
+      if (signal?.aborted) break
+    }
+    if (signal?.aborted) break
+    const phaseStartedAt = new Date().toISOString()
+    const turnText = index === 0 && nonce !== null ? `${definitions[index]}\n\nTrial nonce: ${nonce}` : definitions[index]
+    const { execution, metrics, sessionFile, accounting, prefixViolation } = await executeSpawn({
+      repoRoot,
+      arm,
+      armDir,
+      sessionLogRoot: sessionRoot,
+      taskText: turnText,
+      scratchDir,
+      timeoutMs: task.timeoutMs,
+      env,
+      extraPatchPaths,
+      signal,
+      maxTotalTokens,
+      accountingContext,
+      sessionArgs: index === 0 ? ['--session-id', sessionId] : ['--resume', sessionId],
+      priorLog,
+      pinnedBody,
+    })
+    if (prefixViolation) violations.push(`turn ${index}: the session file did not grow byte-prefix from the previous turn`)
+    phases.push({
+      phaseIndex: index,
+      sessionFile,
+      resumedFrom: index === 0 ? null : /** @type {string} */ (phases[index - 1].sessionFile),
+      exitCode: execution.exitCode,
+      timedOut: execution.timedOut,
+      budgetExceeded: execution.budgetExceeded,
+      metrics,
+      accounting,
+      startedAt: phaseStartedAt,
+      endedAt: new Date().toISOString(),
+    })
+    const outcome = classifySpawn(execution)
+    if (outcome === 'provider-error' || outcome === 'harness-error') {
+      const summed = sumPhaseMetrics(phases)
+      return {
+        ...base,
+        status: 'error',
+        resolved: false,
+        failureMode: outcome === 'provider-error' ? 'PROVIDER_ERROR' : 'HARNESS_ERROR',
+        verifier: skippedVerifier(spawnFailureDetail(outcome, execution, ` in turn ${index}`)),
+        metrics: summed,
+        sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
+        phases: [...phases],
+        ...(violations.length > 0 ? { integrity: { violations: [...violations] } } : {}),
+        ...(nonce === null ? {} : { nonce }),
+        ...pricedPhases(phases, accountingContext),
+        endedAt: new Date().toISOString(),
+      }
+    }
+    const logPath = sessionFile === null ? null : join(armDir, sessionFile)
+    if (logPath !== null && existsSync(logPath)) {
+      const content = await readFile(logPath, 'utf8')
+      priorLog = { content, lastSeq: lastSeqOf(content) ?? 0 }
+    }
+  }
+  if (phases.length === 0 || signal?.aborted) {
+    return {
+      ...base,
+      status: 'error',
+      resolved: false,
+      failureMode: 'HARNESS_ERROR',
+      verifier: skippedVerifier('aborted before the multiturn turns completed'),
+      metrics: phases.length === 0 ? emptyMetrics() : sumPhaseMetrics(phases),
+      sessionFile: phases.length === 0 ? null : /** @type {string | null} */ (phases.at(-1).sessionFile),
+      ...(phases.length > 0 ? { phases: [...phases] } : {}),
+      ...(violations.length > 0 ? { integrity: { violations: [...violations] } } : {}),
+      ...(nonce === null ? {} : { nonce }),
+      ...(phases.length > 0 ? { ...pricedPhases(phases, accountingContext) } : {}),
+      endedAt: new Date().toISOString(),
+    }
+  }
+  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
+  const anyTurnTimedOut = phases.some(phase => phase.timedOut)
+  const anyTurnBudgetExceeded = phases.some(phase => phase.budgetExceeded)
+  return {
+    ...base,
+    status: 'success',
+    resolved: verifier.resolved,
+    failureMode: verifier.resolved ? null : anyTurnBudgetExceeded ? 'BUDGET_EXCEEDED' : anyTurnTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
+    verifier,
+    metrics: sumPhaseMetrics(phases),
+    sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
+    phases: [...phases],
+    ...(violations.length > 0 ? { integrity: { violations: [...violations] } } : {}),
+    ...(nonce === null ? {} : { nonce }),
+    gaps,
+    ...pricedPhases(phases, accountingContext),
+    endedAt: new Date().toISOString(),
   }
 }
 
@@ -861,7 +1343,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {import('./accounting.js').AccountingContext} options.accountingContext - snapshot and config to price under.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens, accountingContext }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens, accountingContext, pinnedBody = undefined }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -884,6 +1366,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       signal,
       maxTotalTokens,
       accountingContext,
+      pinnedBody,
     })
     phases.push({
       phaseIndex: index,
@@ -1085,8 +1568,21 @@ export async function main(argv, io = {}) {
     extraPatchPaths.push(absPath)
   }
 
-  const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
+  // One stream advances across the whole plan in construction order, so the
+  // same --arm-seed replays the same per-task arm order.
+  const plan = buildPlan({
+    taskIds,
+    arms: options.arms,
+    repeats: options.repeats,
+    ...(options.armSeed === undefined ? {} : { armRandom: mulberry32(options.armSeed) }),
+  })
   const experimentDir = join(benchRoot, 'runs', options.experiment)
+  // A confirmatory run adopts the replay writer's generated R and N overlays:
+  // their bodies replace the committed provisional files in every rendered arm
+  // overlay, and their hashes pin the run manifest.
+  const confirmatory = options.confirmatoryOverlays === undefined
+    ? null
+    : loadConfirmatoryOverlays(options.confirmatoryOverlays)
 
   /** @type {import('./accounting.js').AccountingContext} */
   let accountingContext
@@ -1109,6 +1605,7 @@ export async function main(argv, io = {}) {
       ? ''
       : `  tierPatches: ${tierPatchRecords.map(r => `${r.path} (${r.sha256.slice(0, 12)}…)`).join(', ')}`
     print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
+    print(`armSeed: ${options.armSeed ?? '(register order)'}  gapSeed: ${options.gapSeed ?? '(unset)'}  gapCapMs: ${options.gapCapMs ?? '(uncapped)'}  nonce: ${options.nonce ? 'on' : 'off'}`)
     print(`priceSnapshot: ${priceSnapshot}  maxDollars: ${maxDollars === null ? '(uncapped)' : maxDollars}`)
     print(`tasks: ${taskIds.join(', ')}`)
     // The integrity check a dry run exists for: render every selected arm's
@@ -1119,7 +1616,7 @@ export async function main(argv, io = {}) {
       const entry = /** @type {PlanEntry} */ (plan.find(candidate => candidate.arm === armName))
       const sessionLogRoot = join(experimentDir, armName, 'sessions', entry.taskId, String(entry.trialIndex))
       print(`overlay [${armName}] ${sessionLogRoot}`)
-      for (const line of renderArmOverlay(getArm(armName), { sessionLogRoot }).trimEnd().split('\n')) {
+      for (const line of renderArmOverlay(getArm(armName), { sessionLogRoot, pinnedBody: confirmatory?.bodies.get(armName) }).trimEnd().split('\n')) {
         print(`  ${line}`)
       }
     }
@@ -1127,11 +1624,29 @@ export async function main(argv, io = {}) {
     if (options.concurrency > 1) print(`concurrency: ${options.concurrency}`)
     for (const entry of plan) {
       const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
-      const suffix = task.phases === null ? '' : ` (${task.phases.length} phases)`
+      const suffix = task.phases !== null
+        ? ` (${task.phases.length} phases)`
+        : task.turns !== null ? ` (${task.turns.length} turns)` : ''
       print(`  ${entry.taskId} #${entry.trialIndex} [${entry.arm}]${suffix}`)
     }
     return 0
   }
+
+  // Keyless preflights before any key resolution or spend: unpriced routes
+  // refuse the run (aegis §10.3), and confirmatory routing runs require the
+  // replay-passed registration with matching overlays (aegis §10.4).
+  if (options.calibration) await assertCalibrationRegistration({ benchRoot, arms: options.arms })
+  assertRoutesPriced({ benchRoot, arms: options.arms, accountingContext })
+  if (!options.calibration) await assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
+  // The composed-metadata preflight (prereg §8) boots the real launcher per
+  // routing-measurement arm and resolves every conversation and candidate
+  // route against the real adapter registry — keyless, spend-free, and before
+  // any key resolution. Refused arms and unresolved routes fail the run by
+  // name; the loopback request sink must stay at zero requests.
+  if (options.arms.some(arm => PREFLIGHT_ARMS.has(arm))) {
+    await assertFixturesCarryNoLauncherConfig(taskIds.map(id => /** @type {TaskDefinition} */ (tasks.get(id))))
+  }
+  await runPreflight({ repoRoot, benchRoot, arms: options.arms, env, confirmatory: !options.calibration, pinnedBodies: confirmatory?.bodies })
 
   if (apiKeyEnv !== 'none') {
     const fromEnv = env[apiKeyEnv]
@@ -1154,6 +1669,24 @@ export async function main(argv, io = {}) {
     .map(name => getArm(name).judgmentKeyEnv)
     .filter(name => typeof name === 'string'))]
   env = await injectStoredCredentials(env, optionalCredentials)
+  // A routing-measurement arm's own base-route key is a required condition, not
+  // an optional engine reference: the launch fails when it resolves to nothing.
+  // Resolved values reach only that arm's trial environment, never the shared one.
+  const armKeys = new Map()
+  for (const armName of options.arms) {
+    const armEnv = getArm(armName).apiKeyEnv
+    if (armEnv === undefined) continue
+    const fromEnv = env[armEnv]
+    const key = typeof fromEnv === 'string' && fromEnv !== ''
+      ? fromEnv
+      : await readStoredCredential(env, armEnv)
+    if (key === null) {
+      throw new UsageError(
+        `${armEnv} is required for arm ${armName} (its strong route's metered key): export it or add it to the harness credential store`,
+      )
+    }
+    armKeys.set(armEnv, key)
+  }
 
   const shresHome = join(experimentDir, '.shres-home')
   const gitCommit = await resolveGitCommit(repoRoot)
@@ -1176,6 +1709,9 @@ export async function main(argv, io = {}) {
       const mismatches = resumePinMismatches(existing, {
         model, baseUrl, temperature, taskIds, tierPatches: tierPatchRecords, maxTotalTokens: options.maxTotalTokens ?? null, apiKeyEnv,
         maxDollars, priceSnapshot, accountingConfigSha256: accountingContext.configSha256,
+        armSeed: options.armSeed ?? null, gapSeed: options.gapSeed ?? null, gapCapMs: options.gapCapMs ?? null,
+        nonce: options.nonce, armApiKeyEnv: getArm(armName).apiKeyEnv ?? null,
+        confirmatoryOverlays: confirmatory === null ? null : { dir: confirmatory.dir, sha256s: confirmatory.sha256s },
       })
       if (mismatches.length > 0) {
         throw new UsageError(
@@ -1216,6 +1752,12 @@ export async function main(argv, io = {}) {
       maxDollars,
       priceSnapshot,
       accountingConfigSha256: accountingContext.configSha256,
+      armSeed: options.armSeed ?? null,
+      gapSeed: options.gapSeed ?? null,
+      gapCapMs: options.gapCapMs ?? null,
+      nonce: options.nonce,
+      armApiKeyEnv: getArm(armName).apiKeyEnv ?? null,
+      confirmatoryOverlays: confirmatory === null ? null : { dir: confirmatory.dir, sha256s: confirmatory.sha256s },
       startedAt,
       endedAt: '',
     }
@@ -1254,6 +1796,12 @@ export async function main(argv, io = {}) {
     if ((stored.maxTotalTokens ?? null) !== pins.maxTotalTokens) diffs.push('maxTotalTokens')
     if (stored.apiKeyEnv !== pins.apiKeyEnv) diffs.push('apiKeyEnv')
     if ((stored.maxDollars ?? null) !== pins.maxDollars) diffs.push('maxDollars')
+    if ((stored.armSeed ?? null) !== pins.armSeed) diffs.push('armSeed')
+    if ((stored.gapSeed ?? null) !== pins.gapSeed) diffs.push('gapSeed')
+    if ((stored.gapCapMs ?? null) !== pins.gapCapMs) diffs.push('gapCapMs')
+    if ((stored.nonce ?? false) !== pins.nonce) diffs.push('nonce')
+    if ((stored.armApiKeyEnv ?? null) !== pins.armApiKeyEnv) diffs.push('armApiKeyEnv')
+    if (JSON.stringify(stored.confirmatoryOverlays ?? null) !== JSON.stringify(pins.confirmatoryOverlays ?? null)) diffs.push('confirmatoryOverlays')
     if (stored.priceSnapshot !== undefined && stored.priceSnapshot !== pins.priceSnapshot) diffs.push('priceSnapshot')
     if (stored.accountingConfigSha256 !== undefined && stored.accountingConfigSha256 !== pins.accountingConfigSha256) {
       diffs.push('accountingConfigSha256')
@@ -1283,6 +1831,9 @@ export async function main(argv, io = {}) {
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
     const trialEnv = { ...env, SHRES_HOME: shresHome }
+    if (arm.apiKeyEnv !== undefined && armKeys.has(arm.apiKeyEnv)) {
+      trialEnv[arm.apiKeyEnv] = armKeys.get(arm.apiKeyEnv)
+    }
 
     if (options.concurrency > 1) {
       print(`[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] running`)
@@ -1319,7 +1870,27 @@ export async function main(argv, io = {}) {
     /** @type {import('../schema/trial.js').PhaseRecord[] | undefined} */
     let chainPhases
     try {
-      if (task.phases === null) {
+      if (task.turns !== null) {
+        if (options.gapSeed === undefined) {
+          throw new Error(`multiturn task ${entry.taskId} requires --gap-seed: the seeded idle gaps are part of the measured condition`)
+        }
+        trial = await runMultiturnTrial({
+          task, entry, arm, armDir, scratchDir,
+          sessionRoot,
+          repoRoot, env: trialEnv, startedAt: trialStartedAt,
+          extraPatchPaths,
+          signal,
+          maxTotalTokens: options.maxTotalTokens,
+          accountingContext,
+          nonce: options.nonce ? randomUUID().slice(0, 8) : null,
+          gaps: drawGaps({
+            seed: trialGapSeed(/** @type {number} */ (options.gapSeed), entry.taskId, entry.trialIndex),
+            count: /** @type {string[]} */ (task.turns).length - 1,
+            capMs: options.gapCapMs ?? null,
+          }),
+          pinnedBody: confirmatory?.bodies.get(armName),
+        })
+      } else if (task.phases === null) {
         trial = await runSingleSessionTrial({
           task, entry, arm, armDir, scratchDir,
           sessionLogRoot: sessionRoot,
@@ -1328,6 +1899,8 @@ export async function main(argv, io = {}) {
           signal,
           maxTotalTokens: options.maxTotalTokens,
           accountingContext,
+          nonce: options.nonce ? randomUUID().slice(0, 8) : null,
+          pinnedBody: confirmatory?.bodies.get(armName),
         })
       } else {
         chainPhases = []
@@ -1340,6 +1913,7 @@ export async function main(argv, io = {}) {
           maxTotalTokens: options.maxTotalTokens,
           signal,
           accountingContext,
+          pinnedBody: confirmatory?.bodies.get(armName),
         })
       }
     } catch (error) {
