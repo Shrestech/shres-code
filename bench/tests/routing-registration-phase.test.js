@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { REGISTRATION_STATUS, registrationPhase } from '../routing/registration-phase.js'
+import { DRAFT_STATUS, REGISTRATION_STATUS, registrationPhase } from '../routing/registration-phase.js'
 import { fixtureMethod } from './replay-fixture-method.js'
 
 /** A minimal consistent provisional registration. */
@@ -18,8 +18,18 @@ function provisional() {
     schema: 'shres-code/routing-measurement@1',
     method: fixtureMethod(),
     registration: 'prereg-2026-10',
-    status: 'preregistered',
+    status: REGISTRATION_STATUS,
     authorizes: 'confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval',
+  }
+}
+
+/** A draft registration before the owner freezes the method and budget. */
+function draft() {
+  return {
+    ...provisional(),
+    status: DRAFT_STATUS,
+    draftedAt: '2026-09-27',
+    registeredAt: null,
   }
 }
 
@@ -35,13 +45,16 @@ function enforced() {
   }
 }
 
-test('the committed registration reads as provisional', () => {
+test('the committed registration reads as a draft', () => {
   const committed = JSON.parse(readFileSync(fileURLToPath(new URL('../routing/prereg-2026-10.registration.json', import.meta.url)), 'utf8'))
-  assert.equal(registrationPhase(committed), 'provisional')
-  assert.equal(committed.status, REGISTRATION_STATUS)
+  assert.equal(registrationPhase(committed), 'draft')
+  assert.equal(committed.status, DRAFT_STATUS)
+  assert.equal(committed.draftedAt, '2026-09-27')
+  assert.equal(committed.registeredAt, null)
 })
 
 test('one case per phase', () => {
+  assert.equal(registrationPhase(draft()), 'draft')
   assert.equal(registrationPhase(provisional()), 'provisional')
   assert.equal(registrationPhase({ ...provisional(), replayGate: 'failed', replayMetrics: { reason: 'fixture' } }), 'replay-failed')
   assert.equal(registrationPhase({ ...provisional(), replayGate: 'passed', enforced: enforced() }), 'replay-qualified')
@@ -50,8 +63,8 @@ test('one case per phase', () => {
 test('inconsistencies throw, one per case', () => {
   const base = provisional()
   assert.throws(() => registrationPhase(null), /JSON object/)
-  assert.throws(() => registrationPhase({ ...base, status: 'preregistered-provisional-uncalibrated' }), /status must be "preregistered"/)
-  assert.throws(() => registrationPhase({ ...base, status: 'calibrated' }), /status must be "preregistered"/)
+  assert.throws(() => registrationPhase({ ...base, status: 'preregistered-provisional-uncalibrated' }), /status must be "draft" or "preregistered"/)
+  assert.throws(() => registrationPhase({ ...base, status: 'calibrated' }), /status must be "draft" or "preregistered"/)
   assert.throws(() => registrationPhase({ ...base, enforced: enforced() }), /without replayGate/)
   assert.throws(
     () => registrationPhase({ ...base, replayGate: 'failed', enforced: enforced() }),
@@ -70,4 +83,8 @@ test('inconsistencies throw, one per case', () => {
   )
   assert.throws(() => registrationPhase({ ...base, replayGate: null }), /unknown replayGate value/)
   assert.throws(() => registrationPhase({ ...base, replayGate: 'skipped' }), /unknown replayGate value/)
+  assert.throws(() => registrationPhase({ ...draft(), replayGate: 'passed' }), /draft registration cannot carry replayGate/)
+  assert.throws(() => registrationPhase({ ...draft(), enforced: enforced() }), /draft registration cannot carry an enforced block/)
+  assert.throws(() => registrationPhase({ ...draft(), replayMetrics: { gate: { passed: true } } }), /draft registration cannot carry replay metrics/)
+  assert.throws(() => registrationPhase({ ...draft(), operatingPoint: { calibratedBy: 'prereg-2026-10' } }), /draft registration cannot carry a calibrated id/)
 })

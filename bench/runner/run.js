@@ -437,8 +437,9 @@ export function assertRoutesPriced({ benchRoot, arms, accountingContext }) {
  *   generated R and N overlays; required for every confirmatory run, because the committed
  *   provisional overlays never confirm one.
  * @returns {Promise<void>}
- * @throws UsageError on a missing directory, a missing, inconsistent, not replay-qualified, or
- *   mismatching registration, or generated overlays that differ from it.
+ * @throws UsageError on a missing directory, a draft, missing or inconsistent,
+ *   not replay-qualified, or mismatching registration, or generated overlays
+ *   that differ from it.
  */
 export async function assertConfirmatoryRegistration({ benchRoot, arms, confirmatoryOverlaysDir }) {
   if (!arms.some(name => CONFIRMATORY_ARMS.has(name))) return
@@ -465,6 +466,9 @@ export async function assertConfirmatoryRegistration({ benchRoot, arms, confirma
     phase = registrationPhase(reg)
   } catch (error) {
     throw new UsageError(`confirmatory routing runs require a consistent registration; bench/routing/prereg-2026-10.registration.json is inconsistent: ${error.message}`)
+  }
+  if (phase === 'draft') {
+    throw new UsageError('confirmatory routing runs require a frozen preregistration; the registration is still a draft pending the owner budget and method decisions')
   }
   if (phase === 'provisional') {
     throw new UsageError('confirmatory routing runs require a replay-qualified registration; the registration is still provisional and the replay has not written the enforced operating point (pass --calibration for a calibration run)')

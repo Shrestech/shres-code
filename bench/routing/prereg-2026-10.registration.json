@@ -1,8 +1,9 @@
 {
   "schema": "shres-code/routing-measurement@1",
   "registration": "prereg-2026-10",
-  "registeredAt": "2026-10-16",
-  "status": "preregistered",
+  "draftedAt": "2026-09-27",
+  "registeredAt": null,
+  "status": "draft",
   "authorizes": "confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval",
   "question": "On quota routes, does cold-point routing with the local Laya judge reduce strong-model tokens without a meaningful loss of task success, compared with always-strong?",
   "decisionRule": "PR 17 default-on only if H1 through H5, the screens (no warm turn judged, zero lost turns, zero invariant failures), and the Laya replay gate all pass; otherwise off, shadow recommended.",

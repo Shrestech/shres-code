@@ -24,7 +24,8 @@
  *   point's eligible-row rate, because arm N's bench-random engine draws once
  *   per asked consult and asks exactly at eligible cold points.
  *
- * Writes are one-shot and atomic: the registration is rewritten whole through
+ * A draft registration is refused before metrics are accepted or any output
+ * path is touched. Writes are one-shot and atomic: the registration is rewritten whole through
  * a temp file and rename, a registration past the provisional phase
  * (`registrationPhase`) is never overwritten, the static `status` field is
  * never changed, and the generated confirmatory overlays go to an output
@@ -85,14 +86,18 @@ const PROVISIONAL_R_POINT = /^(\s*)operatingPoints: \[\{"engine":"laya","downgra
  */
 export function writeRegistration({ registrationPath, metrics, seed, outDir }) {
   if (typeof registrationPath !== 'string' || registrationPath === '') throw new TypeError('registrationPath must be a non-empty path')
+  const registration = readRegistration(registrationPath)
+  const phase = registrationPhase(registration)
+  if (phase === 'draft') {
+    throw new TypeError(`${registrationPath} is not a frozen provisional registration; draft or finalized registrations cannot be calibrated`)
+  }
+  if (phase !== 'provisional') {
+    throw new TypeError(`${registrationPath} is already finalized (replayGate is set); a registration is written once and never overwritten`)
+  }
   const validated = validatedMetrics(metrics)
   if (!Number.isSafeInteger(seed) || seed < 0) throw new TypeError(`seed must be a non-negative safe integer, got ${JSON.stringify(seed)}`)
   if (typeof outDir !== 'string' || outDir === '') throw new TypeError('outDir must be a non-empty path')
 
-  const registration = readRegistration(registrationPath)
-  if (registrationPhase(registration) !== 'provisional') {
-    throw new TypeError(`${registrationPath} is already finalized (replayGate is set); a registration is written once and never overwritten`)
-  }
   const registeredMethod = parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
   if (registeredMethod.methodSha256 !== validated.methodSha256) {
     throw new MethodProvenanceError('registration.method does not match replay metrics method')

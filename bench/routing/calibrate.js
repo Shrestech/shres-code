@@ -1,6 +1,7 @@
 /**
  * Replay a complete S/C run with the composed fitted judge and publish its
- * labelled rows and metrics. Method choices are required before any child is
+ * labelled rows and metrics. A draft registration is refused before any
+ * replay child is launched; method choices are required before any child is
  * launched. Registration finalization is explicit and happens after the
  * evidence directory is published; a writer refusal keeps that evidence.
  * @module bench/routing/calibrate
@@ -141,7 +142,6 @@ export async function calibrateRun(options, { repoRoot, env }) {
     || registration.schema !== REGISTRATION_SCHEMA) {
     throw new UsageError(`registration must use schema ${REGISTRATION_SCHEMA}`)
   }
-  const { method, methodSha256 } = parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
   let phase
   try {
     phase = registrationPhase(registration)
@@ -149,6 +149,10 @@ export async function calibrateRun(options, { repoRoot, env }) {
     if (!(error instanceof TypeError)) throw error
     throw new UsageError(error.message)
   }
+  if (phase === 'draft') {
+    throw new UsageError('calibration requires a frozen preregistration; the registration is still a draft pending the owner budget and method decisions')
+  }
+  const { method, methodSha256 } = parseReplayMethod(registration.method, { require: ALL_METHOD_FIELDS })
   if (options.writeRegistration && phase !== 'provisional') {
     throw new UsageError('registration is already finalized; replayGate must be absent before writing')
   }

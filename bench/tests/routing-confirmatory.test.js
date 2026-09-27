@@ -19,6 +19,7 @@ import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 import { renderArmOverlay, getArm } from '../runner/arms.js'
 import { assertConfirmatoryRegistration, loadConfirmatoryOverlays, parseArgs } from '../runner/run.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
+import { DRAFT_STATUS, REGISTRATION_STATUS } from '../routing/registration-phase.js'
 import { writeRegistration } from '../routing/write-registration.js'
 
 const routingDir = fileURLToPath(new URL('../routing/', import.meta.url))
@@ -37,9 +38,26 @@ function fixtureTree() {
   }
   const path = join(benchRoot, 'routing', REGISTRATION)
   const registration = JSON.parse(readFileSync(path, 'utf8'))
+  // The committed document is a draft; this temp copy explicitly simulates
+  // the frozen preregistration required by confirmatory adoption.
+  registration.status = REGISTRATION_STATUS
+  registration.registeredAt = '2026-10-16'
+  delete registration.draftedAt
   registration.method = fixtureMethod()
   writeFileSync(path, JSON.stringify(registration))
   return { root, benchRoot }
+}
+
+/** A copied draft with a complete test-only method. */
+function draftTree() {
+  const tree = fixtureTree()
+  const path = join(tree.benchRoot, 'routing', REGISTRATION)
+  const registration = JSON.parse(readFileSync(path, 'utf8'))
+  registration.status = DRAFT_STATUS
+  registration.registeredAt = null
+  registration.draftedAt = '2026-09-27'
+  writeFileSync(path, JSON.stringify(registration))
+  return tree
 }
 
 function row(overrides) {
@@ -89,6 +107,28 @@ test('confirmatory runs require the flag; the provisional overlays never confirm
   await assert.rejects(
     () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'] }),
     /--confirmatory-overlays.*never confirm a run/s,
+  )
+})
+
+test('a draft cannot authorize confirmatory overlays, even with a tampered passed gate', async () => {
+  const { root, benchRoot } = draftTree()
+  const path = join(benchRoot, 'routing', REGISTRATION)
+  const registration = JSON.parse(readFileSync(path, 'utf8'))
+  registration.replayGate = 'passed'
+  registration.enforced = {
+    calibratedBy: registration.registration,
+    downgradeThreshold: 0.9,
+    downgradeMargin: 0.3,
+    entryRate: 0.5,
+    realizedREntryRate: 0.5,
+    seed: 20261016,
+  }
+  writeFileSync(path, JSON.stringify(registration))
+  const adopted = join(root, 'adopted')
+  mkdirSync(adopted, { recursive: true })
+  await assert.rejects(
+    () => assertConfirmatoryRegistration({ benchRoot, arms: ['route-coldpoint', 'route-random'], confirmatoryOverlaysDir: adopted }),
+    /draft registration cannot carry replayGate/,
   )
 })
 

@@ -12,6 +12,7 @@ import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metr
 import { emptyMetrics } from '../runner/metrics.js'
 import { encodeSegment, projectKey } from '../runner/session-layout.js'
 import { fixtureMethod } from './replay-fixture-method.js'
+import { REGISTRATION_STATUS } from '../routing/registration-phase.js'
 const REPLAY_SCRIPTED_FITTING_JUDGE_PATH = fileURLToPath(new URL('../routing/replay-scripted-fitting-judge.mjs', import.meta.url))
 
 const registrationUrl = new URL('../routing/prereg-2026-10.registration.json', import.meta.url)
@@ -31,6 +32,11 @@ async function fixture(kind, run) {
   const realHash = digest(realRegistration)
   try {
     const registration = JSON.parse(realRegistration.toString('utf8'))
+    // The committed document is a draft; this temp copy explicitly simulates
+    // the frozen preregistration needed by the keyless calibration fixture.
+    registration.status = REGISTRATION_STATUS
+    registration.registeredAt = '2026-10-16'
+    delete registration.draftedAt
     registration.method = fixtureMethod()
     const registrationPath = join(root, 'registration.json')
     await writeFile(registrationPath, JSON.stringify(registration))
@@ -96,13 +102,13 @@ test('CLI paths and seed are explicit and malformed options refuse', () => {
   assert.equal(parseArgs([...args, '--write-registration', '--seed', '0', '--overlays-out', 'patches']).seed, 0)
 })
 
-test('the real unpinned registration refuses before reading a nonexistent experiment', async () => {
+test('the real draft registration refuses before reading a nonexistent experiment', async () => {
   const root = await mkdtemp(join(tmpdir(), 'routing-unpinned-'))
   const before = digest(await readFile(registrationUrl))
   try {
     const result = await invoke(['--experiment-dir', join(root, 'absent'), '--registration', registrationUrl.pathname, '--task-root', join(root, 'absent-tasks'), '--out', join(root, 'out')])
     assert.equal(result.code, 2)
-    assert.match(result.errors.join('\n'), /method is unpinned/)
+    assert.match(result.errors.join('\n'), /registration is still a draft/)
     assert.deepEqual(await readdir(root), [])
     assert.equal(digest(await readFile(registrationUrl)), before)
   } finally {

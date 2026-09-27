@@ -19,6 +19,7 @@ import { test } from 'node:test'
 import { computeReplayMetrics as computeMetrics } from '../analysis/replay-metrics.js'
 import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 import { parseReplayMethod } from '../routing/replay-method.js'
+import { DRAFT_STATUS, REGISTRATION_STATUS } from '../routing/registration-phase.js'
 import { writeRegistration } from '../routing/write-registration.js'
 import { assertConfirmatoryRegistration } from '../runner/run.js'
 
@@ -108,9 +109,26 @@ function fixtureTree() {
   }
   const registrationPath = join(benchRoot, 'routing', REGISTRATION)
   const registration = JSON.parse(readFileSync(registrationPath, 'utf8'))
+  // The committed document is a draft; this temp copy explicitly simulates
+  // the frozen preregistration required by the writer round-trip.
+  registration.status = REGISTRATION_STATUS
+  registration.registeredAt = '2026-10-16'
+  delete registration.draftedAt
   registration.method = fixtureMethod()
   writeFileSync(registrationPath, JSON.stringify(registration))
   return { root, benchRoot }
+}
+
+/** A temp tree whose owner-pending draft has a complete test-only method. */
+function draftTree() {
+  const tree = fixtureTree()
+  const path = join(tree.benchRoot, 'routing', REGISTRATION)
+  const registration = JSON.parse(readFileSync(path, 'utf8'))
+  registration.status = DRAFT_STATUS
+  registration.registeredAt = null
+  registration.draftedAt = '2026-09-27'
+  writeFileSync(path, JSON.stringify(registration))
+  return tree
 }
 
 /** Every path whose `calibratedBy` key carries a non-null value. */
@@ -169,6 +187,18 @@ test('a passed gate finalizes the registration and the runner accepts the genera
   assert.doesNotMatch(rText, /PROVISIONAL/, 'the generated overlay does not ship the provisional paragraph')
 })
 
+test('a draft cannot write calibration or confirmatory overlays even with a passed metric', () => {
+  const { root, benchRoot } = draftTree()
+  const registrationPath = join(benchRoot, 'routing', REGISTRATION)
+  const before = readFileSync(registrationPath)
+  assert.throws(
+    () => writeRegistration({ registrationPath, metrics: passingMetrics(benchRoot), seed: 20261016, outDir: join(root, 'out') }),
+    /draft.*cannot be calibrated/,
+  )
+  assert.ok(before.equals(readFileSync(registrationPath)))
+  assert.equal(existsSync(join(root, 'out')), false)
+})
+
 test('a failed gate records no calibration, and the runner refuses the registration', async () => {
   const { root, benchRoot } = fixtureTree()
   const metrics = failingMetrics()
@@ -223,7 +253,7 @@ test('inconsistent and non-provisional inputs are refused before any write', () 
   writeFileSync(driftStatus, JSON.stringify(drifted, null, 2))
   assert.throws(
     () => writeRegistration({ registrationPath: driftStatus, metrics, seed: 20261016, outDir: join(root, 'out') }),
-    /status must be "preregistered"/,
+    /status must be "draft" or "preregistered"/,
   )
   const withEnforced = join(benchRoot, 'routing', 'with-enforced.json')
   const finalized = JSON.parse(readFileSync(join(benchRoot, 'routing', REGISTRATION), 'utf8'))
