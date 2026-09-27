@@ -28,6 +28,7 @@
   "files": [
     "lib/index.js",
     "lib/invariant.js",
+    "lib/config-*.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
@@ -55,7 +56,6 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-settings-file": "workspace:^",
-    "@shres-code/cordis": "workspace:^",
-    "@shres-code/schemastery": "workspace:^"
+    "@shres-code/cordis": "workspace:^"
   }
 }
