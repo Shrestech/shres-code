@@ -533,6 +533,9 @@ importers:
       '@shres-code/shres-code-cmdline':
         specifier: workspace:^
         version: link:../../packages/boot/cmdline
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../packages/llm/judgment
       '@shres-code/shres-code-pwsh-local':
         specifier: workspace:^
         version: link:../../packages/shell/pwsh-local
@@ -4230,6 +4233,9 @@ importers:
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -9387,6 +9393,12 @@ importers:
       '@shres-code/shres-code-agent-default-model':
         specifier: workspace:^
         version: link:../../core/agent-default-model
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
       '@shres-code/shres-code-agent-presets':
         specifier: workspace:^
         version: link:../../preset/agent-presets
@@ -9417,6 +9429,9 @@ importers:
       '@shres-code/shres-code-session-persistence':
         specifier: workspace:^
         version: link:../../session/session-persistence
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
@@ -9429,6 +9444,12 @@ importers:
       '@shres-code/shres-code-storage-domain':
         specifier: workspace:^
         version: link:../../storage/storage-domain
+      '@shres-code/shres-code-subagent-fork-in-process':
+        specifier: workspace:^
+        version: link:../subagent-fork-in-process
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../subagent-spawn-in-process
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
@@ -9852,12 +9873,21 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
       '@shres-code/cordis-plugin-loader':
         specifier: workspace:^
         version: link:../../../vendor/loader
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -9870,6 +9900,12 @@ importers:
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../../llm/llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
