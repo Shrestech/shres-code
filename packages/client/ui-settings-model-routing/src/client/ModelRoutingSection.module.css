@@ -519,9 +519,53 @@
   gap: 12px;
 }
 
+.policyRow {
+  align-items: flex-end;
+}
+
+.policyField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.policyRow > .policyField {
+  flex: 1 1 180px;
+  min-width: min(180px, 100%);
+}
+
+.policyField > .select,
+.policyField > .input,
+.policyField > .textarea {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.policyCheck {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.policyCheck input {
+  margin: 0;
+}
+
 .formActions {
   display: flex;
   gap: 8px;
+}
+
+.policyActions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+}
+
+.policyError {
+  flex-basis: 100%;
 }
 
 .input,
