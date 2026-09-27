@@ -4232,50 +4232,35 @@ describe('the quota cold-point policy', () => {
     }
   })
 
-  it('held quota streak returns at the next cold point after minSteps', async () => {
-    const b = await bench({ config: { ...QUOTA, hold: { minSteps: 2, maxSteps: 40 } } })
+  it('held quota streak returns at the next cold point regardless of minSteps', async () => {
+    const b = await bench({ config: { ...QUOTA, hold: { minSteps: 20, maxSteps: 40 } } })
     stepAt(b.session, 1, T0)
     user(b.session, 'a small change')
     expect(await b.resolve(1)).toEqual(CHEAP)
     closeTurn(b.session, 1)
 
-    // One step into the streak, below minSteps: the cold manual model does not end it.
+    // The next turn is cold despite the horizon being far away, so it returns
+    // to the manual model without another judge call.
     stepAt(b.session, 2, T0 + 1_000)
     user(b.session, 'another small change')
-    expect(await b.resolve(2)).toEqual(CHEAP)
-    expect(b.decision(1)).toMatchObject({
-      outcome: 'downgraded',
-      coldPoint: { kind: 'session-start' },
-      sticky: { active: true, stepsElapsed: 1 },
-    })
-    // A later step of a turn is never a return point, and evaluates no cold point.
-    stepAt(b.session, 2, T0 + 2_000, 2)
-    expect(await b.resolve(2, STRONG, b.signal, 2)).toEqual(CHEAP)
-    expect(b.decision(2)).toMatchObject({ outcome: 'downgraded', sticky: { active: true, stepsElapsed: 2 } })
-    expect(b.decision(2)).not.toHaveProperty('coldPoint')
-    closeTurn(b.session, 2)
-
-    stepAt(b.session, 3, T0 + 3_000)
-    user(b.session, 'a third change')
     const asked = b.engine.asks.length
-    expect(await b.resolve(3)).toBeUndefined()
+    expect(await b.resolve(2)).toBeUndefined()
     expect(b.engine.asks).toHaveLength(asked)
-    expect(b.decision(3)).toMatchObject({
+    expect(b.decision(1)).toMatchObject({
       outcome: 'kept-strong',
       reason: 'cold-point-return',
       coldPoint: { kind: 'session-start' },
       sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' },
     })
-    // Not a quality exit: no re-entry cooldown starts.
     expect(stickyState(b.session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' })
-    strongAnswer(b.session, 3)
-    closeTurn(b.session, 3)
+    strongAnswer(b.session, 2)
+    closeTurn(b.session, 2)
 
     // The manual model answered, so the next turn is warm and skips judgment.
-    stepAt(b.session, 4, T0 + 4_000)
-    user(b.session, 'a fourth change')
-    expect(await b.resolve(4)).toBeUndefined()
-    expect(b.decision(4)).toMatchObject({ reason: 'warm-prefix', coldPoint: null })
+    stepAt(b.session, 3, T0 + 2_000)
+    user(b.session, 'a third change')
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decision(2)).toMatchObject({ reason: 'warm-prefix', coldPoint: null })
     expect(b.engine.asks).toHaveLength(asked)
   })
 

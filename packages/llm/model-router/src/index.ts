@@ -1570,7 +1570,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
         facts.coldPoint = coldPoint ?? null
         facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
-        if (held !== undefined && coldPoint !== undefined && sticky.stepsElapsed >= config.hold.minSteps) {
+        if (held !== undefined && coldPoint !== undefined) {
           return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
         }
       }

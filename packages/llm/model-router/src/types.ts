@@ -336,8 +336,8 @@ export type ModelRoutingReason =
    */
   | 'warm-prefix'
   /**
-   * The manual route's prompt cache went cold after the held quota streak
-   * reached `hold.minSteps`, so the streak returns to it without judgment.
+   * The manual route's prompt cache went cold while a quota streak was held,
+   * so the streak returns to it at the next cold point without judgment.
    */
   | 'cold-point-return'
 
