@@ -11,16 +11,16 @@
  *   through \`ctx.plugin\` exactly as a provider is.
  * - {@link MemorySettings}: the smallest real settings provider (one in-memory
  *   document), used only for the deployment toggle.
- * - {@link ScriptedSummarizer}: the deterministic summarizer both twins share,
- *   so a twin-run diff compares the engines and not the drafts.
- * - {@link TestJevEngine} / {@link TestBasicTwin}: the two engines under diff.
+ * - {@link ScriptedSummarizer}: the deterministic summarizer every draft comes
+ *   from, so a diff compares the engines and not the drafts.
+ * - {@link TestJevEngine}: the engine under test.
  * - {@link InheritedSummarizerJevEngine}: the engine with its real inherited
  *   summarizer, for the verify cascade.
  */
 
 import { Context } from '@shres-code/cordis'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
-import type { BasicCompactionConfig, SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic'
+import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic'
 import type { ContentBlock, GenerateOptions, LlmResolvedModelInfo, StreamChunk, TokenUsage } from '@shres-code/shres-code-llm'
 import LlmRuntime, { CallId, LlmAdapter, createMessage, createToolResultMessage, createUserMessage } from '@shres-code/shres-code-llm'
 import JudgmentService from '@shres-code/shres-code-judgment'
@@ -158,11 +158,6 @@ export function conversation(turns = 4, text = 'fixture '.repeat(40).trim()): Se
   }
   session.append('turn/start', { turn: turns + 1 })
   return session
-}
-
-/** One large open-turn history: enough surface to cross any small threshold. */
-export function pressuredConversation(turns = 4, chars = 600): Session {
-  return conversation(turns, 'x'.repeat(chars))
 }
 
 /** Closed tool turns, one assistant tool-call per turn followed by its result. */
@@ -378,8 +373,8 @@ export class MemorySettings extends SettingsProvider {
   }
 }
 
-/** TEST DOUBLE: the deterministic summarizer both twin engines share. */
-export class ScriptedSummarizer {
+/** TEST DOUBLE: the deterministic summarizer the engine under test serves drafts from. */
+class ScriptedSummarizer {
   /** The draft every call returns. */
   summary: ContentBlock[] = [{ type: 'text', text: 'small checkpoint' }]
   /** Provider recorded on the draft. */
@@ -414,36 +409,6 @@ export class TestJevEngine extends JevCompactionEngine {
   constructor(
     ctx: Context,
     config: JevCompactionConfig,
-    readonly summarizer = new ScriptedSummarizer(),
-  ) {
-    super(ctx, config)
-  }
-
-  /** Expose the protected selection hook. */
-  public override selectRange(
-    session: Session,
-    measurement: TokenMeasurement,
-    retainTokens: number,
-    pinSeqs: readonly number[],
-  ): Promise<{ start: number; end: number } | null> {
-    return super.selectRange(session, measurement, retainTokens, pinSeqs)
-  }
-
-  /** Serve every draft from the scripted summarizer. */
-  protected override summarize(
-    input: SummarizationInput,
-    _agent: Agent,
-    _signal?: AbortSignal,
-  ): Promise<SummaryResult> {
-    return this.summarizer.run(input)
-  }
-}
-
-/** TEST DOUBLE: the compaction-basic twin, sharing one scripted summarizer with the engine. */
-export class TestBasicTwin extends BasicCompactionEngine {
-  constructor(
-    ctx: Context,
-    config: BasicCompactionConfig,
     readonly summarizer = new ScriptedSummarizer(),
   ) {
     super(ctx, config)
@@ -517,7 +482,7 @@ export function summaryEvents(session: Session) {
 }
 
 /** The base compaction config every engine is built from. */
-export const BASE_CONFIG = {
+const BASE_CONFIG = {
   auto: false,
   thresholdRatio: 0.8,
   retainTokens: 100,

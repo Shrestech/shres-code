@@ -148,6 +148,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@shres-code/shres-code-jspace-advisor': ['lib/review-*.js'],
   '@shres-code/shres-code-research-protocol': ['lib/epoch-*.js'],
   '@shres-code/shres-code-agent-team': ['lib/fold-*.js'],
+  // The invariant companion shares the settings-namespace chunk with the entry.
+  '@shres-code/shres-code-judgment-guardrails': ['lib/config-*.js'],
+  '@shres-code/shres-code-worker-escalation': ['lib/config-*.js'],
   // The argv-prefix runner entry ships beside the lib as its own bundle;
   // sandbox-local resolves it through the package's ./runner export. tsdown
   // also shares its generated FFI code through a hashed runtime chunk.

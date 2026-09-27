@@ -98,7 +98,7 @@ export function errorResponse(message: string): StreamChunk[] {
 export type CapturedUpdate = SessionNotification['update']
 
 /** The agent-side ACP methods the bridge tests call, sent over the harness connection. */
-export interface AcpTestClient {
+interface AcpTestClient {
   initialize(params: InitializeRequest): Promise<InitializeResponse>
   authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse>
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>
