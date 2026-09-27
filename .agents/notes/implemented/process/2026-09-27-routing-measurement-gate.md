@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-The PR 16 routing measurement decides whether cold-point routing with a local judge reduces strong-model tokens without meaningful task loss, and default-on must stand on a gate that cannot drift, be silently relaxed, or pass on missing data. The earlier pilots drifted from their own preregistrations by recomputing results by hand, and their suites could not tell a measured zero from an uninstrumented default. The decision rules live in the preregistration, [`bench/routing/prereg-2026-10.md`](../../../../bench/routing/prereg-2026-10.md); this note records the build decisions and what they supersede (plan §5 details where they differ, notably arm N as a bench-only seeded engine and the idle-gap cap). It supersedes no other active Agent Note; bench pricing stays owned by [the priced-accounting note](2026-09-24-bench-priced-accounting.md).
+The PR 16 routing measurement decides whether cold-point routing with a local judge reduces strong-model tokens without meaningful task loss, and default-on must stand on a gate that cannot drift, be silently relaxed, or pass on missing data. The earlier pilots drifted from their own preregistrations by recomputing results by hand, and their suites could not tell a measured zero from an uninstrumented default. The decision rules live in the preregistration, [`bench/routing/prereg-2026-10.md`](../../../../bench/routing/prereg-2026-10.md). It supersedes no other active Agent Note; bench pricing stays owned by [the priced-accounting note](2026-09-24-bench-priced-accounting.md).
 
 ## Decision
 
