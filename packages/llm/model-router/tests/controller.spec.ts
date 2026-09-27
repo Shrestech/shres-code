@@ -4593,7 +4593,9 @@ describe('child-route consult through the controller', () => {
         calibratedBy: 'child-prereg-1',
       },
     })
-    expect(decision?.judgmentQuestions?.[0]?.options).toEqual([
+    const routeQuestion = decision?.judgmentQuestions?.[0]
+    if (routeQuestion?.kind !== 'choice') throw new Error('child route question is not a choice question')
+    expect(routeQuestion.options).toEqual([
       { option: KEEP_CURRENT_OPTION_ID, description: 'Keep the inherited parent model.' },
       { option: 'cheap', description: 'a small change in familiar code' },
     ])
