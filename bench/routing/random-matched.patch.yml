@@ -15,8 +15,9 @@
 #
 # The entry rate and seed shipped here are PROVISIONAL and the operating point
 # deliberately carries NO calibratedBy (its presence alone would mark the point
-# calibrated): replay-judges.mjs is the only writer of the matched rate, the
-# point's threshold and margin, and the registration's calibratedBy, and the
+# calibrated): bench/routing/calibrate.js obtains the fitted rows and
+# bench/routing/write-registration.js is the only writer of the matched rate,
+# the point's threshold and margin, and the registration's calibratedBy, and the
 # runner refuses confirmatory trials unless the registration records a passed
 # Laya gate, a matching overlay, and N's rate equal to R's realized entry rate.
 - id: agent-default-model

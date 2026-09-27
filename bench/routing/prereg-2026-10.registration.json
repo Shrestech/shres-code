@@ -122,10 +122,10 @@
       "downgradeThreshold": 0.8,
       "downgradeMargin": 0.1,
       "calibratedBy": null,
-      "note": "provisional overlays never carry calibratedBy: the router treats its presence as calibrated, so only replay-judges.mjs writes the id, the threshold, and the margin together on a passed gate"
+      "note": "provisional overlays never carry calibratedBy: the router treats its presence as calibrated, so bench/routing/write-registration.js writes the id, the threshold, and the margin together only after a passed gate"
     },
     "writtenBefore": "any confirmatory trial; the runner refuses confirmatory runs unless the registration has replayGate passed, the overlay's calibratedBy equals the registration's, and the overlay values equal the registration's",
-    "soleWriter": "bench/routing/replay-judges.mjs"
+    "soleWriter": "bench/routing/write-registration.js"
   },
   "randomMatched": {
     "rule": "a seeded draw per consult selects the candidate with probability p equal to R's realized entry rate at cold points in the calibration run",

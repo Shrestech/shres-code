@@ -398,8 +398,9 @@ describe('accounting inputs', () => {
     // Every configured price provider names a provider the snapshot prices.
     const providers = new Set([...context.snapshot.entries.values()].map(entry => entry.provider))
     for (const provider of Object.values(context.config.priceProviders)) assert.ok(providers.has(provider), provider)
-    // Both loopback judgment gateways are local: Laya answers over the Shield wire.
-    assert.deepEqual([...context.config.localJudgeEngines].sort(), ['laya', 'shield'])
+    // Laya and Shield are local gateways; bench-random is the local, keyless
+    // matched-rate engine used by the routing measurement's arm N.
+    assert.deepEqual([...context.config.localJudgeEngines].sort(), ['bench-random', 'laya', 'shield'])
   })
 
   it('fails loud on a malformed snapshot or config', async () => {

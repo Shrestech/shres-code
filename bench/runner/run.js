@@ -120,7 +120,8 @@ Options:
                         tasks, pinned in run.json, shared across a trial's arms
   --calibration         mark the run as a calibration run: the confirmatory-run
                         registration checks (replay gate passed, overlay equality,
-                        matched N rate) are enforced only without this flag
+                        matched N rate) are enforced only without this flag; routing
+                        measurement arms still require a frozen preregistration
   --confirmatory-overlays <dir>
                         directory holding the replay writer's generated R and N
                         overlays; required for confirmatory routing runs, whose
@@ -500,6 +501,47 @@ export async function assertConfirmatoryRegistration({ benchRoot, arms, confirma
   }
   if (typeof enforced.realizedREntryRate !== 'number' || Number(rate[1]) !== enforced.realizedREntryRate) {
     throw new UsageError('confirmatory N rate must equal the realized R entry rate the registration records')
+  }
+}
+
+/**
+ * Refuse routing calibration trial collection while its preregistration is a draft.
+ *
+ * The calibration flag intentionally skips confirmatory adoption checks, but it
+ * must not turn the owner-pending draft into permission to spawn real trials.
+ * Non-routing bench arms keep the general calibration flag's existing behavior.
+ * @param {object} options
+ * @param {string} options.benchRoot - the bench directory the registration resolves in.
+ * @param {string[]} options.arms - selected arm names.
+ * @returns {Promise<void>}
+ * @throws UsageError on a missing, inconsistent, or draft registration.
+ */
+export async function assertCalibrationRegistration({ benchRoot, arms }) {
+  if (!arms.some(name => PREFLIGHT_ARMS.has(name))) return
+  const registrationPath = join(benchRoot, 'routing', 'prereg-2026-10.registration.json')
+  let registration
+  try {
+    registration = JSON.parse(readFileSync(registrationPath, 'utf8'))
+  } catch {
+    throw new UsageError(`routing calibration runs require ${registrationPath} so the frozen preregistration can be checked before trial execution`)
+  }
+  let registrationPhase
+  try {
+    ({ registrationPhase } = await import('../routing/registration-phase.js'))
+  } catch (error) {
+    if (error instanceof Error && /** @type {{ code?: string }} */ (error).code === 'ERR_MODULE_NOT_FOUND') {
+      throw new UsageError('run `pnpm run build` (' + error.message + ')')
+    }
+    throw error
+  }
+  let phase
+  try {
+    phase = registrationPhase(registration)
+  } catch (error) {
+    throw new UsageError(`routing calibration runs require a consistent registration; ${registrationPath} is inconsistent: ${error.message}`)
+  }
+  if (phase === 'draft') {
+    throw new UsageError('routing calibration runs require a frozen preregistration; the registration is still a draft pending the owner budget and method decisions')
   }
 }
 
@@ -1593,6 +1635,7 @@ export async function main(argv, io = {}) {
   // Keyless preflights before any key resolution or spend: unpriced routes
   // refuse the run (aegis §10.3), and confirmatory routing runs require the
   // replay-passed registration with matching overlays (aegis §10.4).
+  if (options.calibration) await assertCalibrationRegistration({ benchRoot, arms: options.arms })
   assertRoutesPriced({ benchRoot, arms: options.arms, accountingContext })
   if (!options.calibration) await assertConfirmatoryRegistration({ benchRoot, arms: options.arms, confirmatoryOverlaysDir: options.confirmatoryOverlays })
   // The composed-metadata preflight (prereg §8) boots the real launcher per

@@ -192,7 +192,29 @@ test('the runner refuses fixture launcher config before key resolution or spawn'
     await writeFile(join(taskDir, 'task.json'), JSON.stringify({ taskId: 'fixture-config', stratum: 'short', instruction: 'fixture config refusal', verify: 'node verify.mjs', timeoutMs: 1000 }))
     await writeFile(join(taskDir, 'fixture', 'cordis.patch.yml'), '[]')
     await writeFile(join(fixtureBench, 'routing', 'route-cheap.patch.yml'), await fs.readFile(join(bench, 'routing', 'route-cheap.patch.yml')))
-    await assert.rejects(main(['--experiment', 'fixture-preflight', '--arms', 'route-cheap', '--calibration', '--api-key-env', 'none'], { benchRoot: fixtureBench, env: CLEAN_ENV, print: () => {} }), /fixture launcher config/)
+    await assert.rejects(main(['--experiment', 'fixture-preflight', '--arms', 'route-cheap', '--api-key-env', 'none'], { benchRoot: fixtureBench, env: CLEAN_ENV, print: () => {} }), /fixture launcher config/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('routing calibration refuses the committed draft before preflight or credentials', async () => {
+  const { root } = await scratchHome()
+  const fixtureBench = join(root, 'bench')
+  const taskDir = join(fixtureBench, 'tasks', 'draft-calibration')
+  try {
+    await mkdir(join(taskDir, 'fixture'), { recursive: true })
+    await mkdir(join(fixtureBench, 'routing'))
+    await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'draft-calibration', type: 'module' }))
+    await writeFile(join(taskDir, 'task.json'), JSON.stringify({ taskId: 'draft-calibration', stratum: 'short', instruction: 'draft calibration refusal', verify: 'node verify.mjs', timeoutMs: 1000 }))
+    await writeFile(join(taskDir, 'verify.mjs'), 'process.exit(0)\n')
+    await fs.copyFile(join(bench, 'routing', 'route-cheap.patch.yml'), join(fixtureBench, 'routing', 'route-cheap.patch.yml'))
+    await fs.copyFile(join(bench, 'routing', 'prereg-2026-10.registration.json'), join(fixtureBench, 'routing', 'prereg-2026-10.registration.json'))
+    await assert.rejects(
+      main(['--experiment', 'draft-calibration', '--arms', 'route-cheap', '--calibration'], { benchRoot: fixtureBench, env: CLEAN_ENV, print: () => {} }),
+      /routing calibration runs require a frozen preregistration.*draft/,
+    )
+    await assert.rejects(access(join(fixtureBench, 'runs')), { code: 'ENOENT' })
   } finally {
     await rm(root, { recursive: true, force: true })
   }

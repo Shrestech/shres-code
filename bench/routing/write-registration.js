@@ -323,8 +323,9 @@ const R_PROVISIONAL_PARAGRAPH = [
   '# the operating point is the one difference. The point shipped here is',
   "# PROVISIONAL and deliberately carries NO calibratedBy: in the router that key's",
   '# presence alone marks a point calibrated, so writing the preregistration id',
-  '# here would misrepresent an enforced gate that has not run. The offline replay',
-  '# (bench/routing/replay-judges.mjs) is the only writer of calibratedBy and of',
+  '# here would misrepresent an enforced gate that has not run. The calibration',
+  '# driver (bench/routing/calibrate.js) obtains the fitted rows;',
+  '# bench/routing/write-registration.js is the only writer of calibratedBy and of',
   "# this point's threshold and margin; the runner refuses confirmatory trials",
   '# unless the registration records a passed Laya gate and the overlay equals it.',
   '# Until then this point logs as an uncalibrated point and the router keeps the',
@@ -346,8 +347,9 @@ const R_GENERATED_PARAGRAPH = [
 const N_PROVISIONAL_PARAGRAPH = [
   '# The entry rate and seed shipped here are PROVISIONAL and the operating point',
   '# deliberately carries NO calibratedBy (its presence alone would mark the point',
-  '# calibrated): replay-judges.mjs is the only writer of the matched rate, the',
-  "# point's threshold and margin, and the registration's calibratedBy, and the",
+  '# calibrated): bench/routing/calibrate.js obtains the fitted rows and',
+  '# bench/routing/write-registration.js is the only writer of the matched rate,',
+  "# the point's threshold and margin, and the registration's calibratedBy, and the",
   '# runner refuses confirmatory trials unless the registration records a passed',
   "# Laya gate, a matching overlay, and N's rate equal to R's realized entry rate.",
 ].join('\n')
