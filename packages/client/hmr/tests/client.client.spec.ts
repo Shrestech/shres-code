@@ -333,4 +333,59 @@ describe('client graph membership', () => {
     await ctx.loader.remove(id)
     await ctx.fiber.dispose()
   })
+
+  it('reloads other changed rows before self-reload', async () => {
+    const selfId = '@shres-code/shres-code-client-hmr'
+    const otherId = 'changed-with-self'
+    let otherApplies = 0
+    const factories = new Map<string, () => Record<string, unknown>>()
+    const modules = new ClientModuleSystem({
+      modules: [
+        { id: selfId, url: `/plugins/${selfId}/client.js?rev=1`, rev: '1' },
+        { id: otherId, url: `/plugins/${otherId}/client.js?rev=1`, rev: '1' },
+      ],
+      staticModules: {},
+      loadBundle: async (url) => {
+        const id = /\/plugins\/(.+)\/client\.js/.exec(url)?.[1]
+        const factory = id === undefined ? undefined : factories.get(id)
+        if (id === undefined || factory === undefined) throw new Error('bundle unavailable')
+        win.__ModuleLoader__?.load({ id, factory })
+      },
+    })
+    factories.set(selfId, () => ({ inject, apply }))
+    factories.set(otherId, () => ({ apply: () => { otherApplies += 1 } }))
+
+    const ctx = new Context()
+    await ctx.plugin(Loader)
+    ctx.loader.internal = modules as never
+    ctx.provide('modules', modules)
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const selfEntryId = await ctx.loader.create({ name: selfId })
+    const otherEntryId = await ctx.loader.create({ name: otherId })
+    await ctx.loader.await()
+    const first = FakeEventSource.current
+    if (first === undefined) throw new Error('self HMR did not open EventSource')
+    expect(otherApplies).toBe(1)
+
+    first.emit({
+      type: 'graph',
+      graph: {
+        rev: 'two',
+        entries: [
+          { id: selfId, url: `/plugins/${selfId}/client.js?rev=2`, rev: '2' },
+          { id: otherId, url: `/plugins/${otherId}/client.js?rev=2`, rev: '2' },
+        ],
+      },
+    })
+    await vi.waitFor(() => {
+      expect(otherApplies).toBe(2)
+      expect(FakeEventSource.current).not.toBe(first)
+      expect(FakeEventSource.current?.closed).toBe(false)
+      expect(ctx.loader.resolve(otherEntryId).fiber?.state).toBe(FiberState.ACTIVE)
+    })
+    expect(first.closed).toBe(true)
+    await ctx.loader.remove(otherEntryId)
+    await ctx.loader.remove(selfEntryId)
+    await ctx.fiber.dispose()
+  })
 })

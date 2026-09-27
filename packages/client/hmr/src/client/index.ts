@@ -62,7 +62,7 @@
  * fiberless (the next rebuilt frame retries from scratch); an apply failure
  * leaves a FAILED fiber for the shell's status projection. Both log loudly.
  */
-import { FiberState, type Context } from '@shres-code/cordis'
+import type { Context, FiberState } from '@shres-code/cordis'
 import type { Entry, Loader } from '@shres-code/cordis-plugin-loader'
 import type { BootManifest, WebBootGraph } from '@shres-code/shres-code-client-modules/client'
 import { parseBootManifest, type PluginsEventFrame } from '../events.ts'
@@ -78,6 +78,14 @@ export const name = 'client-hmr'
 export const inject = ['loader', 'modules']
 
 const SELF_ID = '@shres-code/shres-code-client-hmr'
+
+// Cordis erases its const enum at build time; client bundles cannot import a
+// runtime enum object. Keep these values aligned with the pinned definition.
+const FIBER_STATE = {
+  ACTIVE: 2 as FiberState.ACTIVE,
+  FAILED: 3 as FiberState.FAILED,
+  DISPOSED: 4 as FiberState.DISPOSED,
+} as const
 
 /** Find the loader entry whose module specifier is `id` (entry tree ids are random; the package name lives in `options.name`). */
 function findEntry(loader: Loader, id: string): Entry | undefined {
@@ -145,9 +153,9 @@ export function apply(ctx: Context): void {
   const managedGraphIds = new Set(modLoader.graphRows().map(row => row.id))
   const pendingReloadIds = new Set<string>()
 
-  const ownerIsLive = (): boolean => !disposed && ctx.fiber.state === FiberState.ACTIVE
+  const ownerIsLive = (): boolean => !disposed && ctx.fiber.state === FIBER_STATE.ACTIVE
 
-  const loaderTreeIsLive = (): boolean => loaderOwner.state === FiberState.ACTIVE
+  const loaderTreeIsLive = (): boolean => loaderOwner.state === FIBER_STATE.ACTIVE
 
   const transitionIsLive = (id: string): boolean =>
     ownerIsLive() || (id === SELF_ID && selfReloading && loaderTreeIsLive())
@@ -157,7 +165,7 @@ export function apply(ctx: Context): void {
       const entry = loader.resolve(id)
       // Loader.await() settles a fiber that is PENDING on a missing service;
       // only an absent, FAILED, or DISPOSED fiber needs graph repair here.
-      if (entry.fiber === undefined || entry.fiber.state === FiberState.FAILED || entry.fiber.state === FiberState.DISPOSED) {
+      if (entry.fiber === undefined || entry.fiber.state === FIBER_STATE.FAILED || entry.fiber.state === FIBER_STATE.DISPOSED) {
         throw new Error(`client-hmr: graph entry "${entry.options.name}" failed to activate`)
       }
     }
@@ -183,8 +191,8 @@ export function apply(ctx: Context): void {
       if (
         entry === undefined
         || entry.fiber === undefined
-        || entry.fiber.state === FiberState.FAILED
-        || entry.fiber.state === FiberState.DISPOSED
+        || entry.fiber.state === FIBER_STATE.FAILED
+        || entry.fiber.state === FIBER_STATE.DISPOSED
         || entry.disabled
       ) {
         additions.set(row.id, row)
@@ -230,8 +238,8 @@ export function apply(ctx: Context): void {
       if (existing !== undefined) {
         if (
           existing.fiber !== undefined
-          && existing.fiber.state !== FiberState.FAILED
-          && existing.fiber.state !== FiberState.DISPOSED
+          && existing.fiber.state !== FIBER_STATE.FAILED
+          && existing.fiber.state !== FIBER_STATE.DISPOSED
           && !existing.disabled
         ) continue
         await loader.remove(existing.id)
@@ -245,8 +253,17 @@ export function apply(ctx: Context): void {
     for (const row of additions.values()) pendingReloadIds.delete(row.id)
 
     // A graph rev can replace a bundle without a separate rebuilt frame.
-    // Reuse the existing invalidate/prefetch/refresh path for those rows.
-    for (const id of pendingReloadIds) {
+    // Reuse the existing invalidate/prefetch/refresh path for those rows. The
+    // HMR row goes last: disposing it closes this queue's EventSource and
+    // marks this owner disposed, while a fresh HMR instance sees the graph
+    // rows already accepted and cannot infer unfinished reloads.
+    const reloadIds = [...pendingReloadIds]
+    const selfIndex = reloadIds.indexOf(SELF_ID)
+    if (selfIndex >= 0) {
+      reloadIds.splice(selfIndex, 1)
+      reloadIds.push(SELF_ID)
+    }
+    for (const id of reloadIds) {
       if (!desired.has(id)) {
         pendingReloadIds.delete(id)
         continue
