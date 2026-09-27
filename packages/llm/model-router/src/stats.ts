@@ -292,7 +292,6 @@ export interface ModelRoutingStatsState {
     byReason: Record<string, number>
     byModel: Record<string, number>
     failures: number
-    suspended: string[]
   }
   recentChildren: ModelRoutingStatsSnapshot['recentChildren']
 }
@@ -366,7 +365,6 @@ export function createStatsState(): ModelRoutingStatsState {
       byReason: {},
       byModel: {},
       failures: 0,
-      suspended: [] as string[],
     },
     recentChildren: [],
   }
@@ -501,14 +499,12 @@ function applyChildOutcome(
   data: ModelRoutingChildOutcome,
 ): ModelRoutingStatsState {
   const counts = { ...state.counts }
-  const children = { ...state.children, suspended: [...state.children.suspended] }
+  const children = { ...state.children }
   if (data.countedAs === 'failure') {
     counts.childFailures += 1
     children.failures += 1
-    if (!children.suspended.includes(data.candidateId)) children.suspended = [...children.suspended, data.candidateId]
   } else if (data.countedAs === 'success') {
     counts.childSuccesses += 1
-    children.suspended = children.suspended.filter(id => id !== data.candidateId)
   } else {
     counts.childNeutral += 1
   }
@@ -1108,7 +1104,6 @@ export function viewStats(state: ModelRoutingStatsState): ModelRoutingStatsSnaps
       byReason: ranked(state.children.byReason).map(({ key, count }) => ({ reason: key, count })),
       byModel: ranked(state.children.byModel).map(({ key, count }) => ({ candidateId: key, count })),
       failures: state.children.failures,
-      suspended: state.children.suspended.length,
     },
     recentChildren: [...state.recentChildren].reverse(),
   }
@@ -1423,7 +1418,6 @@ export const modelRoutingStatsSchema = zod.object({
     byReason: zod.array(zod.object({ reason: zod.string(), count: zod.number() })),
     byModel: zod.array(zod.object({ candidateId: zod.string(), count: zod.number() })),
     failures: zod.number(),
-    suspended: zod.number(),
   }),
   recentChildren: zod.array(zod.object({
     seq: zod.number(),

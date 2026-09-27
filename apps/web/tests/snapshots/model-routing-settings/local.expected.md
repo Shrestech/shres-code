@@ -1,6 +1,6 @@
 - region "Model routing":
   - text: Applies to all sessions
-  - paragraph: Configure how routing judges each turn. Each session turns routing on or off with the Auto chip in its chat input.
+  - paragraph: Configure when routing may use a pool model. Each session selects Off, Shadow or On with the Auto chip in its chat input.
   - region "Judgment engine":
     - heading "Judgment engine" [level=3]
     - paragraph: The engine every judgment consumer asks, unless a per-consumer override names another. A change applies from each consumer's next ask, in every session.

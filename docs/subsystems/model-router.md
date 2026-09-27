@@ -329,6 +329,71 @@ interface ModelRoutingDecision {
 ```
 
 ```ts type-equiv
+/** One child's routing decision, recorded on the parent before the child exists. */
+interface ModelRoutingChildDecision {
+  /** Whether a pool candidate was returned to the waterfall. */
+  outcome: 'routed' | 'kept'
+  /** Why the child was routed or kept. */
+  reason:
+    | 'child-policy'
+    | 'child-judged'
+    | 'base-unlisted'
+    | 'candidate-equals-base'
+    | 'child-route-errors'
+    | 'input-too-large'
+    | 'engine-absent'
+    | 'engine-uncalibrated'
+    | 'engine-unavailable'
+    | 'invalid-answer'
+    | 'low-confidence'
+    | 'thin-margin'
+  /** Dispatch identity minted by resolveChildRoute. */
+  routeRequestId: string
+  /** Delegation consumer kind. */
+  childKind: 'subagent' | 'workflow'
+  /** Tool-facing agent type, when a tool delegates. */
+  agentType?: string
+  /** Index of the matching childPolicies rule. */
+  policyIndex: number
+  /** Inherited parent route. */
+  inherited: { provider?: string; model?: string }
+  /** Routed pool selection. */
+  selection?: { candidateId: string; provider: string; model: string }
+  /** Child-route never applies pool reasoningEffort. */
+  effortApplied: false
+  /** Character length of the child's task text. */
+  promptChars: number
+  /** Exact task text handed to a plain judgment ask. */
+  judgmentState?: string
+  /** Exact questions supplied to the child-route judgment engine. */
+  judgmentQuestions?: readonly JudgmentQuestion[]
+  /** Exact selected task text and tokenizer facts from a fitted ask. */
+  judgmentInput?: JudgmentTokenFit
+  /** Capacity rejection without model inference. */
+  judgmentRejection?: { limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+  /** The judgment's route answer, when a judgment call produced one. */
+  route?: ModelRoutingRouteAnswer
+  /** Characters handed to the engine; zero records a pre-dispatch input refusal. */
+  inputChars?: number
+  /** Judgment engine identity, when a rule judged. */
+  engine?: string
+  engineId?: string
+  model?: string
+  latencyMs?: number
+  /** Token usage of the child-route judgment call, when the engine reported it. */
+  judgeUsage?: TokenUsage
+  /** Why the child-route judgment call failed, when it failed. */
+  engineFailure?: ModelRoutingEngineFailure
+  /** Thresholds in force for the child-route judgment. */
+  thresholds?: ModelRoutingThresholds
+  /** Whether this consult only recorded what live would do. */
+  shadow?: true
+  /** Parent routeFrom objective, when the base is listed. */
+  objective?: ModelRoutingObjective
+}
+```
+
+```ts type-equiv
 /**
  * Why the manual route's prompt-cache prefix counts as cold at a consult,
  * first match wins: its model never answered in this unseeded session, a
@@ -438,6 +503,12 @@ One decision is logged per fresh judged request step as `model-routing/decision`
 ## Failed judgment calls
 
 Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. The gate applies the `operatingPoints` entry for the selected engine, else the global `downgradeThreshold` and `downgradeMargin`, and an answered decision records them in `thresholds` with their `source` and any `calibratedBy`, plus `entryScoreCeiling` and `escalateBackScoreThreshold` when the consult asked the difficulty question, so the log keeps the thresholds in force at each decision. A selected engine whose registry descriptor declares `verbalized` calibration is refused as `engine-uncalibrated`, without eligibility or a call, unless its operating point sets `acceptVerbalized`. The engine checks are read again, with no await before the call, so they describe the engine the dispatcher asks; an answer stamped with another engine's id is gated by that engine's point, and discarded as `engine-uncalibrated` when that engine is refused, and a failure from an engine that is `starting` or `not-installed` when it arrives is not counted. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest and the `engineId` they were routed to, and clears the count on a decision that carries a route answer. A failure routed to another engine starts a new count, and the consult reads the count only against the engine `ctx.judgment.selectedEngine('model-router')` selects, so an engine switch clears the breaker and the hold tolerance at once. A selected engine whose registry status is `starting` or `not-installed` is not asked; the decision records `engineFailure.engineState`, and the fold does not count it. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
+
+## Child-route decisions
+
+The parent decides a matching subagent or workflow route once, before the child exists. A static rule returns its pool candidate; a judged rule asks keep-current versus that candidate with the candidate's configured description, and only a mode that is still `on` returns the pool route. Shadow records the same spawn decision and returns the inherited route. A child task longer than `state.maxChars` records `input-too-large`, `promptChars`, and `inputChars: 0` before any judge service is called.
+
+Each judged child decision records the exact questions, the plain task text or fitted tokenizer result, the route answer when one arrived, the engine identity, effective thresholds, latency, input characters, reported usage, capacity rejection, and classified engine failure. `inputChars` describes the offered characters; `engineFailure.refusedBeforeDispatch` and `judgmentRejection` distinguish a dispatcher refusal or fit rejection from model inference. A parent cancellation propagates without a decision. A deadline records a late answer's facts as `engine-unavailable` with `DEADLINE` and never returns its route, even when the engine ignores its signal. Parent statistics count child spawn decisions; candidate suspension is folded from the child outcome breaker and is not a per-session stats field.
 
 ## In-turn fallback
 
@@ -986,5 +1057,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md) · [SubagentChildRoute](subagent.md) · [SubagentChildRouteRequest](subagent.md)
 
-Source: [`packages/llm/model-router/src/index.ts:519`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:520`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

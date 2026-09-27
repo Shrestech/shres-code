@@ -876,8 +876,6 @@ export interface ModelRoutingStatsSnapshot {
     byModel: { candidateId: string; count: number }[]
     /** Child outcomes counted as failure. */
     failures: number
-    /** Distinct candidate ids currently at the breaker limit in this fold. */
-    suspended: number
   }
   /** Most recent child-decisions, newest first, at most 100. */
   recentChildren: {
@@ -1244,6 +1242,7 @@ export interface ModelRoutingChildDecision {
     | 'base-unlisted'
     | 'candidate-equals-base'
     | 'child-route-errors'
+    | 'input-too-large'
     | 'engine-absent'
     | 'engine-uncalibrated'
     | 'engine-unavailable'
@@ -1266,11 +1265,29 @@ export interface ModelRoutingChildDecision {
   effortApplied: false
   /** Character length of the child's task text. */
   promptChars: number
+  /** Exact task text handed to a plain judgment ask. */
+  judgmentState?: string
+  /** Exact questions supplied to the child-route judgment engine. */
+  judgmentQuestions?: readonly JudgmentQuestion[]
+  /** Exact selected task text and tokenizer facts from a fitted ask. */
+  judgmentInput?: JudgmentTokenFit
+  /** Capacity rejection without model inference. */
+  judgmentRejection?: { limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+  /** The judgment's route answer, when a judgment call produced one. */
+  route?: ModelRoutingRouteAnswer
+  /** Characters handed to the engine; zero records a pre-dispatch input refusal. */
+  inputChars?: number
   /** Judgment engine identity, when a rule judged. */
   engine?: string
   engineId?: string
   model?: string
   latencyMs?: number
+  /** Token usage of the child-route judgment call, when the engine reported it. */
+  judgeUsage?: TokenUsage
+  /** Why the child-route judgment call failed, when it failed. */
+  engineFailure?: ModelRoutingEngineFailure
+  /** Thresholds in force for the child-route judgment. */
+  thresholds?: ModelRoutingThresholds
   /** Whether this consult only recorded what live would do. */
   shadow?: true
   /** Parent routeFrom objective, when the base is listed. */

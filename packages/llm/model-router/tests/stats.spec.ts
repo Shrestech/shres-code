@@ -979,7 +979,6 @@ describe('cache lifetimes and shadow figures from decisions', () => {
       routed: 1,
       kept: 1,
       failures: 1,
-      suspended: 1,
     })
     expect(stats.children.byReason).toEqual([
       { reason: 'base-unlisted', count: 1 },

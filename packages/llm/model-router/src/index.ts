@@ -69,6 +69,7 @@ import type {
   JudgmentScoreAnswer,
   JudgmentScoreQuestion,
   JudgmentService,
+  JudgmentTokenFit,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
@@ -1233,33 +1234,73 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     config: ResolvedModelRouterConfig,
   ): Promise<{ route?: SubagentChildRoute; decision: ModelRoutingChildDecision }> {
     const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
+    if (request.prompt.length > config.state.maxChars) {
+      return {
+        decision: {
+          ...keep('input-too-large').decision,
+          inputChars: 0,
+        },
+      }
+    }
     const engine = this.ctx.get('judgment')
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-absent')
     const snapshot = this.engineSnapshot(engine, config, { active: false, stepsElapsed: 0 })
-    if (snapshot.refused) return keep('engine-uncalibrated')
-    if (snapshot.warming !== undefined) return keep('engine-unavailable')
+    const snapshotFacts = {
+      ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
+      thresholds: snapshot.thresholds,
+    }
+    let evaluatedFacts = snapshotFacts
+    if (snapshot.refused) return { decision: { ...keep('engine-uncalibrated').decision, ...snapshotFacts } }
+    if (snapshot.warming !== undefined) {
+      return {
+        decision: {
+          ...keep('engine-unavailable').decision,
+          ...snapshotFacts,
+          engineFailure: { code: 'UNAVAILABLE', engineState: snapshot.warming },
+        },
+      }
+    }
     const instructions = config.childRouteInstructions
-    if (instructions === undefined) return keep('engine-absent')
+    if (instructions === undefined) return { decision: { ...keep('engine-absent').decision, ...snapshotFacts } }
     const questions = [{
       kind: 'choice' as const,
       id: ROUTE_QUESTION_ID,
       instructions,
       options: [
         { option: KEEP_CURRENT_OPTION_ID, description: 'Keep the inherited parent model.' },
-        { option: candidate.id, description: `Use ${candidate.provider}/${candidate.model}.` },
+        { option: candidate.id, description: candidate.description },
       ],
     }]
+    const evaluated = (
+      reason: ModelRoutingChildDecision['reason'],
+      details: Partial<ModelRoutingChildDecision> = {},
+    ): { decision: ModelRoutingChildDecision } => ({
+      decision: {
+        ...keep(reason).decision,
+        judgmentQuestions: questions,
+        ...snapshotFacts,
+        ...evaluatedFacts,
+        ...details,
+      },
+    })
     const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
     const askSignal = AbortSignal.any([request.signal, deadline])
     const correlation = { sessionId: request.parent.session.id, consultKey: `child:${request.routeRequestId}` }
     let result: JudgmentResult
+    let judgmentState: string | undefined
+    let judgmentInput: JudgmentTokenFit | undefined
+    let inputChars: number | undefined
     const askStarted = Date.now()
     try {
       const fitting = engine.fittingFor(consumer)
       if (fitting === undefined) {
+        judgmentState = request.prompt
+        inputChars = request.prompt.length
         result = await engine.ask({ state: request.prompt, questions, tier: config.tier, signal: askSignal, consumer, correlation })
+        request.signal.throwIfAborted()
       } else {
+        inputChars = request.prompt.length
         const fitted = await fitting.ask({
           states: [request.prompt],
           questions,
@@ -1268,62 +1309,103 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           consumer,
           correlation,
         })
+        request.signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
-          return {
-            decision: {
-              ...keep('invalid-answer').decision,
-              latencyMs: Date.now() - askStarted,
-              ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
-            },
-          }
+          return evaluated(deadline.aborted ? 'engine-unavailable' : 'invalid-answer', {
+            latencyMs: Date.now() - askStarted,
+            engine: fitted.engine,
+            model: fitted.model,
+            ...fitted.engineId === undefined ? {} : { engineId: fitted.engineId },
+            judgmentRejection: { limits: fitted.limits, reason: fitted.reason },
+            ...inputChars === undefined ? {} : { inputChars },
+            ...deadline.aborted ? { engineFailure: { code: 'DEADLINE' as const } } : {},
+          })
         }
+        judgmentInput = fitted.fit
+        inputChars = fitted.fit.state.length
         result = fitted.result
       }
     } catch (error: unknown) {
-      if (request.signal.aborted) throw error
-      return {
-        decision: {
-          ...keep('engine-unavailable').decision,
-          latencyMs: Date.now() - askStarted,
-          ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
-        },
+      request.signal.throwIfAborted()
+      const coded = error instanceof JudgmentError ? error.code : undefined
+      const refusedBeforeDispatch = error instanceof JudgmentError ? error.refusedBeforeDispatch : undefined
+      const failedEngineId = error instanceof JudgmentError ? error.engineId : undefined
+      if (failedEngineId !== undefined && failedEngineId !== snapshot.engineId) {
+        const failed = this.engineSnapshot(engine, config, { active: false, stepsElapsed: 0 }, failedEngineId)
+        evaluatedFacts = {
+          ...failed.engineId === undefined ? {} : { engineId: failed.engineId },
+          thresholds: failed.thresholds,
+        }
       }
+      const engineFailure = coded === undefined
+        ? deadline.aborted ? { code: 'DEADLINE' as const } : undefined
+        : {
+          code: coded,
+          ...refusedBeforeDispatch === undefined ? {} : { refusedBeforeDispatch },
+        }
+      const sentChars = refusedBeforeDispatch === true ? 0 : request.prompt.length
+      const reason = coded === 'INPUT_TOO_LARGE' ? 'input-too-large' : 'engine-unavailable'
+      return evaluated(reason, {
+        ...judgmentState === undefined ? {} : { judgmentState },
+        ...sentChars === undefined ? {} : { inputChars: sentChars },
+        latencyMs: Date.now() - askStarted,
+        ...failedEngineId === undefined ? {} : { engineId: failedEngineId },
+        ...engineFailure === undefined ? {} : { engineFailure },
+      })
     }
+    request.signal.throwIfAborted()
     const latencyMs = Date.now() - askStarted
     const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const identity = {
-      ...result.engine === undefined ? {} : { engine: result.engine },
-      ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
-      ...result.model === undefined ? {} : { model: result.model },
-      latencyMs,
+      ...judgmentState === undefined ? {} : { judgmentState },
+      ...judgmentInput === undefined ? {} : { judgmentInput },
+      ...inputChars === undefined ? {} : { inputChars },
+      engine: result.engine,
+      model: result.model,
+      latencyMs: result.latencyMs ?? latencyMs,
+      ...result.engineId === undefined ? {} : { engineId: result.engineId },
+      ...result.usage === undefined ? {} : { judgeUsage: result.usage },
     }
-    if (route === undefined) return { decision: { ...keep('invalid-answer').decision, ...identity } }
+    const answering = this.engineSnapshot(
+      engine,
+      config,
+      { active: false, stepsElapsed: 0 },
+      result.engineId ?? snapshot.engineId,
+    )
+    evaluatedFacts = {
+      ...answering.engineId === undefined ? {} : { engineId: answering.engineId },
+      thresholds: answering.thresholds,
+    }
+    if (answering.refused) return evaluated('engine-uncalibrated', identity)
+    if (deadline.aborted) return evaluated('engine-unavailable', { ...identity, engineFailure: { code: 'DEADLINE' } })
+    if (route === undefined) return evaluated('invalid-answer', identity)
+    const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
     if (route.option === KEEP_CURRENT_OPTION_ID) {
-      return { decision: { ...keep('child-judged').decision, ...identity } }
+      return evaluated('child-judged', { ...identity, route: routeAnswer })
     }
-    const thresholds = {
-      downgradeThreshold: snapshot.thresholds.downgradeThreshold,
-      downgradeMargin: snapshot.thresholds.downgradeMargin,
-    }
+    const thresholds = answering.thresholds
     if (route.confidence < thresholds.downgradeThreshold) {
-      return { decision: { ...keep('low-confidence').decision, ...identity } }
+      return evaluated('low-confidence', { ...identity, route: routeAnswer })
     }
     const probabilities = Object.values(route.probabilities).sort((left, right) => right - left)
     const top = probabilities[0] ?? 0
     const second = probabilities[1] ?? 0
     if (top - second < thresholds.downgradeMargin) {
-      return { decision: { ...keep('thin-margin').decision, ...identity } }
+      return evaluated('thin-margin', { ...identity, route: routeAnswer })
     }
-    if (route.option !== candidate.id) return { decision: { ...keep('invalid-answer').decision, ...identity } }
+    if (route.option !== candidate.id) return evaluated('invalid-answer', { ...identity, route: routeAnswer })
     const decision: ModelRoutingChildDecision = {
       outcome: 'routed',
       reason: 'child-judged',
       ...common,
       selection: { candidateId: candidate.id, provider: candidate.provider, model: candidate.model },
+      judgmentQuestions: questions,
+      ...evaluatedFacts,
       ...identity,
+      route: routeAnswer,
     }
-    if (this.modeOf(request.parent.session) === 'shadow') return { decision }
+    if (this.modeOf(request.parent.session) !== 'on') return { decision }
     return { route: { provider: candidate.provider, model: candidate.model }, decision }
   }
 
@@ -2194,7 +2276,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const point = config.operatingPoints.find(candidate => candidate.engine === String(descriptor.id))
     if (routingCalibration(descriptor.calibration, point).kind === 'refused') return ''
     const destination = descriptor.destination === undefined ? '' : ` at ${descriptor.destination}`
-    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this session to it${destination}.`
+    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this conversation or subagent task to it${destination}.`
   }
 
   /** Render the `/route` command's result. */

@@ -950,7 +950,7 @@ describe('the /route command', () => {
   })
 
   it('states remote egress for shadow as it does for on, because shadow sends the same state', async () => {
-    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this session to it at api.typesafe.ai.'
+    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this conversation or subagent task to it at api.typesafe.ai.'
     const b = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
     await b.ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
     await registeredEngine(b.ctx, 'typesafe', { state: 'ready' }, 'calibrated', PASSING, { egress: 'remote', destination: 'api.typesafe.ai' })
@@ -961,7 +961,7 @@ describe('the /route command', () => {
   })
 
   it('names a remote judge, where it sends state, and the character cap when turned on', async () => {
-    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this session to it at api.typesafe.ai.'
+    const remoteNotice = ' The judge, typesafe, runs off this machine: each consult sends up to 12,000 characters of this conversation or subagent task to it at api.typesafe.ai.'
     const off = await bench({ config: { ...CONFIG, initialMode: 'off' }, commands: true, engine: false })
     await off.ctx.plugin(JudgmentDispatch, { defaultEngine: 'typesafe' })
     await registeredEngine(off.ctx, 'typesafe', { state: 'ready' }, 'calibrated', PASSING, { egress: 'remote', destination: 'api.typesafe.ai' })
@@ -989,7 +989,7 @@ describe('the /route command', () => {
     })
     await unnamed.ctx.plugin(JudgmentDispatch, { defaultEngine: 'llm:x' })
     await registeredEngine(unnamed.ctx, 'llm:x', { state: 'ready' }, 'verbalized', PASSING, { egress: 'remote' })
-    expect(await route(unnamed, '/route on')).toBe('Model routing on. The judge, llm:x, runs off this machine: each consult sends up to 12,000 characters of this session to it.')
+    expect(await route(unnamed, '/route on')).toBe('Model routing on. The judge, llm:x, runs off this machine: each consult sends up to 12,000 characters of this conversation or subagent task to it.')
   })
 })
 
@@ -4468,6 +4468,11 @@ describe('child-route consult through the controller', () => {
     ...CONFIG,
     childPolicies: [{ match: { kind: 'subagent', agentType: 'explore' }, candidate: 'cheap' }],
   }
+  const JUDGED_CHILD_CONFIG: ModelRouterConfig = {
+    ...CHILD_CONFIG,
+    childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
+    childRouteInstructions: 'Keep the parent model or use the cheaper child?',
+  }
 
   async function childRequest(b: Awaited<ReturnType<typeof bench>>, overrides: Partial<SubagentChildRouteRequest> = {}) {
     b.session.append('request/header', {
@@ -4521,11 +4526,7 @@ describe('child-route consult through the controller', () => {
 
   it('judge:true asks with child:routeRequestId correlation', async () => {
     const b = await bench({
-      config: {
-        ...CHILD_CONFIG,
-        childPolicies: [{ match: { kind: 'subagent' }, candidate: 'cheap', judge: true }],
-        childRouteInstructions: 'Keep the parent model or use the cheaper child?',
-      },
+      config: JUDGED_CHILD_CONFIG,
     })
     b.engine.choice = { kind: 'choice', id: ROUTE_QUESTION_ID, option: 'cheap', confidence: 0.95, probabilities: { cheap: 0.95, [KEEP_CURRENT_OPTION_ID]: 0.05 } }
     expect(await childRequest(b)).toEqual(CHEAP)
@@ -4533,6 +4534,224 @@ describe('child-route consult through the controller', () => {
       sessionId: b.session.id,
       consultKey: 'child:child-route-1',
     })
+    expect(b.session.events.find(event => event.type === 'model-routing/child-decision')?.data).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-judged',
+    })
+  })
+
+  it('records plain child judgment facts, including the candidate description and thresholds', async () => {
+    const b = await bench({
+      config: {
+        ...JUDGED_CHILD_CONFIG,
+        operatingPoints: [{ engine: 'laya', downgradeThreshold: 0.7, downgradeMargin: 0.2, calibratedBy: 'child-prereg-1' }],
+      },
+    })
+    await engineRegistry(b.ctx)
+    await registeredEngine(b.ctx, 'laya', { state: 'ready' })
+    b.engine.selected = judgmentEngineId('laya')
+    b.engine.stamp = { engineId: judgmentEngineId('laya'), usage: { inputTokens: 11, outputTokens: 3, cacheReadTokens: 0 } }
+
+    expect(await childRequest(b)).toEqual(CHEAP)
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      outcome: 'routed',
+      reason: 'child-judged',
+      judgmentState: 'explore the tree',
+      inputChars: 'explore the tree'.length,
+      engine: 'scripted-judgment',
+      model: 'scripted-1',
+      engineId: 'laya',
+      judgeUsage: { inputTokens: 11, outputTokens: 3, cacheReadTokens: 0 },
+      route: { choice: 'cheap', confidence: 0.9, probabilities: { cheap: 0.9, strong: 0.02 } },
+      thresholds: {
+        downgradeThreshold: 0.7,
+        downgradeMargin: 0.2,
+        source: 'operating-point',
+        calibratedBy: 'child-prereg-1',
+      },
+    })
+    expect(decision?.judgmentQuestions?.[0]?.options).toEqual([
+      { option: KEEP_CURRENT_OPTION_ID, description: 'Keep the inherited parent model.' },
+      { option: 'cheap', description: 'a small change in familiar code' },
+    ])
+  })
+
+  it('gates a child answer against the engine that stamped the result', async () => {
+    const b = await bench({
+      config: {
+        ...JUDGED_CHILD_CONFIG,
+        operatingPoints: [
+          { engine: 'laya', downgradeThreshold: 0.7, downgradeMargin: 0.1, calibratedBy: 'child-prereg-laya' },
+          { engine: 'pt', downgradeThreshold: 0.95, downgradeMargin: 0.1, calibratedBy: 'child-prereg-pt' },
+        ],
+      },
+    })
+    await engineRegistry(b.ctx)
+    await registeredEngine(b.ctx, 'laya', { state: 'ready' })
+    await registeredEngine(b.ctx, 'pt', { state: 'ready' })
+    b.engine.selected = judgmentEngineId('laya')
+    b.engine.stamp = { engineId: judgmentEngineId('pt') }
+
+    expect(await childRequest(b)).toBeUndefined()
+    expect(b.session.events.find(event => event.type === 'model-routing/child-decision')?.data).toMatchObject({
+      outcome: 'kept',
+      reason: 'low-confidence',
+      engineId: 'pt',
+      thresholds: {
+        downgradeThreshold: 0.95,
+        downgradeMargin: 0.1,
+        source: 'operating-point',
+        calibratedBy: 'child-prereg-pt',
+      },
+    })
+  })
+
+  it('records a fitted child input and its token facts', async () => {
+    const b = await bench({ config: JUDGED_CHILD_CONFIG })
+    const limits: JudgmentTokenLimits = {
+      maxSequenceTokens: 1024,
+      maxHeadTokens: 256,
+      maxBatchTokens: 4096,
+      manifestSha256: 'b'.repeat(64),
+    }
+    b.engine.fittingForConsumer = {
+      ask: async (input) => {
+        const state = input.states[0]!
+        const result = await b.engine.ask({ ...input, state })
+        return {
+          kind: 'answered',
+          result,
+          fit: { selectedIndex: 0, state, stateTokens: 12, sequenceTokens: [24], paddedTokens: 24, limits },
+        }
+      },
+    }
+
+    expect(await childRequest(b, { prompt: 'fitted child task' })).toEqual(CHEAP)
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      reason: 'child-judged',
+      judgmentInput: { selectedIndex: 0, state: 'fitted child task', stateTokens: 12, sequenceTokens: [24], paddedTokens: 24, limits },
+      inputChars: 'fitted child task'.length,
+    })
+    expect(decision).not.toHaveProperty('judgmentState')
+  })
+
+  it('records a fit rejection separately from the offered child characters', async () => {
+    const b = await bench({ config: JUDGED_CHILD_CONFIG })
+    const limits: JudgmentTokenLimits = {
+      maxSequenceTokens: 16,
+      maxHeadTokens: 8,
+      maxBatchTokens: 32,
+      manifestSha256: 'c'.repeat(64),
+    }
+    b.engine.fittingForConsumer = {
+      ask: async () => ({ kind: 'unfit', engine: 'fit-engine', model: 'fit-model', limits, reason: 'state' }),
+    }
+
+    expect(await childRequest(b)).toBeUndefined()
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      outcome: 'kept',
+      reason: 'invalid-answer',
+      engine: 'fit-engine',
+      model: 'fit-model',
+      inputChars: 'explore the tree'.length,
+      judgmentRejection: { limits, reason: 'state' },
+    })
+    expect(b.engine.asks).toEqual([])
+  })
+
+  it('marks a dispatcher refusal as pre-dispatch with no child characters sent', async () => {
+    const b = await bench({ config: JUDGED_CHILD_CONFIG })
+    b.engine.failure = new JudgmentError('UNAVAILABLE', 'laya is not ready', {
+      engineId: judgmentEngineId('laya'),
+      refusedBeforeDispatch: true,
+    })
+
+    expect(await childRequest(b)).toBeUndefined()
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      outcome: 'kept',
+      reason: 'engine-unavailable',
+      inputChars: 0,
+      engineFailure: { code: 'UNAVAILABLE', refusedBeforeDispatch: true },
+    })
+  })
+
+  it('keeps a late child answer on the inherited route and records its cost', async () => {
+    const b = await bench({ config: { ...JUDGED_CHILD_CONFIG, judgmentDeadlineMs: 10 } })
+    b.engine.askOverride = () => new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          answers: [PASSING],
+          engine: 'late-child-judge',
+          model: 'late-child-1',
+          latencyMs: 30,
+          engineId: judgmentEngineId('laya'),
+          usage: { inputTokens: 17, outputTokens: 2 },
+        })
+      }, 30)
+    })
+
+    expect(await childRequest(b)).toBeUndefined()
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      outcome: 'kept',
+      reason: 'engine-unavailable',
+      judgmentState: 'explore the tree',
+      inputChars: 'explore the tree'.length,
+      engine: 'late-child-judge',
+      model: 'late-child-1',
+      engineId: 'laya',
+      latencyMs: 30,
+      judgeUsage: { inputTokens: 17, outputTokens: 2 },
+      engineFailure: { code: 'DEADLINE' },
+    })
+    expect(decision).not.toHaveProperty('route')
+  })
+
+  it('rethrows parent cancellation after a child judge answers late', async () => {
+    const b = await bench({ config: JUDGED_CHILD_CONFIG })
+    const controller = new AbortController()
+    let started!: () => void
+    const askStarted = new Promise<void>((resolve) => { started = resolve })
+    let resolveAsk!: (result: JudgmentResult) => void
+    const pendingAsk = new Promise<JudgmentResult>((resolve) => { resolveAsk = resolve })
+    b.engine.askOverride = async () => {
+      started()
+      return pendingAsk
+    }
+
+    const pending = childRequest(b, { signal: controller.signal })
+    await askStarted
+    controller.abort()
+    resolveAsk({ answers: [PASSING], engine: 'late-child-judge', model: 'late-child-1', latencyMs: 2 })
+    await expect(pending).rejects.toThrow()
+    expect(b.session.events.some(event => event.type === 'model-routing/child-decision')).toBe(false)
+  })
+
+  it('refuses an over-budget child task before asking any judge', async () => {
+    const b = await bench({ config: { ...JUDGED_CHILD_CONFIG, state: { maxChars: 4 } } })
+    expect(await childRequest(b)).toBeUndefined()
+    const decision = b.session.events.find(event => event.type === 'model-routing/child-decision')?.data
+    expect(decision).toMatchObject({
+      outcome: 'kept',
+      reason: 'input-too-large',
+      promptChars: 'explore the tree'.length,
+      inputChars: 0,
+    })
+    expect(b.engine.asks).toHaveLength(0)
+  })
+
+  it('does not return a routed child when mode changes while the judge is waiting', async () => {
+    const b = await bench({ config: JUDGED_CHILD_CONFIG })
+    b.engine.askOverride = async () => {
+      b.session.append('model-routing/mode', { active: false })
+      return { answers: [PASSING], engine: 'scripted-judgment', model: 'scripted-1', latencyMs: 1 }
+    }
+
+    expect(await childRequest(b)).toBeUndefined()
     expect(b.session.events.find(event => event.type === 'model-routing/child-decision')?.data).toMatchObject({
       outcome: 'routed',
       reason: 'child-judged',

@@ -380,7 +380,7 @@ describe('RoutingChip remote-judge confirm', () => {
     fireEvent.click(offChip())
     const dialog = screen.getByRole('dialog', { name: en['confirm.title'] })
     expect(dialog.textContent).toContain(en['confirm.body'])
-    await screen.findByText('This judge runs off this machine: each consult sends up to 12,000 characters of this session to api.typesafe.ai.')
+    await screen.findByText('This judge runs off this machine: each consult sends up to 12,000 characters of this conversation or subagent task to api.typesafe.ai.')
     expect(setRouting).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: en['confirm.turnOn'] }))
     expect(setRouting).toHaveBeenCalledWith(true)
@@ -390,9 +390,9 @@ describe('RoutingChip remote-judge confirm', () => {
   it('names the destination alone while the cap loads or when it cannot be read', async () => {
     setup({ routing: OFF, engine: REMOTE_JUDGE, loadGate: () => Promise.reject(new Error('gone')) })
     fireEvent.click(offChip())
-    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this conversation or subagent task to api.typesafe.ai.')).toBeTruthy()
     await act(async () => { await Promise.resolve() })
-    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to api.typesafe.ai.')).toBeTruthy()
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this conversation or subagent task to api.typesafe.ai.')).toBeTruthy()
   })
 
   it('cancels or closes without switching', () => {
@@ -410,7 +410,7 @@ describe('RoutingChip remote-judge confirm', () => {
     const unnamed = engines('typesafe', { engines: [LOCAL, unnamedRemote] })
     setup({ routing: OFF, engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
     fireEvent.click(offChip())
-    expect(screen.getByText('This judge runs off this machine: each consult sends part of this session to Jev (TypeSafe).')).toBeTruthy()
+    expect(screen.getByText('This judge runs off this machine: each consult sends part of this conversation or subagent task to Jev (TypeSafe).')).toBeTruthy()
   })
 
   it('says a judge the router refuses sends nothing, once gate() reports it', async () => {
