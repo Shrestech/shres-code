@@ -1858,15 +1858,44 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     const now = latestStepStart(session.events) ?? Date.now()
     let liveTtl: ModelRoutingCacheTtl | undefined
-    if (from.objective === 'quota' && !from.allowEveryTurn && (held === undefined || step === 1)) {
-      const ttl = await this.cacheTtl(config, base, signal)
-      liveTtl = ttl
-      const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
-      facts.coldPoint = coldPoint ?? null
-      facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
-      if (held === undefined && coldPoint === undefined) return keep('warm-prefix')
-      if (held !== undefined && coldPoint !== undefined && sticky.stepsElapsed >= config.hold.minSteps) {
-        return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
+    // A quota route enters only at a cold point of the manual model's prompt
+    // cache and returns at the next one, so a warm prefix is never rewritten
+    // and costs no judgment call and no capability assessment. A held streak is
+    // checked on the first step only when that turn has no warm pin; a warm
+    // held selection keeps its candidate for every step of the turn.
+    if (from.objective === 'quota' && !from.allowEveryTurn) {
+      const pin = this.pins.get(session)
+      const warmTurn = pin?.turn === turn && pin.decision.coldPoint === null
+      if (warmTurn) {
+        facts.coldPoint = null
+        if (pin?.decision.cache !== undefined) facts.cache = pin.decision.cache
+      } else if (held === undefined || step === 1) {
+        const ttl = await this.cacheTtl(config, base, signal)
+        liveTtl = ttl
+        const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
+        facts.coldPoint = coldPoint ?? null
+        facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
+        if (held !== undefined && coldPoint !== undefined) {
+          return { ...keep('cold-point-return'), sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' } }
+        }
+      }
+      if (facts.coldPoint === null) {
+        if (held === undefined) return keep('warm-prefix')
+        return {
+          outcome: 'downgraded',
+          reason: 'sticky-hold',
+          stateHash: observed.hash,
+          stateSeqs: observed.seqs,
+          selection: held,
+          ...facts,
+          sticky: {
+            active: true,
+            routeErrorLimit: config.maxRouteErrors,
+            stepsElapsed: sticky.stepsElapsed,
+            ...heldEntry(sticky),
+            entryBase: entryBaseOf(sticky, base),
+          },
+        }
       }
     }
     const llm = this.ctx.get('llm')

@@ -986,4 +986,38 @@ describe('cache lifetimes and shadow figures from decisions', () => {
     ].sort((left, right) => left.reason < right.reason ? -1 : 1))
     expect(stats.recentChildren.map(row => row.outcome)).toEqual(['routed', 'kept'])
   })
+
+  it('counts a warm held decision as skipped judgment without counting a judged hold', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, {
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      selection: selection('flash', FLASH),
+      route: answer('flash', 0.9, { flash: 0.9, 'keep-current': 0.1 }),
+      sticky: held(),
+      ...pool(FLASH),
+    })
+    log.step(2, 2, 1)
+    log.decide(3, {
+      outcome: 'downgraded',
+      reason: 'sticky-hold',
+      coldPoint: null,
+      selection: selection('flash', FLASH),
+      sticky: held(STRONG, 1),
+    })
+    log.step(4, 3, 1)
+    log.decide(5, {
+      outcome: 'downgraded',
+      reason: 'sticky-hold',
+      coldPoint: { kind: 'idle', ttlMs: 1, ttlSource: 'fallback', idleMs: 2 },
+      selection: selection('flash', FLASH),
+      route: answer('flash', 0.9, { flash: 0.9, 'keep-current': 0.1 }),
+      engine: 'snapshot',
+      latencyMs: 1,
+      sticky: held(STRONG, 2),
+    })
+
+    expect(fold(log).counts.warmSkipped).toBe(1)
+  })
 })

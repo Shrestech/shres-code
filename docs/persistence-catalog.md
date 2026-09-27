@@ -884,7 +884,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/child-decision': ModelRoutingChildDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1331`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1349`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingchild-outcome--log-only"></a>
 
@@ -898,7 +898,7 @@ Source: [`packages/llm/model-router/src/types.ts:1331`](../packages/llm/model-ro
 'model-routing/child-outcome': ModelRoutingChildOutcome
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1336`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1354`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingconfiguration--log-only"></a>
 
@@ -913,7 +913,7 @@ Source: [`packages/llm/model-router/src/types.ts:1336`](../packages/llm/model-ro
 'model-routing/configuration': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1314`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1332`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -928,7 +928,7 @@ Source: [`packages/llm/model-router/src/types.ts:1314`](../packages/llm/model-ro
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1326`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1344`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -943,7 +943,7 @@ Source: [`packages/llm/model-router/src/types.ts:1326`](../packages/llm/model-ro
 'model-routing/mode': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1320`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1338`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

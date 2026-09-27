@@ -10,7 +10,7 @@ The model-selection hook `installModelSelection` ([shres-agent](../../packages/c
 
 The latest explicit `agent/model-selection` event is the manual selection authority, even when no request header exists or its provider/model/effort matches a routed header byte for byte. Resume and fork therefore recover manual intent before consulting the router's sticky base or a logged request header. Routing policy is unchanged: the consult may select only an eligible configured candidate for the current request, and the manual selection remains the fallback when the consult returns no route.
 
-Under a `quota` `routeFrom` entry without `allowEveryTurn`, the consult first evaluates the manual model's cold point — on step 1 of the turn, after the reentry-cooldown check and before any engine, breaker, or capability work, so a warm turn costs no judgment call. The fold reads log facts only: first match among session start, a completed compaction, a manual model change, a zero lifetime, or idle beyond the model's lifetime wins. A header the durable manual base recorded beneath `agent/route-base` is routed and never a manual switch, whatever the turn's decisions say; a header without such a record is read through the turn's own live downgraded decision, and never through a shadow one, which rewrites nothing. `coldPoints.unknownTtlMs` supplies the lifetime a model's metadata declares none of, and replay reads the recorded `coldPoint` instead of the clock. A held quota streak returns at the next cold point once `hold.minSteps` is reached.
+Under a `quota` `routeFrom` entry without `allowEveryTurn`, the consult first evaluates the manual model's cold point — on step 1 of the turn, after the reentry-cooldown check and before any engine, breaker, or capability work, so a warm turn costs no judgment call. The fold reads log facts only: first match among session start, a completed compaction, a manual model change, a zero lifetime, or idle beyond the model's lifetime wins. A header the durable manual base recorded beneath `agent/route-base` is routed and never a manual switch, whatever the turn's decisions say; a header without such a record is read through the turn's own live downgraded decision, and never through a shadow one, which rewrites nothing. `coldPoints.unknownTtlMs` supplies the lifetime a model's metadata declares none of, and replay reads the recorded `coldPoint` instead of the clock. A held quota streak returns at the next cold point regardless of `hold.minSteps`. While its prefix is warm, an active held streak logs `sticky-hold` with `coldPoint: null` and keeps its selection without a fresh judgment or capability assessment; the turn pin covers later steps even if tool work outlasts the lifetime.
 
 In `shadow` the same consult runs in full — eligibility, egress, breaker, and calibration checks exactly as `on`, awaited on the request's critical path under `judgmentDeadlineMs` — over a separate `shadowStickyState` fold that applies only decisions marked `shadow: true`. The decision is logged with `shadow: true` and the manual route stands, so the live streak and the turn's pin are released as `mode-off` when the mode switches and a shadow pin never returns a selection. The package invariant rejects any `request/header` in the shadow decision's own turn and step that does not name the manual base the consult judged.
 
@@ -134,7 +134,7 @@ type ModelRoutingOutcome = 'downgraded' | 'kept-strong' | 'skipped' | 'error'
 type ModelRoutingReason =
   /** An allowlisted candidate passed the gate (or re-affirmed a held streak). */
   | 'gate-passed'
-  /** The gate failed while the streak is below its amortization horizon. */
+  /** The held selection continues below its horizon, or through a warm quota turn without a fresh judgment. */
   | 'sticky-hold'
   /** No judgment engine is composed. */
   | 'engine-absent'
@@ -203,17 +203,18 @@ type ModelRoutingReason =
   | 'judgment-error'
   /**
    * The manual route is a `quota` route and its prompt-cache prefix is still
-   * warm, so no switch is attempted and no judgment runs this turn.
+   * warm, so no switch is attempted and no judgment runs this turn. A held
+   * selection uses `sticky-hold` with `coldPoint: null` instead.
    */
   | 'warm-prefix'
   /**
-   * The manual route's prompt cache went cold after the held quota streak
-   * reached `hold.minSteps`, so the streak returns to it without judgment.
+   * The manual route's prompt cache went cold while a quota streak was held,
+   * so the streak returns to it at the next cold point without judgment.
    */
   | 'cold-point-return'
 ```
 
-Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, `route-errors`, and `route-failed` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon.
+Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, `route-errors`, and `route-failed` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon, or the quota prefix stayed warm for the turn.
 
 ```ts type-equiv
 /**

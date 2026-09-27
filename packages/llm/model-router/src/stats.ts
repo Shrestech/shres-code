@@ -557,7 +557,9 @@ function applyDecision(
       deadlineHits: state.counts.deadlineHits + (data.engineFailure?.code === 'DEADLINE' ? 1 : 0),
       warmUps: state.counts.warmUps + (warmUp ? 1 : 0),
       turnsWithDecisions: state.counts.turnsWithDecisions + (state.lastDecisionTurn === turn ? 0 : 1),
-      warmSkipped: state.counts.warmSkipped + (data.reason === 'warm-prefix' ? 1 : 0),
+      warmSkipped: state.counts.warmSkipped + (
+        data.reason === 'warm-prefix' || (data.reason === 'sticky-hold' && data.coldPoint === null) ? 1 : 0
+      ),
     },
     ttlModels: applyTtlModels(state.ttlModels, data),
     shadow: {
