@@ -1739,6 +1739,9 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
 
   packages/bundle/web-app:
     dependencies:

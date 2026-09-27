@@ -1,0 +1,12 @@
+# Router-free second spawn of the headless --session-id/--resume two-spawn
+# snapshot: same model rows as the routed spawn, no router, judgment, or
+# fixture, so the resumed session can only recover its route from the log.
+
+- id: llm-deepseek
+  config:
+    baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
