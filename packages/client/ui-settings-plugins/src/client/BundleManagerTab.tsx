@@ -57,10 +57,10 @@ function slotBundle(bundle: ManagedBundle): SettingsPluginsBundle {
 }
 
 /** Describe an activation outcome without importing feature-specific copy. */
-function outcomeDetail(outcome: PluginActivationOutcome, t: BundleManagerTabProps['t']): string {
+function outcomeDetail(outcome: PluginActivationOutcome, t: BundleManagerTabProps['t'], enabled: boolean): string {
   if (outcome.kind === 'saved') {
     const key: Record<typeof outcome.application, PluginsSettingsLocaleKey> = {
-      applied: 'bundleApplied',
+      applied: enabled ? 'bundleApplied' : 'bundleDisabledSaved',
       'restart-required': 'bundleRestartRequired',
       overridden: 'bundleOverridden',
     }
@@ -128,7 +128,7 @@ export function BundleManagerTab(props: BundleManagerTabProps): ReactNode {
           setAction({ kind: 'saved', name: bundle.name, enabled, outcome })
           setRequest(value => value + 1)
         } else {
-          setAction({ kind: 'refused', name: bundle.name, detail: outcomeDetail(outcome, t) })
+          setAction({ kind: 'refused', name: bundle.name, detail: outcomeDetail(outcome, t, enabled) })
         }
       } catch (error) {
         setAction({ kind: 'error', detail: error instanceof Error ? error.message : t('bundleOperationFailed') })
@@ -146,7 +146,7 @@ export function BundleManagerTab(props: BundleManagerTabProps): ReactNode {
   return (
     <div className={css.section} aria-busy={working !== undefined}>
       <p className={css.intro}>{t('bundlesIntro')}</p>
-      {action.kind === 'saved' ? <p className={css.notice} role="status">{outcomeDetail(action.outcome, t)}</p> : null}
+      {action.kind === 'saved' ? <p className={css.notice} role="status">{outcomeDetail(action.outcome, t, action.enabled)}</p> : null}
       {action.kind === 'refused' || action.kind === 'error' ? <p className={css.alert} role="alert">{action.detail}</p> : null}
       <ul className={css.cards}>
         {view.bundles.map((bundle) => {

@@ -102,6 +102,22 @@ describe('BundleManagerTab', () => {
     await waitFor(() => { expect(b.listBundles).toHaveBeenCalledTimes(2) })
   })
 
+  it('uses direction-specific copy for applied enable and disable outcomes', async () => {
+    const b = renderManager({ listBundles: vi.fn()
+      .mockResolvedValueOnce([bundle({ selected: false, active: false })])
+      .mockResolvedValueOnce([bundle()])
+      .mockResolvedValueOnce([bundle({ selected: false, active: false })]) })
+    await waitFor(() => { expect(screen.getByRole('button', { name: en.bundleEnableAction })).toBeTruthy() })
+
+    fireEvent.click(screen.getByRole('button', { name: en.bundleEnableAction }))
+    await waitFor(() => { expect(screen.getByRole('status').textContent).toBe(en.bundleApplied) })
+    await waitFor(() => { expect(screen.getByRole('button', { name: en.bundleDisableAction })).toBeTruthy() })
+
+    fireEvent.click(screen.getByRole('button', { name: en.bundleDisableAction }))
+    await waitFor(() => { expect(screen.getByRole('status').textContent).toBe(en.bundleDisabledSaved) })
+    expect(b.setBundleEnabled).toHaveBeenLastCalledWith('grant', BUNDLE, false)
+  })
+
   it.each([
     { application: 'restart-required' as const, message: en.bundleRestartRequired },
     { application: 'overridden' as const, message: en.bundleOverridden },
