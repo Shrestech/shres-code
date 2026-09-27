@@ -584,7 +584,7 @@ describe('real Loader composition', () => {
     expect(execution?.result).toEqual({ kind: 'success', text: 'Model routing off.' })
     const modes = eventsOfType(agent.session.events, 'model-routing/mode')
     expect(modes.map(mode => mode.data.active)).toEqual([false])
-    expect(loaded.modelRouting.get(agent)).toEqual({ active: false })
+    expect(loaded.modelRouting.get(agent)).toEqual({ mode: 'off' })
 
     await turn(agent, 'Second easy turn.')
 
@@ -593,7 +593,7 @@ describe('real Loader composition', () => {
     expect(eventsOfType(agent.session.events, 'turn/end').at(-1)?.data.reason).toEqual({ kind: 'completed' })
     // Off is off: no further decision, and no judgment ask for the turn.
     expect(eventsOfType(agent.session.events, 'model-routing/decision')).toHaveLength(1)
-    expect(loaded.modelRouting.modeOf(agent.session)).toBe(false)
+    expect(loaded.modelRouting.modeOf(agent.session)).toBe('off')
     expect(scriptedEngine(loaded).asks).toHaveLength(1)
     // The consumed request is the manual route again, and the stub server sees it.
     const headers = eventsOfType(agent.session.events, 'request/header')

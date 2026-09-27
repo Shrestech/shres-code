@@ -84,12 +84,13 @@ export interface RoutingChipInjected {
    */
   available: boolean
   /**
-   * Switch the routing mode by executing /route on or /route off.
-   * @param next - the mode to request.
+   * Switch the routing mode by executing /route on, /route off, or
+   * /route shadow.
+   * @param next - `true` is on, `false` off, `'shadow'` shadow.
    * @returns null on admitted execution; a user-visible failure line otherwise.
    * Rejects on a transport fault, which the chip surfaces the same way.
    */
-  setRouting: (next: boolean) => Promise<string | null>
+  setRouting: (next: boolean | 'shadow') => Promise<string | null>
   /**
    * Point the session's own selection back at the route the last downgraded
    * streak was entered on, through the model-selection directory the composer
@@ -233,7 +234,7 @@ export function apply(ctx: ClientContext): void {
       available: routable(sessionId),
       // Failure strings stay English (error-surface policy: not localized).
       setRouting: async (next) => {
-        const line = next ? '/route on' : '/route off'
+        const line = next === 'shadow' ? '/route shadow' : next ? '/route on' : '/route off'
         const result = await ctx.remote.commands.execute(sessionId, line)
         if (!result.ok) return `${result.error.message} (${result.error.code})`
         if (result.value === undefined) return `unknown command: ${line}`

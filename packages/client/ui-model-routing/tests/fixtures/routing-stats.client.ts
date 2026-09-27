@@ -31,7 +31,7 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
   return {
     counts: {
       decisions: 0, consults: 0, downgradedSteps: 0, steps: 0, streaks: 0,
-      keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 0,
+      keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 0, warmSkipped: 0,
     },
     reasons: [],
     keptReasons: [],
@@ -55,7 +55,8 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
       { cause: 'post-compaction', count: 0, tokens: 0 },
       { cause: 'other', count: 0, tokens: 0 },
     ],
-    coldTtl: { ms: 300_000, fallback: true },
+    coldTtl: { perModel: [], fallbackMs: 300_000 },
+    shadow: { decisions: 0, downgraded: 0, streaks: 0 },
     unreportedCallShare: null,
     moved: { tokensOffStrong: 0, returnReprefill: 0, objective: null },
     egress: [],
@@ -83,13 +84,15 @@ export function liveStats(): ModelRoutingStatsSnapshot {
     reason: index < 15 ? 'current-preferred' : index < 20 ? 'low-confidence' : 'difficulty-too-high',
     best: index === 21 ? null : Math.round((0.02 + (index % 10) * 0.037) * 100) / 100,
     engine: 0,
+    shadow: false,
+    wouldModel: null,
   }))
   const counts = BUCKETS.map(bound => (bound === 1000 ? 22 : 0))
   return {
     ...base,
     counts: {
       decisions: 22, consults: 22, downgradedSteps: 0, steps: 93, streaks: 0,
-      keptStrong: 22, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 22,
+      keptStrong: 22, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 22, warmSkipped: 0,
     },
     reasons: [
       { reason: 'current-preferred', group: 'judge-no', count: 15 },
@@ -149,7 +152,7 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     ...base,
     counts: {
       decisions: 60, consults: 40, downgradedSteps: 38, steps: 100, streaks: 6,
-      keptStrong: 20, routeFailed: 2, judgeFailed: 20, deadlineHits: 3, warmUps: 0, turnsWithDecisions: 60,
+      keptStrong: 20, routeFailed: 2, judgeFailed: 20, deadlineHits: 3, warmUps: 0, turnsWithDecisions: 60, warmSkipped: 3,
     },
     reasons: [
       { reason: 'gate-passed', group: 'switched', count: 20 },
@@ -176,7 +179,13 @@ export function activeStats(): ModelRoutingStatsSnapshot {
       { provider: 'a', model: 'm6', role: 'other', colorSlot: 'other', steps: 0, calls: 1, uncached: 1, unreported: 0, cacheRead: 0, cacheWrite: 0, output: 1, reportedCalls: 1 },
     ],
     cold: base.cold.map(row => (row.cause === 'routed-switch' ? { ...row, count: 6, tokens: 120_000 } : row.cause === 'routed-return' ? { ...row, count: 5, tokens: 80_000 } : row)),
-    coldTtl: { ms: 3_600_000, fallback: false },
+    coldTtl: {
+      perModel: [
+        { provider: 'claude-session', model: 'claude-opus-5-5', ms: 3_600_000, source: 'adapter' },
+      ],
+      fallbackMs: 300_000,
+    },
+    shadow: { decisions: 0, downgraded: 0, streaks: 0 },
     unreportedCallShare: 0.07,
     moved: { tokensOffStrong: 600_000, returnReprefill: 80_000, objective: 'mixed' },
     egress: [{ engine: 'laya', asks: 40, chars: 120_000, bound: 'exact' }],
@@ -189,9 +198,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
       ],
       marks: [{ i: 1, kind: 'down' }, { i: 2, kind: 'return' }, { i: 2, kind: 'failed' }],
       decisions: [
-        { seq: 11, i: 1, outcome: 'downgraded', reason: 'gate-passed', best: 0.9, engine: 0 },
-        { seq: 21, i: 2, outcome: 'error', reason: 'route-failed', best: 0.2, engine: null },
-        { seq: 22, i: 2, outcome: 'kept-strong', reason: 'thin-margin', best: 0.5, engine: 0 },
+        { seq: 11, i: 1, outcome: 'downgraded', reason: 'gate-passed', best: 0.9, engine: 0, shadow: false, wouldModel: null },
+        { seq: 21, i: 2, outcome: 'error', reason: 'route-failed', best: 0.2, engine: null, shadow: false, wouldModel: null },
+        { seq: 22, i: 2, outcome: 'kept-strong', reason: 'thin-margin', best: 0.5, engine: 0, shadow: false, wouldModel: null },
       ],
       aggregated: true,
     },
@@ -200,9 +209,9 @@ export function activeStats(): ModelRoutingStatsSnapshot {
 }
 
 /** Routing on, with no decision logged yet. */
-export const ON: ModelRoutingProjection = { active: true, pending: false }
+export const ON: ModelRoutingProjection = { mode: 'on', active: true, pending: false }
 /** Routing off. */
-export const OFF: ModelRoutingProjection = { active: false, pending: false }
+export const OFF: ModelRoutingProjection = { mode: 'off', active: false, pending: false }
 
 /** One logged decision as the drill-down reads it: kept strong on low confidence. */
 export function decisionDetail(

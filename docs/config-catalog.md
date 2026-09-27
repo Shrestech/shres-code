@@ -2524,7 +2524,11 @@ Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedb
 ```ts config-catalog
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
+  /**
+   * Deployment mode for sessions without an explicit user choice: `off`, `on`,
+   * or `shadow`, which judges and logs without rewriting a request. Changes
+   * commit between requests.
+   */
   initialMode: ModelRoutingInitialMode
   /**
    * The one shared pool of downgrade candidates, whose relative capability and
@@ -2594,6 +2598,8 @@ export interface ModelRouterConfig {
   judgmentDeadlineMs?: number
   /** How failed judgment calls affect a held streak and later consults. */
   judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /** The prompt-cache facts the quota cold-point policy reads. */
+  coldPoints?: ModelRoutingColdPointsConfig
   /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
@@ -2620,8 +2626,8 @@ export interface ModelRouterConfig {
   tier?: 'fast' | 'accurate'
 }
 
-/** Whether routing starts in force. */
-export type ModelRoutingInitialMode = 'off' | 'on'
+/** The mode a session without an explicit user choice starts in. */
+export type ModelRoutingInitialMode = ModelRoutingMode
 
 /**
  * One allowlisted downgrade candidate as configuration states it: plain
@@ -2653,8 +2659,10 @@ export interface ModelRoutingRouteFromConfig {
   /** How this strong route is billed. Required. */
   objective: ModelRoutingObjective
   /**
-   * Allow per-turn entry from a `quota` route. The per-turn entry policy
-   * refuses a quota route without it.
+   * Allow per-turn entry from a `quota` route, as `dollars` and `latency`
+   * routes enter. Without it a quota route starts a downgrade only at a cold
+   * point of its prompt cache and returns at the next one; set it for bench
+   * arms that measure per-turn entry.
    */
   allowEveryTurn?: boolean
 }
@@ -2741,6 +2749,16 @@ export interface ModelRoutingJudgmentFailuresConfig {
   breakerOpenTurns?: number
 }
 
+/** The prompt-cache facts the quota cold-point policy reads. */
+export interface ModelRoutingColdPointsConfig {
+  /**
+   * Cache lifetime, in milliseconds, assumed for a manual model whose metadata
+   * declares no `promptCacheTtlMs`. A positive integer of at most 86,400,000.
+   * Defaults to 300000, the common five-minute prompt-cache lifetime.
+   */
+  unknownTtlMs?: number
+}
+
 /** What a failed downgraded request means for its step. */
 export type ModelRoutingInTurnFallback = 'manual' | 'off'
 
@@ -2773,6 +2791,12 @@ export interface ModelRoutingStateConfig {
 }
 
 /**
+ * The routing mode in force: `off` never judges, `on` judges and may rewrite a
+ * request, and `shadow` judges and logs every decision but never rewrites one.
+ */
+export type ModelRoutingMode = 'off' | 'on' | 'shadow'
+
+/**
  * How a strong route that routing may start from is billed, which fixes what
  * routing away from it saves: `quota` for a subscription or credit plan,
  * `dollars` for a metered key, `latency` for a route chosen for speed.
@@ -2780,7 +2804,7 @@ export interface ModelRoutingStateConfig {
 export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:120`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:131`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

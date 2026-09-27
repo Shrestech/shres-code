@@ -50,6 +50,18 @@ export interface Config {
   deploymentModes?: ('on' | 'off')[]
   /** Turn on which the fixture records an explicit manual `on` choice. */
   manualModeTurn?: number
+  /** Fallback cache lifetimes to write before selected turns. */
+  cacheTtlUpdates?: { turn: number; unknownTtlMs: number }[]
+  /**
+   * Turn from whose accepted pre-step on, the process clock reads this many
+   * milliseconds later than it really is: the recorded idle gap the cold-point
+   * policy measures.
+   */
+  clockJumpTurn?: number
+  /** Milliseconds the clock jumps forward at `clockJumpTurn`. */
+  clockJumpMs?: number
+  /** Zero-based index of the ask the route answer answers below the gate floor. */
+  lowConfidenceAsk?: number
 }
 
 /** Schemastery configuration for the scripted judgment engine. */
@@ -61,6 +73,13 @@ export const Config: z<Config> = z.object({
   trailingContext: z.string().default(''),
   deploymentModes: z.array(z.union(['on', 'off'] as const)).default([]),
   manualModeTurn: z.number().step(1).min(0).default(0),
+  cacheTtlUpdates: z.array(z.object({
+    turn: z.number().step(1).min(1),
+    unknownTtlMs: z.number().step(1).min(1).max(86_400_000),
+  })).default([]),
+  clockJumpTurn: z.number().step(1).min(0).default(0),
+  clockJumpMs: z.number().min(0).default(0),
+  lowConfidenceAsk: z.number().step(1).min(-1).default(-1),
 })
 
 /** A judgment engine answering every ask from the configured script. */
@@ -71,6 +90,8 @@ class SnapshotJudgment implements JudgmentEngine {
   readonly fitting?: JudgmentFittingEngine
 
   private readonly config: Required<Config>
+  /** Asks answered so far, in order: the low-confidence script keys on this. */
+  private askCount = 0
 
   /**
    * Create the scripted engine and register it as `snapshot`.
@@ -86,6 +107,10 @@ class SnapshotJudgment implements JudgmentEngine {
       trailingContext: config.trailingContext ?? '',
       deploymentModes: config.deploymentModes ?? [],
       manualModeTurn: config.manualModeTurn ?? 0,
+      cacheTtlUpdates: config.cacheTtlUpdates ?? [],
+      clockJumpTurn: config.clockJumpTurn ?? 0,
+      clockJumpMs: config.clockJumpMs ?? 0,
+      lowConfidenceAsk: config.lowConfidenceAsk ?? -1,
     }
     if (this.config.fitStateMaxChars > 0) {
       this.fitting = { ask: async (input) => {
@@ -137,18 +162,22 @@ class SnapshotJudgment implements JudgmentEngine {
       }
       const choice = this.config.route === 'current' ? KEEP_CURRENT_OPTION_ID : CANDIDATE
       const others = question.options.filter(option => option.option !== choice)
-      const remainder = Number(((1 - ROUTE_CONFIDENCE) / Math.max(1, others.length)).toFixed(12))
+      // The scripted low-confidence ask falls below every gate floor, so the
+      // held streak it judges ends with the ordinary gate-failed break.
+      const confidence = this.askCount === this.config.lowConfidenceAsk ? 0.5 : ROUTE_CONFIDENCE
+      const remainder = Number(((1 - confidence) / Math.max(1, others.length)).toFixed(12))
       return {
         kind: 'choice',
         id: question.id,
         option: choice,
         probabilities: Object.fromEntries(question.options.map(option => [
           option.option,
-          option.option === choice ? ROUTE_CONFIDENCE : remainder,
+          option.option === choice ? confidence : remainder,
         ])),
-        confidence: ROUTE_CONFIDENCE,
+        confidence,
       }
     })
+    this.askCount += 1
     return Promise.resolve({ answers, engine: 'snapshot-judgment', model: 'snapshot-judgment-v1', latencyMs: 0 })
   }
 }
@@ -166,15 +195,35 @@ export const inject = ['settings']
  */
 export function apply(ctx: Context, config: Config): void {
   ctx.plugin(SnapshotJudgment, config)
+  // The fake clock reads real time until the configured turn's accepted
+  // pre-step, and real-time-plus-jump from there on: the cold-point policy
+  // measures the recorded idle gap from the step/start times it lands in.
+  const realNow = Date.now
+  let clockOffsetMs = 0
+  ctx.effect(() => {
+    Date.now = () => realNow() + clockOffsetMs
+    return () => {
+      Date.now = realNow
+    }
+  }, 'model-router-snapshot-fixture: fake clock')
   ctx.on('agent/pre-step', async ({ agent, turn }, next) => {
+    if (config.clockJumpTurn !== undefined && config.clockJumpTurn > 0 && turn === config.clockJumpTurn) {
+      clockOffsetMs += config.clockJumpMs ?? 0
+    }
     if (config.manualModeTurn === turn) {
       const routing = ctx.get('modelRouting')
       if (routing === undefined) throw new Error('model-router-snapshot-fixture: manualModeTurn requires modelRouting')
-      routing.set(agent, true)
+      routing.set(agent, 'on')
     }
     const deploymentMode = config.deploymentModes?.[turn - 1]
     if (deploymentMode !== undefined) {
       await ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { initialMode: deploymentMode })
+    }
+    const cacheTtlUpdate = config.cacheTtlUpdates?.find(update => update.turn === turn)
+    if (cacheTtlUpdate !== undefined) {
+      await ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+        coldPoints: { unknownTtlMs: cacheTtlUpdate.unknownTtlMs },
+      })
     }
     const decision = await next()
     if (decision.kind === 'reject' || !config.trailingContext) return decision

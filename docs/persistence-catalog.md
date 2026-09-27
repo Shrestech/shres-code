@@ -882,10 +882,10 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
  * selection. Log-only, non-surface, whole-value replace. Changes during
  * an open turn commit at its next accepted pre-step.
  */
-'model-routing/configuration': { active: boolean }
+'model-routing/configuration': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1047`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1174`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -900,7 +900,7 @@ Source: [`packages/llm/model-router/src/types.ts:1047`](../packages/llm/model-ro
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1059`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1186`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -908,14 +908,14 @@ Source: [`packages/llm/model-router/src/types.ts:1059`](../packages/llm/model-ro
 
 ```ts persistence-catalog
 /**
- * Whether model routing is in force from this point on: log-only,
- * non-surface, whole-value replace. The last `model-routing/mode` wins; a
- * log with none folds to inactive through {@link foldModelRouting}.
+ * The routing mode in force from this point on: log-only, non-surface,
+ * whole-value replace. The last `model-routing/mode` wins; a log with none
+ * folds to off through {@link foldModelRouting}.
  */
-'model-routing/mode': { active: boolean }
+'model-routing/mode': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1053`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1180`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

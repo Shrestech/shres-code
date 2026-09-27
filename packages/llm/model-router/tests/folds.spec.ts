@@ -12,15 +12,20 @@
  * only the events a case appends.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ReasoningEffortId, createUserMessage } from '@shres-code/shres-code-llm'
 import type { LlmFailure } from '@shres-code/shres-code-llm'
 import { Session, SessionId } from '@shres-code/shres-code-session'
-import type { TurnEndReason } from '@shres-code/shres-code-session'
+import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 import {
   advanceStickyFoldState,
+  coldPointAt,
   createStickyFoldState,
   foldModelRouting,
+  isCompactionEnd,
+  latestStepStart,
+  modeOfRecord,
+  modeRecord,
   readStickyFoldState,
   stickyState,
 } from '../src/folds.ts'
@@ -104,29 +109,46 @@ function rawDecision(session: Session, sticky: unknown): void {
 describe('foldModelRouting', () => {
   it('folds an empty log to the caller\u2019s initial mode', () => {
     const session = scripted('mode-empty')
-    expect(foldModelRouting(session.events)).toBe(false)
-    expect(foldModelRouting(session.events, session.events.length, true)).toBe(true)
-    expect(foldModelRouting(session.events, 0, true)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('off')
+    expect(foldModelRouting(session.events, session.events.length, 'on')).toBe('on')
+    expect(foldModelRouting(session.events, 0, 'shadow')).toBe('shadow')
   })
 
   it('takes the last mode event', () => {
     const session = scripted('mode-last-wins')
     session.append('model-routing/mode', { active: true })
-    expect(foldModelRouting(session.events)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('on')
+    session.append('model-routing/mode', { active: true, shadow: true })
+    expect(foldModelRouting(session.events)).toBe('shadow')
     session.append('model-routing/mode', { active: false })
-    expect(foldModelRouting(session.events)).toBe(false)
-    session.append('model-routing/mode', { active: true })
-    expect(foldModelRouting(session.events)).toBe(true)
+    expect(foldModelRouting(session.events)).toBe('off')
+    session.append('model-routing/configuration', { active: true, shadow: true })
+    expect(foldModelRouting(session.events)).toBe('shadow')
   })
 
   it('honours the end prefix', () => {
     const session = scripted('mode-prefix')
     session.append('model-routing/mode', { active: true })
     session.append('model-routing/mode', { active: false })
-    expect(foldModelRouting(session.events, 1)).toBe(true)
-    expect(foldModelRouting(session.events, 0)).toBe(false)
+    expect(foldModelRouting(session.events, 1)).toBe('on')
+    expect(foldModelRouting(session.events, 0)).toBe('off')
     // Past the end nothing changes; the prefix rule is the whole rule.
-    expect(foldModelRouting(session.events, 99)).toBe(false)
+    expect(foldModelRouting(session.events, 99)).toBe('off')
+  })
+
+  it('reads a record from before shadow unchanged, and an inactive record as off whatever it marks', () => {
+    expect(modeOfRecord({ active: true })).toBe('on')
+    expect(modeOfRecord({ active: false })).toBe('off')
+    expect(modeOfRecord({ active: true, shadow: true })).toBe('shadow')
+    // Malformed durable history: shadow cannot switch routing on by itself.
+    expect(modeOfRecord({ active: false, shadow: true })).toBe('off')
+  })
+
+  it('records each mode additively, so on writes what logs before shadow wrote', () => {
+    expect(modeRecord('off')).toEqual({ active: false })
+    expect(modeRecord('on')).toEqual({ active: true })
+    expect(modeRecord('shadow')).toEqual({ active: true, shadow: true })
+    for (const mode of ['off', 'on', 'shadow'] as const) expect(modeOfRecord(modeRecord(mode))).toBe(mode)
   })
 })
 
@@ -345,6 +367,21 @@ describe('stickyState break reasons', () => {
     const session = entered('break-mode-off')
     session.append('model-routing/mode', { active: false })
     expect(stickyState(session.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+  })
+
+  it('clears the streak with mode-off when the mode switches to shadow, which never rewrites a request', () => {
+    const user = entered('break-mode-shadow')
+    user.append('model-routing/mode', { active: true, shadow: true })
+    expect(stickyState(user.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+
+    const configured = entered('break-configuration-shadow')
+    configured.append('model-routing/configuration', { active: true, shadow: true })
+    expect(stickyState(configured.events)).toEqual({ active: false, stepsElapsed: 0, brokenBy: 'mode-off' })
+
+    // A record re-affirming on leaves the streak held.
+    const affirmed = entered('break-mode-on')
+    affirmed.append('model-routing/mode', { active: true })
+    expect(stickyState(affirmed.events).active).toBe(true)
   })
 
   it('records nothing for a mode event the fold saw while already strong', () => {
@@ -815,5 +852,255 @@ describe('stickyState purity', () => {
       if (end > 0) state = advanceStickyFoldState(state, session.events[end - 1]!)
       expect(readStickyFoldState(state)).toEqual(stickyState(session.events, end))
     }
+  })
+})
+
+describe('coldPointAt', () => {
+  const STRONG_ROUTE = { provider: 'strong-provider', model: 'strong-model' }
+  const FIVE_MINUTES = { ttlMs: 300_000, ttlSource: 'fallback' } as const
+  const ONE_HOUR = { ttlMs: 3_600_000, ttlSource: 'adapter' } as const
+  const NONE = { ttlMs: 0, ttlSource: 'adapter' } as const
+
+  /** A log with explicit times: contiguous seqs, as a session commits them. */
+  class TimedLog {
+    readonly events: SessionEvent[] = []
+
+    private add(type: string, data: unknown, time: number): number {
+      const seq = this.events.length
+      this.events.push({ type, seq, time, data } as unknown as SessionEvent)
+      return seq
+    }
+
+    turn(time: number, turn: number): void {
+      this.add('turn/start', { turn }, time)
+    }
+
+    step(time: number, turn: number, step = 1): void {
+      this.add('step/start', { turn, step }, time)
+    }
+
+    /** One answer on a route; returns its seq. */
+    answer(time: number, turn: number, route: { provider: string; model: string }, step = 1): number {
+      return this.add('assistant/message', {
+        turn,
+        step,
+        message: { id: `m${String(this.events.length)}`, role: 'assistant', content: [], source: { kind: 'model', ...route } },
+      }, time)
+    }
+
+    compacted(time: number, error?: string): number {
+      return this.add('compaction/end', { compactionId: 'c', turn: null, ...error === undefined ? {} : { error } }, time)
+    }
+
+    select(time: number, route: { provider: string; model: string }): void {
+      this.add('agent/model-selection', route, time)
+    }
+
+    header(time: number, route: { provider: string; model: string }): void {
+      this.add('request/header', { header: { config: route }, reason: 'change' }, time)
+    }
+
+    decide(time: number, data: Partial<ModelRoutingDecision>): void {
+      this.add('model-routing/decision', { stateHash: '0', stateSeqs: [], sticky: { active: false, stepsElapsed: 0 }, ...data }, time)
+    }
+
+    /** One durable manual-base record: the manual route beneath a routed request. */
+    routeBase(time: number, manual: { provider: string; model: string }, routed: { provider: string; model: string }): void {
+      this.add('agent/route-base', { manual, routed }, time)
+    }
+  }
+
+  /** One strong turn at `time`: its step starts, then the manual model answers 1 s later. */
+  function strongTurn(log: TimedLog, time: number, turn: number): number {
+    log.turn(time, turn)
+    log.step(time, turn)
+    return log.answer(time + 1_000, turn, STRONG_ROUTE)
+  }
+
+  it('session-start is cold only without seed', () => {
+    const log = new TimedLog()
+    log.turn(0, 1)
+    log.step(0, 1)
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 0, false))
+      .toEqual({ kind: 'session-start', ttlMs: 300_000, ttlSource: 'fallback' })
+    // Another model's answer is not the manual model's prefix.
+    log.answer(500, 1, { provider: 'cheap-provider', model: 'cheap-model' })
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 1_000, false)?.kind).toBe('session-start')
+    // A fork's seed carries its parent's prefix: without a manual answer it is warm.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 1_000, true)).toBeUndefined()
+    expect(coldPointAt(log.events, STRONG_ROUTE, NONE, 1_000, true))
+      .toEqual({ kind: 'no-cache', ttlMs: 0, ttlSource: 'adapter' })
+  })
+
+  it('resumed or forked session is warm', () => {
+    const log = new TimedLog()
+    const answered = strongTurn(log, 10_000, 1)
+    log.turn(70_000, 2)
+    log.step(70_000, 2)
+    const warm = [log.events, STRONG_ROUTE, FIVE_MINUTES, 70_000] as const
+    // Resumed (unseeded) and forked (seeded) logs with a recent manual answer are warm alike.
+    expect(coldPointAt(...warm, false)).toBeUndefined()
+    expect(coldPointAt(...warm, true)).toBeUndefined()
+    expect(answered).toBe(2)
+  })
+
+  it('compaction after last base message is cold', () => {
+    const log = new TimedLog()
+    log.compacted(5_000)
+    const answered = strongTurn(log, 10_000, 1)
+    // A compaction before the last answer does not touch the prefix that answer wrote.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
+    // A failed compaction rewrote nothing.
+    log.compacted(15_000, 'the summary call failed')
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
+    const compaction = log.compacted(16_000)
+    log.compacted(17_000, 'a later failure')
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toEqual({
+      kind: 'post-compaction',
+      ttlMs: 300_000,
+      ttlSource: 'fallback',
+      idleMs: 10_000,
+      lastBaseSeq: answered,
+      compactionSeq: compaction,
+    })
+    expect(isCompactionEnd(log.events[compaction]!)).toBe(true)
+    expect(isCompactionEnd(log.events[compaction + 1]!)).toBe(false)
+  })
+
+  it('a manual model change after the last base message is cold, and a routed or same-model header is not', () => {
+    const cheap = { provider: 'cheap-provider', model: 'cheap-model' }
+    const routed = new TimedLog()
+    strongTurn(routed, 0, 1)
+    routed.turn(10_000, 2)
+    routed.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', selection: { candidateId: 'cheap', ...cheap } })
+    routed.header(10_000, cheap)
+    // The header a downgraded decision of its own turn rewrote is not a manual switch.
+    expect(coldPointAt(routed.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
+    routed.header(11_000, STRONG_ROUTE)
+    routed.select(12_000, STRONG_ROUTE)
+    expect(coldPointAt(routed.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
+
+    // The same candidate header in a later turn with no decision is a manual choice.
+    const manual = new TimedLog()
+    strongTurn(manual, 0, 1)
+    manual.turn(10_000, 2)
+    manual.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', selection: { candidateId: 'cheap', ...cheap } })
+    manual.turn(11_000, 3)
+    manual.header(11_000, cheap)
+    expect(coldPointAt(manual.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+
+    const kept = new TimedLog()
+    strongTurn(kept, 0, 1)
+    kept.turn(10_000, 2)
+    kept.decide(10_000, { outcome: 'kept-strong', reason: 'low-confidence' })
+    kept.header(10_000, cheap)
+    expect(coldPointAt(kept.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+
+    const selected = new TimedLog()
+    const answered = strongTurn(selected, 0, 1)
+    selected.select(5_000, cheap)
+    selected.select(6_000, STRONG_ROUTE)
+    expect(coldPointAt(selected.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toEqual({
+      kind: 'manual-switch', ttlMs: 300_000, ttlSource: 'fallback', idleMs: 20_000, lastBaseSeq: answered,
+    })
+  })
+
+  it('idle beyond adapter TTL is cold; within is warm', () => {
+    const log = new TimedLog()
+    const answered = strongTurn(log, 1_000, 1)
+    // The lifetime counts from the start of the answering step, not the answer.
+    expect(coldPointAt(log.events, STRONG_ROUTE, ONE_HOUR, 1_000 + 3_600_000, false)).toBeUndefined()
+    expect(coldPointAt(log.events, STRONG_ROUTE, ONE_HOUR, 1_000 + 3_600_001, false)).toEqual({
+      kind: 'idle', ttlMs: 3_600_000, ttlSource: 'adapter', idleMs: 3_600_001, lastBaseSeq: answered,
+    })
+    // The same gap is warm under a longer lifetime and cold under the five-minute fallback.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 1_000 + 300_001, false)?.kind).toBe('idle')
+    expect(coldPointAt(log.events, STRONG_ROUTE, ONE_HOUR, 1_000 + 300_001, false)).toBeUndefined()
+  })
+
+  it('measures from the answer itself when the log lacks its step start', () => {
+    const log = new TimedLog()
+    log.turn(0, 1)
+    log.step(0, 1)
+    const answered = log.answer(50_000, 2, STRONG_ROUTE)
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 350_000, false)).toBeUndefined()
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 350_001, false)).toEqual({
+      kind: 'idle', ttlMs: 300_000, ttlSource: 'fallback', idleMs: 300_001, lastBaseSeq: answered,
+    })
+  })
+
+  it('ttl 0 is always cold', () => {
+    const log = new TimedLog()
+    const answered = strongTurn(log, 0, 1)
+    // An answer a millisecond ago keeps no prefix when the route keeps no cache.
+    expect(coldPointAt(log.events, STRONG_ROUTE, NONE, 1, false)).toEqual({
+      kind: 'no-cache', ttlMs: 0, ttlSource: 'adapter', idleMs: 1, lastBaseSeq: answered,
+    })
+    expect(coldPointAt(new TimedLog().events, STRONG_ROUTE, NONE, 0, false)?.kind).toBe('session-start')
+  })
+
+  it('replay reads the recorded step start, not the clock', () => {
+    const log = new TimedLog()
+    strongTurn(log, 1_000, 1)
+    log.turn(61_000, 2)
+    log.step(61_000, 2)
+    vi.useFakeTimers({ now: 1_000 + 10 * 3_600_000 })
+    try {
+      // Hours later on the wall clock, the consult still measures to the logged step start.
+      expect(latestStepStart(log.events)).toBe(61_000)
+      expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, latestStepStart(log.events)!, false)).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(latestStepStart(new TimedLog().events)).toBeUndefined()
+  })
+
+  it('a header recorded in agent/route-base is routed and never a manual switch', () => {
+    const cheap = { provider: 'cheap-provider', model: 'cheap-model' }
+    const log = new TimedLog()
+    strongTurn(log, 0, 1)
+    log.turn(10_000, 2)
+    log.step(10_000, 2)
+    log.routeBase(10_000, STRONG_ROUTE, cheap)
+    log.header(10_000, cheap)
+    // The routed header runs the recorded candidate: the manual prefix is not switched.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 10_000, false)).toBeUndefined()
+
+    // A manual header back to the strong model bounds the record, so a later
+    // candidate header without a fresh record is a manual choice again.
+    log.turn(20_000, 3)
+    log.step(20_000, 3)
+    log.header(20_000, STRONG_ROUTE)
+    log.header(21_000, cheap)
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 25_000, false)?.kind).toBe('manual-switch')
+
+    // The record must match the header it describes: one for another route is ignored.
+    const other = new TimedLog()
+    strongTurn(other, 0, 1)
+    other.turn(10_000, 2)
+    other.step(10_000, 2)
+    other.routeBase(10_000, { provider: 'mid-provider', model: 'mid-model' }, { provider: 'mid-provider', model: 'mid-model-2' })
+    other.header(10_000, cheap)
+    expect(coldPointAt(other.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+  })
+
+  it('a shadow decision never licenses the routed-header fallback for logs without records', () => {
+    const cheap = { provider: 'cheap-provider', model: 'cheap-model' }
+    const log = new TimedLog()
+    strongTurn(log, 0, 1)
+    log.turn(10_000, 2)
+    log.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', shadow: true, selection: { candidateId: 'cheap', ...cheap } })
+    log.step(11_000, 2, 2)
+    log.header(11_000, cheap)
+    // Shadow rewrote nothing, so the header to the candidate is a manual choice.
+    expect(coldPointAt(log.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)?.kind).toBe('manual-switch')
+    // The same header after a live downgraded decision of its own step is routed.
+    const live = new TimedLog()
+    strongTurn(live, 0, 1)
+    live.turn(10_000, 2)
+    live.step(10_000, 2)
+    live.decide(10_000, { outcome: 'downgraded', reason: 'gate-passed', selection: { candidateId: 'cheap', ...cheap } })
+    live.header(11_000, cheap)
+    expect(coldPointAt(live.events, STRONG_ROUTE, FIVE_MINUTES, 20_000, false)).toBeUndefined()
   })
 })

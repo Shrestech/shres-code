@@ -294,6 +294,7 @@ describe('modelRoutingStats fold', () => {
       deadlineHits: 0,
       warmUps: 0,
       turnsWithDecisions: 22,
+      warmSkipped: 0,
     })
     expect(stats.reasons).toEqual([
       { reason: 'current-preferred', group: 'judge-no', count: 19 },
@@ -325,7 +326,9 @@ describe('modelRoutingStats fold', () => {
       reportedCalls: 22,
     }])
     expect(coldOf(stats)['session-start']).toEqual([1, 40_000])
-    expect(stats.coldTtl).toEqual({ ms: COLD_TTL_FALLBACK_MS, fallback: true })
+    // No decision described a model's lifetime, so the snapshot reports only the fallback.
+    expect(stats.coldTtl).toEqual({ perModel: [], fallbackMs: COLD_TTL_FALLBACK_MS })
+    expect(stats.shadow).toEqual({ decisions: 0, downgraded: 0, streaks: 0 })
     expect(stats.unreportedCallShare).toBe(0)
     expect(stats.moved).toEqual({ tokensOffStrong: 0, returnReprefill: 0, objective: 'dollars' })
     expect(stats.egress).toEqual([{ engine: 'jev-typesafe', asks: 22, chars: 22 * 12_000, bound: 'at-most' }])
@@ -352,6 +355,7 @@ describe('modelRoutingStats fold', () => {
       deadlineHits: 1,
       warmUps: 0,
       turnsWithDecisions: 4,
+      warmSkipped: 0,
     })
     expect(stats.reasons).toEqual([
       { reason: 'gate-passed', group: 'switched', count: 3 },
@@ -854,5 +858,109 @@ describe('decisions recording judgment-call facts', () => {
     expect(answered.latency.counts.reduce((sum, count) => sum + count, 0)).toBe(1)
     expect(answered.engines).toEqual([])
     expect(modelRoutingStatsSchema.safeParse(stats).success).toBe(true)
+  })
+})
+
+describe('cache lifetimes and shadow figures from decisions', () => {
+  it('uses the lifetime a decision recorded for that model\'s idle expiry, with the fallback for the rest', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, {
+      cache: {
+        base: { provider: STRONG.provider, model: STRONG.model, ttlMs: 3_600_000, source: 'adapter' },
+        candidates: [{ id: 'candidate-0', ttlMs: 60_000, source: 'adapter' }],
+      },
+      candidateEligibility: {
+        requirements: {},
+        candidates: [{ id: 'candidate-0', ...FLASH, description: 'candidate' }],
+        eligibleCandidates: [],
+        assessments: [{ id: 'candidate-0', provider: FLASH.provider, model: FLASH.model, promptCacheTtlMs: 60_000, reason: 'eligible' }],
+      } as unknown as ModelRoutingCandidateEligibility,
+    })
+    log.call(10, 1, 1, STRONG, reported(20_000, 20_000, 20_000, 10))
+    // 400 s later: idle under the 5-minute fallback, warm under the recorded hour.
+    log.step(400_000, 2, 1)
+    log.call(400_010, 2, 1, STRONG, reported(20_000, 20_000, 20_000, 10))
+    // More than the recorded hour after the latest call's start: idle expiry.
+    log.step(4_000_500, 3, 1)
+    log.call(4_000_510, 3, 1, STRONG, reported(20_000, 0, 20_000, 10))
+    const stats = fold(log)
+    expect(stats.coldTtl).toEqual({
+      perModel: [
+        { provider: STRONG.provider, model: STRONG.model, ms: 3_600_000, source: 'adapter' },
+        { provider: FLASH.provider, model: FLASH.model, ms: 60_000, source: 'adapter' },
+      ],
+      fallbackMs: COLD_TTL_FALLBACK_MS,
+    })
+    expect(coldOf(stats)['idle-expiry']).toEqual([1, 40_000])
+    // The latest decision describing a model wins.
+    const again = new Log()
+    again.step(0, 1, 1)
+    again.decide(1, { cache: { base: { provider: STRONG.provider, model: STRONG.model, ttlMs: 1_000, source: 'fallback' } } })
+    again.decide(2, { cache: { base: { provider: STRONG.provider, model: STRONG.model, ttlMs: 2_000, source: 'adapter' } } })
+    expect(fold(again).coldTtl.perModel).toEqual([
+      { provider: STRONG.provider, model: STRONG.model, ms: 2_000, source: 'adapter' },
+    ])
+  })
+
+  it('shadow decisions feed the would-have figures and no measured cold cause', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, { reason: 'warm-prefix', shadow: true, coldPoint: null })
+    log.call(10, 1, 1, STRONG, unreported(300, 10))
+    log.step(20, 2, 1)
+    log.decide(21, {
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      shadow: true,
+      selection: selection('flash', FLASH),
+      sticky: held(STRONG, 0),
+      route: answer('flash', 0.9, { flash: 0.9, strong: 0.02 }),
+      ...pool(FLASH),
+    })
+    // The manual route answered: nothing moved and no cold cause is measured.
+    log.call(30, 2, 1, STRONG, unreported(300, 10))
+    const stats = fold(log)
+    expect(stats.counts.warmSkipped).toBe(1)
+    expect(stats.shadow).toEqual({ decisions: 2, downgraded: 1, streaks: 1 })
+    expect(stats.counts.downgradedSteps).toBe(0)
+    for (const [cause, [count]] of Object.entries(coldOf(stats))) {
+      expect([cause, count]).toEqual([cause, 0])
+    }
+    expect(stats.timeline.decisions.map(decision => decision.shadow)).toEqual([true, true])
+  })
+
+  it('counts a warm held decision as skipped judgment without counting a judged hold', () => {
+    const log = new Log()
+    log.step(0, 1, 1)
+    log.decide(1, {
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      selection: selection('flash', FLASH),
+      route: answer('flash', 0.9, { flash: 0.9, 'keep-current': 0.1 }),
+      sticky: held(),
+      ...pool(FLASH),
+    })
+    log.step(2, 2, 1)
+    log.decide(3, {
+      outcome: 'downgraded',
+      reason: 'sticky-hold',
+      coldPoint: null,
+      selection: selection('flash', FLASH),
+      sticky: held(STRONG, 1),
+    })
+    log.step(4, 3, 1)
+    log.decide(5, {
+      outcome: 'downgraded',
+      reason: 'sticky-hold',
+      coldPoint: { kind: 'idle', ttlMs: 1, ttlSource: 'fallback', idleMs: 2 },
+      selection: selection('flash', FLASH),
+      route: answer('flash', 0.9, { flash: 0.9, 'keep-current': 0.1 }),
+      engine: 'snapshot',
+      latencyMs: 1,
+      sticky: held(STRONG, 2),
+    })
+
+    expect(fold(log).counts.warmSkipped).toBe(1)
   })
 })

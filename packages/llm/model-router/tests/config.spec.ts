@@ -74,11 +74,12 @@ function raw(overrides: Record<string, unknown>): ModelRouterConfig {
 describe('resolveConfig required fields', () => {
   it('requires the mode', () => {
     expect(() => resolveConfig(raw({ initialMode: undefined })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
     expect(() => resolveConfig(raw({ initialMode: 'sometimes' })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
     expect(() => resolveConfig(raw({ initialMode: '' })))
-      .toThrow('ModelRouterConfig.initialMode must be "off" or "on"')
+      .toThrow('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
+    expect(resolveConfig(raw({ initialMode: 'shadow' })).initialMode).toBe('shadow')
   })
 
   it('requires the route question text', () => {
@@ -408,14 +409,26 @@ describe('resolveConfig bounds', () => {
     expect(resolveConfig(valid({ routeFrom: [latency], judgmentDeadlineMs: 200 })).routeFrom[0]?.objective).toBe('latency')
   })
 
-  it('quota base refuses every-turn without allowEveryTurn', () => {
+  it('quota route no longer requires allowEveryTurn', () => {
     const quota = { ...ROUTE_FROM, objective: 'quota' as const }
-    expect(() => resolveConfig(valid({ routeFrom: [quota] })))
-      .toThrow('ModelRouterConfig.routeFrom["strong-provider/strong-model"].objective "quota" requires allowEveryTurn: true under the per-turn entry policy')
-    expect(() => resolveConfig(valid({ routeFrom: [{ ...quota, allowEveryTurn: false }] })))
-      .toThrow('requires allowEveryTurn: true')
+    // Without the flag a quota route enters at cold points; with it, per turn.
+    expect(resolveConfig(valid({ routeFrom: [quota] })).routeFrom[0]).toEqual({ ...quota, allowEveryTurn: false })
+    expect(resolveConfig(valid({ routeFrom: [{ ...quota, allowEveryTurn: false }] })).routeFrom[0])
+      .toEqual({ ...quota, allowEveryTurn: false })
     expect(resolveConfig(valid({ routeFrom: [{ ...quota, allowEveryTurn: true }] })).routeFrom[0])
       .toEqual({ ...quota, allowEveryTurn: true })
+  })
+
+  it('coldPoints.unknownTtlMs rejects 0 and non-integers', () => {
+    const message = 'ModelRouterConfig.coldPoints.unknownTtlMs must be a positive integer no greater than 86400000'
+    for (const unknownTtlMs of [0, -1, 1.5, Number.NaN, 86_400_001]) {
+      expect(() => resolveConfig(valid({ coldPoints: { unknownTtlMs } }))).toThrow(message)
+    }
+    expect(resolveConfig(valid()).coldPoints).toEqual({ unknownTtlMs: 300_000 })
+    expect(resolveConfig(valid({ coldPoints: {} })).coldPoints).toEqual({ unknownTtlMs: 300_000 })
+    expect(resolveConfig(valid({ coldPoints: { unknownTtlMs: 1 } })).coldPoints).toEqual({ unknownTtlMs: 1 })
+    expect(resolveConfig(valid({ coldPoints: { unknownTtlMs: 86_400_000 } })).coldPoints).toEqual({ unknownTtlMs: 86_400_000 })
+    expect(Object.isFrozen(resolveConfig(valid()).coldPoints)).toBe(true)
   })
 
   it('refuses an empty routeFrom unless routing starts off', () => {
@@ -424,6 +437,13 @@ describe('resolveConfig bounds', () => {
     const { routeFrom: _routeFrom, ...unlisted } = valid()
     expect(() => resolveConfig(unlisted)).toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
     expect(resolveConfig({ ...unlisted, initialMode: 'off' }).routeFrom).toEqual([])
+  })
+
+  it('initialMode shadow requires non-empty routeFrom', () => {
+    const { routeFrom: _routeFrom, ...unlisted } = valid()
+    expect(() => resolveConfig({ ...unlisted, initialMode: 'shadow' }))
+      .toThrow('ModelRouterConfig.routeFrom is empty: routing can never run')
+    expect(resolveConfig(valid({ initialMode: 'shadow' })).initialMode).toBe('shadow')
   })
 
   it('rejects the removed turn-counted horizon key by name', () => {
@@ -500,6 +520,12 @@ describe('the composition schema', () => {
     expect(() => throughSchema({ ...bare(), candidates: [{ id: 'cheap', provider: 'p', model: 'm' }] })).toThrow()
     expect(() => throughSchema({ ...bare(), candidates: [{ ...CANDIDATE, description: 'x'.repeat(161) }] })).toThrow()
     expect(normalized.judgmentFailures).toEqual({ holdTolerance: 2, breakerThreshold: 3, breakerOpenTurns: 5 })
+    expect(normalized.coldPoints).toEqual({ unknownTtlMs: 300_000 })
+    expect(resolved.coldPoints).toEqual({ unknownTtlMs: 300_000 })
+    // The schema bounds the assumed lifetime as the resolver does.
+    expect(() => throughSchema({ ...bare(), coldPoints: { unknownTtlMs: 0 } })).toThrow()
+    expect(() => throughSchema({ ...bare(), coldPoints: { unknownTtlMs: 86_400_001 } })).toThrow()
+    expect(() => throughSchema({ ...bare(), coldPoints: { unknownTtlMs: 1.5 } })).toThrow()
     expect('difficultyInstructions' in resolved).toBe(false)
     expect(resolved.difficultyToEffort).toBeUndefined()
     expect(resolved.hardHintScoreThreshold).toBeUndefined()

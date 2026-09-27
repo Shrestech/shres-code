@@ -13,6 +13,7 @@ import { ReasoningEffortId } from '@shres-code/shres-code-llm'
 import { SettingsFieldError } from '@shres-code/shres-code-settings'
 import type {
   ModelRoutingCandidate,
+  ModelRoutingMode,
   ModelRoutingCandidateConfig,
   ModelRoutingObjective,
   ModelRoutingOperatingPoint,
@@ -21,8 +22,8 @@ import type {
   ModelRoutingRouteFromConfig,
 } from './types.ts'
 
-/** Whether routing starts in force. */
-export type ModelRoutingInitialMode = 'off' | 'on'
+/** The mode a session without an explicit user choice starts in. */
+export type ModelRoutingInitialMode = ModelRoutingMode
 
 /** What a failed judgment call means for the turn. */
 export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
@@ -76,6 +77,16 @@ export interface ModelRoutingDifficultyConfig {
   entryScoreCeiling?: number
 }
 
+/** The prompt-cache facts the quota cold-point policy reads. */
+export interface ModelRoutingColdPointsConfig {
+  /**
+   * Cache lifetime, in milliseconds, assumed for a manual model whose metadata
+   * declares no `promptCacheTtlMs`. A positive integer of at most 86,400,000.
+   * Defaults to 300000, the common five-minute prompt-cache lifetime.
+   */
+  unknownTtlMs?: number
+}
+
 /** How failed judgment calls affect a held streak and later consults. */
 export interface ModelRoutingJudgmentFailuresConfig {
   /**
@@ -118,7 +129,11 @@ export interface ModelRoutingDifficultyToEffortConfig {
 
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
+  /**
+   * Deployment mode for sessions without an explicit user choice: `off`, `on`,
+   * or `shadow`, which judges and logs without rewriting a request. Changes
+   * commit between requests.
+   */
   initialMode: ModelRoutingInitialMode
   /**
    * The one shared pool of downgrade candidates, whose relative capability and
@@ -188,6 +203,8 @@ export interface ModelRouterConfig {
   judgmentDeadlineMs?: number
   /** How failed judgment calls affect a held streak and later consults. */
   judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /** The prompt-cache facts the quota cold-point policy reads. */
+  coldPoints?: ModelRoutingColdPointsConfig
   /**
    * What a failed downgraded request does to its step. `manual` records a
    * `route-failed` decision and retries the step on the manual route after
@@ -264,6 +281,8 @@ export interface ResolvedModelRouterConfig {
     readonly breakerThreshold: number
     readonly breakerOpenTurns: number
   }
+  /** Cache lifetime assumed for a manual model that declares none. */
+  readonly coldPoints: { readonly unknownTtlMs: number }
   /** Policy for a failed downgraded request. */
   readonly inTurnFallback: ModelRoutingInTurnFallback
   /** Effort lift for a hard turn, when configured. */
@@ -338,6 +357,12 @@ export const DEFAULT_JUDGMENT_BREAKER_THRESHOLD = 3
 /** Default number of turns an open breaker keeps the manual route. */
 export const DEFAULT_JUDGMENT_BREAKER_OPEN_TURNS = 5
 
+/** Default cache lifetime assumed for a manual model that declares none, in milliseconds. */
+export const DEFAULT_UNKNOWN_TTL_MS = 300_000
+
+/** Largest accepted assumed cache lifetime, in milliseconds: one day. */
+export const MAX_UNKNOWN_TTL_MS = 86_400_000
+
 /**
  * Default difficulty levels. Scores are zero-based indexes into this ordered
  * list, so the fourth level (`hard`) is score 3. A deployment replaces the
@@ -370,6 +395,7 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'onUnavailable',
   'judgmentDeadlineMs',
   'judgmentFailures',
+  'coldPoints',
   'inTurnFallback',
   'difficultyToEffort',
   'hardHint',
@@ -426,8 +452,8 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   // schema's to enforce for a composition entry, but programmatic construction
   // bypasses it, so they are re-judged here as raw values a type cannot vouch for.
   const raw = config as { initialMode?: unknown; onUnavailable?: unknown; inTurnFallback?: unknown; tier?: unknown }
-  if (raw.initialMode !== 'off' && raw.initialMode !== 'on') {
-    throw new Error('ModelRouterConfig.initialMode must be "off" or "on"')
+  if (raw.initialMode !== 'off' && raw.initialMode !== 'on' && raw.initialMode !== 'shadow') {
+    throw new Error('ModelRouterConfig.initialMode must be "off", "on", or "shadow"')
   }
   if (raw.onUnavailable !== undefined && raw.onUnavailable !== 'fallback' && raw.onUnavailable !== 'error') {
     throw new Error('ModelRouterConfig.onUnavailable must be "fallback" or "error"')
@@ -533,6 +559,10 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   if (!Number.isInteger(breakerOpenTurns) || breakerOpenTurns < 0) {
     throw new Error('ModelRouterConfig.judgmentFailures.breakerOpenTurns must be a non-negative integer')
   }
+  const unknownTtlMs = config.coldPoints?.unknownTtlMs ?? DEFAULT_UNKNOWN_TTL_MS
+  if (!Number.isInteger(unknownTtlMs) || unknownTtlMs < 1 || unknownTtlMs > MAX_UNKNOWN_TTL_MS) {
+    throw new Error(`ModelRouterConfig.coldPoints.unknownTtlMs must be a positive integer no greater than ${MAX_UNKNOWN_TTL_MS}`)
+  }
   const routeFrom = resolveRouteFrom(config.routeFrom ?? [], judgmentDeadlineMs)
   const operatingPoints = resolveOperatingPoints(config.operatingPoints ?? [])
   if (config.initialMode !== 'off' && routeFrom.length === 0) {
@@ -597,6 +627,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     onUnavailable,
     judgmentDeadlineMs,
     judgmentFailures: Object.freeze({ holdTolerance, breakerThreshold, breakerOpenTurns }),
+    coldPoints: Object.freeze({ unknownTtlMs }),
     inTurnFallback,
     ...difficultyToEffort === undefined
       ? {}
@@ -619,8 +650,8 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
  * @param judgmentDeadlineMs - the resolved judgment deadline, which a `latency` route bounds.
  * @returns the frozen entries in configuration order.
  * @throws Error naming the entry when a route is empty or listed twice, the
- *   objective is unknown, a `latency` route has a deadline above 200 ms, or a
- *   `quota` route lacks `allowEveryTurn` under the per-turn entry policy.
+ *   objective is unknown, `allowEveryTurn` is not a boolean, or a `latency`
+ *   route has a deadline above 200 ms.
  */
 function resolveRouteFrom(
   entries: readonly ModelRoutingRouteFromConfig[],
@@ -650,13 +681,6 @@ function resolveRouteFrom(
       throw new SettingsFieldError(
         at('objective'),
         `${name}.objective "latency" requires judgmentDeadlineMs of at most ${MAX_LATENCY_JUDGMENT_DEADLINE_MS}`,
-      )
-    }
-    // Per-turn entry is the only entry policy, so a quota route opts into it.
-    if (entry.objective === 'quota' && !allowEveryTurn) {
-      throw new SettingsFieldError(
-        at('allowEveryTurn'),
-        `${name}.objective "quota" requires allowEveryTurn: true under the per-turn entry policy`,
       )
     }
     return Object.freeze({ provider: entry.provider, model: entry.model, objective: entry.objective, allowEveryTurn })

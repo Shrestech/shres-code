@@ -83,7 +83,21 @@ function setup(options: Setup = {}) {
 
 const gateLoaded = () => screen.findByText(/switching requires 0\.80/)
 
-describe('RoutingView availability and states', () => {
+describe('RoutingView in shadow', () => {
+  it('reads Shadow in the status line, states the would-have verdict, and prefixes the pool tile', () => {
+    const stats = {
+      ...liveStats(),
+      shadow: { decisions: 22, downgraded: 9, streaks: 2 },
+    }
+    setup({ stats, routing: { mode: 'shadow', active: true, pending: false } })
+    expect(screen.getByText(en['status.shadow'])).toBeTruthy()
+    expect(screen.getByText(en['status.shadow.detail'])).toBeTruthy()
+    expect(screen.getByText('In shadow, routing would have served 40.9% of judged steps on pool models across 2 streaks.')).toBeTruthy()
+    expect(screen.getByText('Would have Steps on pool models')).toBeTruthy()
+    // The measured tiles keep their measured names.
+    expect(screen.getByText('Strong tokens moved off')).toBeTruthy()
+  })
+
   it('holds a skeleton while the host has not answered whether it composes the router', () => {
     setup({ routerStatus: 'loading' })
     expect(screen.getByText(en['view.loading'])).toBeTruthy()
@@ -240,7 +254,8 @@ describe('RoutingView charts', () => {
     await screen.findByText(/Routing served 38\.0% of steps/)
     expect(screen.getByRole('img', { name: /Each entry covers one or more whole turns/ })).toBeTruthy()
     expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual(expect.arrayContaining(['1–3', '4.1', '5–6']))
-    expect(screen.getByText('Idle expiry uses the model cache lifetime of 3600 s.')).toBeTruthy()
+    // The decision that recorded the lifetime names the model, so G5 labels it with its source.
+    expect(screen.getByText('claude-session/claude-opus-5-5: idle past 3600 s (adapter)')).toBeTruthy()
     expect(screen.getByText('Streak length: median 0 steps, longest 3.')).toBeTruthy()
     expect(screen.getByRole('cell', { name: 'gate-failed' })).toBeTruthy()
     expect(screen.getByText('failed 20')).toBeTruthy()
@@ -317,6 +332,49 @@ describe('RoutingView decisions and drill-down', () => {
     expect(within(drawer).getAllByText('—').length).toBeGreaterThan(3)
     fireEvent.click(within(drawer).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows per-question head tokens and a logged fit rejection, inventing nothing when the log lacks them', async () => {
+    const fitted = decisionDetail({
+      judgmentQuestions: [
+        { kind: 'score', id: 'difficulty' as never, instructions: 'Rate the difficulty.', levels: ['a', 'b'] },
+        { kind: 'choice', id: 'route' as never, instructions: 'Which route should handle this turn?', options: [{ option: 'keep-current' }, { option: 'flash' }] },
+      ],
+      judgmentInput: {
+        selectedIndex: 0, state: 'USER: fix the typo', stateTokens: 612, sequenceTokens: [700, 812], paddedTokens: 812,
+        limits: { maxSequenceTokens: 4096, maxHeadTokens: 256, maxBatchTokens: 8192, manifestSha256: 'a'.repeat(64) },
+      },
+    })
+    setup({ loadDecision: () => Promise.resolve(fitted) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const drawer = await screen.findByRole('dialog')
+    // Head = the question's sequence tokens minus the state tokens, of the recorded head limit.
+    expect(within(drawer).getByText('difficulty head')).toBeTruthy()
+    expect(within(drawer).getByText('88 of 256 tokens')).toBeTruthy()
+    expect(within(drawer).getByText('route head')).toBeTruthy()
+    expect(within(drawer).getByText('200 of 256 tokens')).toBeTruthy()
+    expect(within(drawer).queryByText('Fit rejected')).toBeNull()
+
+    const rejected = decisionDetail({
+      judgmentInput: undefined,
+      judgmentRejection: {
+        reason: 'head',
+        limits: { maxSequenceTokens: 4096, maxHeadTokens: 256, maxBatchTokens: 8192, manifestSha256: 'b'.repeat(64) },
+      },
+    })
+    cleanup()
+    setup({ loadDecision: () => Promise.resolve(rejected) })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const rejectedDrawer = await screen.findByRole('dialog')
+    expect(within(rejectedDrawer).getByText('head — head limit 256 tokens')).toBeTruthy()
+
+    // The shipped fixture's fit records no limits: no head row is invented.
+    cleanup()
+    setup()
+    await gateLoaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the reasoning of turn 21.1' }))
+    const plain = await screen.findByRole('dialog')
+    expect(within(plain).queryByText('difficulty head')).toBeNull()
   })
 
   it('reads the challenger confidence and an unmeasured state size', async () => {

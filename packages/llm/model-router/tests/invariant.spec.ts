@@ -89,6 +89,24 @@ describe('model-router invariant companion', () => {
     ])
   })
 
+  it('accepts shadow with active: true and rejects shadow without it, before publication', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    expect(() => {
+      session.append('model-routing/configuration', { active: true, shadow: true })
+      session.append('model-routing/mode', { active: true, shadow: true })
+    }).not.toThrow()
+
+    for (const type of ['model-routing/mode', 'model-routing/configuration'] as const) {
+      const rejected = ctx.sessions.create()
+      expect(() => {
+        rejected.append(type, { active: false, shadow: true })
+      }).toThrow(`a ${type} value marks shadow without active: true`)
+      // Rejected before publication: the malformed record never reached the log.
+      expect(rejected.events).toEqual([])
+    }
+  })
+
   it('rejects configuration after a same-valued explicit mode selection', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()
@@ -288,5 +306,85 @@ describe('model-router invariant companion', () => {
       sticky: { active: false, stepsElapsed: 0 },
     }))
     expect(() => { header(session, 'strong', 'manual') }).toThrow(/recovery decision carries no manual route/)
+  })
+})
+
+describe('a header after a shadow decision', () => {
+  it('must still run the manual base in the same turn and step', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    // Shadow rewrote nothing, so the manual header is the honest one.
+    expect(() => { header(session, 'strong-provider', 'strong-model') }).not.toThrow()
+    // A header that runs the routed candidate contradicts the shadow decision.
+    let rejected: Session | undefined
+    expect(() => {
+      rejected = ctx.sessions.create()
+      header(rejected, 'strong-provider', 'strong-model')
+      rejected.append('turn/start', { turn: 1 })
+      rejected.append('step/start', { turn: 1, step: 1 })
+      rejected.append('model-routing/decision', decision({
+        shadow: true,
+        sticky: { active: false, stepsElapsed: 0 },
+      }))
+      header(rejected, 'cheap-provider', 'cheap-model')
+    }).toThrow(/shadow never leaves the manual route \(strong-provider\/strong-model\)/)
+    expect(rejected?.events.at(-1)?.type).toBe('model-routing/decision')
+  })
+
+  it('leaves the selection of a later step free', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    header(session, 'strong-provider', 'strong-model')
+    // A new step: the user may select another model afresh; the shadow decision
+    // no longer governs.
+    session.append('step/start', { turn: 1, step: 2 })
+    expect(() => { header(session, 'cheap-provider', 'cheap-model') }).not.toThrow()
+  })
+
+  it('a route-failed decision never follows a shadow decision', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    header(session, 'strong-provider', 'strong-model')
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('model-routing/decision', decision({
+      shadow: true,
+      sticky: { active: false, stepsElapsed: 0 },
+    }))
+    // Shadow rewrote nothing, so no routed request of its step can fail: the
+    // shadow decision is ignored as the prior, and the append is rejected.
+    let rejected: Session | undefined
+    expect(() => {
+      rejected = ctx.sessions.create()
+      header(rejected, 'strong-provider', 'strong-model')
+      rejected.append('turn/start', { turn: 1 })
+      rejected.append('step/start', { turn: 1, step: 1 })
+      rejected.append('model-routing/decision', decision({
+        shadow: true,
+        sticky: { active: false, stepsElapsed: 0 },
+      }))
+      rejected.append('model-routing/decision', decision({
+        outcome: 'kept-strong',
+        reason: 'route-failed',
+        selection: undefined,
+        failure: { code: 'RATE_LIMIT', provider: 'cheap-provider', model: 'cheap-model' },
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'route-failed' },
+      }))
+    }).toThrow("a route-failed decision must follow the same step's downgraded decision for the failed provider")
+    expect(rejected?.events.at(-1)?.type).toBe('model-routing/decision')
   })
 })

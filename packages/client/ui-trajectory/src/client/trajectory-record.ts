@@ -85,6 +85,11 @@ export interface TrajectoryRoutingRow {
   readonly streak?: TrajectoryRoutingStreak
   /** Whether the decision changed nothing and renders as the quiet marker. */
   readonly quiet: boolean
+  /**
+   * Verdict a shadow consult simulated, when this row is one: whether live
+   * would have switched, and to which model.
+   */
+  readonly shadow?: { readonly switched: boolean; readonly model?: string }
 }
 
 /** Effective route one request row reports, and whether routing moved it off the selection. */

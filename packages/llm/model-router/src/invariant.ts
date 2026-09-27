@@ -36,6 +36,9 @@ export const inject = ['invariants']
  * chosen afresh, legitimately logs a header that does not match an earlier
  * decision, and checking that would reject a session turning routing off.
  *
+ * A mode or configuration value that marks `shadow` must also be `active`:
+ * shadow judges without rewriting, so it is never a way to switch routing off.
+ *
  * Configuration events may replace one another until the session records an
  * explicit `model-routing/mode`; after that point, even a same-valued
  * configuration append is an invalid producer transition because the user
@@ -53,6 +56,10 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
   ctx.on('internal/dispatch', (_mode, eventName, args) => {
     if (eventName !== 'session/event') return
     const [session, event] = args as [Session, SessionEvent]
+    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') {
+      // Shadow judges without rewriting, so it is a kind of active routing.
+      if (event.data.shadow === true && !event.data.active) fail(`a ${event.type} value marks shadow without active: true`)
+    }
     if (event.type === 'model-routing/configuration') {
       if (session.events.some(candidate => candidate.type === 'model-routing/mode')) {
         fail('a model-routing/configuration event cannot follow an explicit model-routing/mode selection')
@@ -69,17 +76,46 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
     }
     if (event.type !== 'request/header') return
     let turnStartSeq = -1
+    let stepStartSeq = -1
     let decided: ModelRoutingDecision | undefined
     let decisionSeq = -1
+    // The manual route in force when that decision was logged: the latest
+    // header or selection at the moment the decision was appended. Headers
+    // after it record what the session ran since and do not move it.
+    let manualBase: { provider: string; model: string } | undefined
+    let baseAtDecision: typeof manualBase
     for (const candidate of session.events) {
       if (candidate.type === 'turn/start') turnStartSeq = candidate.seq
-      if (candidate.type === 'model-routing/decision') {
+      else if (candidate.type === 'step/start') stepStartSeq = candidate.seq
+      if (candidate.type === 'request/header') {
+        manualBase = { provider: candidate.data.header.config.provider, model: candidate.data.header.config.model }
+      } else if (candidate.type === 'agent/model-selection') {
+        manualBase = { provider: candidate.data.provider, model: candidate.data.model }
+      } else if (candidate.type === 'model-routing/decision') {
         decided = candidate.data
         decisionSeq = candidate.seq
+        baseAtDecision = manualBase
       }
     }
     // Only the decision this turn took is in force for this header.
     if (decided === undefined || decisionSeq < turnStartSeq) return
+    if (decided.shadow === true) {
+      // Shadow judges and never rewrites: a header in the shadow decision's own
+      // turn and step must still run the manual base that consult judged. A
+      // later step's header names whatever the user selected since.
+      if (decisionSeq < stepStartSeq) return
+      const base = decided.sticky.entryBase ?? baseAtDecision
+      if (base !== undefined) {
+        const config = event.data.header.config
+        if (config.provider !== base.provider || config.model !== base.model) {
+          fail(
+            `the request header after a shadow decision runs ${config.provider}/${config.model}`
+            + ` but shadow never leaves the manual route (${base.provider}/${base.model})`,
+          )
+        }
+      }
+      return
+    }
     const failed = decided.reason === 'route-failed' ? decided.failure : undefined
     if (failed !== undefined) {
       const retried = event.data.header.config
@@ -122,7 +158,8 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
 /**
  * Require a `route-failed` decision to retry the step a downgrade selected:
  * the last decision before it, with no `turn/start` or `step/start` between,
- * is downgraded and selected the failed provider.
+ * is downgraded and selected the failed provider. A shadow decision is never
+ * that prior: it rewrote nothing, so no routed request it described can fail.
  * @param events - the session log before the decision is published.
  * @param decision - the `route-failed` decision being appended.
  * @param fail - the reporter that rejects the append.
@@ -130,7 +167,7 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
 function checkRouteFailed(events: readonly SessionEvent[], decision: ModelRoutingDecision, fail: InvariantFailure): void {
   let previous: ModelRoutingDecision | undefined
   for (const candidate of events) {
-    if (candidate.type === 'model-routing/decision') previous = candidate.data
+    if (candidate.type === 'model-routing/decision' && candidate.data.shadow !== true) previous = candidate.data
     else if (candidate.type === 'turn/start' || candidate.type === 'step/start') previous = undefined
   }
   if (previous?.outcome !== 'downgraded' || previous.selection?.provider !== decision.failure?.provider) {

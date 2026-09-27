@@ -146,12 +146,16 @@ export function RoutingView({
   const gate = gateLoad.kind === 'loaded'
     ? gateFor(gateLoad.gate, judge.kind === 'engine' ? String(judge.engine.id) : undefined)
     : null
-  const state = routingViewState(stats, routing.active, judge)
-  const verdict = routingVerdict(stats, gate, routing.active, t)
-  const kpis = routingKpis(stats, gate, engineEgress(engineState), t)
+  // Shadow judges exactly as on does, so every judging flag treats it as
+  // active; only the rewrites and the measured outcomes differ.
+  const shadow = routing.mode === 'shadow'
+  const judging = routing.mode !== 'off'
+  const state = routingViewState(stats, judging, judge)
+  const verdict = routingVerdict(stats, gate, routing.active, t, shadow)
+  const kpis = routingKpis(stats, gate, engineEgress(engineState), t, shadow)
   const segment = judgeSegment(judge, gate, t)
   const trouble = judgeTrouble(judge, t)
-  const egress = egressWarning(judge, routing.active, gate, t)
+  const egress = egressWarning(judge, judging, gate, t, shadow)
   const notUsed = judgeNotUsed(judge, gate, t)
   const trajectory = reveal !== undefined && canReveal?.('trajectory') === true
     ? (seq: number) => { reveal({ view: 'trajectory', target: { kind: 'event', seq } }) }
@@ -165,8 +169,11 @@ export function RoutingView({
         <span className={css.scopePill}>{t('view.scope')}</span>
       </header>
       <p className={css.status}>
-        {t('status.mode')} <strong>{routing.active ? t('status.on') : t('status.off')}</strong>
-        {' · '}{t('status.switch.before')} <span className={css.autoPill} aria-hidden="true">{routing.active ? 'auto' : 'Auto'}</span> {t('status.switch.after')}
+        {t('status.mode')}{' '}
+        <strong>{shadow ? t('status.shadow') : routing.active ? t('status.on') : t('status.off')}</strong>
+        {' · '}{shadow && <span>{t('status.shadow.detail')}</span>}
+        {' · '}{t('status.switch.before')}{' '}
+        <span className={css.autoPill} aria-hidden="true">{shadow ? 'auto · shadow' : routing.active ? 'auto' : 'Auto'}</span> {t('status.switch.after')}
         {' · '}{t('status.judge')} <strong>{segment.name}</strong>
         {segment.state !== undefined && segment.tone !== undefined && (
           <span className={css.judgeState}><StateDot state={segment.tone} size={8} /> {segment.state}</span>

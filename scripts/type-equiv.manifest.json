@@ -2537,6 +2537,21 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingColdPointKind",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingColdPoint",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingDecisionCache",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingActiveStickyView",
       "source": "packages/llm/model-router/src/types.ts"
     },
@@ -2548,6 +2563,16 @@
     {
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStickyView",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingMode",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingModeRecord",
       "source": "packages/llm/model-router/src/types.ts"
     },
     {

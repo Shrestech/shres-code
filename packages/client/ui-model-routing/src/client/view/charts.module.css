@@ -130,6 +130,14 @@
 .slotOther,
 .neutralBar { fill: var(--dsw-alias-chart-axis); }
 
+/* Would-have segment in G1: hatched over the strong bar the step really ran. */
+.hatch {
+  fill: var(--dsw-alias-chart-axis);
+  fill-opacity: 0.45;
+  stroke: var(--dsw-alias-chart-axis);
+  stroke-dasharray: 3 3;
+}
+
 .failedBar { fill: var(--dsw-alias-state-error-primary); }
 
 .groupSwitched { fill: var(--dsw-alias-chart-series-1); background: var(--dsw-alias-chart-series-1); }

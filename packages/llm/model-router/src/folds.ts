@@ -10,8 +10,11 @@
 import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 import type {
   ModelRoutingBreakReason,
+  ModelRoutingColdPoint,
   ModelRoutingDecision,
   ModelRoutingEntryBaseView,
+  ModelRoutingMode,
+  ModelRoutingModeRecord,
   ModelRoutingReason,
   ModelRoutingSelection,
   ModelRoutingStickyView,
@@ -132,28 +135,207 @@ export interface ModelRoutingStickyFoldState {
   readonly judgmentFailures?: ModelRoutingJudgmentFailures
 }
 
+/** The manual route one cold-point evaluation reads: provider and model only. */
+export interface ModelRoutingColdPointBase {
+  /** Registered provider route of the manual model. */
+  readonly provider: string
+  /** Provider-owned model id of the manual model. */
+  readonly model: string
+}
+
+/** A prompt-cache lifetime and where it came from. */
+export interface ModelRoutingCacheTtl {
+  /** Cache lifetime in milliseconds; `0` means the route keeps no cache. */
+  readonly ttlMs: number
+  /** `adapter` when the model's metadata declared it, `fallback` for `coldPoints.unknownTtlMs`. */
+  readonly ttlSource: 'adapter' | 'fallback'
+}
+
 /**
- * Whether model routing is active after the first `end` events. The last
- * user mode or committed configuration event wins; a prefix with neither
- * uses `initialMode`.
+ * Whether the event is a successful `compaction/end`. The compaction package
+ * owns that event type and this package does not depend on it, so the type
+ * name and the `error` field are read from the envelope.
+ * @param event - one committed event.
+ * @returns whether a compaction completed.
+ */
+export function isCompactionEnd(event: SessionEvent): boolean {
+  const record = event as unknown as { type: string; data: { error?: unknown } }
+  return record.type === 'compaction/end' && record.data.error === undefined
+}
+
+/**
+ * The start time of the step a consult serves: the `time` of the log's latest
+ * `step/start`, which the loop appends before it assembles the step's request.
+ * @param events - the session log before the consult.
+ * @returns epoch milliseconds, or `undefined` when no step has started.
+ */
+export function latestStepStart(events: readonly SessionEvent[]): number | undefined {
+  return events.findLast(event => event.type === 'step/start')?.time
+}
+
+/**
+ * Whether the durable manual base records the header at `end` as routed: the
+ * latest `agent/route-base` at or before it whose `routed` route the header
+ * runs, searched back past request headers that run the same route and no
+ * further than the first header that runs another one. The event belongs to
+ * the durable manual base, which this package does not depend on, so the
+ * envelope is read without its type.
+ * @param events - the session log.
+ * @param end - index of the header the record would describe.
+ * @param config - the header's call configuration.
+ * @returns whether a record beneath the header exists.
+ */
+function routedBeneathRecorded(
+  events: readonly SessionEvent[],
+  end: number,
+  config: { provider: string; model: string; reasoningEffort?: unknown },
+): boolean {
+  for (let index = end - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event === undefined) return false
+    const record = event as unknown as { type: string; data: unknown }
+    if (record.type === 'agent/route-base') {
+      const routed = (record.data as { routed?: { provider: string; model: string; reasoningEffort?: string } } | undefined)?.routed
+      if (routed !== undefined && routed.provider === config.provider && routed.model === config.model
+        && (routed.reasoningEffort === undefined || routed.reasoningEffort === config.reasoningEffort)) {
+        return true
+      }
+    } else if (event.type === 'request/header') {
+      const prior = event.data.header.config
+      if (prior.provider !== config.provider || prior.model !== config.model
+        || (config.reasoningEffort !== undefined && prior.reasoningEffort !== config.reasoningEffort)) {
+        return false
+      }
+    }
+  }
+  return false
+}
+
+/** Whether two routes name the same provider and model; effort is not compared. */
+function sameModel(a: ModelRoutingColdPointBase, b: ModelRoutingColdPointBase): boolean {
+  return a.provider === b.provider && a.model === b.model
+}
+
+/**
+ * Find the cold point of the manual route's prompt-cache prefix at one consult,
+ * from log facts only. The first matching rule wins:
+ * - `session-start`: the manual model never answered, and the session is not a
+ *   fork seeded with its parent's prefix;
+ * - `post-compaction`: a successful compaction followed its last answer;
+ * - `manual-switch`: after that answer, an `agent/model-selection` or a
+ *   request header that runs another provider/model without the durable
+ *   manual base recording it beneath `agent/route-base` — and, for logs
+ *   written before that record existed, without a live downgraded decision
+ *   of its own turn rewriting it;
+ * - `no-cache`: the lifetime is zero, so no prefix is kept;
+ * - `idle`: `now` is more than the lifetime after the start of the step whose
+ *   answer was that last one, which is where the cache lifetime counts from.
+ * A seeded session whose manual model never answered is cold only when the
+ * lifetime is zero.
+ * @param events - the session log before the consult.
+ * @param base - the manual route.
+ * @param ttl - the manual model's cache lifetime and its source.
+ * @param now - start time of the consulted step, in epoch milliseconds.
+ * @param seeded - whether the session header records a fork seed.
+ * @returns the cold point, or `undefined` when the prefix is warm.
+ */
+export function coldPointAt(
+  events: readonly SessionEvent[],
+  base: ModelRoutingColdPointBase,
+  ttl: ModelRoutingCacheTtl,
+  now: number,
+  seeded: boolean,
+): ModelRoutingColdPoint | undefined {
+  const cache = { ttlMs: ttl.ttlMs, ttlSource: ttl.ttlSource }
+  const last = events.findLastIndex(event => event.type === 'assistant/message' && sameModel(event.data.message.source, base))
+  const answer = events[last]
+  if (answer?.type !== 'assistant/message') {
+    if (!seeded) return { kind: 'session-start', ...cache }
+    return ttl.ttlMs === 0 ? { kind: 'no-cache', ...cache } : undefined
+  }
+  // The answer's own time bounds its step start when the log lacks that step.
+  const started = events.findLast((event, index) => index < last && event.type === 'step/start'
+    && event.data.turn === answer.data.turn && event.data.step === answer.data.step)?.time ?? answer.time
+  const facts = { ...cache, idleMs: now - started, lastBaseSeq: answer.seq }
+  let compactionSeq: number | undefined
+  let switched = false
+  let turnDecision: ModelRoutingDecision | undefined
+  for (let index = last + 1; index < events.length; index += 1) {
+    const event = events[index]
+    if (event === undefined) continue
+    if (isCompactionEnd(event)) compactionSeq = event.seq
+    else if (event.type === 'turn/start') turnDecision = undefined
+    else if (event.type === 'model-routing/decision') turnDecision = event.data
+    else if (event.type === 'agent/model-selection') switched ||= !sameModel(event.data, base)
+    else if (event.type === 'request/header') {
+      // A header recorded in `agent/route-base` is routed, never a manual
+      // switch, whatever the turn's decisions say. A header without a record
+      // predates the record or was never routed: there, the turn's own live
+      // downgraded decision - never a shadow one, which rewrites nothing -
+      // tells a routed header from a manual choice.
+      const routed = routedBeneathRecorded(events, index, event.data.header.config)
+        || (turnDecision?.outcome === 'downgraded' && turnDecision.shadow !== true
+          && turnDecision.selection !== undefined && sameModel(turnDecision.selection, event.data.header.config))
+      switched ||= !routed && !sameModel(event.data.header.config, base)
+    }
+  }
+  if (compactionSeq !== undefined) return { kind: 'post-compaction', ...facts, compactionSeq }
+  if (switched) return { kind: 'manual-switch', ...facts }
+  if (ttl.ttlMs === 0) return { kind: 'no-cache', ...facts }
+  return facts.idleMs > ttl.ttlMs ? { kind: 'idle', ...facts } : undefined
+}
+
+/**
+ * The mode one logged mode value names. An inactive record is off whatever else
+ * it carries, so a record that marks shadow without `active` cannot switch
+ * routing on; the invariant rejects such a record before it is published.
+ * @param record - a `model-routing/mode` or `model-routing/configuration` value.
+ * @returns `off` when inactive, `shadow` when marked shadow, and `on` otherwise.
+ */
+export function modeOfRecord(record: ModelRoutingModeRecord): ModelRoutingMode {
+  if (!record.active) return 'off'
+  return record.shadow === true ? 'shadow' : 'on'
+}
+
+/**
+ * The value that records one mode in a `model-routing/mode` or
+ * `model-routing/configuration` event.
+ * @param mode - the mode to record.
+ * @returns the logged value; `on` omits `shadow`, as logs from before shadow do.
+ */
+export function modeRecord(mode: ModelRoutingMode): ModelRoutingModeRecord {
+  switch (mode) {
+    case 'off':
+      return { active: false }
+    case 'on':
+      return { active: true }
+    case 'shadow':
+      return { active: true, shadow: true }
+  }
+}
+
+/**
+ * The model routing mode after the first `end` events. The last user mode or
+ * committed configuration event wins; a prefix with neither uses
+ * `initialMode`.
  * @param events - the session log or any prefix of it.
  * @param end - fold `events[0, end)`; defaults to the whole log.
  * @param initialMode - mode in force before the first event; defaults to off.
- * @returns whether routing is active.
+ * @returns the mode in force.
  */
 export function foldModelRouting(
   events: readonly SessionEvent[],
   end: number = events.length,
-  initialMode: boolean = false,
-): boolean {
-  let active = initialMode
+  initialMode: ModelRoutingMode = 'off',
+): ModelRoutingMode {
+  let mode = initialMode
   let index = 0
   for (const event of events) {
     if (index >= end) break
     index++
-    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') active = event.data.active
+    if (event.type === 'model-routing/mode' || event.type === 'model-routing/configuration') mode = modeOfRecord(event.data)
   }
-  return active
+  return mode
 }
 
 /**
@@ -368,6 +550,9 @@ function isRecoveryProof(
     && (event.data.reason.kind === 'completed' || event.data.reason.kind === 'error')
 }
 
+/** Which decisions a sticky fold applies: the live route's, or the shadow simulation's. */
+type FoldScope = 'live' | 'shadow'
+
 /**
  * Advance the sticky accumulator by one durable event.
  *
@@ -381,6 +566,37 @@ function isRecoveryProof(
 export function advanceStickyFoldState(
   state: ModelRoutingStickyFoldState,
   event: SessionEvent,
+): ModelRoutingStickyFoldState {
+  return advanceFold(state, event, 'live')
+}
+
+/**
+ * Advance the shadow simulation's sticky accumulator by one durable event: it
+ * applies only decisions marked `shadow: true`, and only a mode still in
+ * shadow keeps its simulated streak, so a switch to on or off ends it exactly
+ * as the live fold's switch ends a live streak.
+ * @param state - accumulator covering all prior events.
+ * @param event - next committed session event.
+ * @returns the accumulator after the event.
+ */
+export function advanceShadowStickyFoldState(
+  state: ModelRoutingStickyFoldState,
+  event: SessionEvent,
+): ModelRoutingStickyFoldState {
+  return advanceFold(state, event, 'shadow')
+}
+
+/**
+ * The one transition behind both folds, scoped to the decisions it applies.
+ * @param state - accumulator covering all prior events.
+ * @param event - next committed session event.
+ * @param scope - which decisions the fold applies.
+ * @returns the accumulator after the event.
+ */
+function advanceFold(
+  state: ModelRoutingStickyFoldState,
+  event: SessionEvent,
+  scope: FoldScope,
 ): ModelRoutingStickyFoldState {
   switch (event.type) {
     case 'step/start':
@@ -428,9 +644,15 @@ export function advanceStickyFoldState(
     }
     case 'model-routing/mode':
     case 'model-routing/configuration':
-      if (event.data.active) return state
+      // The live fold keeps a streak only under `on`: off stops routing, and
+      // shadow never rewrites a request. The shadow fold keeps one only while
+      // judging continues, so any other mode ends the simulation the same way.
+      if (modeOfRecord(event.data) === (scope === 'shadow' ? 'shadow' : 'on')) return state
       return state.active ? breakSticky(state, 'mode-off') : state
     case 'model-routing/decision': {
+      // Each fold skips the other's decisions, so a shadow streak simulates
+      // holds, cooldowns, and exits without ever moving the live route.
+      if ((event.data.shadow === true) !== (scope === 'shadow')) return state
       const sticky = event.data.sticky
       validateStickyView(sticky)
       return applyDecision(countJudgment(state, event.data), event.data)
@@ -583,6 +805,29 @@ export function stickyState(
     if (index >= end) break
     index++
     state = advanceStickyFoldState(state, event)
+  }
+  return readStickyFoldState(state)
+}
+
+/**
+ * Fold the sticky state a shadow consult continues from: the same fold as
+ * {@link stickyState} over the decisions marked `shadow: true` only. Holds,
+ * cooldowns, and exits in the simulation never move the live route, and a mode
+ * that leaves shadow ends the simulated streak.
+ * @param events - the session log or any prefix of it.
+ * @param end - fold `events[0, end)`; defaults to the whole log.
+ * @returns the simulated sticky state at that point.
+ */
+export function shadowStickyState(
+  events: readonly SessionEvent[],
+  end: number = events.length,
+): ModelRoutingStickyState {
+  let state = createStickyFoldState()
+  let index = 0
+  for (const event of events) {
+    if (index >= end) break
+    index++
+    state = advanceShadowStickyFoldState(state, event)
   }
   return readStickyFoldState(state)
 }
