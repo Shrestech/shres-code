@@ -72,13 +72,13 @@ describe('Settings › Model routing page', () => {
     const warning = screen.getByRole('note')
     expect(within(warning).getByText(en.remoteWarningLead)).toBeTruthy()
     expect(within(warning).getAllByRole('listitem').map(item => item.textContent)).toEqual([
-      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation.',
+      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of the conversation or subagent task.',
     ])
     expect(within(warning).getByText(en.remoteWarningTail)).toBeTruthy()
     cleanup()
     mount(double(ready({ router: null, engines: snapshot([{ ...TYPESAFE, destination: undefined } as never]) })))
     expect(within(screen.getByRole('note')).getByRole('listitem').textContent)
-      .toBe('model-router asks Jev (TypeSafe) at a host off this machine: each routing consult, in a session with routing on, sends part of that conversation.')
+      .toBe('model-router asks Jev (TypeSafe) at a host off this machine: each routing consult, in a session with routing on, sends part of the conversation or subagent task.')
   })
 
   it('warns about every consumer an override sends to a remote engine while the selected engine is local', () => {
@@ -92,7 +92,7 @@ describe('Settings › Model routing page', () => {
     expect(screen.queryByText(en.localNote)).toBeNull()
     const warning = screen.getByRole('note')
     expect(within(warning).getAllByRole('listitem').map(item => item.textContent)).toEqual([
-      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation.',
+      'model-router asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of the conversation or subagent task.',
       'worker-escalation asks Jev (TypeSafe) at api.typesafe.ai: every ask sends the state this consumer judges, whatever the session\'s routing mode.',
     ])
     const rows = within(screen.getByRole('list', { name: en.consumersGroup })).getAllByRole('listitem')
@@ -108,7 +108,7 @@ describe('Settings › Model routing page', () => {
     }) })))
     expect(within(screen.getByRole('note')).getAllByRole('listitem').map(item => item.textContent)).toEqual([
       'compaction-jev asks Jev (TypeSafe) at api.typesafe.ai: every ask sends the state this consumer judges, whatever the session\'s routing mode.',
-      'model-router asks Shield (LAN gateway) at 192.168.1.20:8787: each routing consult, in a session with routing on, sends up to 4 alternative excerpts of that conversation, each at most 12,000 characters.',
+      'model-router asks Shield (LAN gateway) at 192.168.1.20:8787: each routing consult, in a session with routing on, sends up to 4 alternative excerpts of the conversation or subagent task, each at most 12,000 characters.',
     ])
     cleanup()
     mount(double(ready({ engines: snapshot([TYPESAFE, LAYA], 'laya', {

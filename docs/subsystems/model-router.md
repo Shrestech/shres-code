@@ -10,7 +10,7 @@ The model-selection hook `installModelSelection` ([shres-agent](../../packages/c
 
 The latest explicit `agent/model-selection` event is the manual selection authority, even when no request header exists or its provider/model/effort matches a routed header byte for byte. Resume and fork therefore recover manual intent before consulting the router's sticky base or a logged request header. Routing policy is unchanged: the consult may select only an eligible configured candidate for the current request, and the manual selection remains the fallback when the consult returns no route.
 
-Under a `quota` `routeFrom` entry without `allowEveryTurn`, the consult first evaluates the manual model's cold point — on step 1 of the turn, after the reentry-cooldown check and before any engine, breaker, or capability work, so a warm turn costs no judgment call. The fold reads log facts only: first match among session start, a completed compaction, a manual model change, a zero lifetime, or idle beyond the model's lifetime wins. A header the durable manual base recorded beneath `agent/route-base` is routed and never a manual switch, whatever the turn's decisions say; a header without such a record is read through the turn's own live downgraded decision, and never through a shadow one, which rewrites nothing. `coldPoints.unknownTtlMs` supplies the lifetime a model's metadata declares none of, and replay reads the recorded `coldPoint` instead of the clock. A held quota streak returns at the next cold point once `hold.minSteps` is reached.
+Under a `quota` `routeFrom` entry without `allowEveryTurn`, the consult first evaluates the manual model's cold point — on step 1 of the turn, after the reentry-cooldown check and before any engine, breaker, or capability work, so a warm turn costs no judgment call. The fold reads log facts only: first match among session start, a completed compaction, a manual model change, a zero lifetime, or idle beyond the model's lifetime wins. A header the durable manual base recorded beneath `agent/route-base` is routed and never a manual switch, whatever the turn's decisions say; a header without such a record is read through the turn's own live downgraded decision, and never through a shadow one, which rewrites nothing. `coldPoints.unknownTtlMs` supplies the lifetime a model's metadata declares none of, and replay reads the recorded `coldPoint` instead of the clock. A held quota streak returns at the next cold point regardless of `hold.minSteps`. While its prefix is warm, an active held streak logs `sticky-hold` with `coldPoint: null` and keeps its selection without a fresh judgment or capability assessment; the turn pin covers later steps even if tool work outlasts the lifetime.
 
 In `shadow` the same consult runs in full — eligibility, egress, breaker, and calibration checks exactly as `on`, awaited on the request's critical path under `judgmentDeadlineMs` — over a separate `shadowStickyState` fold that applies only decisions marked `shadow: true`. The decision is logged with `shadow: true` and the manual route stands, so the live streak and the turn's pin are released as `mode-off` when the mode switches and a shadow pin never returns a selection. The package invariant rejects any `request/header` in the shadow decision's own turn and step that does not name the manual base the consult judged.
 
@@ -134,7 +134,7 @@ type ModelRoutingOutcome = 'downgraded' | 'kept-strong' | 'skipped' | 'error'
 type ModelRoutingReason =
   /** An allowlisted candidate passed the gate (or re-affirmed a held streak). */
   | 'gate-passed'
-  /** The gate failed while the streak is below its amortization horizon. */
+  /** The held selection continues below its horizon, or through a warm quota turn without a fresh judgment. */
   | 'sticky-hold'
   /** No judgment engine is composed. */
   | 'engine-absent'
@@ -203,17 +203,18 @@ type ModelRoutingReason =
   | 'judgment-error'
   /**
    * The manual route is a `quota` route and its prompt-cache prefix is still
-   * warm, so no switch is attempted and no judgment runs this turn.
+   * warm, so no switch is attempted and no judgment runs this turn. A held
+   * selection uses `sticky-hold` with `coldPoint: null` instead.
    */
   | 'warm-prefix'
   /**
-   * The manual route's prompt cache went cold after the held quota streak
-   * reached `hold.minSteps`, so the streak returns to it without judgment.
+   * The manual route's prompt cache went cold while a quota streak was held,
+   * so the streak returns to it at the next cold point without judgment.
    */
   | 'cold-point-return'
 ```
 
-Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, `route-errors`, and `route-failed` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon.
+Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, `route-errors`, and `route-failed` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon, or the quota prefix stayed warm for the turn.
 
 ```ts type-equiv
 /**
@@ -329,6 +330,71 @@ interface ModelRoutingDecision {
 ```
 
 ```ts type-equiv
+/** One child's routing decision, recorded on the parent before the child exists. */
+interface ModelRoutingChildDecision {
+  /** Whether a pool candidate was returned to the waterfall. */
+  outcome: 'routed' | 'kept'
+  /** Why the child was routed or kept. */
+  reason:
+    | 'child-policy'
+    | 'child-judged'
+    | 'base-unlisted'
+    | 'candidate-equals-base'
+    | 'child-route-errors'
+    | 'input-too-large'
+    | 'engine-absent'
+    | 'engine-uncalibrated'
+    | 'engine-unavailable'
+    | 'invalid-answer'
+    | 'low-confidence'
+    | 'thin-margin'
+  /** Dispatch identity minted by resolveChildRoute. */
+  routeRequestId: string
+  /** Delegation consumer kind. */
+  childKind: 'subagent' | 'workflow'
+  /** Tool-facing agent type, when a tool delegates. */
+  agentType?: string
+  /** Index of the matching childPolicies rule. */
+  policyIndex: number
+  /** Inherited parent route. */
+  inherited: { provider?: string; model?: string }
+  /** Routed pool selection. */
+  selection?: { candidateId: string; provider: string; model: string }
+  /** Child-route never applies pool reasoningEffort. */
+  effortApplied: false
+  /** Character length of the child's task text. */
+  promptChars: number
+  /** Exact task text handed to a plain judgment ask. */
+  judgmentState?: string
+  /** Exact questions supplied to the child-route judgment engine. */
+  judgmentQuestions?: readonly JudgmentQuestion[]
+  /** Exact selected task text and tokenizer facts from a fitted ask. */
+  judgmentInput?: JudgmentTokenFit
+  /** Capacity rejection without model inference. */
+  judgmentRejection?: { limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+  /** The judgment's route answer, when a judgment call produced one. */
+  route?: ModelRoutingRouteAnswer
+  /** Characters handed to the engine; zero records a pre-dispatch input refusal. */
+  inputChars?: number
+  /** Judgment engine identity, when a rule judged. */
+  engine?: string
+  engineId?: string
+  model?: string
+  latencyMs?: number
+  /** Token usage of the child-route judgment call, when the engine reported it. */
+  judgeUsage?: TokenUsage
+  /** Why the child-route judgment call failed, when it failed. */
+  engineFailure?: ModelRoutingEngineFailure
+  /** Thresholds in force for the child-route judgment. */
+  thresholds?: ModelRoutingThresholds
+  /** Whether this consult only recorded what live would do. */
+  shadow?: true
+  /** Parent routeFrom objective, when the base is listed. */
+  objective?: ModelRoutingObjective
+}
+```
+
+```ts type-equiv
 /**
  * Why the manual route's prompt-cache prefix counts as cold at a consult,
  * first match wins: its model never answered in this unseeded session, a
@@ -438,6 +504,12 @@ One decision is logged per fresh judged request step as `model-routing/decision`
 ## Failed judgment calls
 
 Each judgment call runs under the turn's signal combined with `AbortSignal.timeout(judgmentDeadlineMs)` (documented 1500, at most 30000). A deadline expiry that is not a turn cancellation records `engine-unavailable` with `engineFailure.code: DEADLINE`, and an answer that arrives after the deadline is discarded; a turn cancellation still propagates without a decision. A failed call records the engine's `JudgmentError` code in `engineFailure` whenever it arrives, and an unclassified error records none; `DEADLINE` is a cancellation or an uncoded failure after the deadline. Every call records `engineId`, `inputChars`, and the preceding `eligibilityMs`, plus `judgeUsage` when the engine reported it; a failed call's `latencyMs` is the router's wall-clock measure. The router asks as consumer `model-router`, declared to `ctx.judgmentEngines`, and reads its fitting through `fittingFor`. The gate applies the `operatingPoints` entry for the selected engine, else the global `downgradeThreshold` and `downgradeMargin`, and an answered decision records them in `thresholds` with their `source` and any `calibratedBy`, plus `entryScoreCeiling` and `escalateBackScoreThreshold` when the consult asked the difficulty question, so the log keeps the thresholds in force at each decision. A selected engine whose registry descriptor declares `verbalized` calibration is refused as `engine-uncalibrated`, without eligibility or a call, unless its operating point sets `acceptVerbalized`. The engine checks are read again, with no await before the call, so they describe the engine the dispatcher asks; an answer stamped with another engine's id is gated by that engine's point, and discarded as `engine-uncalibrated` when that engine is refused, and a failure from an engine that is `starting` or `not-installed` when it arrives is not counted. While a streak holds, a failed call within `judgmentFailures.holdTolerance` (documented 2) consecutive failures keeps the held candidate as `downgraded` / `judgment-failure-held`, under either `onUnavailable` policy; the next failure ends the streak with the policy's outcome. The fold counts consecutive failed calls — `engine-unavailable`, `invalid-answer`, `judgment-error`, and `judgment-failure-held` — with the turn of the latest and the `engineId` they were routed to, and clears the count on a decision that carries a route answer. A failure routed to another engine starts a new count, and the consult reads the count only against the engine `ctx.judgment.selectedEngine('model-router')` selects, so an engine switch clears the breaker and the hold tolerance at once. A selected engine whose registry status is `starting` or `not-installed` is not asked; the decision records `engineFailure.engineState`, and the fold does not count it. When the count reaches `judgmentFailures.breakerThreshold` (documented 3), consults within `judgmentFailures.breakerOpenTurns` (documented 5, `0` disables) turns of that failure record `breaker-open` and make no judgment call; after the window one call is tried, and its failure opens the breaker again. `state-too-large` and `judgment-input-too-large` are properties of the input, so they end a held streak at once and are not counted.
+
+## Child-route decisions
+
+The parent decides a matching subagent or workflow route once, before the child exists. A static rule returns its pool candidate; a judged rule asks keep-current versus that candidate with the candidate's configured description, and only a mode that is still `on` returns the pool route. Shadow records the same spawn decision and returns the inherited route. A child task longer than `state.maxChars` records `input-too-large`, `promptChars`, and `inputChars: 0` before any judge service is called.
+
+Each judged child decision records the exact questions, the plain task text or fitted tokenizer result, the route answer when one arrived, the engine identity, effective thresholds, latency, input characters, reported usage, capacity rejection, and classified engine failure. `inputChars` describes the offered characters; `engineFailure.refusedBeforeDispatch` and `judgmentRejection` distinguish a dispatcher refusal or fit rejection from model inference. A parent cancellation propagates without a decision. A deadline records a late answer's facts as `engine-unavailable` with `DEADLINE` and never returns its route, even when the engine ignores its signal. Parent statistics count child spawn decisions; candidate suspension is folded from the child outcome breaker and is not a per-session stats field.
 
 ## In-turn fallback
 
@@ -986,5 +1058,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md) · [SubagentChildRoute](subagent.md) · [SubagentChildRouteRequest](subagent.md)
 
-Source: [`packages/llm/model-router/src/index.ts:519`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:520`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -34,7 +34,7 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
       keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 0, warmSkipped: 0,
       childRouted: 0, childFailures: 0, childSuccesses: 0, childNeutral: 0,
     },
-    children: { decided: 0, routed: 0, kept: 0, byReason: [], byModel: [], failures: 0, suspended: 0 },
+    children: { decided: 0, routed: 0, kept: 0, byReason: [], byModel: [], failures: 0 },
     recentChildren: [],
     reasons: [],
     keptReasons: [],

@@ -582,7 +582,7 @@ describe('RoutingView judge facts', () => {
       engines: [{ engine: 'typesafe', calibration: { kind: 'point' as const } }],
     }
     setup({ engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(accepted) })
-    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    await screen.findByText(/each consult sends up to 12,000 characters of this state to api\.typesafe\.ai/)
     expect(statusLine().textContent).not.toContain('Not used for routing')
   })
 
@@ -651,13 +651,13 @@ describe('RoutingView judge facts', () => {
 
   it('warns that excerpts leave the machine while routing is on with a remote judge', async () => {
     setup({ engine: { kind: 'ready', snapshot: engines('typesafe') } })
-    expect(screen.getByText(/each consult sends part of this session to api\.typesafe\.ai/)).toBeTruthy()
-    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    expect(screen.getByText(/each consult sends part of this state to api\.typesafe\.ai/)).toBeTruthy()
+    await screen.findByText(/each consult sends up to 12,000 characters of this state to api\.typesafe\.ai/)
     cleanup()
     const { destination: _dropped, ...noDestination } = REMOTE
     const unnamed = engines('typesafe', { engines: [LOCAL, noDestination] })
     setup({ engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
-    expect(screen.getByText(/each consult sends part of this session to Jev \(TypeSafe\)/)).toBeTruthy()
+    expect(screen.getByText(/each consult sends part of this state to Jev \(TypeSafe\)/)).toBeTruthy()
     cleanup()
     setup({ engine: { kind: 'ready', snapshot: engines('typesafe') }, routing: OFF })
     expect(screen.queryByText(/leave this machine/)).toBeNull()

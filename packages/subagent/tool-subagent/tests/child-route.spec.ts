@@ -22,7 +22,10 @@ function parentAgent(): Agent {
 }
 
 /** Mount the tool on a capturing provider whose children run requested routes. */
-async function setup(toolConfig: Partial<tool.Config> = {}) {
+async function setup(
+  toolConfig: Partial<tool.Config> = {},
+  listenerRoute: { provider?: string; model?: string } = { provider: 'cheap', model: 'flash' },
+) {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   ctx.llm.registerAdapter(['cheap'], new MockAdapter([]))
@@ -46,7 +49,7 @@ async function setup(toolConfig: Partial<tool.Config> = {}) {
     },
   })
   await ctx.plugin(tool, { provider: 'capture', maxDepth: 'provider-managed', ...toolConfig })
-  const listener = vi.fn(async (_request: SubagentChildRouteRequest) => ({ provider: 'cheap', model: 'flash' }))
+  const listener = vi.fn(async (_request: SubagentChildRouteRequest) => listenerRoute)
   ctx.on('subagent/child-route', listener)
   return { ctx, starts, listener }
 }
@@ -75,9 +78,23 @@ describe('shres-tool-subagent child routing', () => {
       prompt: 'list the files',
       inherited: {},
     })
-    expect(starts[0]?.agentOptions).toEqual({ provider: 'cheap', model: 'flash' })
+    expect(starts[0]?.agentOptions).toMatchObject({
+      provider: 'cheap',
+      model: 'flash',
+      subagentRouteRequestId: listener.mock.calls[0]?.[0].routeRequestId,
+    })
     if (result.isError) throw new Error('expected a routed foreground delegation')
     expect(result.value).toMatchObject({ kind: 'foreground', provider: 'cheap', model: 'flash' })
+  })
+
+  it('does not attach a route request id when the listener keeps the inherited route', async () => {
+    const { ctx, starts, listener } = await setup({ toolName: 'explore' }, {})
+    const result = await call(ctx, 'explore', { description: 'scan', prompt: 'list the files' })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(starts[0]?.agentOptions).toBeUndefined()
+    if (result.isError) throw new Error('expected an inherited foreground delegation')
+    expect(result.value).toMatchObject({ kind: 'foreground' })
   })
 
   it('never consults for a configured agentOptions route, so a seat binding stands', async () => {
