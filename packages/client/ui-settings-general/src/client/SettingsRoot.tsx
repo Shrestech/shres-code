@@ -11,12 +11,13 @@ import {
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 
-type Destination = 'settings' | 'teams' | 'customize'
+type Destination = 'settings' | 'teams' | 'plugins' | 'customize'
 
 /** Unknown contributed sections remain discoverable in Settings. */
 function destination(id: string): Destination {
   if (id === 'teams') return 'teams'
-  if (id === 'plugins' || id === 'agent-presets') return 'customize'
+  if (id === 'plugins') return 'plugins'
+  if (id === 'agent-presets') return 'customize'
   return 'settings'
 }
 
@@ -121,7 +122,7 @@ export function SettingsRoot({
       <button className={css.wordmark} onClick={() => { navigate(null) }} aria-label={t('navigation.home')}>SHRES</button>
       <nav className={css.destinations} aria-label={t('navigation.label')}>
         <button className={clsx(css.destination, !open && css.selected)} aria-current={!open ? 'page' : undefined} onClick={() => { navigate(null) }}>{t('navigation.workspace')}</button>
-        {(['teams', 'customize'] as const).map((group) => {
+        {(['teams', 'plugins', 'customize'] as const).map((group) => {
           const first = rows.find(row => destination(row.id) === group)
           return first === undefined ? null : <button key={group}
             className={clsx(css.destination, open && activeDestination === group && css.selected)}

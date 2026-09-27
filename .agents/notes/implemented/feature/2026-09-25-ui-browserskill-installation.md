@@ -8,7 +8,7 @@ The [managed installation decision](../../implemented/feature/2026-09-24-managed
 
 ## Decision
 
-Compose a first-party [BrowserSkill host plugin](../../../../packages/browser/browserskill/README.md) and [Settings section](../../../../packages/client/ui-browserskill/README.md) in the Web bundle. The plugin is already mounted; its Install action provisions runtime resources rather than changing npm dependencies or hot-loading a module graph. The native tools and guide are registered at mount and return a stable not-ready result until the owned browser is connected. The manual skill route remains independently available.
+The optional [BrowserSkill bundle](../../../../packages/bundle/browser/README.md) composes a first-party [host plugin](../../../../packages/browser/browserskill/README.md) and [setup contribution](../../../../packages/client/ui-browserskill/README.md). The [shared plugin activation decision](../architecture/2026-09-27-shared-plugin-activation.md) owns bundle selection and Plugins navigation. Runtime setup provisions resources without changing npm dependencies or plugin selection. The native tools and guide are registered at mount and return a stable not-ready result until the owned browser is connected. The manual skill route remains independently available.
 
 Use the installed Google Chrome executable with a separate Shres-owned profile. The initial supported platform is macOS arm64. Missing Chrome, an unsupported platform, or a version below the extension's minimum is refused before downloading. Extension-protocol compatibility is checked during launch; there is no automatic browser download or manual store-install fallback.
 
@@ -78,7 +78,7 @@ The keyless scenarios use a scripted provider and do not establish live-provider
 
 ## Consequences
 
-- A fresh Web profile completes consent, pinned provisioning, Chrome launch, and observed connection without a terminal step.
+- A Web profile with the BrowserSkill bundle enabled completes consent, pinned provisioning, Chrome launch, and observed connection without a terminal step.
 - Real native tools, invoked through a scripted external model in the actual Web composition, control a local page; an independent server receipt proves the action. A fabricated runtime or executable does not satisfy this criterion.
 - Retained-profile reopen reaches Ready without downloading, after launch-time integrity verification. Endpoint conflicts and unverifiable process identity fail closed.
 - Close drains tracked work, terminates verified recorded processes, and releases the lease. Host disposal escalates the same stop operations; forced host exit and SIGKILL behavior are measured separately. Failed teardown retains ownership and prevents deletion or replacement; a retried Close can recover.

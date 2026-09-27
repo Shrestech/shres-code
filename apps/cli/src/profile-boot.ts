@@ -26,15 +26,25 @@ import {
   loadOverlayPatches,
   loadProfile,
   nodePnpmRunner,
+  listProfileBundles,
+  reconcileRootInclude,
+  resolveProfile,
   resolveProfileDir,
   PROFILE_PATCH_FILENAME,
   ProfilePluginError,
   provideProfileRuntime,
+  setBundleEnabled,
+  setPluginEnabled,
   watchUserPatches,
   withRecoveredProfile,
   type Profile,
+  type ProfileManifest,
+  type ProfileActivationApplication,
+  type ProfileMutationCandidate,
+  type ProfileRuntimeControl,
   type RecoveredProfile,
 } from '@shres-code/shres-code-app-boot'
+import { PROFILE_TEMPLATES, DEFAULT_PROFILE_BUNDLES, OPTIONAL_BUNDLES } from '@shres-code/shres-code-app-boot'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 
 /** Shipped agent-preset root: beside this app's own config, in both source and built layouts. */
@@ -340,6 +350,14 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     throw new Error(NAME + ': profile startup interrupted')
   }
   const rootConfig = join(composed.profile.dir, PROFILE_ROOT_FILENAME)
+  const shippedBundles = [...PROFILE_TEMPLATES[options.profile] ?? DEFAULT_PROFILE_BUNDLES, ...OPTIONAL_BUNDLES]
+  const live: {
+    bundlePatches: PatchOptions[]
+    activeBundles: string[]
+  } = {
+    bundlePatches: structuredClone(composed.bundlePatches),
+    activeBundles: composed.profile.layers.map(layer => layer.packageName),
+  }
   // Recomposition for the live user layers: bundle layers below, overlays
   // above, so a user edit can never displace them. Parsed app arguments are
   // not in here at all — they live in app-provided services that survive a
@@ -353,11 +371,58 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // would bake a user override into the bundle's in-memory insert row, so
   // removing the override could never revert the row to the bundle default.
   const composeLive = (): PatchOptions[] => structuredClone([
-    ...composed.bundlePatches,
+    ...live.bundlePatches,
     ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
     ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
     ...composed.overlays,
   ])
+  const applyCandidate = async (
+    candidate: ProfileMutationCandidate,
+    update: (patches: readonly PatchOptions[]) => Promise<void>,
+  ): Promise<ProfileActivationApplication> => {
+    const candidateProfile = resolveProfile(NAME, composed.profile.name, composed.profile.dir,
+      candidate.manifest as ProfileManifest, INSTALL_ANCHOR, { userLayer: false })
+    const candidateBundlePatches = candidateProfile.layers.flatMap(layer => layer.patches)
+    await update([
+      ...candidateBundlePatches,
+      ...candidate.profilePatches,
+      ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
+      ...composed.overlays,
+    ])
+    live.bundlePatches = structuredClone(candidateBundlePatches)
+    live.activeBundles = [...candidate.bundles]
+    return 'applied'
+  }
+  const mutateProfile = <T>(
+    operation: (apply: (candidate: ProfileMutationCandidate) => Promise<ProfileActivationApplication>) => Promise<T>,
+  ): Promise<T> => {
+    const current = app.current
+    if (current === undefined || current.get('loader') === undefined) {
+      return operation(() => Promise.resolve('restart-required'))
+    }
+    return reconcileRootInclude(current, update => operation(candidate => applyCandidate(candidate, update)))
+  }
+  const profileControl: ProfileRuntimeControl = {
+    listBundles: () => listProfileBundles(composed.profile.dir, live.activeBundles, {
+      installAnchor: INSTALL_ANCHOR, shippedBundles,
+    }),
+    setBundleEnabled: (name, enabled, signal) => mutateProfile(apply => setBundleEnabled(composed.profile.dir, name, enabled, {
+      runner: nodePnpmRunner,
+      signal: AbortSignal.any([signalShutdown.signal, signal]),
+      invokingCwd: process.cwd(),
+      installAnchor: INSTALL_ANCHOR,
+      shippedBundles,
+      apply,
+    })),
+    setPluginEnabled: (request, signal) => mutateProfile(apply => setPluginEnabled(composed.profile.dir, request, {
+      runner: nodePnpmRunner,
+      signal: AbortSignal.any([signalShutdown.signal, signal]),
+      invokingCwd: process.cwd(),
+      installAnchor: INSTALL_ANCHOR,
+      shippedBundles,
+      apply,
+    })),
+  }
   // Cloned for the same insert-aliasing reason as composeLive: the boot
   // application must not mutate the objects later reloads recompose from.
   const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
@@ -369,6 +434,9 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       profileDir: composed.profile.dir,
       bootBundles: composed.profile.layers.map(layer => layer.packageName),
       pluginMutations: 'enabled',
+      installAnchor: INSTALL_ANCHOR,
+      shippedBundles,
+      control: profileControl,
     })
     // The command line and bounded exit request are launcher facts available
     // to every app plugin that injects the argument snapshot.

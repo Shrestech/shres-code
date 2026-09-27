@@ -5,8 +5,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context } from '@shres-code/cordis'
-import { afterEach, describe, expect, it } from 'vitest'
+import { Context, type Fiber } from '@shres-code/cordis'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WebServer, WebRoute } from '@shres-code/shres-code-host-webserver'
 import { ClientModuleRegistry } from '../src/index.ts'
 
@@ -148,5 +148,44 @@ describe('client bundle activation', () => {
       'cache-control': 'no-cache',
     })
     expect(body).toBe(map)
+  })
+
+  it('coalesces loader-settled flushes and drops one that outlives disposal', async () => {
+    const packageName = '@fixture/delayed-flush'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = {}\n')
+    const entries: Array<{ options: { name: string }; fiber: object; disabled: false }> = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let awaitCalls = 0
+    const loader = {
+      *entries() { yield* entries },
+      async await() {
+        awaitCalls += 1
+        await gate
+      },
+    }
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(root!).href + '/'
+    ctx.provide('loader', loader as never)
+    ctx.provide('webServer', {
+      port: 0,
+      register: () => () => {},
+      tapIndex: () => () => {},
+    } as never)
+    const fiber = await ctx.plugin(ClientModuleRegistry)
+    const service = ctx.get('clientModules')
+    if (service === undefined) throw new Error('client module service did not register')
+    entries.push({ options: { name: packageName }, fiber: {}, disabled: false })
+    const eventFiber = { entry: entries[0] } as unknown as Fiber
+    ctx.emit('internal/plugin', eventFiber)
+    ctx.emit('internal/plugin', eventFiber)
+    await vi.waitFor(() => { expect(awaitCalls).toBe(1) })
+
+    await fiber.dispose()
+    release()
+    await vi.waitFor(() => { expect(awaitCalls).toBe(1) })
+    expect(service.graph().entries).toEqual([])
   })
 })

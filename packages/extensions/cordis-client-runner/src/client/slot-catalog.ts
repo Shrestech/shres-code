@@ -1259,7 +1259,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.audio.item\', () => ctx.slots.register(\n      { name: \'settings.audio.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:76',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:89',
   },
   {
     key: 'settings.close',
@@ -1334,7 +1334,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.general.item\', () => ctx.slots.register(\n      { name: \'settings.general.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:74',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:87',
   },
   {
     key: 'settings.header',
@@ -1406,7 +1406,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.onboarding\', () => ctx.slots.register(\n      { name: \'settings.onboarding\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:59',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:72',
   },
   {
     key: 'settings.plugin.item',
@@ -1456,6 +1456,41 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     source: 'packages/client/ui-settings-plugins/src/client/slot-contract.ts:16',
   },
   {
+    key: 'settings.plugins.bundle',
+    kind: 'keyed',
+    scope: 'root',
+    summary: 'Feature-owned configuration for one selected and active plugin bundle.',
+    doc: 'Feature-owned configuration for one selected and active plugin bundle.\nThe Plugins manager dispatches by the exact bundle package name and\nsupplies the generic bundle state; inactive bundles never reach this\nslot, so a feature cannot accidentally offer controls for a disabled\nruntime.',
+    registerOptions: [
+      {
+        name: 'key',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key: the entry renders where the owner dispatches this exact key. Registering an already-occupied key replaces that occupant.',
+      },
+    ],
+    ownerProps: [
+      '/** Owner share for a keyed feature configuration slot. */\nexport interface SettingsPluginsBundleOwnerProps {\n  /** Bundle metadata supplied by the generic Plugins manager. */\n  bundle: SettingsPluginsBundle\n}',
+    ],
+    ownerPropsReferences: [
+      'SettingsPluginsBundle',
+    ],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+    ],
+    keyDomain: 'fixed by the owner\'s key table { [bundleName: string]: SettingsPluginsBundleOwnerProps }, none are taken yet',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'settings.plugins.tab\' (client-ui-settings-plugins), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-browserskill BrowserSkillSettingsSection',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.plugins.bundle\', () => ctx.slots.register(\n      { name: \'settings.plugins.bundle\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:56',
+  },
+  {
     key: 'settings.plugins.tab',
     kind: 'list',
     scope: 'root',
@@ -1496,6 +1531,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-settings-plugin-inventory PluginInventorySettingsTab id \'all\'',
       'client-ui-settings-plugin-inventory PluginManageSettingsTab id \'manage\'',
+      'client-ui-settings-plugins BundleManagerTab id \'bundles\'',
       'client-ui-settings-plugins ConfigurablePluginsTab id \'configurable\'',
     ],
     replaceRisk: 'none',
@@ -1542,7 +1578,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'shell.navigation\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
-      'client-ui-browserskill BrowserSkillSettingsSection id \'browserSkill\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-jspace JSpaceSection id \'jspace\'',
       'client-ui-settings-model-routing ModelRoutingSection id \'model-routing\'',

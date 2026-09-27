@@ -137,6 +137,33 @@ describe('hmr node half', () => {
     await fiber.dispose()
   })
 
+  it('broadcasts graph membership changes to connected browsers', async () => {
+    const early = join(dir, 'sse-early.js')
+    const late = join(dir, 'sse-late.js')
+    writeFileSync(early, 'v1')
+    const rows = new Map([['pkg-early', early]])
+    const clientModuleHost = fakeClientModuleHost(rows)
+    const routes: WebRoute[] = []
+    const fiber = await mount(clientModuleHost, fakeHttpServer(routes))
+    const route = routes.find(candidate => candidate.path === EVENTS_ENDPOINT)
+    if (route === undefined) throw new Error('events route was not registered')
+    const chunks: string[] = []
+    const response = {
+      writeHead: () => response,
+      write: (chunk: string) => { chunks.push(chunk); return true },
+      on: () => response,
+      destroy: () => {},
+    } as never
+    await route.handler({ method: 'GET', url: EVENTS_ENDPOINT } as never, response)
+    expect(chunks.some(chunk => chunk.includes('"type":"graph"'))).toBe(true)
+
+    writeFileSync(late, 'v1')
+    rows.set('pkg-late', late)
+    clientModuleHost.fireGraphChanged()
+    expect(chunks.some(chunk => chunk.includes('pkg-late'))).toBe(true)
+    await fiber.dispose()
+  })
+
   it('rehashes after baseline capture so a construction-window write cannot become the baseline', async () => {
     const bundle = join(dir, 'construction.js')
     writeFileSync(bundle, 'v1')

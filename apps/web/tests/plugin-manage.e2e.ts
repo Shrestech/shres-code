@@ -69,9 +69,9 @@ async function startWeb(root: string): Promise<RunningWeb> {
 async function openManage(page: Page, url: string, welcomePending = false): Promise<Locator> {
   await page.goto(url, { waitUntil: 'load' })
   const notice = page.getByRole('button', { name: 'Continue', exact: true })
-  const customizeButton = page.getByRole('button', { name: 'Customize', exact: true })
+  const pluginsButton = page.getByRole('button', { name: 'Plugins', exact: true })
   try {
-    await expect.poll(async () => await notice.isVisible() || await customizeButton.isVisible(), { timeout: 30_000 }).toBe(true)
+    await expect.poll(async () => await notice.isVisible() || await pluginsButton.isVisible(), { timeout: 30_000 }).toBe(true)
   } catch (error) {
     throw new Error('Web navigation unavailable:\n' + await page.locator('body').innerText(), { cause: error })
   }
@@ -80,16 +80,16 @@ async function openManage(page: Page, url: string, welcomePending = false): Prom
     await notice.click()
     await notice.waitFor({ state: 'hidden' })
   }
-  await customizeButton.click()
-  const region = page.getByRole('region', { name: 'Customize', exact: true })
-  await region.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await pluginsButton.click()
+  const region = page.getByRole('region', { name: 'Plugins', exact: true })
   await region.getByRole('tab', { name: 'Manage', exact: true }).click()
-  await region.getByLabel('Package spec', { exact: true }).waitFor({ timeout: 15_000 })
-  return region
+  const manage = region.locator('[role="tabpanel"]:not([hidden])')
+  await manage.getByLabel('Package spec', { exact: true }).waitFor({ timeout: 15_000 })
+  return manage
 }
 
 async function snapshot(page: Page, root: string, name: string): Promise<void> {
-  const content = await captureStableAria(page, '[role="region"][aria-label="Customize"]', root)
+  const content = await captureStableAria(page, '[role="region"][aria-label="Plugins"]', root)
   await compareOrRefreshGolden(join(SNAPSHOTS, name + '.expected.md'), content, MODE)
 }
 

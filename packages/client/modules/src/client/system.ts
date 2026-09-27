@@ -5,7 +5,7 @@
  * state tables and the load/materialize machinery.
  */
 import type {
-  BootModuleRow, ClientModuleLoader, ClientModuleRecord,
+  BootModuleRow, ClientGraphUpdate, ClientModuleLoader, ClientModuleRecord,
   ClientModuleSystemOptions, ClientPluginHandoff, ShresWindow,
 } from './manifest.ts'
 
@@ -50,6 +50,17 @@ const claimStyles = (id: string): string[] => {
   return owned
 }
 
+/** Remove style tags claimed by one materialized client bundle. */
+const removeStyles = (id: string, styles: readonly string[]): void => {
+  if (typeof document === 'undefined') return
+  const owned = new Set(styles)
+  for (const el of document.querySelectorAll('style[data-plugin]')) {
+    const plugin = el.getAttribute('data-plugin')
+    const css = el.getAttribute('data-plugin-css')
+    if (plugin === id || (css !== null && owned.has(css))) el.remove()
+  }
+}
+
 /**
  * The client module system: state tables plus the arrival/materialization
  * machinery implementing {@link ClientModuleLoader} (whose members carry the
@@ -67,7 +78,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly pendingArrival = new Map<string, Promise<void>>()
   /** Materialization re-entrancy guard: factory-form CJS cannot deliver partial exports, so a cycle is fatal. */
   private readonly materializing = new Set<string>()
-  private readonly graphRows = new Map<string, BootModuleRow>()
+  private readonly graphTable = new Map<string, BootModuleRow>()
   private readonly loadBundle: (url: string) => Promise<void>
 
   /**
@@ -79,8 +90,8 @@ export class ClientModuleSystem implements ClientModuleLoader {
     this.loadBundle = options.loadBundle ?? defaultLoadBundle
 
     for (const row of options.modules) {
-      if (this.graphRows.has(row.id)) throw new Error(`client-modules: duplicate graph entry "${row.id}"`)
-      this.graphRows.set(row.id, row)
+      if (this.graphTable.has(row.id)) throw new Error(`client-modules: duplicate graph entry "${row.id}"`)
+      this.graphTable.set(row.id, row)
     }
 
     const win = globalThis as ShresWindow
@@ -165,7 +176,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
       return exports
     }
     if (!this.factories.has(specifier)) {
-      const row = this.graphRows.get(specifier)
+      const row = this.graphTable.get(specifier)
       if (row === undefined) {
         throw new Error(
           `client-modules: cannot resolve "${specifier}" — not a seed word, not a shell-own module, `
@@ -184,9 +195,55 @@ export class ClientModuleSystem implements ClientModuleLoader {
 
   async prefetch(id: string): Promise<void> {
     if (this.statics.has(id)) return
-    const row = this.graphRows.get(id)
+    const row = this.graphTable.get(id)
     if (row === undefined) throw new Error(`client-modules: prefetch("${id}") — not a graph entry`)
     await this.arrive(row)
+  }
+
+  /**
+   * Replace the browser graph rows after validating duplicate ids. Existing
+   * rows stay materialized until the caller has removed their Loader entries;
+   * the returned diff gives that caller the required lifecycle order.
+   * @param rows - the host's validated module-view graph rows.
+   * @returns rows added, withdrawn, or changed in place.
+   */
+  applyGraph(rows: readonly BootModuleRow[]): ClientGraphUpdate {
+    const next = new Map<string, BootModuleRow>()
+    for (const row of rows) {
+      if (next.has(row.id)) throw new Error(`client-modules: duplicate graph entry "${row.id}"`)
+      next.set(row.id, { ...row })
+    }
+    const added: BootModuleRow[] = []
+    const removed: BootModuleRow[] = []
+    const changed: Array<{ before: BootModuleRow; after: BootModuleRow }> = []
+    for (const [id, before] of this.graphTable) {
+      const after = next.get(id)
+      if (after === undefined) removed.push({ ...before })
+      else if (after.url !== before.url || after.rev !== before.rev) changed.push({ before: { ...before }, after: { ...after } })
+    }
+    for (const [id, after] of next) {
+      if (!this.graphTable.has(id)) added.push({ ...after })
+    }
+    this.graphTable.clear()
+    for (const [id, row] of next) this.graphTable.set(id, row)
+    return { added, removed, changed }
+  }
+
+  /** Return a defensive snapshot of the current graph rows. */
+  graphRows(): BootModuleRow[] {
+    return [...this.graphTable.values()].map(row => ({ ...row }))
+  }
+
+  /**
+   * Withdraw one graph row after its Loader entry has disposed. The cached
+   * factory, materialized exports, and styles belong exclusively to that row.
+   * @param id - graph entry name to remove.
+   */
+  withdraw(id: string): void {
+    const record = this.loadCache.get(id)
+    this.invalidate(id)
+    this.graphTable.delete(id)
+    if (record !== undefined) removeStyles(id, record.styles)
   }
 
   invalidate(id: string): void {

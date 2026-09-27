@@ -36,6 +36,7 @@ export type {
 // Client contribution names what it sends and receives through this
 // assembly, never through a Host package import.
 export type {
+  ManagedBundle, ManagedPlugin, PluginActivationOutcome,
   InstalledSkillView, ParkedTransactionView, PluginAdminConfirmOutcome, PluginAdminGestureVerb,
   PluginAdminInstallOutcome, PluginAdminRemoveOutcome, PluginAdminStatusResult, PluginConfirmToken,
   PluginGestureToken, PluginMutations, PluginTransactionId, SkillInstallOutcome, SkillRemoveOutcome,

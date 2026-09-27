@@ -58,7 +58,7 @@ Package metadata — including the negative "not a client package" verdict — i
 
 `ClientModuleRegistry` (`ctx.clientModules`, defined in [`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts)) exposes reads and the rebuild face; signatures are in the generated [service catalog](#ctxclientmodules--clientmoduleregistry). `graph()` returns the current composed graph (a stable object between changes) and `clientPath(id)` the bundle's absolute path. `rebuilt(id)` is the only entry point through which bundle content reaches the graph: it re-hashes the file, and only a real rev change recomposes the graph and notifies. `onRebuilt` fires per changed bundle with the new rev; `onGraphChanged` fires after any flush that recomposed the graph (row added or removed, or a rebuilt rev change) and is pull-model — listeners re-read `graph()`. Both notification paths contain listener exceptions so one throwing subscriber cannot skip later subscribers or kill whatever triggered the flush.
 
-In development, [shres-client-hmr](../../packages/client/hmr/README.md) is the registry's watch driver: its node half stat-polls every graph row's bundle from a synchronously captured baseline, calls `rebuilt(id)` on change, resyncs its watch set through `onGraphChanged`, and broadcasts rev changes to the browser half over SSE. Production graphs omit the HMR row entirely; the module host itself never watches files.
+In development, [shres-client-hmr](../../packages/client/hmr/README.md) is the registry's watch driver: its node half stat-polls every graph row's bundle from a synchronously captured baseline, calls `rebuilt(id)` on change, resyncs its watch set through `onGraphChanged`, and broadcasts settled graph and rev changes to the browser half over SSE. The browser half serializes graph and rebuilt frames, applies graph row diffs through the client module table and Loader, disposes obsolete rows before creating replacements, and withdraws factories and styles after disposal. A fiber that is pending on an injected service remains pending; missing, failed, or disposed entries are retried on the next graph frame, including an identical frame after a failed transition. Self-reload drains the old HMR fiber while its Loader owner remains live, then opens a new event stream; self-removal runs after unrelated rows reconcile. Production graphs omit the HMR row entirely; the module host itself never watches files.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -121,5 +121,5 @@ onGraphChanged(listener: () => void): () => void
 async fetchBundle(request: Request): Promise<Response>
 ```
 
-Source: [`packages/client/modules/src/index.ts:184`](../../packages/client/modules/src/index.ts)
+Source: [`packages/client/modules/src/index.ts:183`](../../packages/client/modules/src/index.ts)
 <!-- END GENERATED cordis-surface -->

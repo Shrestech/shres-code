@@ -41,7 +41,7 @@ The tree composes over an empty root:
 - then the profile's `cordis.patch.yml`, then the home-level `$SHRES_HOME/cordis.patch.yml`
 - then `--patch` overlays
 
-Bundles named in `shres.profile.bundles` resolve from the shres installation first (`@shres-code/shres-code-base`, `@shres-code/shres-code-web-app`, `@shres-code/shres-code-headless`), then from the profile's own `node_modules`, where pnpm installs out-of-tree plugins.
+Bundles named in `shres.profile.bundles` resolve from the shres installation first (`@shres-code/shres-code-base`, `@shres-code/shres-code-web-app`, the optional `@shres-code/shres-code-browser-bundle`, and `@shres-code/shres-code-headless`), then from the profile's own `node_modules`, where pnpm installs out-of-tree plugins.
 
 Use `--dump-default-config` and `--dump-config` to inspect the composed tree without booting it.
 

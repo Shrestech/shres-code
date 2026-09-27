@@ -8,15 +8,12 @@
     - searchbox "Search settings…"
     - text: ⌘ K
     - navigation "Customize":
-      - button "Plugins":
-        - img
-        - text: Plugins
       - button "Agent presets":
         - img
         - text: Agent presets
   - text: Customize
   - heading "Agent presets" [level=1]
-  - paragraph: Shape your agent with presets and plugins.
+  - paragraph: Shape your agent with presets.
   - paragraph: A preset is the plugin composition one session's agent runs — its tools, prompt, and capabilities. Duplicate an existing one and make it yours, or let the agent draft one for you in Creator mode.
   - heading "Built-in" [level=3]
   - list:

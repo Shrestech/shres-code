@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 /**
- * The settings.section owner-props merge, over the production renderer: the
- * shell's owner share carries close (leave Settings) and the slot renderer
- * spreads owner props over the injected face, so the BrowserSkill face names
- * its launch controls closeBrowser/openBrowser. Clicking "Close browser" must
- * reach the browserSkill namespace exactly once and never call the owner's
- * close. Mounted through the SlotTestRuntime harness — a real Cordis Context,
+ * The keyed Plugins bundle slot over the production renderer: the generic
+ * manager supplies bundle metadata and dispatches the feature by package name.
+ * Clicking "Close browser" must reach the browserSkill namespace exactly once.
+ * Mounted through the SlotTestRuntime harness — a real Cordis Context,
  * the real SlotRegistry, and the real web-react renderer — so the merge order
  * under test is the shipping one, not a test-local reimplementation.
  */
@@ -21,6 +19,7 @@ import { apply, inject } from '../src/client/index.ts'
 import { en } from '../src/client/locales.ts'
 
 usePinnedBrowserLanguages('en-US')
+const BUNDLE_NAME = '@shres-code/shres-code-browser-bundle'
 
 afterEach(cleanup)
 
@@ -46,9 +45,20 @@ function okVerdict(operationId: string) {
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
-  // The settings shell owns the root and declares the section list slot; the
-  // test reproduces exactly that declaration so the inject seat resolves.
-  await runtime.declare({ 'settings.section': { kind: 'list', scope: 'root' } })
+  // The generic Plugins manager owns the keyed feature slot; the test
+  // reproduces exactly that declaration so the inject seat resolves.
+  await runtime.root.declare(
+    { 'settings.plugins.bundle': { kind: 'keyed', scope: 'root' } },
+    ({ renderSlot }) => renderSlot('settings.plugins.bundle', {
+      bundle: {
+        name: BUNDLE_NAME,
+        selected: true,
+        active: true,
+        shipped: true,
+        rows: [],
+      },
+    }, { entryKey: BUNDLE_NAME }),
+  )
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
   runtime.slots.installLocale(locale)
@@ -73,13 +83,12 @@ async function bench() {
   return { runtime, browserSkill }
 }
 
-describe('BrowserSkill section through the real settings.section merge', () => {
-  it('clicking Close browser spends browserSkill.close exactly once and never the owner close', async () => {
+describe('BrowserSkill feature through the real keyed Plugins slot', () => {
+  it('clicking Close browser spends browserSkill.close exactly once', async () => {
     const { runtime, browserSkill } = await bench()
-    const ownerClose = vi.fn()
-    const view = runtime.renderSlot('settings.section', { close: ownerClose })
+    const view = runtime.renderRoot()
     const closeButton = await waitFor(() => {
-      const el = view.view.getByRole('button', { name: en.closeAction })
+      const el = view.getByRole('button', { name: en.closeAction })
       expect(el).toBeTruthy()
       return el
     })
@@ -93,9 +102,6 @@ describe('BrowserSkill section through the real settings.section merge', () => {
     // the verb a second time.
     await act(async () => {})
     expect(browserSkill.close).toHaveBeenCalledTimes(1)
-    // The owner share's close is the shell's leave-Settings affordance; the
-    // browser control must never dispatch it.
-    expect(ownerClose).not.toHaveBeenCalled()
     await runtime.dispose()
   })
 })

@@ -4,13 +4,13 @@ A profile is a named directory of bundle layers plus the user's own patch layer,
 
 ## Profile runtime
 
-A launcher provides `ProfileRuntime` under the `profileRuntime` context key through `provideProfileRuntime` before any tree entry mounts. The value is a frozen boot snapshot, so a manifest edit after boot is reported as a restart requirement rather than applied. The CLI provides `'enabled'`; the packaged desktop provides `'unsupported'` because it has no executable plugin-install owner. A composition whose launcher provides no runtime has no managed profile at all.
+A launcher provides `ProfileRuntime` under the `profileRuntime` context key through `provideProfileRuntime` before any tree entry mounts. Boot metadata is frozen. An optional `control` owner exposes current bundle membership and serializes explicit activation with live patch reconciliation; hosts without that owner retain restart-required behavior. The CLI provides `'enabled'`; the packaged desktop provides `'unsupported'` because it has no executable plugin-install owner. A composition whose launcher provides no runtime has no managed profile at all.
 
 ```ts type-equiv
 /**
  * The boot-time profile facts an app provides before any tree entry mounts.
- * The values are frozen snapshots: later manifest edits apply after a
- * restart, which is exactly the readiness model the plugin states report.
+ * Boot facts are frozen; optional controls own the current applied composition.
+ * Hosts without controls save supported changes for their next restart.
  */
 interface ProfileRuntime {
   /** Absolute directory of the booted profile (its manifest's owner). */
@@ -23,6 +23,12 @@ interface ProfileRuntime {
    * it serves status and refuses mutations with its own message.
    */
   readonly pluginMutations: 'enabled' | 'unsupported'
+  /** Package anchor used to resolve installed profile bundles. */
+  readonly installAnchor?: string
+  /** Required and optional bundles available from the running installation. */
+  readonly shippedBundles?: readonly string[]
+  /** Live profile controls exposed by a launcher that supports reconciliation. */
+  readonly control?: ProfileRuntimeControl
 }
 ```
 
@@ -63,7 +69,7 @@ interface ParkedInstall {
 type InstallBegin = { kind: 'parked'; install: ParkedInstall } | InstallRefused
 ```
 
-A confirmed install commits `InstallCommitted`; its `readiness` is always `'restart-required'` because bundle composition is fixed at boot.
+A confirmed install commits `InstallCommitted` and reports `'restart-required'`. A subsequent explicit activation can reconcile a supported live profile.
 
 ```ts type-equiv
 /** A consented manifest commit takes effect on the next profile boot. */
@@ -117,7 +123,7 @@ type RemoveOutcome = { kind: 'removed'; pnpm: 'ok' | 'failed'; detail?: string }
   | { kind: 'refused'; code: 'not-installed' | 'template-bundle' | 'unsupported-platform' }
 ```
 
-`pluginStates` compares the manifest's desired bundles with `ProfileRuntime.bootBundles`. Each row's `removable` repeats the core's own removal precondition — desired membership outside the shipped template bundles — so a removed-restart row is never removable. Lock timeouts, a live transaction owned by another process, and failed restorations are `ProfilePluginError` exceptions with the codes `lock-timeout`, `transaction-pending`, and `restore-failed`, never package refusals.
+`pluginStates` compares the manifest’s desired bundles with the caller’s applied membership; hosts without live controls use `ProfileRuntime.bootBundles`. Each row's `removable` repeats the core's own removal precondition — desired membership outside the shipped template bundles — so a removed-restart row is never removable. Lock timeouts, a live transaction owned by another process, and failed restorations are `ProfilePluginError` exceptions with the codes `lock-timeout`, `transaction-pending`, and `restore-failed`, never package refusals.
 
 ```ts type-equiv
 /** Desired profile membership compared with this process's boot snapshot. */
@@ -231,4 +237,98 @@ type PluginAdminInstallOutcome =
 type PluginAdminConfirmOutcome =
   | ({ kind: 'committed' } & InstallCommitted)
   | { kind: 'refused'; refusal: InstallRefusal; rollback: RollbackReport }
+```
+
+## Bundle and row activation
+
+`ProfileRuntimeControl` owns live application for the booted profile. The core reports selected and applied bundle membership independently, keeps malformed selected bundles visible, and separates a persisted preference from its effective value under higher-priority overlays. Activation does not delete package dependencies or feature runtime data. The [shared management decision](../../.agents/notes/implemented/architecture/2026-09-27-shared-plugin-activation.md) owns this separation from native setup and package installation.
+
+```ts type-equiv
+/** The mutations a pluginAdmin user gesture can authorize. */
+type PluginAdminGestureVerb = 'install' | 'remove' | 'skill-add' | 'skill-remove'
+  | 'bundle-enable' | 'bundle-disable' | 'plugin-enable' | 'plugin-disable'
+```
+
+```ts type-equiv
+/**
+ * Coordinates profile mutations with the running loader.
+ *
+ * Implementations must persist desired state before returning `saved`; a
+ * restart-required result leaves the current loader active until the next
+ * process start.
+ */
+interface ProfileRuntimeControl {
+  /** Read available bundles and the current applied membership.
+   * @returns current bundle metadata and membership.
+   */
+  listBundles(): Promise<ProfileBundleState[]>
+  /** Persist bundle selection and reconcile the running composition.
+   * @param name - installed or shipped package identity.
+   * @param enabled - desired selection.
+   * @param signal - operation cancellation from the caller.
+   * @returns saved application state or expected refusal.
+   */
+  setBundleEnabled(
+    name: string,
+    enabled: boolean,
+    signal: AbortSignal,
+  ): Promise<ProfileActivationOutcome>
+  /** Persist a row override and reconcile the running composition.
+   * @param request - patch id, module identity, and desired enablement.
+   * @param signal - operation cancellation from the caller.
+   * @returns saved application state or expected refusal.
+   */
+  setPluginEnabled(
+    request: { id: string; moduleName: string; enabled: boolean },
+    signal: AbortSignal,
+  ): Promise<ProfileActivationOutcome>
+}
+```
+
+```ts type-equiv
+/**
+ * Reports one bundle's selected and active state to the plugin manager.
+ *
+ * `active` describes the running loader. It can therefore differ from
+ * `selected` until a restart applies a saved manifest change.
+ */
+interface ProfileBundleState {
+  name: string
+  description?: string
+  version?: string
+  selected: boolean
+  active: boolean
+  shipped: boolean
+  rows: readonly string[]
+  readOnlyReason?: string
+  error?: string
+}
+```
+
+```ts type-equiv
+/**
+ * Describes the result of a profile mutation requested by the plugin manager.
+ *
+ * A saved mutation can require a process or browser restart when the live
+ * loader cannot replace every affected host or client entry.
+ */
+type ProfileActivationOutcome =
+  | {
+      kind: 'saved'
+      application: 'applied' | 'restart-required' | 'overridden'
+      detail?: string
+    }
+  | {
+      kind: 'refused'
+      code:
+        | 'unknown-bundle'
+        | 'unknown-plugin'
+        | 'management-required'
+        | 'unaddressable'
+        | 'invalid-composition'
+      detail?: string
+    }
+  | {
+      kind: 'unsupported'
+    }
 ```

@@ -238,6 +238,55 @@ describe('HMR reset', () => {
   })
 })
 
+describe('live graph membership', () => {
+  it('adds, changes, and withdraws rows without disturbing unrelated entries', async () => {
+    const b = bench([row('keep')], {
+      keep: () => ({ marker: 'keep' }),
+      added: () => ({ marker: 'added' }),
+    })
+    await b.loader.import('keep', '', {})
+    const update = b.loader.applyGraph([
+      row('keep'),
+      { id: 'added', url: '/plugins/added/client.js?rev=1', rev: '1' },
+    ])
+    expect(update.added.map(item => item.id)).toEqual(['added'])
+    expect(update.removed).toEqual([])
+    expect(update.changed).toEqual([])
+    await b.loader.import('added', '', {})
+    expect(await b.loader.import('keep', '', {})).toEqual({ marker: 'keep' })
+
+    const changed = b.loader.applyGraph([
+      { id: 'keep', url: '/plugins/keep/client.js?rev=2', rev: '2' },
+    ])
+    expect(changed.changed.map(item => item.after.id)).toEqual(['keep'])
+    expect(changed.removed.map(item => item.id)).toEqual(['added'])
+    b.loader.withdraw('added')
+    await expect(b.loader.prefetch('added')).rejects.toThrow('not a graph entry')
+    expect(await b.loader.import('keep', '', {})).toEqual({ marker: 'keep' })
+  })
+
+  it('rejects duplicate rows before changing the current graph', () => {
+    const b = bench([row('keep')])
+    expect(() => b.loader.applyGraph([row('next'), row('next')])).toThrow('duplicate graph entry "next"')
+    expect(b.loader.graphRows()).toEqual([row('keep')])
+  })
+
+  it('withdraws materialized styles with the row', async () => {
+    const b = bench([row('styled')], {
+      styled: () => {
+        const style = document.createElement('style')
+        style.setAttribute('data-plugin-css', 'styled-sheet')
+        document.head.append(style)
+        return {}
+      },
+    })
+    await b.loader.import('styled', '', {})
+    expect(document.querySelector('style[data-plugin="styled"]')).not.toBeNull()
+    b.loader.withdraw('styled')
+    expect(document.querySelector('style[data-plugin="styled"]')).toBeNull()
+  })
+})
+
 describe('style claiming', () => {
   it('claims untagged style tags for the materializing plugin and inventories owned css ids', async () => {
     const foreign = document.createElement('style')

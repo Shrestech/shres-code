@@ -138,6 +138,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@shres-code/shres-code-skill-filesystem': ['lib/install.js', 'lib/parse-*.js'],
   // Profile bundles publish their shres.bundle.patch layer beside the lib.
   '@shres-code/shres-code-base': ['cordis.patch.yml'],
+  '@shres-code/shres-code-browser-bundle': ['cordis.patch.yml'],
   '@shres-code/shres-code-web-app': ['cordis.patch.yml'],
   '@shres-code/shres-code-headless': ['cordis.patch.yml'],
   '@shres-code/shres-code-client-ui-theme': ['lib/styles'],

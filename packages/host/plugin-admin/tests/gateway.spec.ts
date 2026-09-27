@@ -89,6 +89,9 @@ function fabricatedCore(begin: (signal: AbortSignal) => Promise<InstallBegin> = 
   }
   const core = {
     ...recorded,
+    async listBundles() { return [] },
+    async setBundleEnabled() { return { kind: 'saved' as const, application: 'applied' as const } },
+    async setPluginEnabled() { return { kind: 'saved' as const, application: 'applied' as const } },
     async beginPluginInstall(_profileDir: string, spec: string, options: { signal: AbortSignal }) {
       core.beginCalls.push({ spec, signal: options.signal })
       return await begin(options.signal)
@@ -186,11 +189,11 @@ describe('PluginAdminGateway', () => {
     expect(new entry.PluginAdminError('invalid-target', 'm').code).toBe('invalid-target')
   })
 
-  it('exposes the eight methods as direct Remote calls', async () => {
+  it('exposes the management methods as direct Remote calls', async () => {
     const gateway = await harness(fabricatedCore())
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'pluginAdmin', namespace: 'pluginAdmin' })
     expect(remoteMethods(gateway).map(marker => marker.method)).toEqual([
-      'status', 'begin', 'stageInstall', 'confirm', 'cancel', 'removePlugin', 'skillAdd', 'skillRemove',
+      'status', 'listBundles', 'listPlugins', 'setBundleEnabled', 'setPluginEnabled', 'begin', 'stageInstall', 'confirm', 'cancel', 'removePlugin', 'skillAdd', 'skillRemove',
     ])
   })
 
@@ -205,6 +208,78 @@ describe('PluginAdminGateway', () => {
     // A token minted for another spec is refused too.
     const wrongTarget = gateway.begin({ verb: 'install', target: '/plugins/other' }).token
     await expect(gateway.stageInstall({ token: wrongTarget, spec: SPEC })).rejects.toMatchObject({ code: 'gesture-refused' })
+  })
+
+  it('requires a matching one-use activation gesture before reaching the core', async () => {
+    const core = fabricatedCore()
+    const change = vi.spyOn(core, 'setBundleEnabled')
+    const gateway = await harness(core)
+    const name = '@example/browser'
+    const token = gateway.begin({ verb: 'bundle-enable', target: name }).token
+    await expect(gateway.setBundleEnabled({ token, name, enabled: false })).rejects.toMatchObject({ code: 'gesture-refused' })
+    await expect(gateway.setBundleEnabled({ token, name, enabled: true })).rejects.toMatchObject({ code: 'gesture-refused' })
+    expect(change).not.toHaveBeenCalled()
+    const enabledToken = gateway.begin({ verb: 'bundle-enable', target: name }).token
+    await expect(gateway.setBundleEnabled({ token: enabledToken, name, enabled: true })).resolves.toEqual({ kind: 'saved', application: 'applied' })
+    expect(change).toHaveBeenCalledWith(expect.objectContaining({ bootBundles: ['plugin-hello'] }), name, true,
+      expect.anything())
+    expect(change.mock.calls[0]?.[3].signal).toBeInstanceOf(AbortSignal)
+    await expect(gateway.setBundleEnabled({ token: enabledToken, name, enabled: true })).rejects.toMatchObject({ code: 'gesture-refused' })
+  })
+
+  it.each([null, 'unsupported'] as const)('does not attempt activation on an unsupported host (%s)', async (mutations) => {
+    const core = fabricatedCore()
+    const bundle = vi.spyOn(core, 'setBundleEnabled')
+    const plugin = vi.spyOn(core, 'setPluginEnabled')
+    const gateway = await harness(core, { mutations })
+    const name = '@example/browser'
+    const entryId = 'include:browser' as never
+    await expect(gateway.setBundleEnabled({ token: gateway.begin({ verb: 'bundle-enable', target: name }).token,
+      name, enabled: true })).resolves.toEqual({ kind: 'unsupported' })
+    await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-disable', target: entryId }).token,
+      entryId, enabled: false })).resolves.toEqual({ kind: 'unsupported' })
+    expect(bundle).not.toHaveBeenCalled()
+    expect(plugin).not.toHaveBeenCalled()
+  })
+
+  it('refuses unknown Loader identities and lists an absent profile without touching core storage', async () => {
+    const core = fabricatedCore()
+    const gateway = await harness(core)
+    const entryId = 'include:missing' as never
+    expect(gateway.listPlugins()).toEqual([])
+    await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-enable', target: entryId }).token,
+      entryId, enabled: true })).resolves.toEqual({ kind: 'refused', code: 'unknown-plugin' })
+    const unavailable = await harness(core, { mutations: null })
+    const list = vi.spyOn(core, 'listBundles')
+    expect(await unavailable.listBundles()).toEqual([])
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  it('keeps activation out of a parked install and drains accepted work on disposal', async () => {
+    const core = fabricatedCore(async () => ({ kind: 'parked', install: fakeParked() }))
+    const gateway = await harness(core)
+    const token = await parkedToken(gateway)
+    const name = '@example/browser'
+    await expect(gateway.setBundleEnabled({ token: gateway.begin({ verb: 'bundle-disable', target: name }).token,
+      name, enabled: false })).rejects.toMatchObject({ code: 'transaction-pending' })
+    await gateway.cancel({ token })
+    const settled = gate()
+    let signal: AbortSignal | undefined
+    core.setBundleEnabled = async (_runtime, _name, _enabled, options) => {
+      signal = options.signal
+      await settled.promise
+      return { kind: 'saved', application: 'applied' }
+    }
+    const changed = gateway.setBundleEnabled({ token: gateway.begin({ verb: 'bundle-enable', target: name }).token,
+      name, enabled: true })
+    const disposed = contextOf(gateway).fiber.dispose()
+    await vi.waitFor(() => { expect(signal?.aborted).toBe(true) })
+    let finished = false
+    void disposed.then(() => { finished = true })
+    await Promise.resolve()
+    expect(finished).toBe(false)
+    settled.open()
+    await Promise.all([changed, disposed])
   })
 
   it('refuses an empty begin target', async () => {

@@ -16,6 +16,7 @@
  * @module @shres-code/shres-code-host-plugin-admin/gateway
  */
 
+import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -24,6 +25,7 @@ import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { PROFILE_RUNTIME_KEY } from '@shres-code/shres-code-app-boot'
 import type { InstallBegin, ParkedInstall, ProfileRuntime, RollbackReport } from '@shres-code/shres-code-app-boot'
+import type { ProfileBundleState as ManagedBundle, ProfileActivationOutcome as PluginActivationOutcome } from '@shres-code/shres-code-app-boot/plugin-types'
 import { GestureLedger } from '@shres-code/shres-code-host-remote-control/gesture'
 import { parseSkillDocument } from '@shres-code/shres-code-skill-filesystem'
 import { Remote, TypertRemoteService } from '@shres-code/shres-code-typert-protocol'
@@ -31,7 +33,11 @@ import type { SkillInstallRoots } from '@shres-code/shres-code-skill-filesystem/
 import { nodePluginAdminCore, resolveSkillRoots } from './core.ts'
 import type { PluginAdminCore } from './core.ts'
 import { PluginAdminError } from './errors.ts'
+import { managedPlugins } from './activation.ts'
 import type {
+  ManagedPlugin,
+  PluginAdminBundleEnabledRequest,
+  PluginAdminPluginEnabledRequest,
   InstalledSkillView,
   PluginAdminBeginRequest,
   PluginAdminConfirmOutcome,
@@ -170,7 +176,9 @@ export class PluginAdminGateway extends TypertRemoteService {
   async status(): Promise<PluginAdminStatusResult> {
     const runtime = this.profileRuntime()
     const [plugins, skills] = await Promise.all([
-      runtime === undefined ? Promise.resolve([]) : this.core.pluginStates(runtime.profileDir, runtime.bootBundles),
+      runtime === undefined ? Promise.resolve([]) : this.core.pluginStates(runtime.profileDir,
+        runtime.control === undefined ? runtime.bootBundles
+          : (await runtime.control.listBundles()).filter(bundle => bundle.active).map(bundle => bundle.name)),
       this.installedSkillViews(),
     ])
     const transaction = this.transaction
@@ -182,6 +190,72 @@ export class PluginAdminGateway extends TypertRemoteService {
         ? { parked: { transactionId: transaction.transactionId, preview: transaction.install.preview } }
         : {}),
     }
+  }
+
+  /**
+   * Read selected and deselected bundles available to this profile.
+   * @returns bundle metadata and current profile membership; empty without a managed profile.
+   */
+  @Remote('listBundles')
+  listBundles(): Promise<ManagedBundle[]> {
+    const runtime = this.profileRuntime()
+    return runtime === undefined ? Promise.resolve([]) : this.core.listBundles(runtime)
+  }
+
+  /**
+   * Read current plugin rows and their activation restrictions.
+   * @returns Loader-owned runtime state, including disabled rows.
+   */
+  @Remote('listPlugins')
+  listPlugins(): ManagedPlugin[] {
+    const rows = managedPlugins(this.ctx)
+    return this.profileRuntime()?.pluginMutations === 'enabled' ? rows
+      : rows.map(row => ({ ...row, readOnlyReason: row.readOnlyReason ?? 'unsupported' }))
+  }
+
+  /**
+   * Select or deselect one bundle without removing its installed runtime data.
+   * @param request - one-use gesture, package identity, and desired membership.
+   * @returns the saved application state or an explicit refusal.
+   */
+  @Remote('setBundleEnabled')
+  async setBundleEnabled(request: PluginAdminBundleEnabledRequest): Promise<PluginActivationOutcome> {
+    this.requireGesture(request.token, request.enabled ? 'bundle-enable' : 'bundle-disable', request.name)
+    const runtime = this.mutableRuntime()
+    if (runtime === undefined) return { kind: 'unsupported' }
+    this.requireFreeSlot()
+    return this.track(signal => this.core.setBundleEnabled(runtime, request.name, request.enabled, {
+      signal, invokingCwd: this.invokingCwd,
+    }))
+  }
+
+  /**
+   * Persist a profile override for one addressable plugin row and apply it when supported.
+   * @param request - one-use gesture, current entry identity, and desired enablement.
+   * @returns saved application state, including higher-priority overrides, or refusal.
+   */
+  @Remote('setPluginEnabled')
+  async setPluginEnabled(request: PluginAdminPluginEnabledRequest): Promise<PluginActivationOutcome> {
+    this.requireGesture(request.token, request.enabled ? 'plugin-enable' : 'plugin-disable', request.entryId)
+    const runtime = this.mutableRuntime()
+    if (runtime === undefined) return { kind: 'unsupported' }
+    this.requireFreeSlot()
+    const row = this.listPlugins().find(entry => entry.entryId === request.entryId)
+    if (row === undefined) return { kind: 'refused', code: 'unknown-plugin' }
+    if (row.readOnlyReason !== undefined) return {
+      kind: 'refused', code: row.readOnlyReason === 'management-required' ? 'management-required' : 'unaddressable',
+    }
+    const entry = [...this.ctx.loader.entries()].find(item => item.id === request.entryId)
+    assert(entry !== undefined, 'A managed inventory row must have its Loader entry')
+    return this.track(async (signal) => {
+      const outcome = await this.core.setPluginEnabled(runtime, {
+        id: entry.options.id, moduleName: row.moduleName, enabled: request.enabled,
+      }, { signal, invokingCwd: this.invokingCwd })
+      if (outcome.kind !== 'saved' || outcome.application !== 'applied') return outcome
+      const current = this.listPlugins().find(item => item.entryId === request.entryId)
+      return current?.enabled === request.enabled
+        ? outcome : { kind: 'saved', application: 'overridden' }
+    })
   }
 
   /**

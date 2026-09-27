@@ -2,7 +2,15 @@
 
 /** Locale keys these surfaces render. */
 export type PluginsSettingsLocaleKey =
-  | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
+  | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'bundlesTab' | 'bundlesIntro'
+  | 'bundlesLoading' | 'bundlesError' | 'bundlesEmpty' | 'bundleEnableAction' | 'bundleDisableAction'
+  | 'bundleEnabling' | 'bundleDisabling' | 'bundleActive' | 'bundlePending' | 'bundlePendingEnable' | 'bundlePendingDisable' | 'bundleDisabled'
+  | 'bundleNotShipped' | 'bundleInstalled' | 'bundleUnavailable' | 'bundleFeatureUnavailable' | 'bundleVersion'
+  | 'bundleRows'
+  | 'bundleShowDetails' | 'bundleHideDetails'
+  | 'bundleApplied' | 'bundleDisabledSaved' | 'bundleRestartRequired' | 'bundleOverridden' | 'bundleUnsupported'
+  | 'bundleUnknown' | 'bundleManagementRequired' | 'bundleUnaddressable' | 'bundleInvalidComposition'
+  | 'bundleOperationFailed' | 'empty'
   | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
@@ -29,6 +37,38 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   intro: 'Configure and inspect the plugins installed in this deployment.',
   tabs: 'Plugin views',
   configurableTab: 'Plugin configuration',
+  bundlesTab: 'Bundles',
+  bundlesIntro: 'Choose which installed bundles belong to this profile. Active bundles expose their own settings here.',
+  bundlesLoading: 'Reading bundles…',
+  bundlesError: 'Bundles are temporarily unavailable.',
+  bundlesEmpty: 'No installed bundles are available.',
+  bundleEnableAction: 'Enable',
+  bundleDisableAction: 'Disable',
+  bundleEnabling: 'Enabling…',
+  bundleDisabling: 'Disabling…',
+  bundleActive: 'Active',
+  bundlePending: 'Pending restart',
+  bundlePendingEnable: 'Enabled — restart required',
+  bundlePendingDisable: 'Disabled — restart required',
+  bundleDisabled: 'Disabled',
+  bundleNotShipped: 'Unavailable in this installation',
+  bundleInstalled: 'Installed bundle',
+  bundleUnavailable: 'Unavailable',
+  bundleFeatureUnavailable: 'This bundle is selected but its feature is unavailable in the running host.',
+  bundleVersion: 'Version',
+  bundleRows: 'Included plugin rows',
+  bundleShowDetails: 'Show details',
+  bundleHideDetails: 'Hide details',
+  bundleApplied: 'Bundle enabled.',
+  bundleDisabledSaved: 'Bundle disabled.',
+  bundleRestartRequired: 'Saved. Restart the app to apply this bundle.',
+  bundleOverridden: 'Saved, but the active profile overrides this selection.',
+  bundleUnsupported: 'Bundle selection is unavailable in this host.',
+  bundleUnknown: 'That bundle is no longer available.',
+  bundleManagementRequired: 'This bundle must be managed by its owning profile.',
+  bundleUnaddressable: 'That bundle cannot be addressed in the current composition.',
+  bundleInvalidComposition: 'The resulting profile composition was refused.',
+  bundleOperationFailed: 'The bundle operation failed.',
   empty: 'This deployment exposes no plugin settings.',
   overridden: 'Overridden',
   reset: 'Reset to default',
@@ -86,4 +126,3 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
 }
-

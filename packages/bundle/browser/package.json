@@ -1,0 +1,52 @@
+{
+  "name": "@shres-code/shres-code-browser-bundle",
+  "description": "BrowserSkill browser control with a separate Chrome profile",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/bundle/browser"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "shres": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@shres-code/shres-code-browserskill": "workspace:^",
+    "@shres-code/shres-code-client-ui-browserskill": "workspace:^"
+  },
+  "peerDependencies": {
+    "@shres-code/cordis": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^"
+  }
+}

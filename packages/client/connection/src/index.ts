@@ -141,6 +141,10 @@ const PRIVILEGED_METHODS = new Set([
   // gesture gate lives inside the namespace; this pin keeps the whole plane
   // loopback-same-origin like the rest of the configuration surface.
   'pluginAdmin/status',
+  'pluginAdmin/listBundles',
+  'pluginAdmin/listPlugins',
+  'pluginAdmin/setBundleEnabled',
+  'pluginAdmin/setPluginEnabled',
   'pluginAdmin/begin',
   'pluginAdmin/stageInstall',
   'pluginAdmin/confirm',

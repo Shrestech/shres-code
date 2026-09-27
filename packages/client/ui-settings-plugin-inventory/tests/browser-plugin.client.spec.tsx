@@ -16,11 +16,6 @@ import type { PluginConfirmToken, PluginGestureToken } from '@shres-code/shres-c
 usePinnedBrowserLanguages('en-US')
 afterEach(cleanup)
 
-const EMPTY = { entries: [] }
-type ListResult =
-  | { readonly ok: true; readonly value: typeof EMPTY }
-  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
-
 const EMPTY_STATUS = { mutations: 'enabled', plugins: [], skills: [] }
 type StatusResult =
   | { readonly ok: true; readonly value: typeof EMPTY_STATUS }
@@ -37,12 +32,11 @@ async function bench() {
     }
   }
   new RemoteService(ctx)
-  const list = vi.fn<() => Promise<ListResult>>()
-    .mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.pluginInventory', { list })
   const admin = {
     status: vi.fn<() => Promise<StatusResult>>()
       .mockResolvedValue({ ok: true, value: EMPTY_STATUS }),
+    listPlugins: vi.fn().mockResolvedValue(ok([])),
+    setPluginEnabled: vi.fn().mockResolvedValue(ok({ kind: 'saved', application: 'applied' as const })),
     begin: vi.fn().mockResolvedValue({ ok: true, value: { token: 'tok', expiresAt: '2026-01-01T00:02:00Z' } }),
     stageInstall: vi.fn().mockResolvedValue(ok({
       kind: 'parked',
@@ -57,7 +51,7 @@ async function bench() {
     skillRemove: vi.fn().mockResolvedValue(ok({ kind: 'removed' })),
   }
   ctx.provide('remote.pluginAdmin', admin)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, admin }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, admin }
 }
 
 function ok<T>(value: T): { readonly ok: true; readonly value: T } {
@@ -77,7 +71,7 @@ function entryById(slots: SlotRegistry, id: string) {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contributions', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.pluginAdmin'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginAdmin'])
   })
 
   it('registers localized tabs without reading either Remote eagerly', async () => {
@@ -97,14 +91,14 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(manage.locale).toBe(NS)
     expect(resolveSlotLabel(manage.options.label)).toBe('Manage')
 
-    expect(b.list).not.toHaveBeenCalled()
+    expect(b.admin.listPlugins).not.toHaveBeenCalled()
     expect(b.admin.status).not.toHaveBeenCalled()
 
     const listFace = (inventory.inject as unknown as () => PluginInventorySettingsTabInjected)()
-    await expect(listFace.list()).resolves.toEqual(EMPTY)
-    expect(b.list).toHaveBeenCalledOnce()
-    b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
-    await expect(listFace.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+    await expect(listFace.listPlugins()).resolves.toEqual([])
+    expect(b.admin.listPlugins).toHaveBeenCalledOnce()
+    b.admin.listPlugins.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
+    await expect(listFace.listPlugins()).rejects.toThrow('pluginAdmin.listPlugins failed: REMOTE_ERROR: unavailable')
 
     const manageFace = (manage.inject as unknown as () => PluginManageSettingsTabInjected)()
     await expect(manageFace.status()).resolves.toEqual(EMPTY_STATUS)

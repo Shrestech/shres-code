@@ -1,5 +1,5 @@
 /**
- * Opt-in real native BrowserSkill Web evidence: the shipped Settings install
+ * Opt-in real native BrowserSkill Web evidence: the optional Plugins install
  * flow over pinned loopback artifacts, one real agent round through the owned
  * browser, and owned teardown across a restart. Network exposure is bounded
  * but not total: the model API and external Node fetch are disabled, the
@@ -36,6 +36,7 @@ const REAL_ENABLED = process.env.SHRES_BROWSERSKILL_REAL === '1'
   && ASSET_DIR !== undefined && ASSET_DIR !== ''
 
 const MODEL_FIXTURE = fileURLToPath(new URL('../../../examples/headless-agent/tests/fixtures/browserskill-web/model.ts', import.meta.url))
+const BROWSER_BUNDLE = '@shres-code/shres-code-browser-bundle'
 const OFFLINE = fileURLToPath(new URL('./fixtures/plugin-manage/offline.mjs', import.meta.url))
 const COMPLETION = 'BROWSERSKILL_WEB_CONTROL_COMPLETE'
 const RECEIPT_LABEL = 'BSK-WEB-RECEIVED'
@@ -259,26 +260,27 @@ async function dismissWelcome(page: Page): Promise<void> {
   await notice.waitFor({ state: 'hidden' })
 }
 
-/** Open Settings on the BrowserSkill section and return the section locator scoped to the dialog. */
+/** Open Plugins on the Browser bundle and return its BrowserSkill feature locator. */
 async function openBrowserSkillSection(page: Page): Promise<Locator> {
-  const dialog = page.getByRole('region', { name: 'Settings' })
+  const dialog = page.getByRole('region', { name: 'Plugins' })
   if (await dialog.count() > 0) {
     await page.keyboard.press('Escape')
     await expect.poll(() => dialog.count(), { timeout: 10_000 }).toBe(0)
   }
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
   await dialog.waitFor({ timeout: 30_000 })
-  await dialog.getByRole('button', { name: 'BrowserSkill', exact: true }).click()
-  await expect.poll(
-    () => dialog.getByRole('button', { name: 'BrowserSkill', exact: true }).getAttribute('aria-current'),
-    { timeout: 10_000 },
-  ).toBe('page')
-  return dialog.locator('[data-browserskill-state]').first()
+  const bundle = dialog.locator(`[data-bundle="${BROWSER_BUNDLE}"]`)
+  await bundle.waitFor({ timeout: 30_000 })
+  const details = bundle.getByRole('button', { name: 'Show details', exact: true })
+  if (await details.count() > 0) await details.click()
+  const section = bundle.locator('[data-browserskill-state]').first()
+  await section.waitFor({ timeout: 30_000 })
+  return section
 }
 
-/** Close the Settings dialog through its header button and await the region leaving the page. */
-async function closeSettingsDialog(page: Page): Promise<void> {
-  const dialog = page.getByRole('region', { name: 'Settings' })
+/** Close the Plugins dialog through its header button and await the region leaving the page. */
+async function closePluginsDialog(page: Page): Promise<void> {
+  const dialog = page.getByRole('region', { name: 'Plugins' })
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect.poll(() => dialog.count(), { timeout: 10_000 }).toBe(0)
 }
@@ -574,7 +576,7 @@ async function exerciseControl(scenario: OwnedScenario): Promise<void> {
   let { page, web } = scenario.current
   let section: Locator
   try {
-    await closeSettingsDialog(page)
+    await closePluginsDialog(page)
     // The real chat round: the scripted external model drives the REAL browser
     // tools; the form server records the receipt independently of any model claim.
     await connectFreshWorkspace(page, root)
@@ -859,8 +861,9 @@ async function withOwnedScenario(name: string, exercise: (scenario: OwnedScenari
     await writeFile(join(root, 'npmrc'), '')
     await writeFile(join(root, 'npm-globalrc'), '')
     // User-authored profile without the optional edition inventory: nothing is
-    // downloaded at boot, and BrowserSkill mounts only through the web bundle.
-    initProfile(profile, PROFILE_TEMPLATES.web!)
+    // downloaded at boot. Select the optional BrowserSkill bundle explicitly;
+    // the Web template itself intentionally stays BrowserSkill-free.
+    initProfile(profile, [...PROFILE_TEMPLATES.web!, BROWSER_BUNDLE])
     const mirror = await startArtifactServer(ASSET_DIR)
     artifact = mirror
     const formServer = await startFormServer(join(root, 'receipts'))
@@ -1070,7 +1073,7 @@ it.skipIf(process.platform === 'win32')('checks later recorded groups after an e
 })
 
 it.skipIf(!REAL_ENABLED)(
-  'installs BrowserSkill from Settings, drives the owned browser through a real agent round, and tears it down across a restart',
+  'installs BrowserSkill from Plugins, drives the owned browser through a real agent round, and tears it down across a restart',
   async () => { await withOwnedScenario('control', exerciseControl) },
   2_400_000,
 )

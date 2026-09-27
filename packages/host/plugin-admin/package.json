@@ -60,7 +60,9 @@
     "@shres-code/schemastery": "workspace:^",
     "@shres-code/shres-code-skill": "workspace:^",
     "@shres-code/shres-code-skill-filesystem": "workspace:^",
-    "@shres-code/shres-code-typert-protocol": "workspace:^"
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-host-plugin-inventory": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/cordis": "workspace:^",
@@ -71,6 +73,8 @@
     "@shres-code/schemastery": "workspace:^",
     "@shres-code/shres-code-skill": "workspace:^",
     "@shres-code/shres-code-skill-filesystem": "workspace:^",
-    "@shres-code/shres-code-typert-protocol": "workspace:^"
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-host-plugin-inventory": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^"
   }
 }

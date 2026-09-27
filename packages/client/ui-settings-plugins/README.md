@@ -1,6 +1,6 @@
 # shres-client-ui-settings-plugins
 
-The **Plugins** settings section and its **Plugin configuration** tab. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`. This package's own tab shows one expandable card per Host plugin whose configuration a user owns. A card shows the plugin's name and what it governs; expanding it in place reveals hand-written controls bound to that plugin's settings namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed. Plugin configuration opens under Customize and uses the shared rectangular controls.
+The shared **Plugins** page and its bundle and feature tabs. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`. The generic Bundles tab reads profile bundle membership through `pluginAdmin`, spends one-shot gesture grants for selection changes, and dispatches feature details through the keyed `settings.plugins.bundle` slot. It renders a feature detail only for a selected, active bundle whose host reports no composition error. The Plugin configuration tab shows one expandable card per Host plugin whose configuration a user owns. Plugins open as a top-level destination beside Teams and Customize.
 
 ## What appears here
 
@@ -12,7 +12,7 @@ Brave, Perplexity, and DeepSeek each have an independent Show/Hide settings cont
 
 ## Extension point
 
-The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares the nested `settings.plugin.item` list slot. A plugin that ships a browser half registers its own card into that nested slot and owns its controls; this package neither enumerates namespaces nor renders a form it was not given. Both levels follow the contribution's `order`.
+The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers the generic `bundles` contribution, which declares the keyed `settings.plugins.bundle` slot, and the `configurable` contribution, which declares the nested `settings.plugin.item` list slot. A bundle feature registers its own detail under its exact bundle package name and owns its controls; this package neither imports feature packages nor renders a form it was not given. Both levels follow the contribution's `order`.
 
 ## Writes
 

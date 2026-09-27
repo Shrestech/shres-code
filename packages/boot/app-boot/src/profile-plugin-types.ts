@@ -80,6 +80,50 @@ export interface PluginStateEntry {
    */
   removable: boolean
 }
+
+/**
+ * Describes the result of a profile mutation requested by the plugin manager.
+ *
+ * A saved mutation can require a process or browser restart when the live
+ * loader cannot replace every affected host or client entry.
+ */
+export type ProfileActivationOutcome =
+  | {
+    kind: 'saved'
+    application: 'applied' | 'restart-required' | 'overridden'
+    detail?: string
+  }
+  | {
+    kind: 'refused'
+    code:
+        | 'unknown-bundle'
+        | 'unknown-plugin'
+        | 'management-required'
+        | 'unaddressable'
+        | 'invalid-composition'
+    detail?: string
+  }
+  | {
+    kind: 'unsupported'
+  }
+
+/**
+ * Reports one bundle's selected and active state to the plugin manager.
+ *
+ * `active` describes the running loader. It can therefore differ from
+ * `selected` until a restart applies a saved manifest change.
+ */
+export interface ProfileBundleState {
+  name: string
+  description?: string
+  version?: string
+  selected: boolean
+  active: boolean
+  shipped: boolean
+  rows: readonly string[]
+  readOnlyReason?: string
+  error?: string
+}
 /** Lock/recovery failures that callers must not reinterpret as package refusals. */
 export class ProfilePluginError extends Error {
   override readonly name = 'ProfilePluginError'

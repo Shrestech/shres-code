@@ -22,7 +22,7 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 export const NS = 'settings.pluginInventory'
 
 /** Services required by the Settings registrations and the generated Remote faces. */
-export const inject = ['slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.pluginAdmin']
+export const inject = ['slots', 'locale', 'remote', 'remote.pluginAdmin']
 
 /**
  * Unwrap one pluginAdmin receipt. A wire failure throws exactly like the
@@ -48,14 +48,16 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-settings-plugin-inventory: dictionaries')
 
   const t = ctx.locale.bind(NS)
-  const list: PluginInventorySettingsTabInjected['list'] = async () => {
-    const result = await ctx.remote.pluginInventory.list()
-    if (!result.ok) {
-      throw new Error(`pluginInventory.list failed: ${result.error.code}: ${result.error.message}`)
-    }
-    return result.value
-  }
-  const injected = (): PluginInventorySettingsTabInjected => ({ list })
+  const listPlugins: PluginInventorySettingsTabInjected['listPlugins'] = () => (
+    unwrap('listPlugins', ctx.remote.pluginAdmin.listPlugins())
+  )
+  const beginPlugin: PluginInventorySettingsTabInjected['beginPlugin'] = (verb, target) => (
+    unwrap('begin', ctx.remote.pluginAdmin.begin({ verb, target }))
+  )
+  const setPluginEnabled: PluginInventorySettingsTabInjected['setPluginEnabled'] = (token, entryId, enabled) => (
+    unwrap('setPluginEnabled', ctx.remote.pluginAdmin.setPluginEnabled({ token, entryId, enabled }))
+  )
+  const injected = (): PluginInventorySettingsTabInjected => ({ listPlugins, beginPlugin, setPluginEnabled })
 
   const managed = (): PluginManageSettingsTabInjected => ({
     status: () => unwrap('status', ctx.remote.pluginAdmin.status()),

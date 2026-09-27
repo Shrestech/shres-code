@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * ui-browserskill browser half on a real cordis Context with fake
- * slots/locale/remote faces: the plugin registers exactly one Settings
- * section entry, its inject face unwraps the generated receipts and forwards
+ * slots/locale/remote faces: the plugin registers exactly one keyed Plugins
+ * entry, its inject face unwraps the generated receipts and forwards
  * to the browserSkill namespace, registration disposal rides the plugin
  * fiber (HMR safety), and a re-apply after disposal leaves one entry — never
  * a duplicate.
@@ -16,6 +16,7 @@ import { apply, inject, NS } from '../src/client/index.ts'
 import type { BrowserSkillSettingsSectionInjected } from '../src/client/index.ts'
 
 const contexts: Context[] = []
+const BUNDLE_NAME = '@shres-code/shres-code-browser-bundle'
 
 afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
@@ -70,11 +71,11 @@ async function bench(failing: Record<string, { code: string; message: string }> 
     uninstall: answer('browserSkill/uninstall'),
   })
   await ctx.plugin(SlotRegistry).await()
-  // The settings shell owns the root and declares the section list slot; the
-  // test reproduces that declaration so the inject seat resolves.
+  // The generic Plugins manager owns the keyed feature slot; the test
+  // reproduces that declaration so the inject seat resolves.
   ctx.slots.register({
     name: 'root',
-    children: { 'settings.section': { kind: 'list', scope: 'root' } },
+    children: { 'settings.plugins.bundle': { kind: 'keyed', scope: 'root' } },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -83,19 +84,17 @@ async function bench(failing: Record<string, { code: string; message: string }> 
     ctx,
     calls,
     fiber,
-    entry: () => ctx.slots.entries('settings.section')[0],
-    face: () => ctx.slots.entries('settings.section')[0]?.inject as unknown as () => BrowserSkillSettingsSectionInjected,
+    entry: () => ctx.slots.entries('settings.plugins.bundle')[0],
+    face: () => ctx.slots.entries('settings.plugins.bundle')[0]?.inject as unknown as () => BrowserSkillSettingsSectionInjected,
   }
 }
 
 describe('ui-browserskill browser plugin', () => {
-  it('registers one BrowserSkill Settings section with the locale-bound label', async () => {
+  it('registers one BrowserSkill feature entry with the bundle key', async () => {
     const b = await bench()
     const entry = b.entry()
-    expect(entry?.options).toMatchObject({ id: 'browserSkill', order: 16 })
+    expect(entry?.options).toMatchObject({ key: BUNDLE_NAME })
     expect(entry?.locale).toBe(NS)
-    const label = (entry?.options as { label?: () => string }).label?.()
-    expect(label).toBe('BrowserSkill')
   })
 
   it('forwards every inject-face verb to the browserSkill namespace and unwraps receipts', async () => {
@@ -139,12 +138,12 @@ describe('ui-browserskill browser plugin', () => {
 
   it('removes the registration with the fiber and re-applies without duplicates', async () => {
     const b = await bench()
-    expect(b.ctx.slots.entries('settings.section')).toHaveLength(1)
+    expect(b.ctx.slots.entries('settings.plugins.bundle')).toHaveLength(1)
     await b.fiber.dispose()
-    expect(b.ctx.slots.entries('settings.section')).toHaveLength(0)
+    expect(b.ctx.slots.entries('settings.plugins.bundle')).toHaveLength(0)
     // The HMR re-run mounts a fresh plugin fiber over the same context.
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.ctx.slots.entries('settings.section')).toHaveLength(1)
+    expect(b.ctx.slots.entries('settings.plugins.bundle')).toHaveLength(1)
   })
 })

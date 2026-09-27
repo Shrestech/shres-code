@@ -33,6 +33,11 @@ async function bench() {
       credentials: { describe: describeCredentials },
     },
   } as never)
+  ctx.provide('remote.pluginAdmin', {
+    listBundles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+    begin: vi.fn().mockResolvedValue({ ok: true, value: { token: 'bundle-token', expiresAt: 'x' } }),
+    setBundleEnabled: vi.fn().mockResolvedValue({ ok: true, value: { kind: 'saved', application: 'applied' } }),
+  })
   await ctx.plugin(SettingsScopeBinder).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, describeCredentials }
 }
@@ -46,7 +51,7 @@ function declareRoot(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugins apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.pluginAdmin', 'settingsScope'])
   })
 
   it('registers one Plugins section and declares the tab and card slots', async () => {
@@ -61,8 +66,11 @@ describe('ui-settings-plugins apply', () => {
     expect(resolveSlotLabel(section.options.label)).toBe('Plugins')
     expect(slots.spec('settings.plugins.tab')).toMatchObject({ kind: 'list', scope: 'root' })
     const tab = slots.entries('settings.plugins.tab')[0]!
-    expect(tab.options).toMatchObject({ id: 'configurable', order: 0 })
-    expect(resolveSlotLabel(tab.options.label)).toBe('Plugin configuration')
+    expect(tab.options).toMatchObject({ id: 'bundles', order: 0 })
+    expect(resolveSlotLabel(tab.options.label)).toBe('Bundles')
+    const configurable = slots.entries('settings.plugins.tab').find(entry => entry.options.id === 'configurable')!
+    expect(configurable.options).toMatchObject({ id: 'configurable', order: 10 })
+    expect(resolveSlotLabel(configurable.options.label)).toBe('Plugin configuration')
     expect(slots.spec('settings.plugin.item')).toMatchObject({ kind: 'list', scope: 'root' })
   })
 
@@ -85,7 +93,8 @@ describe('ui-settings-plugins apply', () => {
     const sectionFace = (section.inject as unknown as () => PluginsSettingsSectionInjected)()
     const initialTabs = sectionFace.hooks.tabs.getSnapshot()
     expect(initialTabs).toEqual([
-      { id: 'configurable', order: 0, label: 'Plugin configuration' },
+      { id: 'bundles', order: 0, label: 'Bundles' },
+      { id: 'configurable', order: 10, label: 'Plugin configuration' },
     ])
     expect(sectionFace.hooks.tabs.getSnapshot()).toBe(initialTabs)
 
@@ -93,12 +102,13 @@ describe('ui-settings-plugins apply', () => {
     const unsubscribe = sectionFace.hooks.tabs.subscribe(listener)
     slots.register({ name: 'settings.plugins.tab', id: 'plain' } as never, () => null)
     expect(sectionFace.hooks.tabs.getSnapshot()).toEqual([
-      { id: 'configurable', order: 0, label: 'Plugin configuration' },
+      { id: 'bundles', order: 0, label: 'Bundles' },
       { id: 'plain', order: 0, label: '' },
+      { id: 'configurable', order: 10, label: 'Plugin configuration' },
     ])
     unsubscribe()
 
-    const tab = slots.entries('settings.plugins.tab')[0]!
+    const tab = slots.entries('settings.plugins.tab').find(entry => entry.options.id === 'configurable')!
     expect((tab.inject as unknown as () => ConfigurablePluginsTabInjected)()).toEqual({ cardCount: 3 })
     for (const entry of slots.entries('settings.plugin.item')) {
       const face = (entry as { inject?: () => unknown }).inject?.() as { hooks: Record<string, unknown> }

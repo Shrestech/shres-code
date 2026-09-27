@@ -117,10 +117,6 @@
     - id: plugin-admin
       name: '@shres-code/shres-code-host-plugin-admin'
 
-    # Runtime downloads and the owned browser start only after local UI consent.
-    - id: browserskill
-      name: '@shres-code/shres-code-browserskill'
-
     - id: cordis-host-runner
       name: '@shres-code/shres-code-cordis-host-runner'
 
@@ -225,9 +221,6 @@
 
     - id: ui-settings-plugin-inventory
       name: '@shres-code/shres-code-client-ui-settings-plugin-inventory'
-
-    - id: ui-browserskill
-      name: '@shres-code/shres-code-client-ui-browserskill'
 
     - id: ui-conversation
       name: '@shres-code/shres-code-client-ui-conversation'

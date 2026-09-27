@@ -164,6 +164,9 @@ importers:
       '@shres-code/shres-code-base':
         specifier: workspace:^
         version: link:../../packages/bundle/base
+      '@shres-code/shres-code-browser-bundle':
+        specifier: workspace:^
+        version: link:../../packages/bundle/browser
       '@shres-code/shres-code-client-ui-agent-preset':
         specifier: workspace:^
         version: link:../../packages/client/ui-agent-preset
@@ -1219,6 +1222,9 @@ importers:
       npm-package-arg:
         specifier: ^14.0.0
         version: 14.0.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1685,6 +1691,22 @@ importers:
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
 
+  packages/bundle/browser:
+    dependencies:
+      '@shres-code/shres-code-browserskill':
+        specifier: workspace:^
+        version: link:../../browser/browserskill
+      '@shres-code/shres-code-client-ui-browserskill':
+        specifier: workspace:^
+        version: link:../../client/ui-browserskill
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+
   packages/bundle/headless:
     dependencies:
       '@shres-code/schemastery':
@@ -1757,9 +1779,6 @@ importers:
       '@shres-code/shres-code-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
-      '@shres-code/shres-code-browserskill':
-        specifier: workspace:^
-        version: link:../../browser/browserskill
       '@shres-code/shres-code-client-connection':
         specifier: workspace:^
         version: link:../../client/connection
@@ -1781,9 +1800,6 @@ importers:
       '@shres-code/shres-code-client-ui-agent-team':
         specifier: workspace:^
         version: link:../../client/ui-agent-team
-      '@shres-code/shres-code-client-ui-browserskill':
-        specifier: workspace:^
-        version: link:../../client/ui-browserskill
       '@shres-code/shres-code-client-ui-commands':
         specifier: workspace:^
         version: link:../../client/ui-commands
@@ -6104,12 +6120,18 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
       '@shres-code/shres-code-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
       '@shres-code/shres-code-brand':
         specifier: workspace:^
         version: link:../../util/brand
+      '@shres-code/shres-code-host-plugin-inventory':
+        specifier: workspace:^
+        version: link:../plugin-inventory
       '@shres-code/shres-code-host-remote-control':
         specifier: workspace:^
         version: link:../remote-control

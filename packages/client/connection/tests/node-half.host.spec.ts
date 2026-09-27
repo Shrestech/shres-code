@@ -235,6 +235,7 @@ describe('connection node half', () => {
       // the registry read, and the mutations install code the next boot
       // executes or copy content into the shared skills root — the gesture
       // gate stays inside the namespace.
+      'pluginAdmin/listBundles', 'pluginAdmin/listPlugins', 'pluginAdmin/setBundleEnabled', 'pluginAdmin/setPluginEnabled',
       'pluginAdmin/status', 'pluginAdmin/begin', 'pluginAdmin/stageInstall', 'pluginAdmin/confirm',
       'pluginAdmin/cancel', 'pluginAdmin/removePlugin', 'pluginAdmin/skillAdd', 'pluginAdmin/skillRemove',
       'browserSkill/status', 'browserSkill/begin', 'browserSkill/provision', 'browserSkill/open',

@@ -1,6 +1,6 @@
 /**
  * Plugins settings surface, browser half — one section whose feature-owned
- * tabs include configurable Host plugin cards and read-only inventory.
+ * tabs include configurable Host plugin cards and the managed plugin inventory.
  *
  * The section declares `settings.plugins.tab`; its own `configurable` tab then
  * declares `settings.plugin.item` and renders whatever cards were registered
@@ -17,11 +17,12 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 // through the service, never a value import (client bundle purity gate).
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
-import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import { resolveSlotLabel, type HostObservable } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: the ctx.remote Context merge and the forwarded-event key face.
 import type {} from '@shres-code/shres-code-api-remotes/client'
 import { AgentLoopCard } from './AgentLoopCard.tsx'
 import { BashCard } from './BashCard.tsx'
+import { BundleManagerTab, type BundleManagerTabInjected } from './BundleManagerTab.tsx'
 import { ConfigurablePluginsTab } from './ConfigurablePluginsTab.tsx'
 import type { ConfigurablePluginsTabInjected } from './ConfigurablePluginsTab.tsx'
 import { PluginsSettingsSection } from './PluginsSettingsSection.tsx'
@@ -34,6 +35,7 @@ import { en } from './locales.ts'
 
 export type { PluginsSettingsSectionInjected, PluginsSettingsSectionProps } from './PluginsSettingsSection.tsx'
 export type { ConfigurablePluginsTabInjected, ConfigurablePluginsTabProps } from './ConfigurablePluginsTab.tsx'
+export type { BundleManagerTabInjected, BundleManagerTabProps } from './BundleManagerTab.tsx'
 export type { PluginCardProps } from './PluginCard.tsx'
 export type { SettingsPluginItemOwnerProps } from './slot-contract.ts'
 export type { FieldProps } from './fields.tsx'
@@ -47,8 +49,21 @@ export type { WebSearchBraveSettings, WebSearchCardFace, WebSearchCardState, Web
 /** Dictionary namespace owned by this plugin. */
 const NS = 'settings.plugins'
 
+/** Unwrap a generated pluginAdmin receipt at the registration face. */
+async function unwrapRemote<T>(
+  op: string,
+  receipt: Promise<
+    | { readonly ok: true; readonly value: T }
+    | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+  >,
+): Promise<T> {
+  const result = await receipt
+  if (!result.ok) throw new Error(`pluginAdmin.${op} failed: ${result.error.code}: ${result.error.message}`)
+  return result.value
+}
+
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.pluginAdmin', 'settingsScope']
 
 /**
  * Mount the plugin configuration section and the cards this package ships.
@@ -76,6 +91,20 @@ export function apply(ctx: ClientContext): void {
     () => ctx.remote.$on('credentials/updated', (ref) => { webSearch.refreshCredential(ref) }),
     'ui-settings-plugins: credential invalidations',
   )
+
+  let connectionRevision = 0
+  const revisionListeners = new Set<() => void>()
+  const connectionRevisionSource: HostObservable<number> = {
+    getSnapshot: () => connectionRevision,
+    subscribe: (listener) => {
+      revisionListeners.add(listener)
+      return () => { revisionListeners.delete(listener) }
+    },
+  }
+  ctx.effect(() => ctx.on('connection/reset', () => {
+    connectionRevision += 1
+    for (const listener of [...revisionListeners]) listener()
+  }), 'ui-settings-plugins: bundle invalidation')
 
   let tabsVersion = -1
   let tabsRevision = -1
@@ -112,6 +141,19 @@ export function apply(ctx: ClientContext): void {
     },
   })
 
+  // The bundle manager is generic: it knows only the profile-management
+  // vocabulary and dispatches feature details through the keyed settings slot.
+  const bundleManager = (): BundleManagerTabInjected => {
+    return {
+      listBundles: async () => unwrapRemote('listBundles', ctx.remote.pluginAdmin.listBundles()),
+      begin: async (verb, target) => unwrapRemote('begin', ctx.remote.pluginAdmin.begin({ verb, target })),
+      setBundleEnabled: async (token, name, enabled) => unwrapRemote(
+        'setBundleEnabled', ctx.remote.pluginAdmin.setBundleEnabled({ token, name, enabled }),
+      ),
+      hooks: { connectionRevision: connectionRevisionSource },
+    }
+  }
+
   // This package owns the one Plugins navigation entry and the tab chrome;
   // feature plugins contribute pages without competing for Settings nav rows.
   ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -128,8 +170,18 @@ export function apply(ctx: ClientContext): void {
   // of the card slot and the three shipped card contributions below.
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
     name: 'settings.plugins.tab',
-    id: 'configurable',
+    id: 'bundles',
     order: 0,
+    label: () => t('bundlesTab'),
+    locale: NS,
+    inject: bundleManager,
+    children: { 'settings.plugins.bundle': { kind: 'keyed', scope: 'root' } },
+  }, BundleManagerTab))
+
+  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
+    name: 'settings.plugins.tab',
+    id: 'configurable',
+    order: 10,
     label: () => t('configurableTab'),
     locale: NS,
     inject: (): ConfigurablePluginsTabInjected => ({

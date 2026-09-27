@@ -2894,6 +2894,26 @@
       "doc": "docs/subsystems/skills.md",
       "symbol": "SkillAddRefused",
       "source": "packages/skill/skill-filesystem/src/install.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginAdminGestureVerb",
+      "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ProfileRuntimeControl",
+      "source": "packages/boot/app-boot/src/profile-runtime.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ProfileBundleState",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
+      "symbol": "ProfileActivationOutcome",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
     }
   ]
 }

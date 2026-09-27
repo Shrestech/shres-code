@@ -32,6 +32,7 @@ declare module '@shres-code/cordis' {
 export {
   composeEntries,
   DEFAULT_PROFILE_BUNDLES,
+  OPTIONAL_BUNDLES,
   healProfilesModuleFallback,
   initProfile,
   loadProfile,
@@ -42,6 +43,7 @@ export {
   SHIELD_EDITION_PACKAGE,
   PROFILES_DIR,
   readProfileManifest,
+  resolveProfile,
   resolveBundleDir,
   resolveProfileDir,
   writeProfileManifest,
@@ -53,14 +55,28 @@ export {
   type ProfileLayer,
   type ProfileManifest,
 } from './profile.ts'
-export { provideProfileRuntime, PROFILE_RUNTIME_KEY, type ProfileRuntime } from './profile-runtime.ts'
-export { beginPluginInstall, removePlugin, recoverPluginTransaction, withRecoveredProfile, pluginStates } from './profile-plugins.ts'
+export {
+  provideProfileRuntime,
+  PROFILE_RUNTIME_KEY,
+  type ProfileRuntime,
+  type ProfileRuntimeControl,
+} from './profile-runtime.ts'
+export {
+  beginPluginInstall,
+  removePlugin,
+  recoverPluginTransaction,
+  withRecoveredProfile,
+  pluginStates,
+} from './profile-plugins.ts'
+export { listProfileBundles, setBundleEnabled, setPluginEnabled, type ProfileActivationApplication, type ProfileMutationCandidate, type ProfileMutationOptions } from './profile-activation.ts'
+export { isProfileManagementModule } from './profile-management-policy.ts'
 export { nodePnpmRunner, type PnpmOutcome, type PnpmRunner } from './profile-pnpm.ts'
 export { loadOptionalPatches, loadOverlayPatches } from './patch-files.ts'
 export {
   ProfilePluginError, type CoreOptions, type InstallPreview, type InstallRefusal, type InstallRefused,
   type InstallCommitted, type InstallBegin, type ParkedInstall, type RollbackReport, type RemoveOutcome,
   type RecoveredProfile, type RecoveryOutcome, type PluginStateEntry,
+  type ProfileActivationOutcome, type ProfileBundleState,
 } from './profile-plugin-types.ts'
 
 /**
@@ -212,6 +228,35 @@ export function loadLayeredEnv(
 }
 
 const bootstrapIncludes = new WeakMap<Context, Entry>()
+const rootIncludeReconciles = new WeakMap<Context, Promise<void>>()
+
+/**
+ * Serialize a profile mutation and its Include updates against user-patch watchers.
+ * The operation owns persistence and rollback inside the same queue; composition must be read there.
+ * @param ctx - settled app context containing the root Include.
+ * @param operation - work receiving the transactional Include updater; must not re-enter this queue.
+ * @returns the operation's result after its updates and any restoration finish.
+ */
+export async function reconcileRootInclude<T>(
+  ctx: Context,
+  operation: (update: (patches: readonly PatchOptions[]) => Promise<void>) => Promise<T>,
+): Promise<T> {
+  const entry = bootstrapIncludes.get(ctx)
+  if (entry === undefined) throw new Error('The root Include entry is unavailable')
+  const previous = rootIncludeReconciles.get(ctx) ?? Promise.resolve()
+  // Each caller observes its own failure; a rejected generation does not poison later updates.
+  const next = previous.catch(() => undefined).then(() => operation(async (patches) => {
+    const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
+    await entry.update({ config: { ...includeConfig, patches: structuredClone([...patches]) } })
+  }))
+  const settled = next.then(() => undefined, () => undefined)
+  rootIncludeReconciles.set(ctx, settled)
+  try {
+    return await next
+  } finally {
+    if (rootIncludeReconciles.get(ctx) === settled) rootIncludeReconciles.delete(ctx)
+  }
+}
 
 /** Options for live user patch-layer reconciliation. */
 export interface UserPatchWatchOptions {
@@ -245,20 +290,10 @@ export async function watchUserPatches(
   if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
   const entry = bootstrapIncludes.get(ctx)
   if (entry === undefined) throw new Error(`${binName}: user patch-layer watching requires the root Include entry`)
-  const register = hmr.registerConfig(filename, async () => {
-    // Re-read the include's non-patch options per refresh: a writer that
-    // updates the root Include's other options between refreshes (none exists
-    // today) must not have them silently reverted by a user-layer reload.
-    const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
+  const register = hmr.registerConfig(filename, () => reconcileRootInclude(ctx, async (update) => {
     const userPatches = loadOptionalPatches(binName, filename) ?? []
-    const patches = compose(userPatches)
-    await entry.update({
-      config: {
-        ...includeConfig,
-        patches,
-      },
-    })
-  })
+    await update(compose(userPatches))
+  }))
   try {
     return await register
   } catch (error) {

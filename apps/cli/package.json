@@ -31,6 +31,7 @@
     "@shres-code/shres-code-agent-tool-presentation": "workspace:^",
     "@shres-code/shres-code-app-boot": "workspace:^",
     "@shres-code/shres-code-base": "workspace:^",
+    "@shres-code/shres-code-browser-bundle": "workspace:^",
     "@shres-code/shres-code-client-ui-agent-preset": "workspace:^",
     "@shres-code/shres-code-client-ui-cordis": "workspace:^",
     "@shres-code/shres-code-cmdline": "workspace:^",

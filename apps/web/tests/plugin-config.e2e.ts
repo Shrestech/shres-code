@@ -40,19 +40,16 @@ describe('web e2e: plugin configuration section', () => {
     await scaffold?.close()
   })
 
-  /** Open the global Customize destination on the Plugins section. */
+  /** Open the global Plugins destination on the configuration tab. */
   async function openPlugins() {
-    if (await page.getByRole('region', { name: 'Customize' }).count() > 0) {
+    if (await page.getByRole('region', { name: 'Plugins' }).count() > 0) {
       await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('region', { name: 'Customize' }).count(), { timeout: 5_000 }).toBe(0)
+      await expect.poll(() => page.getByRole('region', { name: 'Plugins' }).count(), { timeout: 5_000 }).toBe(0)
     }
-    await page.getByRole('button', { name: 'Customize', exact: true }).click()
-    const dialog = page.getByRole('region', { name: 'Customize' })
+    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    const dialog = page.getByRole('region', { name: 'Plugins' })
     await dialog.waitFor({ timeout: 10_000 })
-    await dialog.getByRole('button', { name: 'Plugins', exact: true }).click()
-    await expect
-      .poll(() => dialog.getByRole('button', { name: 'Plugins', exact: true }).getAttribute('aria-current'), { timeout: 5_000 })
-      .toBe('page')
+    await dialog.getByRole('tab', { name: 'Plugin configuration', exact: true }).click()
     await expect
       .poll(() => dialog.getByRole('tab', { name: 'Plugin configuration', exact: true }).getAttribute('aria-selected'), { timeout: 5_000 })
       .toBe('true')
@@ -76,7 +73,7 @@ describe('web e2e: plugin configuration section', () => {
     // Collapsed: a card's fields appear only once it is expanded.
     expect(await dialog.getByLabel('Command timeout (ms)').count()).toBe(0)
 
-    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Plugins"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
@@ -111,7 +108,7 @@ describe('web e2e: plugin configuration section', () => {
     expect(deepseekBox).not.toBeNull()
     expect(perplexityBox!.y).toBeLessThan(perplexityKeyBox!.y)
     expect(perplexityKeyBox!.y).toBeLessThan(deepseekBox!.y)
-    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Plugins"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
     const before = await settingsDocument()
     const endpoint = dialog.getByLabel('Perplexity endpoint', { exact: true })

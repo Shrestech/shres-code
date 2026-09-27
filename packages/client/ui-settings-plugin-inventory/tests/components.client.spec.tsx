@@ -7,39 +7,40 @@ import type {
   PluginInventorySettingsTabProps,
 } from '../src/client/PluginInventorySettingsTab.tsx'
 import { en, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
+import type { PluginGestureToken } from '@shres-code/shres-code-api-remotes/client'
 
 afterEach(cleanup)
 
-type Snapshot = Awaited<ReturnType<PluginInventorySettingsTabInjected['list']>>
+type Entries = Awaited<ReturnType<PluginInventorySettingsTabInjected['listPlugins']>>
 const t = ((key: PluginInventoryLocaleKey): string => en[key]) as PluginInventorySettingsTabProps['t']
 
-function props(list: PluginInventorySettingsTabInjected['list']): PluginInventorySettingsTabProps {
+function props(listPlugins: PluginInventorySettingsTabInjected['listPlugins']): PluginInventorySettingsTabProps {
   return {
     t,
-    list,
+    listPlugins,
+    beginPlugin: async () => ({ token: 'unused' as PluginGestureToken, expiresAt: 'later' }),
+    setPluginEnabled: async () => ({ kind: 'saved', application: 'applied' }),
   } as PluginInventorySettingsTabProps
 }
 
-const SNAPSHOT = {
-  entries: [
-    { entryId: '8a1b2c3d', moduleName: '@shres-code/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
-    { entryId: 'pending', moduleName: 'cordis:pending-name', enabled: true, fiberPhase: 'pending' },
-    { entryId: 'loading', moduleName: '@fixture/loading-name', enabled: true, fiberPhase: 'loading' },
-    { entryId: 'failed', moduleName: '@fixture/failed-name', enabled: true, fiberPhase: 'failed' },
-    { entryId: 'unloading', moduleName: '@fixture/unloading-name', enabled: true, fiberPhase: 'unloading' },
-    { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
-    { entryId: 'disabled-entry', moduleName: '@shres-code/shres-code-host-directory-picker-native', enabled: false, fiberPhase: null },
-  ],
-} as unknown as Snapshot
+const ENTRIES = [
+  { entryId: '8a1b2c3d', moduleName: '@shres-code/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
+  { entryId: 'pending', moduleName: 'cordis:pending-name', enabled: true, fiberPhase: 'pending' },
+  { entryId: 'loading', moduleName: '@fixture/loading-name', enabled: true, fiberPhase: 'loading' },
+  { entryId: 'failed', moduleName: '@fixture/failed-name', enabled: true, fiberPhase: 'failed' },
+  { entryId: 'unloading', moduleName: '@fixture/unloading-name', enabled: true, fiberPhase: 'unloading' },
+  { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
+  { entryId: 'disabled-entry', moduleName: '@shres-code/shres-code-host-directory-picker-native', enabled: false, fiberPhase: null },
+] as unknown as Entries
 
 describe('PluginInventorySettingsTab', () => {
   it('renders runtime status only for enabled plugins', async () => {
-    const deferred = Promise.withResolvers<Snapshot>()
+    const deferred = Promise.withResolvers<Entries>()
     const list = vi.fn(() => deferred.promise)
     const view = render(<PluginInventorySettingsTab {...props(list)} />)
     expect(screen.getByText(en.loading)).toBeTruthy()
 
-    await act(async () => { deferred.resolve(SNAPSHOT) })
+    await act(async () => { deferred.resolve(ENTRIES) })
     expect(list).toHaveBeenCalledOnce()
     expect(screen.getByRole('searchbox', { name: en.search })).toBeTruthy()
     expect(screen.getByRole('heading', { name: en.catalog })).toBeTruthy()
@@ -79,7 +80,7 @@ describe('PluginInventorySettingsTab', () => {
   })
 
   it('filters by module name or Loader entry id', async () => {
-    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT)} />)
+    render(<PluginInventorySettingsTab {...props(async () => ENTRIES)} />)
     const search = await screen.findByRole('searchbox', { name: en.search })
 
     fireEvent.change(search, { target: { value: 'disabled-entry' } })
@@ -96,9 +97,9 @@ describe('PluginInventorySettingsTab', () => {
   })
 
   it('shows a generic failure and retries into the empty state', async () => {
-    const list = vi.fn<PluginInventorySettingsTabInjected['list']>()
+    const list = vi.fn<PluginInventorySettingsTabInjected['listPlugins']>()
       .mockRejectedValueOnce(new Error('private transport detail'))
-      .mockResolvedValueOnce({ entries: [] })
+      .mockResolvedValueOnce([])
     render(<PluginInventorySettingsTab {...props(list)} />)
 
     expect((await screen.findByRole('alert')).textContent).toBe(en.error)
@@ -109,17 +110,17 @@ describe('PluginInventorySettingsTab', () => {
   })
 
   it('contains a synchronous Remote failure and ignores a result after unmount', async () => {
-    const syncFailure = vi.fn(() => { throw new Error('namespace unavailable') }) as PluginInventorySettingsTabInjected['list']
+    const syncFailure = vi.fn(() => { throw new Error('namespace unavailable') }) as PluginInventorySettingsTabInjected['listPlugins']
     const failed = render(<PluginInventorySettingsTab {...props(syncFailure)} />)
     expect((await screen.findByRole('alert')).textContent).toBe(en.error)
     failed.unmount()
 
-    const deferred = Promise.withResolvers<Snapshot>()
+    const deferred = Promise.withResolvers<Entries>()
     const pending = render(<PluginInventorySettingsTab {...props(() => deferred.promise)} />)
     pending.unmount()
-    await act(async () => { deferred.resolve(SNAPSHOT) })
+    await act(async () => { deferred.resolve(ENTRIES) })
 
-    const deferredFailure = Promise.withResolvers<Snapshot>()
+    const deferredFailure = Promise.withResolvers<Entries>()
     const pendingFailure = render(<PluginInventorySettingsTab {...props(() => deferredFailure.promise)} />)
     pendingFailure.unmount()
     await act(async () => { deferredFailure.reject(new Error('late failure')) })

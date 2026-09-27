@@ -5514,6 +5514,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-atomic-write` ([`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts))
 - `@shres-code/shres-code-base` ([`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts))
 - `@shres-code/shres-code-brand` ([`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts))
+- `@shres-code/shres-code-browser-bundle` ([`packages/bundle/browser/src/index.ts`](../packages/bundle/browser/src/index.ts))
 - `@shres-code/shres-code-client-schema-form` ([`packages/client/schema-form/src/index.ts`](../packages/client/schema-form/src/index.ts))
 - `@shres-code/shres-code-client-test-runtime` ([`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts))
 - `@shres-code/shres-code-client-ui-attachment` ([`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts))

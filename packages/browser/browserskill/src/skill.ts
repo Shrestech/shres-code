@@ -4,9 +4,9 @@ import type {} from '@shres-code/shres-code-skill'
 
 const content = `# BrowserSkill
 
-Use BrowserSkill for web tasks in the browser opened from Settings → BrowserSkill. It uses a separate Chrome profile; your everyday browser tabs and logins are not available there. If a separate browser-skill guide is installed, use these native tools for this managed browser rather than its shell commands.
+Use BrowserSkill for web tasks in the browser opened from Plugins → BrowserSkill. It uses a separate Chrome profile; your everyday browser tabs and logins are not available there. If a separate browser-skill guide is installed, use these native tools for this managed browser rather than its shell commands.
 
-If a browser tool reports that the browser is not ready, ask the user to open BrowserSkill in Settings. Do not install components through the shell or connect to another browser.
+If a browser tool reports that the browser is not ready, ask the user to open Plugins → BrowserSkill. Do not install components through the shell or connect to another browser.
 
 1. Start a session with browser_session and retain its returned session id. Each conversation, including each subagent, owns its own sessions.
 2. Open an HTTP or HTTPS page with browser_navigate. Pass the session id on every page operation.

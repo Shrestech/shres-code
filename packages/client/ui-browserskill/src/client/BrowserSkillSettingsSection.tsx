@@ -1,5 +1,5 @@
 /**
- * BrowserSkill Settings section over the gesture-gated browserSkill
+ * BrowserSkill feature settings over the gesture-gated browserSkill
  * namespace: the single disclosed install flow (verified provisioning and
  * the owned-browser launch behind one confirmation), provisioning progress
  * and readiness, and teardown. Reset always deletes the owned profile and
@@ -42,13 +42,24 @@ export type BrowserSkillStartVerdict =
   | { accepted: true; operationId: BrowserSkillOperationId }
   | { accepted: false; refusal: BrowserSkillRefusal }
 
+/** Transport marker for a host composition without the selected BrowserSkill row. */
+export class BrowserSkillUnavailableError extends Error {
+  readonly kind = 'browserSkill-unavailable'
+
+  /**
+   * @param message - Gateway diagnostic retained for logs, never shown as a
+   *   provisioning control or fallback instruction.
+   */
+  constructor(message: string) {
+    super(message)
+    this.name = 'BrowserSkillUnavailableError'
+  }
+}
+
 /**
- * Registration-side browserSkill face used by the section. The names of the
- * two launch controls deliberately differ from their wire verbs: the
- * 'settings.section' owner share contributes `close` (leave Settings), and
- * the slot renderer merges owner props over the injected face, so a face
- * member named `close` (or `open`, the same collision class) would be
- * shadowed and never reach the browserSkill namespace.
+ * Registration-side browserSkill face used by the feature settings. Runtime
+ * bundle selection is owned by the generic Plugins manager; this face owns
+ * only consented BrowserSkill provisioning and lifecycle actions.
  */
 export interface BrowserSkillSettingsSectionInjected {
   /** Read the lifecycle picture: state, consent facts, artifacts, operation. */
@@ -69,12 +80,17 @@ export interface BrowserSkillSettingsSectionInjected {
 
 /** Full component props assembled by the Settings slot renderer. */
 export type BrowserSkillSettingsSectionProps =
-  PropsRuntime<'settings.section'>
+  PropsRuntime<'settings.plugins.bundle'>
   & PropsLocale<'settings.browserSkill'>
   & InjectFace<BrowserSkillSettingsSectionInjected>
 
 /** Poll cadence while an accepted operation or a runtime transition is in flight. */
 const POLL_MS = 500
+
+/** Whether a failed status read means the feature row is unavailable. */
+function isUnavailable(error: unknown): error is BrowserSkillUnavailableError {
+  return error instanceof BrowserSkillUnavailableError
+}
 
 /** The operation this client accepted and is waiting to settle. */
 interface TrackedOperation {
@@ -200,7 +216,9 @@ function DownloadRow({ artifact, url, version, sha256 }: {
 export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionProps): ReactNode {
   const { status, begin, provision, openBrowser, closeBrowser, reset, uninstall, t } = props
   const [view, setView] = useState<
-    { phase: 'loading' } | { phase: 'error' } | { phase: 'ready'; result: BrowserSkillStatus }
+    | { phase: 'loading' }
+    | { phase: 'error'; unavailable: boolean }
+    | { phase: 'ready'; result: BrowserSkillStatus }
   >({ phase: 'loading' })
   const [request, setRequest] = useState(0)
   const [pending, setPending] = useState<string | null>(null)
@@ -244,7 +262,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           }
         }
       },
-      () => { if (current) setView({ phase: 'error' }) },
+      (error: unknown) => { if (current) setView({ phase: 'error', unavailable: isUnavailable(error) }) },
     )
     return () => { current = false }
   }, [status, request])
@@ -320,7 +338,8 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
     return (
       <div className={css.section} aria-busy={view.phase === 'loading'}>
         {view.phase === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
-        {view.phase === 'error' ? (
+        {view.phase === 'error' && view.unavailable ? <p className={css.unsupported} role="status">{t('unavailable')}</p> : null}
+        {view.phase === 'error' && !view.unavailable ? (
           <div className={css.failure}>
             <p role="alert">{t('error')}</p>
             <button type="button" onClick={refresh}>{t('retry')}</button>

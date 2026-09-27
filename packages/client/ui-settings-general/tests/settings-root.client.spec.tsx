@@ -69,15 +69,16 @@ describe('global destinations and settings', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Settings' }))
   })
 
-  it('keeps teams and customization out of settings and returns to the workspace', () => {
+  it('keeps teams, plugins, and customization outside Preferences', () => {
     mount()
     openSettings()
     expect(within(screen.getByRole('region', { name: 'Settings' })).queryByRole('button', { name: 'Team members' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Plugins' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Teams' }))
     expect(screen.getByTestId('section-teams')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Customize' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plugins' }))
     expect(screen.getByTestId('section-plugins')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Customize' }))
+    expect(screen.queryByTestId('section-plugins')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Agent presets' }))
     expect(screen.getByTestId('section-agent-presets')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))

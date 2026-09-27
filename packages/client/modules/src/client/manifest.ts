@@ -78,6 +78,16 @@ export interface BootModuleRow {
   rev: string
 }
 
+/** One graph transition computed by {@link ClientModuleSystem.applyGraph}. */
+export interface ClientGraphUpdate {
+  /** Rows absent from the previous graph and available for Loader creation. */
+  added: BootModuleRow[]
+  /** Rows absent from the next graph and ready for Loader removal. */
+  removed: BootModuleRow[]
+  /** Rows whose bundle URL or revision changed in place. */
+  changed: Array<{ before: BootModuleRow; after: BootModuleRow }>
+}
+
 /** The cordis-plugin view of one boot row: what entry composition needs (optional wire fields normalized). */
 export interface BootPluginRow {
   /** Entry name == package name. */
@@ -218,6 +228,22 @@ export interface ClientModuleLoader {
    * @param id - graph entry name.
    */
   prefetch(id: string): Promise<void>
+  /**
+   * Replace the module table's graph rows and return the add/remove/rebuild diff.
+   * @param rows - validated host graph rows for the next Loader composition.
+   * @returns the rows added, removed, or changed by this replacement.
+   */
+  applyGraph(rows: readonly BootModuleRow[]): ClientGraphUpdate
+  /**
+   * Snapshot the current graph rows for a failed transition or diagnostics.
+   * @returns defensive copies of the current graph rows.
+   */
+  graphRows(): BootModuleRow[]
+  /**
+   * Remove one withdrawn graph row and its materialized client-owned resources.
+   * @param id - graph entry name whose Loader entry has already been disposed.
+   */
+  withdraw(id: string): void
   /**
    * Full reset of one module: drop its registered factory and materialized
    * record so the next prefetch/import reloads it (the HMR invalidation hook).

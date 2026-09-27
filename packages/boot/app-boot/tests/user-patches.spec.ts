@@ -18,6 +18,7 @@ import {
   boot,
   loadOptionalPatches,
   PROFILE_PATCH_FILENAME,
+  reconcileRootInclude,
   watchUserPatches,
 } from '../src/index.ts'
 
@@ -415,6 +416,57 @@ describe('boot with user patches', () => {
       // Same user-layer path registered twice: HMR refuses; not a teardown race.
       await expect(watchUserPatches(ctx, { binName: NAME, filename })).rejects.toThrow('already registered')
       await dispose()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
+describe('root Include reconciliation', () => {
+  it('serializes a deferred profile mutation with watcher recomposition', async () => {
+    const dir = tmp()
+    const ctx = await boot(NAME, writeTree(dir))
+    try {
+      const events: string[] = []
+      let release!: () => void
+      const deferred = new Promise<void>((resolve) => { release = resolve })
+      const profile = reconcileRootInclude(ctx, async (update) => {
+        events.push('profile-start')
+        await deferred
+        await update([{ id: 'noop', config: { value: 'profile' } }])
+        events.push('profile-end')
+      })
+      await Promise.resolve()
+      const watcher = reconcileRootInclude(ctx, async (update) => {
+        events.push('watcher-start')
+        await update([{ id: 'noop', config: { value: 'watcher' } }])
+        events.push('watcher-end')
+      })
+      await Promise.resolve()
+      expect(events).toEqual(['profile-start'])
+      expect(entryConfig(ctx, 'noop')).toEqual({ value: 'base' })
+      release()
+      await Promise.all([profile, watcher])
+      expect(events).toEqual(['profile-start', 'profile-end', 'watcher-start', 'watcher-end'])
+      expect(entryConfig(ctx, 'noop')).toEqual({ value: 'watcher' })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('runs a later update after a failed predecessor', async () => {
+    const dir = tmp()
+    const ctx = await boot(NAME, writeTree(dir))
+    try {
+      const failed = reconcileRootInclude(ctx, async (update) => {
+        await update([{ id: 'noop', config: { fail: true } }])
+      })
+      await expect(failed).rejects.toThrow('candidate config failed')
+      const recovered = reconcileRootInclude(ctx, async (update) => {
+        await update([{ id: 'noop', config: { value: 'recovered' } }])
+      })
+      await expect(recovered).resolves.toBeUndefined()
+      expect(entryConfig(ctx, 'noop')).toEqual({ value: 'recovered' })
     } finally {
       await ctx.fiber.dispose()
     }

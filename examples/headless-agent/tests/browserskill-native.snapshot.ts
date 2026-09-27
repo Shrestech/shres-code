@@ -30,7 +30,7 @@ describe('BrowserSkill native headless snapshot', () => {
     const records: unknown[] = result.stdout.trim().split(String.fromCharCode(10)).map(line => JSON.parse(line) as unknown)
     expect(records).toHaveLength(5)
     expect(JSON.stringify(records)).toContain('BROWSERSKILL_NATIVE_NOT_READY')
-    expect(JSON.stringify(records)).toContain('The browser is not ready. Ask the user to open Settings → BrowserSkill.')
+    expect(JSON.stringify(records)).toContain('The browser is not ready. Ask the user to open Plugins → BrowserSkill.')
     expect(records).toMatchInlineSnapshot(`
       [
         {
@@ -201,9 +201,9 @@ describe('BrowserSkill native headless snapshot', () => {
       <skill_instructions>
       # BrowserSkill
 
-      Use BrowserSkill for web tasks in the browser opened from Settings → BrowserSkill. It uses a separate Chrome profile; your everyday browser tabs and logins are not available there. If a separate browser-skill guide is installed, use these native tools for this managed browser rather than its shell commands.
+      Use BrowserSkill for web tasks in the browser opened from Plugins → BrowserSkill. It uses a separate Chrome profile; your everyday browser tabs and logins are not available there. If a separate browser-skill guide is installed, use these native tools for this managed browser rather than its shell commands.
 
-      If a browser tool reports that the browser is not ready, ask the user to open BrowserSkill in Settings. Do not install components through the shell or connect to another browser.
+      If a browser tool reports that the browser is not ready, ask the user to open Plugins → BrowserSkill. Do not install components through the shell or connect to another browser.
 
       1. Start a session with browser_session and retain its returned session id. Each conversation, including each subagent, owns its own sessions.
       2. Open an HTTP or HTTPS page with browser_navigate. Pass the session id on every page operation.
@@ -219,7 +219,7 @@ describe('BrowserSkill native headless snapshot', () => {
         },
         {
           "kind": "session-result",
-          "output": "{"ok":false,"reason":"not-ready","detail":"The browser is not ready. Ask the user to open Settings → BrowserSkill."}",
+          "output": "{"ok":false,"reason":"not-ready","detail":"The browser is not ready. Ask the user to open Plugins → BrowserSkill."}",
         },
         {
           "kind": "navigate-result",
@@ -229,7 +229,7 @@ describe('BrowserSkill native headless snapshot', () => {
       user explicitly repeats them.
 
       <browser-result>
-      {"ok":false,"reason":"not-ready","detail":"The browser is not ready. Ask the user to open Settings → BrowserSkill."}
+      {"ok":false,"reason":"not-ready","detail":"The browser is not ready. Ask the user to open Plugins → BrowserSkill."}
       </browser-result>",
         },
         {

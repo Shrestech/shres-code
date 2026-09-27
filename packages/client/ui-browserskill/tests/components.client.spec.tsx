@@ -14,7 +14,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserSkillOperationId, BrowserSkillRefusal, BrowserSkillStatus } from '@shres-code/shres-code-api-remotes/client'
-import { BrowserSkillSettingsSection } from '../src/client/BrowserSkillSettingsSection.tsx'
+import { BrowserSkillSettingsSection, BrowserSkillUnavailableError } from '../src/client/BrowserSkillSettingsSection.tsx'
 import type {
   BrowserSkillSettingsSectionInjected,
   BrowserSkillSettingsSectionProps,
@@ -91,6 +91,15 @@ async function renderReady(overrides?: Partial<BrowserSkillSettingsSectionInject
 }
 
 describe('BrowserSkillSettingsSection', () => {
+  it('renders an unavailable bundle without provisioning controls', async () => {
+    const status = vi.fn<BrowserSkillSettingsSectionInjected['status']>()
+      .mockRejectedValue(new BrowserSkillUnavailableError('browserSkill/status failed: method-unavailable'))
+    render(<BrowserSkillSettingsSection {...props({ status })} />)
+    expect((await screen.findByRole('status')).textContent).toBe(en.unavailable)
+    expect(screen.queryByRole('button', { name: en.installAction })).toBeNull()
+    expect(screen.queryByRole('button', { name: en.retry })).toBeNull()
+  })
+
   it('renders the disconnected-transport state and recovers through retry', async () => {
     const deferred = Promise.withResolvers<BrowserSkillStatus>()
     const status = vi.fn<BrowserSkillSettingsSectionInjected['status']>()

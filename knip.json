@@ -40,6 +40,7 @@
         "headless-agent/tests/fixtures/model-router-select-driver.ts",
         "headless-agent/tests/fixtures/model-router-snapshot-fixture.ts",
         "headless-agent/tests/fixtures/model-router-unmount-driver.ts",
+        "headless-agent/tests/fixtures/browser-bundle/driver.ts",
         "headless-agent/tests/fixtures/semantic-checkpoint-agent.ts",
         "headless-agent/tests/fixtures/subagent-diagnostic-agent.ts",
         "headless-agent/tests/fixtures/subagent-inheritance-agent.ts",
@@ -916,6 +917,15 @@
     "packages/bundle/base": {
       "ignoreDependencies": [
         "@shres-code/.+"
+      ]
+    },
+    "packages/bundle/browser": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@shres-code/shres-code-browserskill",
+        "@shres-code/shres-code-client-ui-browserskill"
       ]
     },
     "packages/bundle/headless": {
