@@ -57,8 +57,8 @@ export interface ModelRoutingEscalateBackConfig {
 export interface ModelRoutingHoldConfig {
   /**
    * Steps a downgrade is held through a failed gate or a different candidate
-   * before either may end it. `0` disables stickiness, so every step is judged
-   * on its own. Defaults to 20.
+   * before either may end it. `0` disables stickiness, so each eligible
+   * cold-point or per-turn consult is judged on its own. Defaults to 20.
    */
   minSteps?: number
   /**
