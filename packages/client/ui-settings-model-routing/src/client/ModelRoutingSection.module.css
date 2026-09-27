@@ -519,9 +519,42 @@
   gap: 12px;
 }
 
+.policyRow {
+  align-items: flex-end;
+}
+
+.policyField {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(180px, 100%);
+}
+
+.policyCheck {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.policyCheck input {
+  margin: 0;
+}
+
 .formActions {
   display: flex;
   gap: 8px;
+}
+
+.policyActions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+}
+
+.policyError {
+  flex-basis: 100%;
 }
 
 .input,

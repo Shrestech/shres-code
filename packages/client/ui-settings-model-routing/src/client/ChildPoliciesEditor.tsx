@@ -73,10 +73,11 @@ export function ChildPoliciesEditor({ state, controller, t }: ChildPoliciesEdito
       {rows.childPolicies.map((rule, index) => {
         const error = rowFailure(failure, index)
         return (
-          <div key={index} className={css['row']}>
-            <label>
+          <div key={index} className={clsx(css['formRow'], css['policyRow'])}>
+            <label className={clsx(css['fieldLabel'], css['policyField'])}>
               {t('childKind')}
               <select
+                className={css['select']}
                 disabled={disabled}
                 value={rule.matchKind ?? ''}
                 onChange={(event) => {
@@ -97,17 +98,19 @@ export function ChildPoliciesEditor({ state, controller, t }: ChildPoliciesEdito
                 <option value="workflow">{t('childKindWorkflow')}</option>
               </select>
             </label>
-            <label>
+            <label className={clsx(css['fieldLabel'], css['policyField'])}>
               {t('childAgentType')}
               <input
+                className={css['input']}
                 disabled={disabled}
                 value={rule.agentType ?? ''}
                 onChange={event => update(index, { agentType: event.target.value })}
               />
             </label>
-            <label>
+            <label className={clsx(css['fieldLabel'], css['policyField'])}>
               {t('childCandidate')}
               <select
+                className={css['select']}
                 disabled={disabled}
                 value={rule.candidate}
                 onChange={event => update(index, { candidate: event.target.value })}
@@ -116,7 +119,7 @@ export function ChildPoliciesEditor({ state, controller, t }: ChildPoliciesEdito
                 {poolIds.map(id => <option key={id} value={id}>{id}</option>)}
               </select>
             </label>
-            <label>
+            <label className={clsx(css['fieldLabel'], css['policyCheck'])}>
               {t('childJudge')}
               <input
                 type="checkbox"
@@ -126,37 +129,42 @@ export function ChildPoliciesEditor({ state, controller, t }: ChildPoliciesEdito
                 onChange={event => update(index, { judge: event.target.checked })}
               />
             </label>
-            <button type="button" disabled={disabled || index === 0} onClick={() => {
-              const next = [...rows.childPolicies]
-              const current = next[index]
-              const previous = next[index - 1]
-              if (current === undefined || previous === undefined) return
-              next[index - 1] = current
-              next[index] = previous
-              commit({ ...rows, childPolicies: next })
-            }}>{t('childUp', { index: index + 1 })}</button>
-            <button type="button" disabled={disabled || index === rows.childPolicies.length - 1} onClick={() => {
-              const next = [...rows.childPolicies]
-              const current = next[index]
-              const following = next[index + 1]
-              if (current === undefined || following === undefined) return
-              next[index + 1] = current
-              next[index] = following
-              commit({ ...rows, childPolicies: next })
-            }}>{t('childDown', { index: index + 1 })}</button>
-            <button type="button" disabled={disabled} onClick={() => {
-              commit({ ...rows, childPolicies: rows.childPolicies.filter((_, at) => at !== index) })
-            }}>{t('childDelete', { index: index + 1 })}</button>
-            {error !== undefined ? <p className={css['fieldError']} role="alert">{error.message}</p> : null}
+            <div className={clsx(css['formActions'], css['policyActions'])}>
+              <button type="button" className={css['button']} disabled={disabled || index === 0} onClick={() => {
+                const next = [...rows.childPolicies]
+                const current = next[index]
+                const previous = next[index - 1]
+                if (current === undefined || previous === undefined) return
+                next[index - 1] = current
+                next[index] = previous
+                commit({ ...rows, childPolicies: next })
+              }}>{t('childUp', { index: index + 1 })}</button>
+              <button type="button" className={css['button']} disabled={disabled || index === rows.childPolicies.length - 1} onClick={() => {
+                const next = [...rows.childPolicies]
+                const current = next[index]
+                const following = next[index + 1]
+                if (current === undefined || following === undefined) return
+                next[index + 1] = current
+                next[index] = following
+                commit({ ...rows, childPolicies: next })
+              }}>{t('childDown', { index: index + 1 })}</button>
+              <button type="button" className={css['button']} disabled={disabled} onClick={() => {
+                commit({ ...rows, childPolicies: rows.childPolicies.filter((_, at) => at !== index) })
+              }}>{t('childDelete', { index: index + 1 })}</button>
+            </div>
+            {error !== undefined ? <p className={clsx(css['fieldError'], css['policyError'])} role="alert">{error.message}</p> : null}
           </div>
         )
       })}
-      <button type="button" disabled={disabled} onClick={() => {
-        commit({ ...rows, childPolicies: [...rows.childPolicies, { candidate: poolIds[0] ?? '', judge: false }] })
-      }}>{t('childAdd')}</button>
-      <label>
+      <div className={css['formActions']}>
+        <button type="button" className={css['button']} disabled={disabled} onClick={() => {
+          commit({ ...rows, childPolicies: [...rows.childPolicies, { candidate: poolIds[0] ?? '', judge: false }] })
+        }}>{t('childAdd')}</button>
+      </div>
+      <label className={clsx(css['fieldLabel'], css['policyField'])}>
         {t('childErrors')}
         <input
+          className={css['input']}
           type="number"
           min={1}
           disabled={disabled}
@@ -166,9 +174,10 @@ export function ChildPoliciesEditor({ state, controller, t }: ChildPoliciesEdito
       </label>
       {judges
         ? (
-          <label>
+          <label className={clsx(css['fieldLabel'], css['policyField'])}>
             {t('childInstructions')}
             <textarea
+              className={css['textarea']}
               disabled={disabled}
               value={rows.childRouteInstructions ?? ''}
               onChange={event => commit({ ...rows, childRouteInstructions: event.target.value })}
