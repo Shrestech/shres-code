@@ -13,7 +13,7 @@ import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 import { parseReplayMethod } from '../routing/replay-method.js'
 
 /** The registration's layaGate bounds (prereg-2026-10.registration.json). */
-const gateBounds = { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15 }
+const gateBounds = { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15, eceMax: 0.1 }
 
 /** The R overlay's fixed entry conditions. */
 const entry = { entryScoreCeiling: 2, candidateIds: ['flash'] }
@@ -225,6 +225,21 @@ test('pCheap and confidence can rank differently; the operating point sits on th
   assert.equal(result.operatingPoint.routes, 1)
 })
 
+test('high ECE keeps the replay-curve point and leaves the other gate legs unchanged', () => {
+  const rows = [
+    row({ task: 'false-downgrade', confidence: 0.95, margin: 0.1, pCheap: 0.2, cheapSufficient: false }),
+    row({ task: 'sufficient', confidence: 0.8, margin: 0.4, pCheap: 0.9 }),
+  ]
+  const result = computeReplayMetrics(rows, { eceBins: 2, tieBreak, gate: { ...gateBounds, coverageMin: 0.4 }, entry })
+  assert.ok(result.calibration.ece > result.calibration.eceMax)
+  assert.equal(result.calibration.reading, 'curve-only')
+  assert.deepEqual(result.gate.legs, { auroc: true, feasiblePoint: true, coverage: true })
+  assert.equal(result.gate.passed, true)
+  assert.equal(result.operatingPoint.thresholdSource, 'replay-curve')
+  assert.equal(result.operatingPoint.downgradeThreshold, 0.8)
+  assert.equal(result.operatingPoint.downgradeMargin, 0.4)
+})
+
 test('the two denominators are reported separately', () => {
   const rows = [
     row({ task: 'a', confidence: 0.9, margin: 0.5 }),
@@ -268,6 +283,9 @@ test('method inputs are recorded verbatim; nothing is defaulted', () => {
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, gate: gateBounds, entry }), /tieBreak/)
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, tieBreak, entry }), /gate/)
   assert.throws(() => computeReplayMetrics(rows, { eceBins: 10, tieBreak, gate: gateBounds }), /entry/)
+  assert.throws(() => computeReplayMetrics(rows, {
+    eceBins: 10, tieBreak, gate: { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15 }, entry,
+  }), /gate\.eceMax/)
   assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['bogus'] }), /method\.tieBreak.*unknown-key/)
   assert.throws(() => computeReplayMetrics(rows, { ...full, tieBreak: ['falseDowngrade', 'falseDowngrade'] }), /method\.tieBreak.*duplicate/)
 })

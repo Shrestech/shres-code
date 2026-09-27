@@ -276,6 +276,7 @@ export function ece(samples, binCount) {
  * @property {number} aurocMin - minimum AUROC (preregistered 0.70).
  * @property {number} falseDowngradeMax - maximum false-downgrade share at the chosen point (preregistered 0.10).
  * @property {number} coverageMin - minimum coverage of cold points at the chosen point (preregistered 0.15).
+ * @property {number} eceMax - reported ECE bound; values above it use the replay curve as the threshold source.
  */
 
 /**
@@ -309,11 +310,11 @@ export function ece(samples, binCount) {
  * @property {FixedEntryConditions} fixed
  * @property {{ rows: number, eligible: number, answered: number, unanswered: number, truncated: number, routed: number | null, falseDowngrades: number | null }} counts - selected-point counts are null for a refused search.
  * @property {{ status: 'evaluated', auroc: number | null, positives: number, negatives: number } | LabelRefusal} discrimination
- * @property {{ status: 'evaluated', ece: number | null, bins: object[] } | LabelRefusal} calibration
+ * @property {{ status: 'evaluated', ece: number | null, bins: object[], eceMax: number, reading: 'within-bound' | 'curve-only' | 'unavailable' } | LabelRefusal} calibration
  * @property {{ total: number, byArm: {S: number, C: number}, byReason: Record<string, number> }} unlabelled
  * @property {{ headTokensMean: number | null, headTokensP95: number | null, truncationRate: number | null, unansweredRate: number }} tokens
  * @property {{ downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number | null, falseDowngrades: number | null, falseDowngrade: number | null, feasible: boolean | null, falseDowngradeStatus: 'evaluated' | 'refused-unlabelled' }[]} curve - all grid points, including label-free rates at refused points.
- * @property {{ status: 'evaluated', downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number, falseDowngrades: number, falseDowngrade: number } | { status: 'refused', reason: 'unlabelled-rows' } | null} operatingPoint - null means no feasible point in an evaluated search.
+ * @property {{ status: 'evaluated', downgradeThreshold: number, downgradeMargin: number, routes: number, coverage: number, entryRate: number, falseDowngrades: number, falseDowngrade: number, thresholdSource: 'replay-curve' } | { status: 'refused', reason: 'unlabelled-rows' } | null} operatingPoint - null means no feasible point in an evaluated search.
  * @property {{ status: 'evaluated' | 'method-unpinned', passed: boolean | null, legs: { auroc: boolean | null, feasiblePoint: boolean | null, coverage: boolean | null }, bounds: LayaGateBounds, reading: string }} gate - an unevaluable gate neither passes nor fails.
  */
 
@@ -364,8 +365,11 @@ export function computeReplayMetrics(rows, options) {
     positives: samples.filter(sample => sample.positive).length,
     negatives: samples.filter(sample => !sample.positive).length,
   }
+  const calibrationValues = answeredRows.length > 0 ? ece(samples, eceBins) : { ece: null, bins: [] }
   const calibration = missingAnswered > 0 ? { ...refusal } : {
-    status: 'evaluated', ...(answeredRows.length > 0 ? ece(samples, eceBins) : { ece: null, bins: [] }),
+    status: 'evaluated', ...calibrationValues,
+    eceMax: bounds.eceMax,
+    reading: calibrationReading(calibrationValues.ece, bounds.eceMax),
   }
   const thresholds = [...new Set(candidates.map(row => row.confidence))].sort((a, b) => b - a)
   const margins = [...new Set(candidates.map(row => row.margin))].sort((a, b) => b - a)
@@ -389,7 +393,7 @@ export function computeReplayMetrics(rows, options) {
   const searchRefused = curve.some(point => point.feasible === null)
   const selected = searchRefused ? null : chooseOperatingPoint(curve, tieBreak)
   const operatingPoint = searchRefused ? { status: 'refused', reason: 'unlabelled-rows' }
-    : selected === null ? null : { ...selected, status: 'evaluated' }
+    : selected === null ? null : { ...selected, status: 'evaluated', thresholdSource: 'replay-curve' }
   const gateRefused = searchRefused || missingAnswered > 0
   const legs = gateRefused ? { auroc: null, feasiblePoint: null, coverage: null } : {
     auroc: discrimination.auroc !== null && discrimination.auroc >= bounds.aurocMin,
@@ -433,7 +437,7 @@ function readOptions(options) {
   const { method, methodSha256 } = parseReplayMethod(options.method, { require: ['version', 'eceBins', 'tieBreak'] })
   const { gate, entry } = options
   if (gate === null || typeof gate !== 'object') throw new TypeError('options.gate is required: the registration layaGate bounds')
-  for (const key of ['aurocMin', 'falseDowngradeMax', 'coverageMin']) {
+  for (const key of ['aurocMin', 'falseDowngradeMax', 'coverageMin', 'eceMax']) {
     const value = gate[key]
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
       throw new TypeError(`options.gate.${key} must be a number from 0 through 1`)
@@ -447,6 +451,12 @@ function readOptions(options) {
     throw new TypeError('options.entry.candidateIds must be a non-empty array of non-empty strings')
   }
   return { method, methodSha256, gate, entry }
+}
+
+/** Classify calibration without turning ECE into a second gate. */
+function calibrationReading(value, eceMax) {
+  if (value === null) return 'unavailable'
+  return value <= eceMax ? 'within-bound' : 'curve-only'
 }
 
 /**

@@ -6,7 +6,7 @@ import { computeReplayMetrics, parseLabelledScores, KEEP_CURRENT_OPTION_ID } fro
 import { MethodProvenanceError } from '../routing/replay-method.js'
 import { fixtureMethod, fixtureRow } from './replay-fixture-method.js'
 
-const gate = { aurocMin: 0.7, falseDowngradeMax: 0.05, coverageMin: 0.15 }
+const gate = { aurocMin: 0.7, falseDowngradeMax: 0.05, coverageMin: 0.15, eceMax: 0.1 }
 const entry = { entryScoreCeiling: 2, candidateIds: ['flash'] }
 const method = fixtureMethod({ finalWindow: 'unlabelled' })
 const unknown = { status: 'unlabelled', reason: 'final-window-unlabelled' }
@@ -38,6 +38,7 @@ test('unlabelled routed rows preserve both denominators and refuse the whole sea
   assert.equal(result.calibration.status, 'refused')
   assert.equal(result.gate.status, 'method-unpinned')
   assert.equal(result.gate.passed, null)
+  assert.equal(result.calibration.reason, 'unlabelled-rows')
   assert.deepEqual(result.unlabelled, { total: 1, byArm: { S: 0, C: 1 }, byReason: { 'final-window-unlabelled': 1 } })
 })
 

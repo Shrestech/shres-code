@@ -7,7 +7,7 @@ import { join, relative, sep } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { load as loadYaml } from 'js-yaml'
-import { main, parseArgs } from '../routing/calibrate.js'
+import { calibrateRun, main, parseArgs } from '../routing/calibrate.js'
 import { computeReplayMetrics, validateReplayRow } from '../analysis/replay-metrics.js'
 import { emptyMetrics } from '../runner/metrics.js'
 import { encodeSegment, projectKey } from '../runner/session-layout.js'
@@ -100,6 +100,37 @@ test('CLI paths and seed are explicit and malformed options refuse', () => {
     assert.throws(() => parseArgs([...args, '--write-registration', '--seed', seed, '--overlays-out', 'patches']))
   }
   assert.equal(parseArgs([...args, '--write-registration', '--seed', '0', '--overlays-out', 'patches']).seed, 0)
+  assert.throws(
+    () => parseArgs([
+      ...args, '--write-registration', '--seed', '0', '--overlays-out', 'patches',
+      '--judge-fixture', 'fixture.mjs', '--judge-fixture-config', 'judge.json', '--judge-fixture-engine', 'fixture',
+    ]),
+    /cannot be combined with --judge-fixture/,
+  )
+})
+
+test('the programmatic driver refuses fixture registration before reading or creating anything', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'routing-fixture-write-'))
+  const registrationPath = join(root, 'registration.json')
+  const outDir = join(root, 'out')
+  await writeFile(registrationPath, '{"untouched":true}\n')
+  const before = digest(await readFile(registrationPath))
+  try {
+    await assert.rejects(
+      () => calibrateRun({
+        experimentDir: join(root, 'missing-experiment'), registrationPath,
+        taskRoot: join(root, 'missing-tasks'), outDir,
+        writeRegistration: true, seed: 7, overlaysOut: join(root, 'overlays'),
+        judgeFixturePath: join(root, 'fixture.mjs'), judgeFixtureEnabled: true,
+      }, { repoRoot: root, env: {} }),
+      /cannot be combined with --judge-fixture/,
+    )
+    assert.equal(digest(await readFile(registrationPath)), before)
+    await assert.rejects(access(outDir), { code: 'ENOENT' })
+    await assert.rejects(access(join(root, 'overlays')), { code: 'ENOENT' })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('the real draft registration refuses before reading a nonexistent experiment', async () => {
@@ -116,11 +147,17 @@ test('the real draft registration refuses before reading a nonexistent experimen
   }
 })
 
-test('answered S rows retain unknown labels, publish evidence and refuse registration', async () => {
+test('fixture evidence cannot finalize registration and still records unknown labels', async () => {
   await fixture('answered', async ({ root, args, outDir, registrationPath }) => {
     const before = digest(await readFile(registrationPath))
-    const result = await invoke([...args, '--write-registration', '--seed', '7', '--overlays-out', join(root, 'overlays')])
-    assert.equal(result.code, 4, result.errors.join('\n'))
+    const refusal = await invoke([...args, '--write-registration', '--seed', '7', '--overlays-out', join(root, 'overlays')])
+    assert.equal(refusal.code, 2, refusal.errors.join('\n'))
+    assert.match(refusal.errors.join('\n'), /cannot be combined with --judge-fixture/)
+    await assert.rejects(access(outDir), { code: 'ENOENT' })
+    await assert.rejects(access(join(root, 'overlays')), { code: 'ENOENT' })
+    assert.equal(digest(await readFile(registrationPath)), before)
+    const result = await invoke(args)
+    assert.equal(result.code, 0, result.errors.join('\n'))
     const rows = (await readFile(join(outDir, 'labelled-scores.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse)
     assert.ok(rows.length > 0)
     assert.ok(rows.some(row => row.arm === 'S' && row.answered))
@@ -134,6 +171,7 @@ test('answered S rows retain unknown labels, publish evidence and refuse registr
     const metrics = JSON.parse(await readFile(join(outDir, 'metrics.json'), 'utf8'))
     assert.equal(metrics.gate.status, 'method-unpinned')
     assert.equal(metrics.gate.passed, null)
+    assert.equal(metrics.gate.bounds.eceMax, 0.1)
     assert.equal(metrics.discrimination.status, 'refused')
     assert.equal(metrics.calibration.status, 'refused')
     assert.deepEqual(metrics, computeReplayMetrics(rows, { method: fixtureMethod(), gate: metrics.gate.bounds, entry: metrics.fixed }))
@@ -145,10 +183,13 @@ test('answered S rows retain unknown labels, publish evidence and refuse registr
   })
 })
 
-test('all-unfit replay writes an evaluated failed gate once without overlays', async () => {
+test('fixture replay records an evaluated failed gate without finalizing registration', async () => {
   await fixture('unfit', async ({ root, args, outDir, registrationPath }) => {
     const writing = [...args, '--write-registration', '--seed', '7', '--overlays-out', join(root, 'overlays')]
-    const result = await invoke(writing)
+    const refusal = await invoke(writing)
+    assert.equal(refusal.code, 2, refusal.errors.join('\n'))
+    assert.match(refusal.errors.join('\n'), /cannot be combined with --judge-fixture/)
+    const result = await invoke(args)
     assert.equal(result.code, 0, result.errors.join('\n'))
     const metrics = JSON.parse(await readFile(join(outDir, 'metrics.json'), 'utf8'))
     assert.ok(metrics.counts.eligible > 0)
@@ -156,12 +197,8 @@ test('all-unfit replay writes an evaluated failed gate once without overlays', a
     assert.equal(metrics.gate.status, 'evaluated')
     assert.equal(metrics.gate.passed, false)
     const registration = JSON.parse(await readFile(registrationPath, 'utf8'))
-    assert.equal(registration.replayGate, 'failed')
-    assert.equal(registration.enforced, undefined)
+    assert.equal(registration.replayGate, undefined)
     await assert.rejects(access(join(root, 'overlays')), { code: 'ENOENT' })
-    const again = await invoke(writing)
-    assert.equal(again.code, 2)
-    assert.match(again.errors.join('\n'), /already finalized/)
   })
 })
 

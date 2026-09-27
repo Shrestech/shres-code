@@ -2,7 +2,8 @@
  * Replay a complete S/C run with the composed fitted judge and publish its
  * labelled rows and metrics. A draft registration is refused before any
  * replay child is launched; method choices are required before any child is
- * launched. Registration finalization is explicit and happens after the
+ * launched. Fixture judging is evidence-only and cannot finalize a
+ * registration. Registration finalization is explicit and happens after the
  * evidence directory is published; a writer refusal keeps that evidence.
  * @module bench/routing/calibrate
  */
@@ -23,7 +24,7 @@ const USAGE = [
   'Usage: node bench/routing/calibrate.js --experiment-dir <dir> --registration <file> --task-root <dir> --out <dir>',
   '  [--extra-overlay <file>] [--write-registration --seed <int> --overlays-out <dir>]',
   '  [--judge-fixture <module> --judge-fixture-config <json> --judge-fixture-engine <id> [--judge-fixture-disabled]]',
-  'Fixture mode produces test evidence, not real calibration.',
+  'Fixture mode produces test evidence, not real calibration, and cannot be combined with --write-registration.',
 ].join('\n')
 const PATH_FLAGS = {
   'experiment-dir': 'experimentDir', registration: 'registrationPath',
@@ -31,7 +32,8 @@ const PATH_FLAGS = {
   'extra-overlay': 'extraOverlayPath', 'overlays-out': 'overlaysOut',
   'judge-fixture': 'judgeFixturePath', 'judge-fixture-config': 'judgeFixtureConfigPath',
 }
-const GATE_KEYS = ['aurocMin', 'falseDowngradeMax', 'coverageMin']
+const GATE_KEYS = ['aurocMin', 'falseDowngradeMax', 'coverageMin', 'eceMax']
+const FIXTURE_WRITE_REFUSAL = '--write-registration cannot be combined with --judge-fixture; fixture mode produces test evidence, not real calibration'
 
 /**
  * Parse the explicit calibration inputs; no numerical method choice defaults.
@@ -66,6 +68,7 @@ export function parseArgs(argv) {
   if (fixture && fixtureFlags.slice(0, 3).some(flag => !values[flag])) {
     throw new UsageError('--judge-fixture requires --judge-fixture-config and --judge-fixture-engine together')
   }
+  if (writing && fixture) throw new UsageError(FIXTURE_WRITE_REFUSAL)
   let seed
   if (values.seed !== undefined) {
     if (!/^[0-9]+$/.test(values.seed) || !Number.isSafeInteger(Number(values.seed))) {
@@ -128,8 +131,10 @@ function jsonl(records) {
  * @param {string} runtime.repoRoot - repository containing the built launcher.
  * @param {object} runtime.env - child environment, never included in artifacts.
  * @returns {Promise<object>} output path, method identity, metrics and writer result.
+ * @throws {UsageError} when fixture judging is combined with registration finalization.
  */
 export async function calibrateRun(options, { repoRoot, env }) {
+  if (options.writeRegistration && options.judgeFixturePath !== undefined) throw new UsageError(FIXTURE_WRITE_REFUSAL)
   const registrationBytes = await readFile(options.registrationPath)
   let registration
   try {

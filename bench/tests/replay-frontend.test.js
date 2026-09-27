@@ -336,7 +336,7 @@ test('class-B artifact is ignored by metrics', () => {
   base.label = { status: 'unlabelled', reason: 'no-label-source-for-arm' }
   validateReplayRow(base, 'plain')
   validateReplayRow({ ...base, artifact: 'open-final-turn' }, 'b')
-  const options = { method, gate: { aurocMin: 0, falseDowngradeMax: 1, coverageMin: 0 }, entry: { entryScoreCeiling: 2, candidateIds: ['flash'] } }
+  const options = { method, gate: { aurocMin: 0, falseDowngradeMax: 1, coverageMin: 0, eceMax: 0.1 }, entry: { entryScoreCeiling: 2, candidateIds: ['flash'] } }
   const withB = computeReplayMetrics([base, { ...base, coldPointId: 'c2', artifact: 'open-final-turn' }], options)
   const without = computeReplayMetrics([base, { ...base, coldPointId: 'c2' }], options)
   assert.deepEqual(withB, without)

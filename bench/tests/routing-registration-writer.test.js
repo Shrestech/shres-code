@@ -75,13 +75,13 @@ function denominatorsRows() {
 function passingMetrics(benchRoot) {
   const registration = JSON.parse(readFileSync(join(benchRoot, 'routing', REGISTRATION), 'utf8'))
   const rOverlay = readFileSync(join(benchRoot, 'routing', R_OVERLAY), 'utf8')
-  const { aurocMin, falseDowngradeMax, coverageMin } = registration.operatingPoint.layaGate
+  const { aurocMin, falseDowngradeMax, coverageMin, eceMax } = registration.operatingPoint.layaGate
   const entryScoreCeiling = Number(rOverlay.match(/"entryScoreCeiling":(\d+)/)[1])
   const candidates = JSON.parse(rOverlay.match(/\bcandidates: (\[.*\])$/m)[1])
   return computeReplayMetrics(denominatorsRows(), {
     eceBins: 10,
     tieBreak: ['falseDowngrade', 'downgradeThreshold', 'downgradeMargin'],
-    gate: { aurocMin, falseDowngradeMax, coverageMin },
+    gate: { aurocMin, falseDowngradeMax, coverageMin, eceMax },
     entry: { entryScoreCeiling, candidateIds: candidates.map(candidate => candidate.id) },
   })
 }
@@ -94,7 +94,7 @@ function failingMetrics() {
   return computeReplayMetrics(rows, {
     eceBins: 10,
     tieBreak: ['falseDowngrade', 'downgradeThreshold', 'downgradeMargin'],
-    gate: { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15 },
+    gate: { aurocMin: 0.7, falseDowngradeMax: 0.1, coverageMin: 0.15, eceMax: 0.1 },
     entry: { entryScoreCeiling: 2, candidateIds: ['flash'] },
   })
 }
@@ -313,6 +313,42 @@ test('writes are atomic: the registration stays valid JSON and no temp file surv
   const files = readdirSync(join(benchRoot, 'routing'))
   assert.ok(files.every(name => !name.includes('.tmp-')), `no temp file survives: ${files.join(', ')}`)
   assert.doesNotThrow(() => JSON.parse(readFileSync(join(benchRoot, 'routing', REGISTRATION), 'utf8')))
+})
+
+test('registration failure rolls back only this attempt’s overlay pair', () => {
+  const { root, benchRoot } = fixtureTree()
+  const registrationPath = join(benchRoot, 'routing', REGISTRATION)
+  const outDir = join(root, 'existing-out')
+  mkdirSync(outDir)
+  const retainedPath = join(outDir, 'retain.txt')
+  writeFileSync(retainedPath, 'keep this file\n')
+  const before = readFileSync(registrationPath)
+  assert.throws(
+    () => writeRegistration({
+      registrationPath,
+      metrics: passingMetrics(benchRoot),
+      seed: 20261016,
+      outDir,
+    }, { writeRegistrationFile: () => { throw new Error('injected registration write failure') } }),
+    /injected registration write failure/,
+  )
+  assert.ok(before.equals(readFileSync(registrationPath)), 'registration bytes remain provisional')
+  assert.equal(readFileSync(retainedPath, 'utf8'), 'keep this file\n')
+  assert.deepEqual(readdirSync(outDir), ['retain.txt'])
+
+  const second = fixtureTree()
+  const secondRegistration = join(second.benchRoot, 'routing', REGISTRATION)
+  const secondOut = join(second.root, 'created-out')
+  assert.throws(
+    () => writeRegistration({
+      registrationPath: secondRegistration,
+      metrics: passingMetrics(second.benchRoot),
+      seed: 20261016,
+      outDir: secondOut,
+    }, { writeRegistrationFile: () => { throw new Error('injected registration write failure') } }),
+    /injected registration write failure/,
+  )
+  assert.equal(existsSync(secondOut), false, 'an output directory created by the attempt is removed')
 })
 
 test('refusals: missing registration, drifted schema, malformed metrics, and existing outputs', () => {

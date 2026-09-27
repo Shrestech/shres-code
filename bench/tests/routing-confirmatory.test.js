@@ -73,7 +73,7 @@ function row(overrides) {
 function passingMetrics(benchRoot) {
   const registration = JSON.parse(readFileSync(join(benchRoot, 'routing', REGISTRATION), 'utf8'))
   const rOverlay = readFileSync(join(benchRoot, 'routing', R_OVERLAY), 'utf8')
-  const { aurocMin, falseDowngradeMax, coverageMin } = registration.operatingPoint.layaGate
+  const { aurocMin, falseDowngradeMax, coverageMin, eceMax } = registration.operatingPoint.layaGate
   const entryScoreCeiling = Number(rOverlay.match(/"entryScoreCeiling":(\d+)/)[1])
   const candidates = JSON.parse(rOverlay.match(/\bcandidates: (\[.*\])$/m)[1])
   const rows = [
@@ -85,7 +85,7 @@ function passingMetrics(benchRoot) {
   ]
   return computeReplayMetrics(rows, {
     method: fixtureMethod(),
-    gate: { aurocMin, falseDowngradeMax, coverageMin },
+    gate: { aurocMin, falseDowngradeMax, coverageMin, eceMax },
     entry: { entryScoreCeiling, candidateIds: candidates.map(candidate => candidate.id) },
   })
 }

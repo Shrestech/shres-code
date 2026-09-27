@@ -27,14 +27,16 @@
  * A draft registration is refused before metrics are accepted or any output
  * path is touched. Writes are one-shot and atomic: the registration is rewritten whole through
  * a temp file and rename, a registration past the provisional phase
- * (`registrationPhase`) is never overwritten, the static `status` field is
- * never changed, and the generated confirmatory overlays go to an output
- * directory, never over the committed provisional overlays. This module
- * writes files only; it runs no replay, no model, and no trial.
+ * (`registrationPhase`) is never overwritten, and the generated confirmatory
+ * overlays are staged as a complete pair before either registration finalization
+ * or a confirmatory run can use them. If finalization fails, rollback removes
+ * only overlay files and an output directory created by that attempt; existing
+ * output contents remain untouched. This module writes files only; it runs no
+ * replay, no model, and no trial.
  *
  * @module bench/routing/write-registration
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { registrationPhase } from './registration-phase.js'
@@ -80,12 +82,15 @@ const PROVISIONAL_R_POINT = /^(\s*)operatingPoints: \[\{"engine":"laya","downgra
  * @param {number} options.seed - the experiment's fixed seed for arm N's bench-random engine.
  * @param {string} options.outDir - the directory for the generated confirmatory overlays, created
  *   when missing; existing targets refuse the write.
+ * @param {object} [hooks] - filesystem hook used by keyless tests to inject a registration-write failure.
+ * @param {(path: string, text: string) => void} [hooks.writeRegistrationFile=writeFileAtomic] - final registration writer.
  * @returns {WriteRegistrationResult} what was written, for the CLI and tests.
  * @throws {TypeError} on a malformed metrics result, an inconsistent or already-finalized
  *   registration, an unexpected provisional overlay shape, or an existing output target.
  */
-export function writeRegistration({ registrationPath, metrics, seed, outDir }) {
+export function writeRegistration({ registrationPath, metrics, seed, outDir }, { writeRegistrationFile = writeFileAtomic } = {}) {
   if (typeof registrationPath !== 'string' || registrationPath === '') throw new TypeError('registrationPath must be a non-empty path')
+  if (typeof writeRegistrationFile !== 'function') throw new TypeError('hooks.writeRegistrationFile must be a function')
   const registration = readRegistration(registrationPath)
   const phase = registrationPhase(registration)
   if (phase === 'draft') {
@@ -128,19 +133,25 @@ export function writeRegistration({ registrationPath, metrics, seed, outDir }) {
     throw new TypeError('the writer never changes the registration status')
   }
 
-  // Every fallible step of overlay preparation runs before the registration is
-  // finalized, so a drifted provisional overlay cannot strand a written
-  // registration without its confirmatory overlays.
+  // Every fallible step of overlay preparation and publication runs before the
+  // registration is finalized, so a drifted provisional overlay or a partial
+  // output cannot strand a written registration without its pair.
   let overlays
+  let publication
   if (validated.passed) {
     overlays = prepareConfirmatoryOverlays({ registrationPath, registration, enforced, outDir })
+    publication = publishConfirmatoryOverlays(overlays)
   }
-  writeFileAtomic(registrationPath, `${JSON.stringify(next, null, 2)}\n`)
+  try {
+    writeRegistrationFile(registrationPath, `${JSON.stringify(next, null, 2)}\n`)
+  } catch (error) {
+    if (publication !== undefined) rollbackOverlayPublication(publication)
+    throw error
+  }
   if (!validated.passed) {
     return { replayGate: next.replayGate, registrationPath, enforced: undefined, overlays: undefined }
   }
-  writeConfirmatoryOverlays(overlays)
-  return { replayGate: next.replayGate, registrationPath, enforced, overlays: { routeColdpoint: overlays.rTarget, randomMatched: overlays.nTarget } }
+  return { replayGate: next.replayGate, registrationPath, enforced, overlays: { routeColdpoint: publication.rTarget, randomMatched: publication.nTarget } }
 }
 
 /** Read and shape-check the committed registration; refusal names the file. */
@@ -221,11 +232,64 @@ function prepareConfirmatoryOverlays({ registrationPath, registration, enforced,
   return { rText, nText, rTarget, nTarget, outDir }
 }
 
-/** Write the prepared overlays; the only step after the registration is finalized. */
-function writeConfirmatoryOverlays({ rText, nText, rTarget, nTarget, outDir }) {
-  mkdirSync(outDir, { recursive: true })
-  writeFileSync(rTarget, rText)
-  writeFileSync(nTarget, nText)
+/**
+ * Publish both prepared overlays before registration finalization.
+ *
+ * The private staging directory prevents a half-written pair from being
+ * mistaken for a complete confirmatory output. Exclusive hard links publish
+ * each staged file without overwriting a target that appeared concurrently.
+ * Existing output directories retain unrelated files; only targets this call
+ * successfully publishes are eligible for rollback.
+ */
+function publishConfirmatoryOverlays({ rText, nText, rTarget, nTarget, outDir }) {
+  const outputExisted = existsSync(outDir)
+  let stageDir
+  const published = []
+  try {
+    mkdirSync(outDir, { recursive: true })
+    stageDir = mkdtempSync(join(outDir, '.routing-overlays.tmp-'))
+    const stageR = join(stageDir, basename(rTarget))
+    const stageN = join(stageDir, basename(nTarget))
+    writeFileSync(stageR, rText, { flag: 'wx' })
+    writeFileSync(stageN, nText, { flag: 'wx' })
+    linkSync(stageR, rTarget)
+    published.push({ path: rTarget, text: rText })
+    unlinkSync(stageR)
+    linkSync(stageN, nTarget)
+    published.push({ path: nTarget, text: nText })
+    unlinkSync(stageN)
+    rmdirSync(stageDir)
+    stageDir = undefined
+    return { rTarget, nTarget, outDir, outputCreated: !outputExisted, published }
+  } catch (error) {
+    if (stageDir !== undefined) rmSync(stageDir, { recursive: true, force: true })
+    removePublishedOverlays({ outDir, outputCreated: !outputExisted, published })
+    throw error
+  }
+}
+
+/** Roll back only the overlay pair and output directory created by this call. */
+function rollbackOverlayPublication(publication) {
+  removePublishedOverlays(publication)
+}
+
+/** Remove published files whose bytes still belong to this attempt. */
+function removePublishedOverlays({ outDir, outputCreated, published }) {
+  for (const { path, text } of published.toReversed()) {
+    if (!existsSync(path)) continue
+    try {
+      if (readFileSync(path, 'utf8') === text) unlinkSync(path)
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+    }
+  }
+  if (outputCreated) {
+    try {
+      rmdirSync(outDir)
+    } catch (error) {
+      if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error
+    }
+  }
 }
 
 /** Resolve one registration-named overlay under the repo root; refusal names the expected path. */
