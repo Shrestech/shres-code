@@ -885,7 +885,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/configuration': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1173`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1174`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingdecision--log-only"></a>
 
@@ -900,7 +900,7 @@ Source: [`packages/llm/model-router/src/types.ts:1173`](../packages/llm/model-ro
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1185`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1186`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -915,7 +915,7 @@ Source: [`packages/llm/model-router/src/types.ts:1185`](../packages/llm/model-ro
 'model-routing/mode': ModelRoutingModeRecord
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:1179`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:1180`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

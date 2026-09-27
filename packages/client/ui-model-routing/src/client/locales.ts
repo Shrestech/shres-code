@@ -94,7 +94,7 @@ export const en = {
   'verdict.off': 'Routing is Off for this session now; these are the decisions it made while it was On.',
   'verdict.shadow': 'In shadow, routing would have served {share} of judged steps on pool models across {streaks} streaks.',
   'kpi.wouldHave': 'Would have',
-  'kpi.warmSkipped': 'Warm turns skipped',
+  'kpi.warmSkipped': 'Warm judge skips',
   'kpi.warmSkipped.detail': 'no judge call, prefix kept warm',
 
   'kpi.none': '—',

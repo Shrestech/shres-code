@@ -779,7 +779,7 @@ describe('headless model-routing snapshots', () => {
     }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
-  it('enters a quota route only at cold points and returns the held streak at the next one', async () => {
+  it('enters at cold points, holds a warm candidate turn, and returns at the next one', async () => {
     const server = await startMockLlmServer({
       sequence: ['tool_call_success', 'success'],
       repeatLast: true,
@@ -793,16 +793,16 @@ describe('headless model-routing snapshots', () => {
         configPath: join(exampleDir, 'model-router-coldpoint.cordis.snapshot.yml'),
         promptFixture: 'model-router-coldpoint',
       }, server)
-      // The manual model served turns 1 (second step), 2, and 4; the routed
-      // candidate served turn 1's first step and turn 3.
+      // The manual model served turn 1's second step, turn 2, and turn 5; the
+      // routed candidate served turn 1's first step and turns 3-4.
       expect(server.requests.map((_, index) => requestedModel(server, index))).toEqual([
-        'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-pro',
+        'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash', 'deepseek-v4-pro',
       ])
       const decisions = parseJsonl(output.session)
         .filter(event => event['type'] === 'model-routing/decision')
         .map(event => event['data'] as Record<string, unknown>)
       expect(decisions.map(decision => decision['reason'])).toEqual([
-        'gate-passed', 'gate-failed', 'warm-prefix', 'gate-passed', 'cold-point-return',
+        'gate-passed', 'gate-failed', 'warm-prefix', 'gate-passed', 'sticky-hold', 'cold-point-return',
       ])
       // Session start is a cold point of the quota route, under the fallback
       // lifetime: the adapter declares none.
@@ -823,13 +823,28 @@ describe('headless model-routing snapshots', () => {
         coldPoint: { kind: 'idle', ttlMs: 300_000, ttlSource: 'fallback' },
       })
       expect((decisions[3]?.coldPoint as { idleMs?: number }).idleMs ?? 0).toBeGreaterThan(300_000)
-      // Turn 4 returns the held streak at that cold point without judging.
+      // Turn 4 remains on the held candidate through a warm turn. Its null
+      // cold point and absent judgment fields prove the fixture made no ask.
       expect(decisions[4]).toMatchObject({
+        outcome: 'downgraded',
+        reason: 'sticky-hold',
+        coldPoint: null,
+        selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        cache: { base: { ttlMs: 86_400_000, source: 'fallback' } },
+        sticky: { active: true },
+      })
+      expect(decisions[4]).not.toHaveProperty('route')
+      expect(decisions[4]).not.toHaveProperty('engineId')
+      expect(decisions[4]).not.toHaveProperty('candidateEligibility')
+      expect(decisions[4]).not.toHaveProperty('latencyMs')
+      expect(decisions[4]).not.toHaveProperty('inputChars')
+      // Turn 5 restores the shorter lifetime and returns the held streak at
+      // that cold point without judging.
+      expect(decisions[5]).toMatchObject({
         outcome: 'kept-strong',
         coldPoint: { kind: 'idle' },
         sticky: { active: false, stepsElapsed: 0, brokenBy: 'cold-point-return' },
       })
-      expect(decisions[4]).not.toHaveProperty('route')
       await expectArmFixtures('model-router-coldpoint', output)
     } finally {
       await server.close()
