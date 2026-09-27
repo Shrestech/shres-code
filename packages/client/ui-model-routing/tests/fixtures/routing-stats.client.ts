@@ -32,7 +32,10 @@ export function emptyStats(): ModelRoutingStatsSnapshot {
     counts: {
       decisions: 0, consults: 0, downgradedSteps: 0, steps: 0, streaks: 0,
       keptStrong: 0, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 0, warmSkipped: 0,
+      childRouted: 0, childFailures: 0, childSuccesses: 0, childNeutral: 0,
     },
+    children: { decided: 0, routed: 0, kept: 0, byReason: [], byModel: [], failures: 0 },
+    recentChildren: [],
     reasons: [],
     keptReasons: [],
     exits: [],
@@ -93,6 +96,7 @@ export function liveStats(): ModelRoutingStatsSnapshot {
     counts: {
       decisions: 22, consults: 22, downgradedSteps: 0, steps: 93, streaks: 0,
       keptStrong: 22, routeFailed: 0, judgeFailed: 0, deadlineHits: 0, warmUps: 0, turnsWithDecisions: 22, warmSkipped: 0,
+      childRouted: 0, childFailures: 0, childSuccesses: 0, childNeutral: 0,
     },
     reasons: [
       { reason: 'current-preferred', group: 'judge-no', count: 15 },
@@ -153,6 +157,7 @@ export function activeStats(): ModelRoutingStatsSnapshot {
     counts: {
       decisions: 60, consults: 40, downgradedSteps: 38, steps: 100, streaks: 6,
       keptStrong: 20, routeFailed: 2, judgeFailed: 20, deadlineHits: 3, warmUps: 0, turnsWithDecisions: 60, warmSkipped: 3,
+      childRouted: 0, childFailures: 0, childSuccesses: 0, childNeutral: 0,
     },
     reasons: [
       { reason: 'gate-passed', group: 'switched', count: 20 },

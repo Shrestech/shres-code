@@ -160,7 +160,7 @@ function hasHostedToolFloor(
  * accounting is not available yet.
  */
 export async function assessModelRoutingCandidates(
-  runtime: LlmRuntime,
+  runtime: Pick<LlmRuntime, 'resolveModelInfo' | 'prepareCall'>,
   base: LlmCallConfig,
   messages: readonly Message[],
   candidates: readonly ModelRoutingCandidate[],

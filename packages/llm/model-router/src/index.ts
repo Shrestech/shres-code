@@ -48,13 +48,16 @@ import type {
   PreStepDecision,
   RequestErrorAction,
 } from '@shres-code/shres-code-agent'
+import { childTurnOutcomes } from '@shres-code/shres-code-subagent'
+import type { SubagentChildRoute, SubagentChildRouteRequest, SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
+import { logChildDecision, resolveChildRouteConsult } from './child-route.ts'
+import { outcomesFromChildTurns, recordedChildOutcomes, routedChildDecisions, suspendedChildCandidates } from './child-outcomes.ts'
 import {
   declareJudgmentConsumer,
   JudgmentError,
   judgmentConsumerId,
   judgmentEngineId,
   judgmentEnabled,
-  judgmentQuestionId,
 } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
@@ -66,10 +69,12 @@ import type {
   JudgmentScoreAnswer,
   JudgmentScoreQuestion,
   JudgmentService,
+  JudgmentTokenFit,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
-import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import { SessionId } from '@shres-code/shres-code-session/types'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
 // Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children,
@@ -88,6 +93,7 @@ import {
   DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
   DEFAULT_JUDGMENT_DEADLINE_MS,
   DEFAULT_JUDGMENT_HOLD_TOLERANCE,
+  DEFAULT_CHILD_ROUTE_ERRORS,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -130,6 +136,8 @@ import { summarizeSession, workspaceStats } from './workspace-stats.ts'
 import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
+import { consultInputFrom } from './replay.ts'
+import { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 import type {
   ModelRoutingCacheTtl,
   ModelRoutingJudgmentFailures,
@@ -139,6 +147,7 @@ import type {
 import type {
   ModelRoutingCalibration,
   ModelRoutingCandidate,
+  ModelRoutingChildDecision,
   ModelRoutingDecision,
   ModelRoutingDecisionDetail,
   ModelRoutingEngineFailure,
@@ -174,6 +183,7 @@ export {
   DEFAULT_JUDGMENT_BREAKER_THRESHOLD,
   DEFAULT_JUDGMENT_DEADLINE_MS,
   DEFAULT_JUDGMENT_HOLD_TOLERANCE,
+  DEFAULT_CHILD_ROUTE_ERRORS,
   DEFAULT_MAX_ROUTE_ERRORS,
   DEFAULT_REENTRY_COOLDOWN_TURNS,
   DEFAULT_STATE_CONTEXT_TURNS,
@@ -187,7 +197,20 @@ export {
   MAX_UNKNOWN_TTL_MS,
   resolveConfig,
 } from './config.ts'
-export { foldModelRouting, modeOfRecord, modeRecord, shadowStickyState, stickyState } from './folds.ts'
+export { coldPointAt, foldModelRouting, modeOfRecord, modeRecord, shadowStickyState, stickyState } from './folds.ts'
+export {
+  consultPrefix,
+  replayConsultInput,
+  ReplayConsultError,
+} from './replay.ts'
+export type {
+  ReplayConsultAsk,
+  ReplayConsultAt,
+  ReplayConsultCache,
+  ReplayConsultIneligible,
+  ReplayConsultInput,
+  ReplayConsultWarm,
+} from './replay.ts'
 export { foldModelRoutingStats, routeMargin } from './stats.ts'
 export type { ModelRoutingJudgmentFailures, ModelRoutingStickyState } from './folds.ts'
 
@@ -223,11 +246,7 @@ export function routingCalibration(
   return point.calibratedBy === undefined ? { kind: 'point' } : { kind: 'calibrated', by: point.calibratedBy }
 }
 
-/** The route question's id, echoed by the answer this service reads. */
-export const ROUTE_QUESTION_ID = judgmentQuestionId('model-route')
-
-/** The difficulty question's id, echoed by the answer this service reads. */
-export const DIFFICULTY_QUESTION_ID = judgmentQuestionId('turn-difficulty')
+export { DIFFICULTY_QUESTION_ID, ROUTE_QUESTION_ID } from './question-ids.ts'
 
 /** The human command that switches routing. */
 export const ROUTE_COMMAND = 'route'
@@ -518,6 +537,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       objective: z.union(['quota', 'dollars', 'latency']).required(),
       allowEveryTurn: z.boolean(),
     })).default([]),
+    childPolicies: z.array(z.object({
+      match: z.object({
+        kind: z.union(['subagent', 'workflow']),
+        agentType: z.string(),
+      }).required(),
+      candidate: z.string().required(),
+      judge: z.boolean(),
+    })).default([]),
+    childRouteErrors: z.number().step(1).min(1).default(DEFAULT_CHILD_ROUTE_ERRORS),
+    childRouteInstructions: z.string(),
     downgradeThreshold: z.number().min(0).max(1).required(),
     downgradeMargin: z.number().min(0).max(1).required(),
     operatingPoints: z.array(z.object({
@@ -706,12 +735,14 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         view: viewStats,
         // The unit state counts warm-ups, judge usage, recorded thresholds, and failed-ask latency,
         // plus the per-model cache lifetimes and shadow figures decisions record, and nothing sent
-        // for a call the dispatcher refused before dispatching it.
-        stateVersion: 5,
+        // for a call the dispatcher refused before dispatching it, and child-route counts.
+        stateVersion: 6,
       })
     })
     declareJudgmentConsumer(ctx, MODEL_ROUTER_JUDGMENT_CONSUMER)
     this.reportUnregisteredOperatingPoints(ctx)
+    ctx.effect(() => ctx.on('subagent/child-route', (request, next) => this.onChildRoute(request, next)))
+    this.observeChildOutcomes()
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         name: ROUTE_COMMAND,
@@ -851,6 +882,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     this.liveAgents.add(agent)
     this.reconcileConfiguration(agent.session)
+    void this.reconcileChildOutcomes(agent)
   }
 
   /**
@@ -863,6 +895,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.unreachable.delete(agent)
     this.liveAgents.add(agent)
     this.reconcileConfiguration(agent.session)
+    void this.reconcileChildOutcomes(agent)
   }
 
   /** Resolve service ownership through the agent's current isolation realm. */
@@ -1162,6 +1195,275 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   }
 
   /**
+   * Answer one `subagent/child-route` consult. `next()` runs first so another
+   * listener's answer wins and this policy records nothing.
+   * @param request - the waterfall request, including the minted routeRequestId.
+   * @param next - remaining listeners.
+   * @returns the route to start the child with, or undefined to keep inherited.
+   */
+  async onChildRoute(
+    request: SubagentChildRouteRequest,
+    next: () => Promise<SubagentChildRoute | undefined>,
+  ): Promise<SubagentChildRoute | undefined> {
+    const answered = await next()
+    if (answered !== undefined) return answered
+    const config = this.config()
+    const consult = resolveChildRouteConsult({
+      config,
+      mode: this.modeOf(request.parent.session),
+      suspended: suspendedChildCandidates(request.parent.session.events, config.childRouteErrors),
+    }, request)
+    if (consult.pendingJudge === true && consult.candidate !== undefined && consult.common !== undefined && consult.keep !== undefined) {
+      const judged = await this.judgeChildRoute(request, consult.candidate, consult.common, consult.keep, config)
+      logChildDecision(request.parent.session, judged.decision)
+      return judged.route
+    }
+    if (consult.decision !== undefined) logChildDecision(request.parent.session, consult.decision)
+    return consult.route
+  }
+
+  /**
+   * Ask keep-current vs one pool candidate over the child's prompt. Correlation
+   * is `child:<routeRequestId>` and is never transmitted by the engines.
+   */
+  private async judgeChildRoute(
+    request: SubagentChildRouteRequest,
+    candidate: ModelRoutingCandidate,
+    common: Omit<ModelRoutingChildDecision, 'outcome' | 'reason' | 'selection'>,
+    keep: (reason: ModelRoutingChildDecision['reason']) => { decision: ModelRoutingChildDecision },
+    config: ResolvedModelRouterConfig,
+  ): Promise<{ route?: SubagentChildRoute; decision: ModelRoutingChildDecision }> {
+    const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
+    if (request.prompt.length > config.state.maxChars) {
+      return {
+        decision: {
+          ...keep('input-too-large').decision,
+          inputChars: 0,
+        },
+      }
+    }
+    const engine = this.ctx.get('judgment')
+    if (engine === undefined) return keep('engine-absent')
+    if (!judgmentEnabled(engine.settings)) return keep('engine-absent')
+    const snapshot = this.engineSnapshot(engine, config, { active: false, stepsElapsed: 0 })
+    const snapshotFacts = {
+      ...snapshot.engineId === undefined ? {} : { engineId: snapshot.engineId },
+      thresholds: snapshot.thresholds,
+    }
+    let evaluatedFacts = snapshotFacts
+    if (snapshot.refused) return { decision: { ...keep('engine-uncalibrated').decision, ...snapshotFacts } }
+    if (snapshot.warming !== undefined) {
+      return {
+        decision: {
+          ...keep('engine-unavailable').decision,
+          ...snapshotFacts,
+          engineFailure: { code: 'UNAVAILABLE', engineState: snapshot.warming },
+        },
+      }
+    }
+    const instructions = config.childRouteInstructions
+    if (instructions === undefined) return { decision: { ...keep('engine-absent').decision, ...snapshotFacts } }
+    const questions = [{
+      kind: 'choice' as const,
+      id: ROUTE_QUESTION_ID,
+      instructions,
+      options: [
+        { option: KEEP_CURRENT_OPTION_ID, description: 'Keep the inherited parent model.' },
+        { option: candidate.id, description: candidate.description },
+      ],
+    }]
+    const evaluated = (
+      reason: ModelRoutingChildDecision['reason'],
+      details: Partial<ModelRoutingChildDecision> = {},
+    ): { decision: ModelRoutingChildDecision } => ({
+      decision: {
+        ...keep(reason).decision,
+        judgmentQuestions: questions,
+        ...snapshotFacts,
+        ...evaluatedFacts,
+        ...details,
+      },
+    })
+    const deadline = AbortSignal.timeout(config.judgmentDeadlineMs)
+    const askSignal = AbortSignal.any([request.signal, deadline])
+    const correlation = { sessionId: request.parent.session.id, consultKey: `child:${request.routeRequestId}` }
+    let result: JudgmentResult
+    let judgmentState: string | undefined
+    let judgmentInput: JudgmentTokenFit | undefined
+    let inputChars: number | undefined
+    const askStarted = Date.now()
+    try {
+      const fitting = engine.fittingFor(consumer)
+      if (fitting === undefined) {
+        judgmentState = request.prompt
+        inputChars = request.prompt.length
+        result = await engine.ask({ state: request.prompt, questions, tier: config.tier, signal: askSignal, consumer, correlation })
+        request.signal.throwIfAborted()
+      } else {
+        inputChars = request.prompt.length
+        const fitted = await fitting.ask({
+          states: [request.prompt],
+          questions,
+          tier: config.tier,
+          signal: askSignal,
+          consumer,
+          correlation,
+        })
+        request.signal.throwIfAborted()
+        if (fitted.kind === 'unfit') {
+          return evaluated(deadline.aborted ? 'engine-unavailable' : 'invalid-answer', {
+            latencyMs: Date.now() - askStarted,
+            engine: fitted.engine,
+            model: fitted.model,
+            ...fitted.engineId === undefined ? {} : { engineId: fitted.engineId },
+            judgmentRejection: { limits: fitted.limits, reason: fitted.reason },
+            ...inputChars === undefined ? {} : { inputChars },
+            ...deadline.aborted ? { engineFailure: { code: 'DEADLINE' as const } } : {},
+          })
+        }
+        judgmentInput = fitted.fit
+        inputChars = fitted.fit.state.length
+        result = fitted.result
+      }
+    } catch (error: unknown) {
+      request.signal.throwIfAborted()
+      const coded = error instanceof JudgmentError ? error.code : undefined
+      const refusedBeforeDispatch = error instanceof JudgmentError ? error.refusedBeforeDispatch : undefined
+      const failedEngineId = error instanceof JudgmentError ? error.engineId : undefined
+      if (failedEngineId !== undefined && failedEngineId !== snapshot.engineId) {
+        const failed = this.engineSnapshot(engine, config, { active: false, stepsElapsed: 0 }, failedEngineId)
+        evaluatedFacts = {
+          ...failed.engineId === undefined ? {} : { engineId: failed.engineId },
+          thresholds: failed.thresholds,
+        }
+      }
+      const engineFailure = coded === undefined
+        ? deadline.aborted ? { code: 'DEADLINE' as const } : undefined
+        : {
+          code: coded,
+          ...refusedBeforeDispatch === undefined ? {} : { refusedBeforeDispatch },
+        }
+      const sentChars = refusedBeforeDispatch === true ? 0 : request.prompt.length
+      const reason = coded === 'INPUT_TOO_LARGE' ? 'input-too-large' : 'engine-unavailable'
+      return evaluated(reason, {
+        ...judgmentState === undefined ? {} : { judgmentState },
+        ...sentChars === undefined ? {} : { inputChars: sentChars },
+        latencyMs: Date.now() - askStarted,
+        ...failedEngineId === undefined ? {} : { engineId: failedEngineId },
+        ...engineFailure === undefined ? {} : { engineFailure },
+      })
+    }
+    request.signal.throwIfAborted()
+    const latencyMs = Date.now() - askStarted
+    const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
+      answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
+    const identity = {
+      ...judgmentState === undefined ? {} : { judgmentState },
+      ...judgmentInput === undefined ? {} : { judgmentInput },
+      ...inputChars === undefined ? {} : { inputChars },
+      engine: result.engine,
+      model: result.model,
+      latencyMs: result.latencyMs ?? latencyMs,
+      ...result.engineId === undefined ? {} : { engineId: result.engineId },
+      ...result.usage === undefined ? {} : { judgeUsage: result.usage },
+    }
+    const answering = this.engineSnapshot(
+      engine,
+      config,
+      { active: false, stepsElapsed: 0 },
+      result.engineId ?? snapshot.engineId,
+    )
+    evaluatedFacts = {
+      ...answering.engineId === undefined ? {} : { engineId: answering.engineId },
+      thresholds: answering.thresholds,
+    }
+    if (answering.refused) return evaluated('engine-uncalibrated', identity)
+    if (deadline.aborted) return evaluated('engine-unavailable', { ...identity, engineFailure: { code: 'DEADLINE' } })
+    if (route === undefined) return evaluated('invalid-answer', identity)
+    const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
+    if (route.option === KEEP_CURRENT_OPTION_ID) {
+      return evaluated('child-judged', { ...identity, route: routeAnswer })
+    }
+    const thresholds = answering.thresholds
+    if (route.confidence < thresholds.downgradeThreshold) {
+      return evaluated('low-confidence', { ...identity, route: routeAnswer })
+    }
+    const probabilities = Object.values(route.probabilities).sort((left, right) => right - left)
+    const top = probabilities[0] ?? 0
+    const second = probabilities[1] ?? 0
+    if (top - second < thresholds.downgradeMargin) {
+      return evaluated('thin-margin', { ...identity, route: routeAnswer })
+    }
+    if (route.option !== candidate.id) return evaluated('invalid-answer', { ...identity, route: routeAnswer })
+    const decision: ModelRoutingChildDecision = {
+      outcome: 'routed',
+      reason: 'child-judged',
+      ...common,
+      selection: { candidateId: candidate.id, provider: candidate.provider, model: candidate.model },
+      judgmentQuestions: questions,
+      ...evaluatedFacts,
+      ...identity,
+      route: routeAnswer,
+    }
+    if (this.modeOf(request.parent.session) !== 'on') return { decision }
+    return { route: { provider: candidate.provider, model: candidate.model }, decision }
+  }
+
+  /** Re-read routed children of a resumed parent and append missing outcomes. */
+  private async reconcileChildOutcomes(parent: Agent): Promise<void> {
+    const runtime = this.ctx.get('subagents')
+    if (runtime === undefined) return
+    for (const row of routedChildDecisions(parent.session.events)) {
+      const recorded = recordedChildOutcomes(parent.session.events)
+      const childIds = new Set<string>()
+      for (const event of parent.session.events) {
+        if (event.type !== 'model-routing/child-outcome') continue
+        if (event.data.routeRequestId !== row.decision.routeRequestId) continue
+        childIds.add(event.data.childSessionId)
+      }
+      for (const childId of childIds) {
+        const result = await runtime.childTurnOutcomes(parent, SessionId(childId))
+        for (const outcome of outcomesFromChildTurns(row.decision, childId, result, recorded, undefined, true)) {
+          parent.session.append('model-routing/child-outcome', outcome)
+        }
+      }
+    }
+  }
+
+  /** Observe live child settlement and a resumed parent's missing outcomes. */
+  private observeChildOutcomes(): void {
+    this.ctx.on('subagent/end', (info) => {
+      void this.recordChildOutcomes(info.id, info.subagentRouteRequestId, info.runId)
+    })
+  }
+
+  /**
+   * Append missing child-outcomes for one routed child. Live-first runtime
+   * read; cancellation of the parent consult is not used here — settlement is
+   * observe-only.
+   */
+  private async recordChildOutcomes(
+    childId: SessionId,
+    routeRequestId: SubagentRouteRequestId | undefined,
+    runId?: string,
+    reconciled?: true,
+  ): Promise<void> {
+    if (routeRequestId === undefined) return
+    const child = this.ctx.get('sessions')?.get(childId)
+    const parentId = child?.header.parentSession
+    const parentAgent = parentId === undefined ? undefined : [...this.liveAgents].find(agent => agent.id === parentId)
+    if (parentAgent === undefined) return
+    if (this.ctx.get('subagents') === undefined) return
+    const result = await childTurnOutcomes(this.ctx, parentAgent, childId)
+    const recorded = recordedChildOutcomes(parentAgent.session.events)
+    const decision = routedChildDecisions(parentAgent.session.events).find(row => row.decision.routeRequestId === routeRequestId)?.decision
+    if (decision === undefined) return
+    for (const outcome of outcomesFromChildTurns(decision, childId, result, recorded, runId, reconciled)) {
+      parentAgent.session.append('model-routing/child-outcome', outcome)
+    }
+  }
+
+  /**
    * Switch routing on, off, or to shadow. Between turns the change is appended
    * immediately; a changed value during an open turn waits for the next
    * accepted pre-step. An explicit choice equal to the current value records
@@ -1288,7 +1590,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // Shadow judges over its own fold, so its holds and exits simulate what
     // live would do without moving the live route.
     const sticky = mode === 'shadow' ? shadowStickyState(session.events) : stickyState(session.events)
-    const resolved = await this.decide(config, state, sticky, base, turn, step, signal, request, session)
+    const resolved = await this.decide(config, state, sticky, base, session.id, turn, step, signal, request, session)
     const from = routeFromFor(config, base)
     const decision = {
       ...resolved,
@@ -1483,6 +1785,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     state: RoutingState,
     sticky: ModelRoutingStickyState,
     base: ModelSelection,
+    sessionId: SessionId,
     turn: number,
     step: number,
     signal: AbortSignal,
@@ -1553,6 +1856,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       && turn - sticky.cooldownTurn <= config.reentryCooldownTurns) {
       return keep('reentry-cooldown')
     }
+    const now = latestStepStart(session.events) ?? Date.now()
+    let liveTtl: ModelRoutingCacheTtl | undefined
     // A quota route enters only at a cold point of the manual model's prompt
     // cache and returns at the next one, so a warm prefix is never rewritten
     // and costs no judgment call and no capability assessment. A held streak is
@@ -1566,7 +1871,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         if (pin?.decision.cache !== undefined) facts.cache = pin.decision.cache
       } else if (held === undefined || step === 1) {
         const ttl = await this.cacheTtl(config, base, signal)
-        const now = latestStepStart(session.events) ?? Date.now()
+        liveTtl = ttl
         const coldPoint = coldPointAt(session.events, base, ttl, now, session.header.seedLength !== undefined)
         facts.coldPoint = coldPoint ?? null
         facts.cache = { base: { provider: base.provider, model: base.model, ttlMs: ttl.ttlMs, source: ttl.ttlSource } }
@@ -1593,6 +1898,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         }
       }
     }
+    const llm = this.ctx.get('llm')
     const consumer = MODEL_ROUTER_JUDGMENT_CONSUMER
     let engine = this.ctx.get('judgment')
     // Failures count per engine, so an engine switch starts from none. The
@@ -1614,14 +1920,36 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     if (engine === undefined || snapshot === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
     if (snapshot.refused) return withEngine(keep('engine-uncalibrated'), snapshot)
-    const llm = this.ctx.get('llm')
     if (llm === undefined) return keep('model-unavailable')
     const eligibilityStarted = Date.now()
-    const eligibility = await assessModelRoutingCandidates(
-      llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
-    )
+    const replayed = await consultInputFrom({
+      config,
+      prefix: session.events,
+      messages: request.content.messages,
+      requestConfig: request.config,
+      routeBase: base,
+      coldPointBase: base,
+      at: { turn, step, now, seedLength: session.header.seedLength },
+      runtime: llm,
+      signal,
+      cachePolicy: liveTtl === undefined ? { kind: 'live-eligibility' } : { kind: 'live-given', ttl: liveTtl },
+    })
+    if (replayed.kind === 'warm' && held === undefined) {
+      facts.cache = { base: replayed.cache.base }
+      facts.coldPoint = null
+      return keep('warm-prefix')
+    }
+    const eligibility = replayed.kind === 'warm'
+      ? await assessModelRoutingCandidates(
+        llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
+      )
+      : replayed.eligibility
     facts.eligibilityMs = Date.now() - eligibilityStarted
     facts.candidateEligibility = eligibility
+    // Fact insertion order is part of the persisted decision bytes; preserve it.
+    if (held === undefined && replayed.kind !== 'warm' && replayed.coldPoint !== null) {
+      facts.coldPoint = replayed.coldPoint
+    }
     // The lifetimes eligibility resolved: the manual route's, and each
     // candidate's declared one. A cold-point consult already recorded the base.
     facts.cache = {
@@ -1652,11 +1980,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, stepsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
       }
     }
-    const difficultyInstructions = config.difficultyInstructions
-    const questions: JudgmentQuestion[] = [
-      routeQuestion(eligibleConfig, base),
-      ...difficultyInstructions === undefined ? [] : [difficultyQuestion(config, difficultyInstructions)],
-    ]
+    const questions: JudgmentQuestion[] = replayed.kind === 'ask'
+      ? [...replayed.questions]
+      : [
+        routeQuestion(eligibleConfig, base),
+        ...config.difficultyInstructions === undefined ? [] : [difficultyQuestion(config, config.difficultyInstructions)],
+      ]
     facts.judgmentQuestions = questions
     /**
      * One failed judgment call. A held streak keeps its candidate while the
@@ -1737,10 +2066,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const askStarted = Date.now()
     let result: JudgmentResult
     try {
+      const correlation = { sessionId, consultKey: `turn:${turn}/step:${step}` }
       if (fitting === undefined) {
-        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer })
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal: askSignal, consumer, correlation })
       } else {
-        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer })
+        const fitted = await fitting.ask({ states, questions, tier: config.tier, signal: askSignal, consumer, correlation })
         signal.throwIfAborted()
         if (fitted.kind === 'unfit') {
           facts.judgmentRejection = { limits: fitted.limits, reason: fitted.reason }
@@ -1805,7 +2135,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
     const score = result.answers.find((answer): answer is JudgmentScoreAnswer =>
       answer.kind === 'score' && answer.id === DIFFICULTY_QUESTION_ID)
-    if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) {
+    if (route === undefined || (config.difficultyInstructions !== undefined && score === undefined)) {
       return judgmentFailed('invalid-answer', false, answering.failures)
     }
     const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
@@ -1975,7 +2305,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const point = config.operatingPoints.find(candidate => candidate.engine === String(descriptor.id))
     if (routingCalibration(descriptor.calibration, point).kind === 'refused') return ''
     const destination = descriptor.destination === undefined ? '' : ` at ${descriptor.destination}`
-    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this session to it${destination}.`
+    return ` The judge, ${descriptor.label}, runs off this machine: each consult sends up to ${config.state.maxChars.toLocaleString('en-US')} characters of this conversation or subagent task to it${destination}.`
   }
 
   /** Render the `/route` command's result. */

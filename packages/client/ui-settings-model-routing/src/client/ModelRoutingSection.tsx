@@ -18,6 +18,7 @@ import { OverviewCard } from './OverviewCard.tsx'
 import { EngineCard } from './EngineCard.tsx'
 import { ClassifierCard, DefaultModeCard } from './ConfigCards.tsx'
 import { PoolEditor } from './PoolEditor.tsx'
+import { ChildPoliciesEditor } from './ChildPoliciesEditor.tsx'
 import { ThresholdsCard } from './ThresholdsCard.tsx'
 import css from './ModelRoutingSection.module.css'
 
@@ -93,6 +94,7 @@ export function ModelRoutingSection({
         )}
       {state.routingError === null ? null : <p className={css['fieldError']} role="alert">{t('poolLoadFailed', { message: state.routingError })}</p>}
       <PoolEditor state={state} controller={controller} t={t} />
+      <ChildPoliciesEditor state={state} controller={controller} t={t} />
       <ThresholdsCard state={state} t={t} />
       {state.router === null
         ? null

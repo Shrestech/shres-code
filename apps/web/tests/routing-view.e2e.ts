@@ -149,6 +149,7 @@ describe('web e2e: per-session Routing view', () => {
     await page.getByRole('heading', { name: 'Routing', level: 2 }).waitFor({ timeout: 30_000 })
     const decisions = page.locator('[data-kpi="decisions"]')
     await expect.poll(() => decisions.textContent()).toContain('Decisions2')
+    await expect.poll(() => page.locator('[data-kpi="subagents"]').textContent()).toMatch(/Subagent pool selections/)
     await page.getByRole('img', { name: /^Model timeline / }).waitFor()
 
     await page.getByRole('button', { name: 'Open the reasoning of turn 1.2' }).click()

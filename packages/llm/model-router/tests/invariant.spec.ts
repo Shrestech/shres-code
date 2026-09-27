@@ -17,7 +17,7 @@ import { ReasoningEffortId } from '@shres-code/shres-code-llm'
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import * as ModelRouterInvariant from '../src/invariant.ts'
-import type { ModelRoutingDecision } from '../src/types.ts'
+import type { ModelRoutingChildDecision, ModelRoutingDecision } from '../src/types.ts'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()
@@ -386,5 +386,86 @@ describe('a header after a shadow decision', () => {
       }))
     }).toThrow("a route-failed decision must follow the same step's downgraded decision for the failed provider")
     expect(rejected?.events.at(-1)?.type).toBe('model-routing/decision')
+  })
+})
+
+describe('child-route invariant', () => {
+  function childDecision(overrides: Partial<ModelRoutingChildDecision> = {}): ModelRoutingChildDecision {
+    return {
+      outcome: 'routed',
+      reason: 'child-policy',
+      routeRequestId: 'route-1',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: {},
+      selection: { candidateId: 'cheap', provider: 'cheap-provider', model: 'cheap-model' },
+      effortApplied: false,
+      promptChars: 4,
+      ...overrides,
+    }
+  }
+
+  it('accepts an unmatched routed decision for a cancelled start', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    expect(() => {
+      session.append('model-routing/child-decision', childDecision())
+    }).not.toThrow()
+  })
+
+  it('rejects a kept decision that records a selection', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    expect(() => {
+      session.append('model-routing/child-decision', childDecision({
+        outcome: 'kept',
+        reason: 'base-unlisted',
+        selection: { candidateId: 'cheap', provider: 'cheap-provider', model: 'cheap-model' },
+      }))
+    }).toThrow('a kept model-routing/child-decision must not record a selection')
+  })
+
+  it('rejects an outcome with no routed decision, a duplicate turn, a mismatched candidate, and UNKNOWN failure', async () => {
+    const ctx = await setup()
+    const orphan = ctx.sessions.create()
+    expect(() => {
+      orphan.append('model-routing/child-outcome', {
+        routeRequestId: 'missing',
+        candidateId: 'cheap',
+        childSessionId: 'child',
+        childTurn: 1,
+        route: { provider: 'cheap-provider', model: 'cheap-model' },
+        turnEnd: 'error',
+        failureCode: 'QUOTA',
+        countedAs: 'failure',
+      })
+    }).toThrow(/has no routed child-decision/)
+
+    const session = ctx.sessions.create()
+    session.append('model-routing/child-decision', childDecision())
+    const outcome = {
+      routeRequestId: 'route-1',
+      candidateId: 'cheap',
+      childSessionId: 'child',
+      childTurn: 1,
+      route: { provider: 'cheap-provider', model: 'cheap-model' },
+      turnEnd: 'error',
+      failureCode: 'QUOTA',
+      countedAs: 'failure' as const,
+    }
+    expect(() => { session.append('model-routing/child-outcome', outcome) }).not.toThrow()
+    expect(() => { session.append('model-routing/child-outcome', outcome) }).toThrow(/duplicate model-routing\/child-outcome/)
+
+    const mismatch = ctx.sessions.create()
+    mismatch.append('model-routing/child-decision', childDecision())
+    expect(() => {
+      mismatch.append('model-routing/child-outcome', { ...outcome, candidateId: 'other' })
+    }).toThrow(/candidateId other differs/)
+
+    const unknown = ctx.sessions.create()
+    unknown.append('model-routing/child-decision', childDecision())
+    expect(() => {
+      unknown.append('model-routing/child-outcome', { ...outcome, failureCode: 'UNKNOWN' })
+    }).toThrow(/must not use failureCode UNKNOWN/)
   })
 })

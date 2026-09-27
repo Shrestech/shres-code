@@ -6,6 +6,7 @@ import { Context, Service } from '@shres-code/cordis'
 import JudgmentDispatch from '@shres-code/shres-code-judgment-dispatch'
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
+import { SessionId } from '@shres-code/shres-code-session/types'
 import { LAYA_ENGINE_DESCRIPTOR, LAYA_ENGINE_ID, LayaGatewayRemote, LayaJudgmentEngine, layaEngineStatus } from '../src/index.ts'
 import { alive, cleanup, fakeInstallation, MODEL_ID, REPO, REVISION, tempRuntime, until, writeBehavior } from './helpers.ts'
 import type { FakeInstallation } from './helpers.ts'
@@ -177,10 +178,21 @@ describe('LayaJudgmentEngine', { timeout: PROCESS_TIMEOUT_MS }, () => {
     await until(() => engine.status().state === 'ready')
     StubRedactor.calls = 0
 
-    await engine.ask({ state: 'a secret plan', questions: [] })
+    await engine.ask({
+      state: 'a secret plan',
+      questions: [],
+      correlation: { sessionId: SessionId('session-laya-capture'), consultKey: 'turn:1/step:1' },
+    })
 
     const last = (await readFile(requests, 'utf8')).trim().split('\n').at(-1) ?? '{}'
-    expect((JSON.parse(last) as { body: { state: string } }).body.state).toBe('a [redacted] plan')
+    const recorded = JSON.parse(last) as { body: Record<string, unknown> }
+    expect(recorded.body.state).toBe('a [redacted] plan')
+    // Field selection, not a word search: a whole-input dump would leak without
+    // naming `correlation` and would add keys beyond the local wire vocabulary.
+    expect(Object.keys(recorded.body).sort()).toEqual(['model', 'questions', 'state'])
+    expect(JSON.stringify(recorded.body)).not.toContain('sessionId')
+    expect(JSON.stringify(recorded.body)).not.toContain('consultKey')
+    expect(recorded.body).toEqual({ state: 'a [redacted] plan', model: MODEL_ID, questions: [] })
     expect(StubRedactor.calls).toBe(1)
   })
 

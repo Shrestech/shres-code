@@ -295,6 +295,10 @@ describe('modelRoutingStats fold', () => {
       warmUps: 0,
       turnsWithDecisions: 22,
       warmSkipped: 0,
+      childRouted: 0,
+      childFailures: 0,
+      childSuccesses: 0,
+      childNeutral: 0,
     })
     expect(stats.reasons).toEqual([
       { reason: 'current-preferred', group: 'judge-no', count: 19 },
@@ -356,6 +360,10 @@ describe('modelRoutingStats fold', () => {
       warmUps: 0,
       turnsWithDecisions: 4,
       warmSkipped: 0,
+      childRouted: 0,
+      childFailures: 0,
+      childSuccesses: 0,
+      childNeutral: 0,
     })
     expect(stats.reasons).toEqual([
       { reason: 'gate-passed', group: 'switched', count: 3 },
@@ -928,6 +936,55 @@ describe('cache lifetimes and shadow figures from decisions', () => {
       expect([cause, count]).toEqual([cause, 0])
     }
     expect(stats.timeline.decisions.map(decision => decision.shadow)).toEqual([true, true])
+  })
+
+  it('counts child-route decisions and classified outcomes', () => {
+    const log = new Log()
+    log.add('model-routing/child-decision', {
+      outcome: 'routed',
+      reason: 'child-policy',
+      routeRequestId: 'r1',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: {},
+      selection: { candidateId: 'cheap', provider: FLASH.provider, model: FLASH.model },
+      effortApplied: false,
+      promptChars: 4,
+    }, 1)
+    log.add('model-routing/child-decision', {
+      outcome: 'kept',
+      reason: 'base-unlisted',
+      routeRequestId: 'r2',
+      childKind: 'subagent',
+      policyIndex: 0,
+      inherited: {},
+      effortApplied: false,
+      promptChars: 4,
+    }, 2)
+    log.add('model-routing/child-outcome', {
+      routeRequestId: 'r1',
+      candidateId: 'cheap',
+      childSessionId: 'child',
+      childTurn: 1,
+      route: FLASH,
+      turnEnd: 'error',
+      failureCode: 'QUOTA',
+      countedAs: 'failure',
+    }, 3)
+    const stats = fold(log)
+    expect(stats.counts.childRouted).toBe(1)
+    expect(stats.counts.childFailures).toBe(1)
+    expect(stats.children).toMatchObject({
+      decided: 2,
+      routed: 1,
+      kept: 1,
+      failures: 1,
+    })
+    expect(stats.children.byReason).toEqual([
+      { reason: 'base-unlisted', count: 1 },
+      { reason: 'child-policy', count: 1 },
+    ].sort((left, right) => left.reason < right.reason ? -1 : 1))
+    expect(stats.recentChildren.map(row => row.outcome)).toEqual(['routed', 'kept'])
   })
 
   it('counts a warm held decision as skipped judgment without counting a judged hold', () => {

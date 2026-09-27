@@ -25,6 +25,7 @@ export const EMPTY_TRAJECTORY_SNAPSHOT: TrajectorySnapshot = {
   decisions: EMPTY_LIST,
   jspace: EMPTY_LIST,
   routing: EMPTY_LIST,
+  routingChildren: EMPTY_LIST,
 }
 
 function stepKey(turn: number, step: number): string {
@@ -197,6 +198,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     const decisions: TrajectoryShieldDecision[] = []
     const jspace: TrajectoryJSpaceBadge[] = []
     const routing: TrajectoryRoutingDecision[] = []
+    const routingChildren: TrajectorySnapshot['routingChildren'][number][] = []
 
     for (const contribution of this.contributions) {
       const data = contribution.data
@@ -252,6 +254,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
         routing.push(data.decision)
         continue
       }
+      if (data.kind === 'routing-child') {
+        routingChildren.push(data)
+        continue
+      }
       turnEndings.push({
         turn: data.turn,
         time: data.time,
@@ -274,6 +280,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
       decisions,
       jspace,
       routing,
+      routingChildren,
     }
   }
 

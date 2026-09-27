@@ -467,6 +467,13 @@ describe('subagent descriptors', () => {
       toolFilter: complete.toolFilter,
     })).toEqual(complete)
     expect(foldSubagentDescriptor([event(complete)])).toEqual(complete)
+    const routed = snapshotSubagentDescriptor({
+      mode: 'one-shot',
+      provider: 'spawn',
+      agentRouteRequestId: 'route-1',
+    })
+    expect(routed).toEqual({ ...minimal, agentRouteRequestId: 'route-1' })
+    expect(foldSubagentDescriptor([event(routed)])).toEqual(routed)
     expect(foldSubagentDescriptor([
       event({
         version: SUBAGENT_DESCRIPTOR_VERSION,
@@ -517,6 +524,18 @@ describe('subagent descriptors', () => {
       provider: 'spawn',
       label: 7,
     }, 'label must be a string'],
+    ['empty agentRouteRequestId', {
+      version: SUBAGENT_DESCRIPTOR_VERSION,
+      mode: 'one-shot',
+      provider: 'spawn',
+      agentRouteRequestId: '',
+    }, 'agentRouteRequestId must be a nonempty string'],
+    ['non-string agentRouteRequestId', {
+      version: SUBAGENT_DESCRIPTOR_VERSION,
+      mode: 'one-shot',
+      provider: 'spawn',
+      agentRouteRequestId: 1,
+    }, 'agentRouteRequestId must be a string'],
     ['unknown payload field', {
       version: SUBAGENT_DESCRIPTOR_VERSION,
       mode: 'continuable',

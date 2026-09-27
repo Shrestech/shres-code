@@ -124,6 +124,23 @@ describe('RoutingView in shadow', () => {
     expect(screen.getByText(en['view.unavailable'])).toBeTruthy()
   })
 
+  it('tells a child session the model was chosen at spawn and can reveal the parent decision', () => {
+    const stats = {
+      ...emptyStats(),
+      recentChildren: [{ seq: 12, t: 1, outcome: 'routed' as const, reason: 'child-policy', candidateId: 'flash', agentType: null, shadow: false, latencyMs: null }],
+    }
+    const reveal = vi.fn()
+    setup({
+      available: false,
+      stats,
+      reveal,
+      canReveal: view => view === 'trajectory',
+    })
+    expect(screen.getByText(en['view.childChosen'])).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en['view.childOpenParent'] }))
+    expect(reveal).toHaveBeenCalledWith({ view: 'trajectory', target: { kind: 'event', seq: 12 } })
+  })
+
   it('shows the empty-state card and the mode read-only when routing was never used', () => {
     setup({ stats: emptyStats(), routing: OFF })
     expect(screen.getByText(en['state.neverUsed'])).toBeTruthy()
@@ -565,7 +582,7 @@ describe('RoutingView judge facts', () => {
       engines: [{ engine: 'typesafe', calibration: { kind: 'point' as const } }],
     }
     setup({ engine: { kind: 'ready', snapshot }, loadGate: () => Promise.resolve(accepted) })
-    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    await screen.findByText(/each consult sends up to 12,000 characters of this state to api\.typesafe\.ai/)
     expect(statusLine().textContent).not.toContain('Not used for routing')
   })
 
@@ -634,13 +651,13 @@ describe('RoutingView judge facts', () => {
 
   it('warns that excerpts leave the machine while routing is on with a remote judge', async () => {
     setup({ engine: { kind: 'ready', snapshot: engines('typesafe') } })
-    expect(screen.getByText(/each consult sends part of this session to api\.typesafe\.ai/)).toBeTruthy()
-    await screen.findByText(/each consult sends up to 12,000 characters of this session to api\.typesafe\.ai/)
+    expect(screen.getByText(/each consult sends part of this state to api\.typesafe\.ai/)).toBeTruthy()
+    await screen.findByText(/each consult sends up to 12,000 characters of this state to api\.typesafe\.ai/)
     cleanup()
     const { destination: _dropped, ...noDestination } = REMOTE
     const unnamed = engines('typesafe', { engines: [LOCAL, noDestination] })
     setup({ engine: { kind: 'ready', snapshot: unnamed }, loadGate: () => new Promise(() => {}) })
-    expect(screen.getByText(/each consult sends part of this session to Jev \(TypeSafe\)/)).toBeTruthy()
+    expect(screen.getByText(/each consult sends part of this state to Jev \(TypeSafe\)/)).toBeTruthy()
     cleanup()
     setup({ engine: { kind: 'ready', snapshot: engines('typesafe') }, routing: OFF })
     expect(screen.queryByText(/leave this machine/)).toBeNull()

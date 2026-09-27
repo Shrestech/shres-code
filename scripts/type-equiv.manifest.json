@@ -1426,6 +1426,11 @@
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "ChildTurnOutcomesResult",
+      "source": "packages/subagent/subagent/src/child-outcomes.ts"
+    },
+    {
       "doc": "docs/subsystems/web.md",
       "symbol": "WebSearchRequest",
       "source": "packages/web/web/src/types.ts"
@@ -2578,6 +2583,11 @@
     {
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingDecision",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingChildDecision",
       "source": "packages/llm/model-router/src/types.ts"
     },
     {

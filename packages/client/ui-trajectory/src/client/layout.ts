@@ -51,6 +51,15 @@ export interface TrajectoryLayoutInput {
   jspace?: readonly TrajectoryJSpaceBadge[]
   /** Folded routing decisions; each renders as its own row at its seq. */
   routing?: readonly TrajectoryRoutingDecision[]
+  /** Folded child-route decisions; each a CHILD-ROUTE row at its seq. */
+  routingChildren?: readonly {
+    readonly seq: number
+    readonly time: number
+    readonly outcome: 'routed' | 'kept'
+    readonly reason: string
+    readonly model?: string
+    readonly shadow?: true
+  }[]
 }
 
 /** Decision fields used to match an existing user/context/tool cell. */
@@ -132,6 +141,15 @@ type OrderedLayoutEntry =
     seq: number
     decision: TrajectoryRoutingDecision
   }
+  | {
+    kind: 'routing-child'
+    seq: number
+    time: number
+    outcome: 'routed' | 'kept'
+    reason: string
+    model?: string
+    shadow?: true
+  }
 
 function layoutEntryOrder(entry: OrderedLayoutEntry): number {
   return entry.kind === 'system' && entry.change.kind === 'initial'
@@ -171,7 +189,7 @@ function inputCellDetail(node: InputNode): Pick<
 export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly TrajectoryTurnModel[] {
   const {
     nodes, eventLocations, partial, runningCalls, requests = [], callSchemas,
-    decisions = [], jspace = [], routing = [],
+    decisions = [], jspace = [], routing = [], routingChildren = [],
   } = input
   const resultByCall = indexResults(nodes)
   const callById = new Map<string, ToolCallBlock>(resultByCall)
@@ -291,6 +309,15 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
       seq: decision.seq,
       decision,
     })),
+    ...routingChildren.map(child => ({
+      kind: 'routing-child' as const,
+      seq: child.seq,
+      time: child.time,
+      outcome: child.outcome,
+      reason: child.reason,
+      ...child.model === undefined ? {} : { model: child.model },
+      ...child.shadow === true ? { shadow: true as const } : {},
+    })),
   ].sort((left, right) => layoutEntryOrder(left) - layoutEntryOrder(right))
 
   for (const entry of entries) {
@@ -388,6 +415,27 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
       if (request.turn === null) standaloneCompactions.push(compaction)
       else bucket(request.turn).groups.push(...compaction.groups)
       prevAbsTime = finiteTime(request.completedAt) ?? finiteTime(request.startedAt) ?? prevAbsTime
+      continue
+    }
+    if (entry.kind === 'routing-child') {
+      const turn = enclosingPromptTurn(nodes, entry.seq, partial) ?? 1
+      const suffix = entry.shadow === true ? ' (shadow)' : ''
+      const text = entry.outcome === 'routed'
+        ? `Subagent routed to ${entry.model ?? 'pool'}${suffix}`
+        : `Subagent kept your model: ${entry.reason}${suffix}`
+      const laid: LaidCell = {
+        absTime: finiteTime(entry.time),
+        cell: {
+          index: ++index,
+          kind: 'routing',
+          text,
+          sourceSeq: entry.seq,
+          timeSeconds: 0,
+          startedAt: finiteTime(entry.time),
+        },
+      }
+      pushMessage(turn, laid)
+      prevAbsTime = finiteTime(entry.time) ?? prevAbsTime
       continue
     }
     if (entry.kind === 'routing') {

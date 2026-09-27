@@ -1,6 +1,6 @@
 - region "Model routing":
   - text: Applies to all sessions
-  - paragraph: Configure how routing judges each turn. Each session turns routing on or off with the Auto chip in its chat input.
+  - paragraph: Configure when routing may use a pool model. Each session selects Off, Shadow or On with the Auto chip in its chat input.
   - region "Judgment engine":
     - heading "Judgment engine" [level=3]
     - paragraph: The engine every judgment consumer asks, unless a per-consumer override names another. A change applies from each consumer's next ask, in every session.
@@ -23,7 +23,7 @@
       - list:
         - listitem:
           - code: model-router
-          - text: "asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of that conversation."
+          - text: "asks Jev (TypeSafe) at api.typesafe.ai: each routing consult, in a session with routing on, sends up to 12,000 characters of the conversation or subagent task."
       - paragraph: This warning also appears when a session turns routing on.
   - region "Default for new sessions":
     - heading "Default for new sessions" [level=3]
@@ -41,7 +41,23 @@
     - heading "Candidate pool" [level=3]
     - paragraph: Models routing may switch to. One shared pool for every strong model you route from. Descriptions are sent to the judge on every consult; keep each to one short clause.
     - button "Add model…"
-    - paragraph: The pool is empty, so routing keeps the strong model on every turn.
+    - table:
+      - rowgroup:
+        - row "Model Route Description Notes Edit":
+          - columnheader "Model"
+          - columnheader "Route"
+          - columnheader "Description"
+          - columnheader "Notes"
+          - columnheader "Edit"
+      - rowgroup:
+        - row "DeepSeek-V4-Flash deepseek-official/deepseek-v4-flash a small, well-scoped change in familiar code 44/160 Edit DeepSeek-V4-Flash":
+          - rowheader "DeepSeek-V4-Flash"
+          - cell "deepseek-official/deepseek-v4-flash":
+            - code: deepseek-official/deepseek-v4-flash
+          - cell "a small, well-scoped change in familiar code 44/160"
+          - cell
+          - cell "Edit DeepSeek-V4-Flash":
+            - button "Edit DeepSeek-V4-Flash": Edit
   - region "Route from":
     - heading "Route from" [level=3]
     - paragraph: "Routing runs only while one of these strong models is selected. Each needs an objective: what switching is meant to save."
@@ -475,6 +491,29 @@
       - option "Codex (subscription) · GPT-6 Astra"
       - option "Codex (subscription) · GPT-5.6 Luna"
       - option "DeepSeek · DeepSeek-V4-Flash"
+  - heading "Subagent routing" [level=2]
+  - paragraph: Subagents start fresh, so routing them never disturbs your conversation's cache.
+  - paragraph: Forked subagents always use your model.
+  - paragraph: The route is chosen once when a subagent starts.
+  - text: Kind
+  - combobox "Kind":
+    - option "Any"
+    - option "Subagent" [selected]
+    - option "Workflow"
+  - text: Agent type
+  - textbox "Agent type"
+  - text: Pool model
+  - combobox "Pool model":
+    - option
+    - option "flash" [selected]
+  - text: Judge
+  - checkbox "Judge"
+  - button "Move rule 1 up" [disabled]
+  - button "Move rule 1 down" [disabled]
+  - button "Remove rule 1"
+  - button "Add rule"
+  - text: Failures before pausing
+  - spinbutton "Failures before pausing": "2"
   - region "Thresholds":
     - heading "Thresholds" [level=3]
     - paragraph: Read-only. The values routing gates each consult with now; editing them is not offered here.

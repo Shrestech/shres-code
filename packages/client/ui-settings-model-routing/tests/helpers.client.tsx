@@ -32,7 +32,7 @@ export function ready(overrides: Partial<ModelRoutingState> = {}): ModelRoutingS
 }
 
 /** A controller double over a fixed state, recording its writes. */
-export function double(state: ModelRoutingState, writes: Partial<Record<'selectEngine' | 'setClassifier' | 'setDefaultMode' | 'savePool', WriteFailure | undefined>> = {}) {
+export function double(state: ModelRoutingState, writes: Partial<Record<'selectEngine' | 'setClassifier' | 'setDefaultMode' | 'savePool' | 'saveChildPolicies', WriteFailure | undefined>> = {}) {
   const store = createSnapshotStore(state)
   return {
     store,
@@ -43,6 +43,7 @@ export function double(state: ModelRoutingState, writes: Partial<Record<'selectE
     setClassifier: vi.fn(() => Promise.resolve(writes.setClassifier)),
     setDefaultMode: vi.fn(() => Promise.resolve(writes.setDefaultMode)),
     savePool: vi.fn((_candidates: unknown, _routeFrom: unknown) => Promise.resolve(writes.savePool)),
+    saveChildPolicies: vi.fn(() => Promise.resolve(writes.saveChildPolicies)),
     runLaya: vi.fn(() => Promise.resolve()),
   } satisfies ModelRoutingController
 }

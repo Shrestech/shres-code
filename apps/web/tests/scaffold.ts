@@ -720,6 +720,7 @@ export async function seedSession(
   fixtureText: string,
   id: string,
   agentPreset?: string,
+  origin?: 'subagent',
 ): Promise<SessionId> {
   const events = parseSessionLog(realizeSeedFixture(scaffold, fixtureText, id))
   if (events.length === 0) throw new Error('seed fixture has no events')
@@ -732,8 +733,9 @@ export async function seedSession(
     id: SessionId(id),
     createdAt: Date.now() - 60_000,
     cwd: scaffold.workspaceCwd,
-    delegationDepth: 0,
+    delegationDepth: origin === 'subagent' ? 1 : 0,
     ...agentPreset === undefined ? {} : { agentPreset },
+    ...origin === undefined ? {} : { origin },
   }
   await persistSeedSession(scaffold, meta, events)
   return meta.id

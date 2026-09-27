@@ -582,7 +582,20 @@ interface SubagentChildRouteRequest {
   readonly prompt: string
   /** Cancellation of the delegating call. */
   readonly signal: AbortSignal
+  /**
+   * Identity of this waterfall dispatch. Minted once per consult that reaches
+   * listeners so a kept or routed decision can record it. It is not an
+   * instruction to change the child's route.
+   */
+  readonly routeRequestId: SubagentRouteRequestId
 }
+```
+
+```ts type-equiv
+/** Result of {@link childTurnOutcomes}. */
+type ChildTurnOutcomesResult =
+  | ChildTurnOutcomes
+  | { readonly unavailable: ChildTurnOutcomesUnavailable }
 ```
 ## In-process backends: depth and seed
 
@@ -734,6 +747,19 @@ listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<Subagent
 listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>
 
 /**
+ * Observe one direct child's accounting turns and the route in force for
+ * each. Live session first; otherwise one persistence inspect under the
+ * same lifecycle witness as listing. Direct children only. Observe-only:
+ * no events, no mutation. Cancellation rejects with the signal's reason.
+ * Data damage returns `unavailable` and never throws.
+ * @param parent - the exact live parent whose child is read.
+ * @param childId - the durable child session id.
+ * @param signal - caller cancellation forwarded to persistence inspect.
+ * @returns accounting turns, or why they cannot be observed.
+ */
+childTurnOutcomes( parent: Agent, childId: SessionId, signal?: AbortSignal, ): Promise<ChildTurnOutcomesResult>
+
+/**
  * Register a provider under its name. Registration is effect-scoped and HMR
  * safe; removing a provider blocks new starts but does not revoke runs that
  * were already returned to their holders.
@@ -780,7 +806,10 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
  * provider or model (explicit routes win), when the provider seeds the child
  * with parent history (fork), when the provider does not run requested
  * routes, when no listener answers, or when the answer equals the inherited
- * route. A throwing listener is logged and the child keeps its inherited
+ * route. A dispatch that reaches listeners mints one `routeRequestId` on the
+ * request. That id is copied onto the returned `agentOptions` only when a
+ * listener changed the route; every other path returns `requested` unchanged.
+ * A throwing listener is logged and the child keeps its inherited
  * route: routing is an optional cost policy, and a broken policy must not
  * fail the delegation it would only have made cheaper. An `InvariantError`
  * raised during the dispatch is not contained: a violated invariant means
@@ -802,7 +831,7 @@ async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<A
 
 Types: [Agent](core.md) · [AgentOptions](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:275`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:281`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
@@ -843,7 +872,7 @@ The waterfall settles before any child resource exists, so a listener that recor
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:206`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:212`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 
@@ -865,7 +894,7 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:184`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:190`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -882,7 +911,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:158`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:164`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -899,7 +928,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:164`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:170`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -923,5 +952,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:175`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:181`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->

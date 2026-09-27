@@ -29,6 +29,22 @@ export function SubagentRunId(id: string): SubagentRunId {
 }
 
 /**
+ * Identifies one `subagent/child-route` dispatch. Minted by
+ * {@link SubagentRuntime.resolveChildRoute} for every waterfall that reaches
+ * listeners, and carried to the child only when a listener changed the route.
+ */
+export type SubagentRouteRequestId = Branded<'SubagentRouteRequestId'>
+
+/**
+ * Brand a string as a {@link SubagentRouteRequestId}.
+ * @param id - the raw route-request id.
+ * @returns the same string, branded.
+ */
+export function SubagentRouteRequestId(id: string): SubagentRouteRequestId {
+  return id as SubagentRouteRequestId
+}
+
+/**
  * Observe-only identifying detail for a published subagent run, carried by
  * `subagent/start`. One-shot runs and continuable Activation epochs share this
  * payload, so an observer sees the same vocabulary for both.
@@ -47,6 +63,12 @@ export interface SubagentRunInfo {
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */
   readonly local: boolean
+  /**
+   * The child-route dispatch that changed this child's route, when the start
+   * request or durable descriptor carried one. Absent for inherited, explicit,
+   * and fork routes, which never dispatch or never carry the id.
+   */
+  readonly subagentRouteRequestId?: SubagentRouteRequestId
 }
 
 /**
@@ -62,6 +84,11 @@ export interface SubagentRunEndInfo {
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */
   readonly local: boolean
+  /**
+   * The same child-route dispatch id the paired start event carried, when any.
+   * The subagent invariant requires start and end to agree.
+   */
+  readonly subagentRouteRequestId?: SubagentRouteRequestId
   /** The terminal stop reason. */
   readonly stopReason: SubagentResult['stopReason']
   /**
@@ -409,4 +436,10 @@ export interface SubagentChildRouteRequest {
   readonly prompt: string
   /** Cancellation of the delegating call. */
   readonly signal: AbortSignal
+  /**
+   * Identity of this waterfall dispatch. Minted once per consult that reaches
+   * listeners so a kept or routed decision can record it. It is not an
+   * instruction to change the child's route.
+   */
+  readonly routeRequestId: SubagentRouteRequestId
 }

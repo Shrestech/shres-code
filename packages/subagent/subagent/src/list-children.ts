@@ -439,8 +439,13 @@ const LIFECYCLE_WITNESS_KEYS = [
   'version', 'id', 'createdAt', 'cwd', 'parentSession', 'seedLength', 'delegationDepth',
 ] as const
 
-/** Whether an inspected log still belongs to the enumerated lifecycle. */
-function sameLifecycle(meta: SessionHeader, expected: SessionHeader): boolean {
+/**
+ * Whether an inspected log still belongs to the enumerated lifecycle.
+ * @param meta - the header just read from persistence.
+ * @param expected - the header the listing enumerated for this id.
+ * @returns true when the immutable witness fields match.
+ */
+export function sameLifecycle(meta: SessionHeader, expected: SessionHeader): boolean {
   return LIFECYCLE_WITNESS_KEYS.every(key => meta[key] === expected[key])
 }
 

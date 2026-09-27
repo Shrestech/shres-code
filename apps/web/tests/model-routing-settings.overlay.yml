@@ -27,3 +27,12 @@
         downgradeMargin: 0.1
         routeInstructions: Pick the cheapest route that can finish this turn.
         difficultyInstructions: Rate how much reasoning this turn needs.
+        candidates:
+          - id: flash
+            provider: deepseek-official
+            model: deepseek-v4-flash
+            description: a small, well-scoped change in familiar code
+        childPolicies:
+          - match:
+              kind: subagent
+            candidate: flash

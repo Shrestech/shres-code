@@ -114,6 +114,7 @@ describe('routingKpis', () => {
       ['latency', '1000', 'P95 1 s · deadline 1.5 s · 1 s per turn'],
       ['moved', '0', '0 moved − 0 return re-prefill · quota'],
       ['switch-cost', '235k', 'cold prefills after model changes (routed + manual)'],
+      ['subagents', 'none decided', 'spawn decisions, including shadow'],
       ['egress', '≤ 264k', '22 asks to a remote engine · at most'],
     ])
     expect(tiles.find(tile => tile.id === 'egress')?.unit).toBe('chars')
@@ -173,6 +174,17 @@ describe('routingKpis', () => {
     expect(tiles.find(tile => tile.id === 'kept-strong')?.detail).toBe('—')
     expect(tiles.find(tile => tile.id === 'latency')).toMatchObject({ value: '—', detail: 'no answered consults' })
     expect(tiles.find(tile => tile.id === 'latency')?.unit).toBeUndefined()
+    expect(tiles.find(tile => tile.id === 'subagents')).toMatchObject({ value: 'none decided', detail: 'spawn decisions, including shadow' })
+  })
+
+  it('reports routed/decided for child-route consults', () => {
+    const stats = {
+      ...emptyStats(),
+      children: { decided: 4, routed: 3, kept: 1, byReason: [], byModel: [], failures: 0 },
+    }
+    expect(routingKpis(stats, GATE, () => 'local', t).find(tile => tile.id === 'subagents')).toMatchObject({
+      value: '3/4', detail: 'spawn decisions, including shadow',
+    })
   })
 })
 
@@ -399,8 +411,8 @@ describe('judge facts', () => {
 
   it('warns about egress only for a remote judge while routing is on', () => {
     const remote: RoutingJudge = { kind: 'engine', engine: REMOTE }
-    expect(egressWarning(remote, true, GATE, t)).toBe('Conversation excerpts leave this machine while Auto routing is on: each consult sends up to 12,000 characters of this session to api.typesafe.ai.')
-    expect(egressWarning(remote, true, null, t)).toBe('Conversation excerpts leave this machine while Auto routing is on: each consult sends part of this session to api.typesafe.ai.')
+    expect(egressWarning(remote, true, GATE, t)).toBe('Conversation or subagent task excerpts leave this machine while Auto routing is on: each consult sends up to 12,000 characters of this state to api.typesafe.ai.')
+    expect(egressWarning(remote, true, null, t)).toBe('Conversation or subagent task excerpts leave this machine while Auto routing is on: each consult sends part of this state to api.typesafe.ai.')
     expect(egressWarning(remote, false, GATE, t)).toBeUndefined()
     expect(egressWarning(JUDGE, true, GATE, t)).toBeUndefined()
     expect(egressWarning({ kind: 'loading' }, true, GATE, t)).toBeUndefined()
@@ -425,7 +437,7 @@ describe('the router\'s refusal of a judge', () => {
     expect(judgeNotUsed({ kind: 'none', reason: 'disabled' }, judged({ kind: 'refused' }), t)).toBeUndefined()
     expect(egressWarning(judge, true, judged({ kind: 'refused' }), t)).toBeUndefined()
     // Not known yet: warn, since the judge may be asked.
-    expect(egressWarning(judge, true, null, t)).toContain('each consult sends part of this session')
+    expect(egressWarning(judge, true, null, t)).toContain('each consult sends part of this state')
     expect(egressWarning(judge, true, judged({ kind: 'point' }), t)).toContain('each consult sends up to 12,000 characters')
   })
 })

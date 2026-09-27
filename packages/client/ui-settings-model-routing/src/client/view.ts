@@ -201,6 +201,59 @@ export function routerEngine(snapshot: JudgmentEnginesSnapshot | null): string |
   return consumerRoutes(snapshot).find(route => route.consumer === ROUTER_CONSUMER)?.engineId ?? snapshot.selection.engine
 }
 
+/**
+ * Whether the host's model-router schema declares `childPolicies`.
+ * @param schema - the resolved host schema, or a nested object inside it.
+ * @returns true when `childPolicies` is present at any nesting depth.
+ */
+export function hasChildPoliciesCapability(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) return false
+  if (Object.prototype.hasOwnProperty.call(schema, 'childPolicies')) return true
+  return Object.values(schema as Record<string, unknown>).some(hasChildPoliciesCapability)
+}
+
+/** One child-policy rule as the editor writes it. */
+export interface ChildPolicyDraft {
+  readonly matchKind?: 'subagent' | 'workflow'
+  readonly agentType?: string
+  readonly candidate: string
+  readonly judge: boolean
+}
+
+/** Child-route settings the editor writes. */
+export interface ChildPoliciesSection {
+  readonly childPolicies: ChildPolicyDraft[]
+  readonly childRouteErrors: number
+  readonly childRouteInstructions?: string
+}
+
+/**
+ * Read child-route rules from the resolved `model-router` section.
+ * @param router - the resolved `model-router` settings namespace.
+ * @returns the editor's child-policy list, error limit, and optional judge text.
+ */
+export function childPoliciesSection(router: SettingsNamespaceView): ChildPoliciesSection {
+  const value = typeof router.value === 'object' && router.value !== null ? router.value as Record<string, unknown> : {}
+  const list = Array.isArray(value['childPolicies']) ? value['childPolicies'] : []
+  const errors = value['childRouteErrors']
+  const instructions = value['childRouteInstructions']
+  return {
+    childPolicies: list.filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null).map((entry) => {
+      const match = typeof entry['match'] === 'object' && entry['match'] !== null ? entry['match'] as Record<string, unknown> : {}
+      const kind = match['kind']
+      const agentType = match['agentType']
+      return {
+        ...kind === 'subagent' || kind === 'workflow' ? { matchKind: kind } : {},
+        ...typeof agentType === 'string' ? { agentType } : {},
+        candidate: typeof entry['candidate'] === 'string' ? entry['candidate'] : '',
+        judge: entry['judge'] === true,
+      }
+    }),
+    childRouteErrors: typeof errors === 'number' && Number.isInteger(errors) && errors >= 1 ? errors : 2,
+    ...typeof instructions === 'string' ? { childRouteInstructions: instructions } : {},
+  }
+}
+
 /** The pool and allowlist a section stores, as the editor edits them. */
 export interface PoolSection {
   readonly candidates: PoolCandidateDraft[]

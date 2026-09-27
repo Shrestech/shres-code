@@ -12,6 +12,7 @@ import {
   judgmentConsumerId,
   judgmentEngineId,
 } from '@shres-code/shres-code-judgment'
+import type { SessionId } from '@shres-code/shres-code-session'
 import JudgmentDispatch, { resolveConfig } from '../src/index.ts'
 import { FakeEngine } from './fake-engine.ts'
 import type { FakeEngineConfig } from './fake-engine.ts'
@@ -118,6 +119,18 @@ describe('routing', () => {
     expect(result).toEqual({ answers: [], engine: 'fake-alpha', model: 'alpha-1', latencyMs: 1, engineId: 'alpha' })
     expect(alpha.asks).toHaveLength(1)
     expect(beta.asks).toHaveLength(0)
+  })
+
+  it('forwards correlation unchanged to the selected engine', async () => {
+    const ctx = root()
+    await ctx.plugin(JudgmentDispatch, { defaultEngine: 'alpha' })
+    const alpha = await engine(ctx, { id: 'alpha' })
+
+    const correlation = { sessionId: 'session-1' as SessionId, consultKey: 'turn:1/step:0' }
+    await ctx.judgment.ask({ ...ASK, correlation })
+
+    expect(alpha.asks).toHaveLength(1)
+    expect(alpha.asks[0]!.correlation).toEqual(correlation)
   })
 
   it('fails UNCONFIGURED for an unregistered selection and logs it once', async () => {

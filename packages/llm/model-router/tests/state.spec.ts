@@ -338,4 +338,19 @@ describe('user intent among injected context messages', () => {
     expect(candidates[0].oversizedCurrent).toBe(true)
     expect(candidates[0].seqs).toEqual([])
   })
+
+  it('does not treat a steered subagent-report as the current request', () => {
+    const session = makeSession()
+    const current = user(session, 'REAL CURRENT USER')
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'report from child' }],
+      source: { kind: 'subagent-report', form: 'relay', senderSessionId: SessionId('child') },
+    }), { surfaceOp: 'append' })
+    const state = buildRoutingState(session, { contextTurns: 4, maxChars: 12_000 })
+    const items = parseStateItems(state.text)
+    const currentItem = stateItemFor(items, current)
+    expect(currentItem.source).toBe('user')
+    expect(items.some(item => item.source === 'subagent-report')).toBe(true)
+    expect(state.seqs).toContain(current)
+  })
 })

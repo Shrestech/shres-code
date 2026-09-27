@@ -1356,6 +1356,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the mode in force.',
       },
       {
+        signature: 'async onChildRoute( request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>',
+        description: 'Answer one `subagent/child-route` consult. `next()` runs first so another listener\'s answer wins and this policy records nothing.',
+        parameters: [{ name: 'request', description: 'the waterfall request, including the minted routeRequestId.' }, { name: 'next', description: 'remaining listeners.' }],
+        returns: 'the route to start the child with, or undefined to keep inherited.',
+      },
+      {
         signature: 'set(agent: Agent, mode: ModelRoutingMode): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
         description: 'Switch routing on, off, or to shadow. Between turns the change is appended immediately; a changed value during an open turn waits for the next accepted pre-step. An explicit choice equal to the current value records user authority immediately and prevents later settings from overriding it.',
         parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'mode', description: 'the mode routing should run in.' }],
@@ -2242,6 +2248,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{@link SubagentError} under the same conditions as {@link listChildren}.'],
       },
       {
+        signature: 'childTurnOutcomes( parent: Agent, childId: SessionId, signal?: AbortSignal, ): Promise<ChildTurnOutcomesResult>',
+        description: 'Observe one direct child\'s accounting turns and the route in force for each. Live session first; otherwise one persistence inspect under the same lifecycle witness as listing. Direct children only. Observe-only: no events, no mutation. Cancellation rejects with the signal\'s reason. Data damage returns `unavailable` and never throws.',
+        parameters: [{ name: 'parent', description: 'the exact live parent whose child is read.' }, { name: 'childId', description: 'the durable child session id.' }, { name: 'signal', description: 'caller cancellation forwarded to persistence inspect.' }],
+        returns: 'accounting turns, or why they cannot be observed.',
+      },
+      {
         signature: 'registerProvider(provider: SubagentProvider): () => void',
         description: 'Register a provider under its name. Registration is effect-scoped and HMR safe; removing a provider blocks new starts but does not revoke runs that were already returned to their holders.',
         parameters: [{ name: 'provider', description: 'the trusted provider implementation.' }],
@@ -2267,7 +2279,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>',
-        description: 'Resolve the `agentOptions` a delegation consumer starts one fresh child with, dispatching `subagent/child-route` at most once. Consumers pass the result as the start request\'s `agentOptions` and derive any reported route from the same value with `effectiveChildRoute`, so the reported route and the run route cannot diverge.\n\n`input.requested` returns unchanged, without dispatch, when it names a provider or model (explicit routes win), when the provider seeds the child with parent history (fork), when the provider does not run requested routes, when no listener answers, or when the answer equals the inherited route. A throwing listener is logged and the child keeps its inherited route: routing is an optional cost policy, and a broken policy must not fail the delegation it would only have made cheaper. An `InvariantError` raised during the dispatch is not contained: a violated invariant means the durable log is about to become inconsistent, so it rejects the delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the inherited route and resolved against its registered model before return, so an unregistered route rejects before any child exists; agent creation itself does not validate a route.',
+        description: 'Resolve the `agentOptions` a delegation consumer starts one fresh child with, dispatching `subagent/child-route` at most once. Consumers pass the result as the start request\'s `agentOptions` and derive any reported route from the same value with `effectiveChildRoute`, so the reported route and the run route cannot diverge.\n\n`input.requested` returns unchanged, without dispatch, when it names a provider or model (explicit routes win), when the provider seeds the child with parent history (fork), when the provider does not run requested routes, when no listener answers, or when the answer equals the inherited route. A dispatch that reaches listeners mints one `routeRequestId` on the request. That id is copied onto the returned `agentOptions` only when a listener changed the route; every other path returns `requested` unchanged. A throwing listener is logged and the child keeps its inherited route: routing is an optional cost policy, and a broken policy must not fail the delegation it would only have made cheaper. An `InvariantError` raised during the dispatch is not contained: a violated invariant means the durable log is about to become inconsistent, so it rejects the delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the inherited route and resolved against its registered model before return, so an unregistered route rejects before any child exists; agent creation itself does not validate a route.',
         parameters: [{ name: 'name', description: 'the subagent provider the child will start on.' }, { name: 'input', description: 'the parent, consumer kind, requested options, task, and signal.' }],
         returns: 'the options to start the child with, or `undefined` when none apply.',
         throws: ['{SubagentError} `NO_PROVIDER` for an unregistered subagent provider, or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not resolve to a registered model.', '{InvariantError} when a registered invariant fails during the dispatch.'],
@@ -3613,6 +3625,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
   },
   {
+    name: 'ChildTurnOutcome',
+    declaration: 'export interface ChildTurnOutcome {\n    readonly turn: number;\n    readonly reason: TurnEndReason;\n    readonly route?: {\n        readonly provider: string;\n        readonly model: string;\n    };\n}',
+  },
+  {
+    name: 'ChildTurnOutcomes',
+    declaration: 'export interface ChildTurnOutcomes {\n    readonly routeRequestId?: SubagentRouteRequestId;\n    readonly turns: readonly ChildTurnOutcome[];\n}',
+  },
+  {
+    name: 'ChildTurnOutcomesResult',
+    declaration: 'export type ChildTurnOutcomesResult = ChildTurnOutcomes | {\n    readonly unavailable: ChildTurnOutcomesUnavailable;\n};',
+  },
+  {
+    name: 'ChildTurnOutcomesUnavailable',
+    declaration: 'export type ChildTurnOutcomesUnavailable = \'missing\' | \'corrupt\' | \'no-persistence\' | \'not-a-child\';',
+  },
+  {
     name: 'ClaudeSessionManager',
     declaration: 'export class ClaudeSessionManager {\n    constructor(options: ClaudeSessionOptions);\n    current(): Promise<ClaudeSessionToken>;\n}',
   },
@@ -4261,6 +4289,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JudgmentConsumerId = Branded<\'JudgmentConsumerId\'>;',
   },
   {
+    name: 'JudgmentCorrelation',
+    declaration: 'export interface JudgmentCorrelation {\n    sessionId: SessionId;\n    consultKey: string;\n}',
+  },
+  {
     name: 'JudgmentEngine',
     declaration: 'export interface JudgmentEngine {\n    readonly fitting?: JudgmentFittingEngine;\n    ask(input: JudgmentInput): Promise<JudgmentResult>;\n}',
   },
@@ -4318,7 +4350,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JudgmentInput',
-    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n}',
+    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n    correlation?: JudgmentCorrelation;\n}',
   },
   {
     name: 'JudgmentQuestion',
@@ -4685,6 +4717,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelRoutingCandidateRequirements {\n    readonly requiresImage: boolean;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly thinkingMode?: LlmThinkingMode;\n    readonly promptCacheTtlMs?: number;\n}',
   },
   {
+    name: 'ModelRoutingChildPolicy',
+    declaration: 'export interface ModelRoutingChildPolicy {\n    readonly match: {\n        readonly kind?: \'subagent\' | \'workflow\';\n        readonly agentType?: string;\n    };\n    readonly candidate: string;\n    readonly judge: boolean;\n}',
+  },
+  {
     name: 'ModelRoutingColdPoint',
     declaration: 'export interface ModelRoutingColdPoint {\n    kind: ModelRoutingColdPointKind;\n    ttlMs: number;\n    ttlSource: \'adapter\' | \'fallback\';\n    idleMs?: number;\n    lastBaseSeq?: number;\n    compactionSeq?: number;\n}',
   },
@@ -4802,7 +4838,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelRoutingStatsSnapshot',
-    declaration: 'export interface ModelRoutingStatsSnapshot {\n    counts: {\n        decisions: number;\n        consults: number;\n        downgradedSteps: number;\n        steps: number;\n        streaks: number;\n        keptStrong: number;\n        routeFailed: number;\n        judgeFailed: number;\n        deadlineHits: number;\n        warmUps: number;\n        turnsWithDecisions: number;\n        warmSkipped: number;\n    };\n    reasons: {\n        reason: string;\n        group: ModelRoutingReasonGroup;\n        count: number;\n    }[];\n    keptReasons: {\n        reason: string;\n        count: number;\n    }[];\n    exits: {\n        brokenBy: string;\n        count: number;\n    }[];\n    streakLengths: {\n        median: number | null;\n        max: number | null;\n    };\n    confidence: {\n        values: number[];\n        margins: number[];\n        max: number | null;\n        total: number;\n    };\n    latency: {\n        bucketsMs: number[];\n        counts: number[];\n        failed: number;\n        p50: number | null;\n        p95: number | null;\n        includesFailed: boolean;\n    };\n    eligibility: {\n        counts: number[];\n        p50: number | null;\n        p95: number | null;\n    };\n    criticalPath: {\n        totalMs: number;\n        perTurnMs: number | null;\n        judgeOnly: number;\n    };\n    judge: {\n        calls: number;\n        promptTokens: number;\n        outputTokens: number;\n    };\n    thresholds: {\n        downgradeThreshold: number;\n        downgradeMargin: number;\n        source: \'ope /* …truncated — full shape in source */',
+    declaration: 'export interface ModelRoutingStatsSnapshot {\n    counts: {\n        decisions: number;\n        consults: number;\n        downgradedSteps: number;\n        steps: number;\n        streaks: number;\n        keptStrong: number;\n        routeFailed: number;\n        judgeFailed: number;\n        deadlineHits: number;\n        warmUps: number;\n        turnsWithDecisions: number;\n        warmSkipped: number;\n        childRouted: number;\n        childFailures: number;\n        childSuccesses: number;\n        childNeutral: number;\n    };\n    children: {\n        decided: number;\n        routed: number;\n        kept: number;\n        byReason: {\n            reason: string;\n            count: number;\n        }[];\n        byModel: {\n            candidateId: string;\n            count: number;\n        }[];\n        failures: number;\n    };\n    recentChildren: {\n        seq: number;\n        t: number;\n        outcome: \'routed\' | \'kept\';\n        reason: string;\n        candidateId: string | null;\n        agentType: string | null;\n        shadow: boolean;\n        latencyMs: number | null;\n    }[];\n    reasons: {\n        reason: string;\n        group: ModelRoutingReasonGroup;\n        count: number;\n    }[];\n    keptReasons: {\n        reason: string;\n        count: number;\n    }[];\n    exits: {\n        brokenBy: string;\n        count: number;\n    }[];\n    streakLengths: {\n        median: number | null;\n        max: number | null;\n    };\n    confidence: {\n        values: number[];\n        margins: number[ /* …truncated — full shape in source */',
   },
   {
     name: 'ModelRoutingStickyView',
@@ -4986,11 +5022,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRouterConfig',
-    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly coldPoints: {\n        readonly unknownTtlMs: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
-  },
-  {
-    name: 'ResolvedModelRoutingState',
-    declaration: 'export interface ResolvedModelRoutingState {\n    readonly contextTurns: number;\n    readonly maxChars: number;\n    readonly maxFitCandidates: number;\n}',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly childPolicies: readonly ModelRoutingChildPolicy[];\n    readonly childRouteErrors: number;\n    readonly childRouteInstructions?: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly coldPoints: {\n        readonly unknownTtlMs: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    reado /* …truncated — full shape in source */',
   },
   {
     name: 'ResolvedNormalRetryPolicy',
@@ -5674,7 +5706,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentChildRouteRequest',
-    declaration: 'export interface SubagentChildRouteRequest {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly subagentProvider: string;\n    readonly inherited: SubagentChildRoute;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface SubagentChildRouteRequest {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly subagentProvider: string;\n    readonly inherited: SubagentChildRoute;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n    readonly routeRequestId: SubagentRouteRequestId;\n}',
   },
   {
     name: 'SubagentDescendantListEntry',
@@ -5709,12 +5741,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SubagentResult {\n    readonly output: ContentBlock[];\n    readonly structured?: unknown;\n    readonly stopReason: SubagentStopReason;\n}',
   },
   {
+    name: 'SubagentRouteRequestId',
+    declaration: 'export type SubagentRouteRequestId = Branded<\'SubagentRouteRequestId\'>;',
+  },
+  {
     name: 'SubagentRun',
     declaration: 'export interface SubagentRun {\n    readonly id: SessionId;\n    readonly localAgent: Agent | undefined;\n    readonly result: Promise<SubagentResult>;\n    dispose(): Promise<void>;\n}',
   },
   {
     name: 'SubagentRunEndInfo',
-    declaration: 'export interface SubagentRunEndInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly stopReason: SubagentResult[\'stopReason\'];\n    readonly lastAssistantMessage?: ContentBlock[];\n}',
+    declaration: 'export interface SubagentRunEndInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly subagentRouteRequestId?: SubagentRouteRequestId;\n    readonly stopReason: SubagentResult[\'stopReason\'];\n    readonly lastAssistantMessage?: ContentBlock[];\n}',
   },
   {
     name: 'SubagentRunId',
@@ -5722,11 +5758,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRunInfo',
-    declaration: 'export interface SubagentRunInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n}',
+    declaration: 'export interface SubagentRunInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly subagentRouteRequestId?: SubagentRouteRequestId;\n}',
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n    async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>;\n}',
+    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    childTurnOutcomes(parent: Agent, childId: SessionId, signal?: AbortSignal): Promise<ChildTurnOutcomesResult>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n    async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>;\n}',
   },
   {
     name: 'SubagentStartRequest',
