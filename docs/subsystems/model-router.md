@@ -712,7 +712,7 @@ interface ModelRouterConfig {
 }
 ```
 
-`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, model, and description of at most 160 characters, and no two candidates may share an id; a `routeFrom` route is listed once with a known objective, a `latency` route requires `judgmentDeadlineMs` of at most 200, a `quota` route requires `allowEveryTurn: true` under the per-turn entry policy, and an empty `routeFrom` is refused unless `initialMode` is `off`; an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's.
+`resolveConfig` re-judges what the declaration cannot express: presence, bounds, and cross-field requirements. `routeInstructions` and both thresholds are required; a candidate needs a non-empty id, provider, model, and description of at most 160 characters, and no two candidates may share an id; a `routeFrom` route is listed once with a known objective, a `latency` route requires `judgmentDeadlineMs` of at most 200, a `quota` route requires `allowEveryTurn: true` under the per-turn entry policy, and an empty `routeFrom` is refused unless `initialMode` is `off` (each of these rejections is a `SettingsFieldError` at the field's path, such as `["candidates", i, "description"]`); an unknown key fails by name; `difficultyInstructions` is required while `hold.minSteps` is above zero or `hardHint` is set, because a held downgrade re-judges every step and the hint reads the difficulty answer; `hold.minSteps` must not exceed `hold.maxSteps`; `difficulty.entryScoreCeiling` must not exceed `escalateBack.scoreThreshold`, whose defaults are not lowered to fit a shorter rubric; and a `difficultyToEffort.scoreThreshold` must be below `difficulty.entryScoreCeiling`, because a lift applies only on an entering step. Whether a judgment engine is composed at all is the [judgment](judgment.md) settings section's concern, not this one's. A settings write, and only a write, also refuses a pool model or `routeFrom` entry whose provider route the llm runtime does not register, checking only the entries the write adds or whose provider or model it changes, at `["candidates", i, "provider"]` or `["routeFrom", i, "provider"]`: a stored or reloaded section is applied as written, and an unregistered route is excluded at run time as `candidate-unavailable`. `modelRouting/poolStatus` reports the pool and `routeFrom` in force with each model's declared facts and the router's own eligibility result from every base, for configuration surfaces.
 
 `/route` reports the mode in force and any held streak; `/route on` and `/route off` select a persistent user mode. A same-valued choice records user authority immediately. A changed value during an open turn waits for the next accepted pre-step; rejection or cancellation does not commit it. Deployment defaults use `model-routing/configuration` and stop affecting a session after its first explicit `model-routing/mode`. Cold sessions retain their log-derived mode until they acquire a live routing owner. Status and invalid commands never create a pending mode indication.
 
@@ -755,6 +755,15 @@ config(): ResolvedModelRouterConfig
 @Remote('gate') gateView(): ModelRoutingGateView
 
 /**
+ * The pool and `routeFrom` allowlist in force, each model with the facts its
+ * adapter declares, and the router's own eligibility result for every
+ * (base, pool model) pair, computed as a turn without images would compute it.
+ * Makes no model request.
+ * @returns the pool status.
+ */
+@Remote async poolStatus(): Promise<ModelRoutingPoolStatus>
+
+/**
  * One logged decision, verbatim, with the turn and step it was logged in and
  * the gate configuration in force now.
  * @param agent - the session's Agent.
@@ -763,6 +772,19 @@ config(): ResolvedModelRouterConfig
  * @throws when the seq does not name a `model-routing/decision` event.
  */
 @Remote('decision') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail
+
+/**
+ * Routing statistics across one workspace's unarchived sessions, for the
+ * Settings overview: each session's `modelRoutingStats` value, rolled up
+ * over the sessions whose latest decision falls in the range. An attached
+ * session's value is its live one and a cold session's is the persisted
+ * projection cache's; no session log is read, so a cold session without a
+ * cached value on the current unit version is counted as not summarized.
+ * @param request - the workspace and the range.
+ * @returns the workspace statistics.
+ * @throws when this host composes no workspace registry or the workspace is unknown.
+ */
+@Remote('stats') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>
 
 /**
  * Read the logged mode and any selection awaiting the next accepted pre-step.
@@ -832,5 +854,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:439`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:452`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

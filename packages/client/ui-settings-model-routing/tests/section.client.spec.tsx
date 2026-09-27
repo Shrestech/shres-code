@@ -1,66 +1,35 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { ModelRoutingSection } from '../src/client/ModelRoutingSection.tsx'
-import type { ModelRoutingController, ModelRoutingState, WriteFailure } from '../src/client/model.ts'
+import type { ModelRoutingController } from '../src/client/model.ts'
 import { createModelRoutingController } from '../src/client/model.ts'
+import { createOverviewController } from '../src/client/overview.ts'
 import { en } from '../src/client/locales.ts'
-import { JUDGMENT, LAYA, LAYA_VIEW, ROUTER, TYPESAFE, namespace, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
+import { GATE, LAYA, LAYA_VIEW, TYPESAFE, namespace, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
+import { double, ready, t } from './helpers.client.tsx'
 
 afterEach(cleanup)
 
-/** Resolve a key the way the locale runtime does, filling {name} placeholders. */
-function t(key: keyof typeof en, params?: Record<string, unknown>): string {
-  return en[key].replace(/\{(\w+)\}/g, (_match, name: string) => String(params?.[name]))
-}
-
-const unused = (() => { throw new Error('unused standard hook') }) as never
-
-/** A ready page state. */
-function ready(overrides: Partial<ModelRoutingState> = {}): ModelRoutingState {
-  return {
-    availability: 'composed',
-    status: 'ready',
-    error: null,
-    engines: snapshot(),
-    laya: LAYA_VIEW,
-    layaError: null,
-    layaAction: null,
-    writable: true,
-    judgment: JUDGMENT,
-    router: ROUTER,
-    ...overrides,
-  }
-}
-
-/** A controller double over a fixed state, recording its writes. */
-function double(state: ModelRoutingState, writes: Partial<Record<'selectEngine' | 'setClassifier' | 'setDefaultMode', WriteFailure | undefined>> = {}) {
-  const store = createSnapshotStore(state)
-  const controller = {
-    store,
-    probe: vi.fn(() => Promise.resolve()),
-    load: vi.fn(() => Promise.resolve()),
-    refresh: vi.fn(() => Promise.resolve()),
-    selectEngine: vi.fn(() => Promise.resolve(writes.selectEngine)),
-    setClassifier: vi.fn(() => Promise.resolve(writes.setClassifier)),
-    setDefaultMode: vi.fn(() => Promise.resolve(writes.setDefaultMode)),
-    runLaya: vi.fn(() => Promise.resolve()),
-  } satisfies ModelRoutingController
-  return controller
-}
+/** Session list and workspace hooks over an empty client: no workspace, so the overview reads nothing. */
+const useSessions = bindSnapshotSelector(createSnapshotStore({ current: undefined, byId: {} })) as never
+const useWorkspaces = bindSnapshotSelector(createSnapshotStore({ items: [], recentWorkspaceId: undefined })) as never
 
 /** Render the page over one controller. */
 function mount(controller: ModelRoutingController) {
+  const overview = createOverviewController(() => new Promise(() => {}))
   return render(
     <ModelRoutingSection
       controller={controller}
+      overview={overview}
       useSnapshot={bindSnapshotSelector(controller.store)}
+      useOverview={bindSnapshotSelector(overview.store)}
       t={t as never}
       close={() => {}}
-      useSessions={unused}
-      useWorkspaces={unused}
+      useSessions={useSessions}
+      useWorkspaces={useWorkspaces}
     />,
   )
 }
@@ -176,24 +145,27 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByText(/The override for judgment-guardrails/)).toBeTruthy()
   })
 
-  it('shows how the router gates the engine it asks, from its operating points and the engine\'s calibration', () => {
-    const points = (operatingPoints: unknown[]) => namespace('model-router', { initialMode: 'off', operatingPoints })
+  it('shows how the router gates the engine it asks, as its gate read reports that engine', () => {
     const judge = { ...TYPESAFE, id: 'llm', label: 'LLM judge', calibration: 'verbalized', egress: 'none', destination: undefined } as never
-    const badge = (router: ReturnType<typeof namespace>, engine = 'laya'): HTMLElement => {
-      mount(double(ready({ router, engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never, judge], engine) })))
+    const badge = (calibration: unknown, engine = 'laya'): HTMLElement => {
+      const gate = { ...GATE, engines: [{ engine, calibration }] } as never
+      mount(double(ready({ gate, engines: snapshot([TYPESAFE, { ...LAYA, state: 'ready', detail: undefined } as never, judge], engine) })))
       const row = within(screen.getByRole('list', { name: en.consumersGroup })).getByRole('listitem')
       const found = within(row).getAllByText(/Calibrated|Uncalibrated|Not used for routing/)[0] as HTMLElement
       cleanup()
       return found
     }
-    const calibrated = badge(points([{ engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' }]))
+    const calibrated = badge({ kind: 'calibrated', by: 'routing-eval-2026-09' })
     expect(calibrated.textContent).toBe('Calibrated (routing-eval-2026-09)')
     expect(calibrated.getAttribute('title')).toBe('Routing gates this engine\'s answers with the operating point routing-eval-2026-09 evaluated.')
-    expect(badge(points([{ engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08 }])).textContent).toBe(en.uncalibratedPoint)
-    expect(badge(points([{ engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1, calibratedBy: 'x' }])).textContent).toBe(en.uncalibratedGlobal)
-    expect(badge(points([]), 'llm').textContent).toBe(en.routingRefused)
-    expect(badge(points([{ engine: 'llm', downgradeThreshold: 0.9, downgradeMargin: 0.2, acceptVerbalized: true }]), 'llm').textContent).toBe(en.uncalibratedPoint)
-    mount(double(ready({ router: null })))
+    expect(badge({ kind: 'point' }).textContent).toBe(en.uncalibratedPoint)
+    expect(badge({ kind: 'global' }).textContent).toBe(en.uncalibratedGlobal)
+    expect(badge({ kind: 'refused' }, 'llm').textContent).toBe(en.routingRefused)
+    // The page reads the router's own answer: no gate, or no entry for the engine, shows no badge.
+    mount(double(ready({ gate: null })))
+    expect(screen.queryByText(/Uncalibrated|Calibrated|Not used for routing/)).toBeNull()
+    cleanup()
+    mount(double(ready({ gate: { ...GATE, engines: [] } })))
     expect(screen.queryByText(/Uncalibrated|Calibrated|Not used for routing/)).toBeNull()
   })
 
@@ -230,10 +202,10 @@ describe('Settings › Model routing page', () => {
   it('says so when no engine is composed, and when the selected engine is not composed', () => {
     mount(double(ready({ laya: null, engines: snapshot([]) })))
     expect(screen.getByRole('status').textContent).toBe(en.noEngines)
-    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: en.engineLabel })).toBeNull()
     cleanup()
     mount(double(ready({ laya: null, engines: snapshot([TYPESAFE], 'gone') })))
-    expect(screen.getByRole('combobox')).toHaveProperty('value', 'gone')
+    expect(screen.getByRole('combobox', { name: en.engineLabel })).toHaveProperty('value', 'gone')
     expect(screen.getByText('The selected engine "gone" is not composed; every judgment fails until it is, and routing keeps the strong model.')).toBeTruthy()
   })
 
@@ -245,17 +217,17 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByText(en.engineSaving)).toBeTruthy()
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe('engine: judgment: engine "laya" requires darwin-arm64')
-    expect(screen.getByRole('combobox').getAttribute('aria-invalid')).toBe('true')
-    expect(screen.getByRole('combobox').getAttribute('aria-describedby')).toBe(alert.id)
+    expect(screen.getByRole('combobox', { name: en.engineLabel }).getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByRole('combobox', { name: en.engineLabel }).getAttribute('aria-describedby')).toBe(alert.id)
   })
 
   it('shows an unnamed rejection by its message and clears it on a later successful write', async () => {
     const controller = double(ready())
     controller.selectEngine.mockResolvedValueOnce({ message: 'stale revision' })
     mount(controller)
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'laya' } })
+    fireEvent.change(screen.getByRole('combobox', { name: en.engineLabel }), { target: { value: 'laya' } })
     expect((await screen.findByRole('alert')).textContent).toBe('stale revision')
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'laya' } })
+    fireEvent.change(screen.getByRole('combobox', { name: en.engineLabel }), { target: { value: 'laya' } })
     await waitFor(() => { expect(screen.queryByRole('alert')).toBeNull() })
   })
 
@@ -342,7 +314,7 @@ describe('Settings › Model routing page', () => {
   it('disables every write and says why when the settings file is read-only, and omits cards the Host does not expose', () => {
     mount(double(ready({ writable: false })))
     expect(screen.getByText(en.readOnly)).toBeTruthy()
-    expect(screen.getByRole('combobox')).toHaveProperty('disabled', true)
+    expect(screen.getByRole('combobox', { name: en.engineLabel })).toHaveProperty('disabled', true)
     expect(screen.getByRole('switch')).toHaveProperty('disabled', true)
     expect(screen.getByRole('radio', { name: en.modeOn })).toHaveProperty('disabled', true)
     cleanup()
@@ -355,7 +327,12 @@ describe('Settings › Model routing page', () => {
     expect(screen.getByRole('switch')).toBeTruthy()
     cleanup()
     mount(double(ready({ judgment: null, judgmentValue: undefined } as never)))
-    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: en.modeGroup })).toBeTruthy()
+  })
+
+  it('shows a routing read failure above the pool editor', () => {
+    mount(double(ready({ routingError: 'pool socket closed' })))
+    expect(screen.getByRole('alert').textContent).toBe('Routing details could not be read: pool socket closed')
   })
 
   it('renders a real controller end to end: the engine switch changes the egress badge', async () => {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifierEnabled, consumerRoutes, engineOption, ignoredOverrides, initialMode, isRemote, lastExitText, modelsText, numberAt,
-  routingCalibration, stateLabel,
+  engineCalibration, routerEngine, stateLabel,
 } from '../src/client/view.ts'
 import { en } from '../src/client/locales.ts'
-import { LAYA, LAYA_VIEW, TYPESAFE, namespace, snapshot } from './fixtures.client.ts'
+import { GATE, LAYA, LAYA_VIEW, TYPESAFE, namespace, snapshot } from './fixtures.client.ts'
 
 /** Resolve a key the way the locale runtime does. */
 function t(key: keyof typeof en, params?: Record<string, unknown>): string {
@@ -67,24 +67,17 @@ describe('model routing view helpers', () => {
     expect(ignoredOverrides(view)).toEqual([{ consumer: 'undeclared', engineId: 'typesafe' }])
   })
 
-  it('reads the router\'s gate for an engine from its operating points and the engine\'s calibration', () => {
-    const router = namespace('model-router', { operatingPoints: [
-      null,
-      'not a point',
-      { engine: 'shield', downgradeThreshold: 0.8, downgradeMargin: 0.1 },
-      { engine: 'typesafe', downgradeThreshold: 0.8, downgradeMargin: 0.1, calibratedBy: '' },
-      { engine: 'laya', downgradeThreshold: 0.72, downgradeMargin: 0.08, calibratedBy: 'routing-eval-2026-09' },
-    ] })
-    const verbalized = { ...TYPESAFE, id: 'llm', calibration: 'verbalized' } as never
-    expect(routingCalibration(router, LAYA)).toEqual({ kind: 'calibrated', by: 'routing-eval-2026-09' })
-    expect(routingCalibration(router, { ...LAYA, id: 'shield' } as never)).toEqual({ kind: 'point' })
-    expect(routingCalibration(router, TYPESAFE)).toEqual({ kind: 'point' })
-    expect(routingCalibration(router, { ...TYPESAFE, id: 'gone' } as never)).toEqual({ kind: 'global' })
-    expect(routingCalibration(router, verbalized)).toEqual({ kind: 'refused' })
-    expect(routingCalibration(namespace('model-router', { operatingPoints: [{ engine: 'llm', acceptVerbalized: true, calibratedBy: 'eval' }] }), verbalized))
+  it('reads how the router gates an engine from its gate read', () => {
+    expect(engineCalibration(GATE, 'laya')).toEqual({ kind: 'global' })
+    expect(engineCalibration({ ...GATE, engines: [{ engine: 'laya', calibration: { kind: 'calibrated', by: 'eval' } }] }, 'laya'))
       .toEqual({ kind: 'calibrated', by: 'eval' })
-    expect(routingCalibration(namespace('model-router', { operatingPoints: 'none' }), LAYA)).toEqual({ kind: 'global' })
-    expect(routingCalibration(namespace('model-router', null), LAYA)).toEqual({ kind: 'global' })
-    expect(routingCalibration(null, LAYA)).toEqual({ kind: 'global' })
+    expect(engineCalibration(GATE, 'gone')).toBeUndefined()
+    expect(engineCalibration(null, 'laya')).toBeUndefined()
+  })
+
+  it('names the engine the router asks: its override while declared, else the selected engine', () => {
+    expect(routerEngine(snapshot([TYPESAFE, LAYA], 'laya'))).toBe('laya')
+    expect(routerEngine(snapshot([TYPESAFE, LAYA], 'laya', { overrides: { 'model-router': 'typesafe' } }))).toBe('typesafe')
+    expect(routerEngine(null)).toBeUndefined()
   })
 })

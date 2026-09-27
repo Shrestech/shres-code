@@ -8,11 +8,12 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { JudgmentEnginesSnapshot, JudgmentEngineView, LayaGatewayState } from '@shres-code/shres-code-api-remotes/client'
+import type { ModelRoutingCalibration } from '@shres-code/shres-code-model-router/client'
 import clsx from 'clsx'
 import type { ModelRoutingController, ModelRoutingState, WriteFailure } from './model.ts'
 import { LAYA_ENGINE, ROUTER_CONSUMER } from './model.ts'
 import {
-  consumerRoutes, engineOption, ignoredOverrides, isRemote, lastExitText, modelsText, numberAt, routingCalibration, stateLabel,
+  consumerRoutes, engineCalibration, engineOption, ignoredOverrides, isRemote, lastExitText, modelsText, numberAt, stateLabel,
 } from './view.ts'
 import type { ConsumerRoute, Translate } from './view.ts'
 import css from './ModelRoutingSection.module.css'
@@ -129,9 +130,10 @@ function EngineFacts({ engine, t }: { engine: JudgmentEngineView; t: Translate }
   )
 }
 
-/** How the router gates the engine it asks, from its operating points. */
-function RoutingBadge({ engine, state, t }: { engine: JudgmentEngineView; state: ModelRoutingState; t: Translate }): ReactNode {
-  const gate = routingCalibration(state.router, engine)
+/** How the router gates the engine it asks, as its gate read reports it; nothing while the router reports none. */
+export function RoutingBadge({ calibration, t }: { calibration: ModelRoutingCalibration | undefined; t: Translate }): ReactNode {
+  if (calibration === undefined) return null
+  const gate = calibration
   switch (gate.kind) {
     case 'calibrated':
       return <span className={css['pill']} title={t('calibratedTitle', { by: gate.by })}>{t('calibrated', { by: gate.by })}</span>
@@ -169,8 +171,8 @@ function ConsumerList({ snapshot, state, t }: { snapshot: JudgmentEnginesSnapsho
                     <>
                       <span>{route.engine.label}</span>
                       <EgressPill engine={route.engine} t={t} />
-                      {route.consumer === ROUTER_CONSUMER && state.router !== null
-                        ? <RoutingBadge engine={route.engine} state={state} t={t} />
+                      {route.consumer === ROUTER_CONSUMER
+                        ? <RoutingBadge calibration={engineCalibration(state.gate, route.engine.id)} t={t} />
                         : null}
                     </>
                   )}

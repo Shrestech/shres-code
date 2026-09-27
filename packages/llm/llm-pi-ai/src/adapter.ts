@@ -44,6 +44,7 @@ import type {
   Message,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  LlmCacheUsage,
   LlmThinkingMode,
   ReasoningEffortId as ReasoningEffortIdType,
   ResolvedRetryPolicy,
@@ -363,6 +364,11 @@ export class PiAiAdapter extends LlmAdapter {
     return { thinkingMode: compat?.forceAdaptiveThinking === true ? 'adaptive' : 'budget' }
   }
 
+  /** Whether one model's usage reports cache counts, as its requests are mapped. */
+  private cacheUsageOf(profile: ResolvedPiAiProviderProfile, model: Model<Api>): { cacheUsage: LlmCacheUsage } {
+    return { cacheUsage: resolveCacheUsage(profile.cacheUsage, model.api) }
+  }
+
   /** The owner-declared prompt-cache lifetime for one model, or nothing to declare none. */
   private promptCacheTtlOf(
     provider: string,
@@ -395,6 +401,7 @@ export class PiAiAdapter extends LlmAdapter {
         ...this.hostedToolsOf(profile, model.id),
         ...this.promptCacheTtlOf(provider, model.id),
         ...this.thinkingModeOf(model),
+        ...this.cacheUsageOf(profile, model),
       }))
     })
   }
@@ -420,6 +427,7 @@ export class PiAiAdapter extends LlmAdapter {
         ...this.hostedToolsOf(profile, model),
         ...this.promptCacheTtlOf(provider, model),
         ...this.thinkingModeOf(resolvedModel),
+        ...this.cacheUsageOf(profile, resolvedModel),
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),

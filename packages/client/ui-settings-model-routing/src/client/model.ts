@@ -1,10 +1,13 @@
 /**
  * Page model of Settings › Model routing: one snapshot joining the Host's
  * judgment engine view (`judgmentEngines.snapshot`), the local Laya gateway
- * view (`laya.status`, when a `laya` engine is registered), and the resolved
- * `judgment` and `model-router` settings sections. The Host stays the single fact
- * source: every write goes through the settings seam or the Laya Remote and
- * the page re-renders from the next read, pushed or refetched.
+ * view (`laya.status`, when a `laya` engine is registered), the resolved
+ * `judgment` and `model-router` settings sections, and, while the router is
+ * composed, its gate (`modelRouting.gate`), its pool status
+ * (`modelRouting.poolStatus`), and the model catalog (`llm.models`) the pool
+ * editor picks from. The Host stays the single fact source: every write goes
+ * through the settings seam or the Laya Remote and the page re-renders from
+ * the next read, pushed or refetched.
  */
 
 import type {
@@ -12,8 +15,10 @@ import type {
   JudgmentEnginesSnapshot,
   LayaGatewayView,
   LayaInstallResult,
+  ModelProviderGroup,
   SettingsNamespaceView,
 } from '@shres-code/shres-code-api-remotes/client'
+import type { ModelRoutingGateView, ModelRoutingObjective, ModelRoutingPoolStatus } from '@shres-code/shres-code-model-router/client'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 
@@ -53,6 +58,33 @@ export interface ModelRoutingRemotes {
    * @returns the view once the restart began, or the failure.
    */
   layaRestart: () => Promise<RemoteOutcome<LayaGatewayView>>
+  /**
+   * Read the router's gate configuration in force.
+   * @returns the gate view, or the gateway failure.
+   */
+  gate: () => Promise<RemoteOutcome<ModelRoutingGateView>>
+  /**
+   * Read the router's pool and routeFrom with each model's facts and eligibility.
+   * @returns the pool status, or the gateway failure.
+   */
+  poolStatus: () => Promise<RemoteOutcome<ModelRoutingPoolStatus>>
+}
+
+/** One pool model as the editor writes it. */
+export interface PoolCandidateDraft {
+  readonly id: string
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string
+  readonly description: string
+}
+
+/** One `routeFrom` entry as the editor writes it; the objective is absent until the owner picks one. */
+export interface RouteFromDraft {
+  readonly provider: string
+  readonly model: string
+  readonly objective?: ModelRoutingObjective
+  readonly allowEveryTurn?: boolean
 }
 
 /** Whether the Host composes the judgment dispatcher, as far as the page has read. */
@@ -83,6 +115,14 @@ export interface ModelRoutingState {
   judgment: SettingsNamespaceView | null
   /** The resolved `model-router` section, when the Host composes the router. */
   router: SettingsNamespaceView | null
+  /** The router's gate configuration in force, while the Host serves it. */
+  gate: ModelRoutingGateView | null
+  /** The router's pool status, while the Host serves it. */
+  pool: ModelRoutingPoolStatus | null
+  /** The model catalog the pool editor picks from, by provider. */
+  models: ModelProviderGroup[] | null
+  /** A router or catalog read failure; the facts read before stay rendered. */
+  routingError: string | null
 }
 
 /** A rejected write: the Host's message, and the field path an owner named. */
@@ -129,6 +169,13 @@ export interface ModelRoutingController {
    */
   setDefaultMode(mode: 'off' | 'on'): Promise<WriteFailure | undefined>
   /**
+   * Write the pool and the `routeFrom` allowlist in one settings write.
+   * @param candidates - the pool, in order.
+   * @param routeFrom - the enabled strong models, in order.
+   * @returns the failure (with the field path the Host named), or undefined once the write committed.
+   */
+  savePool(candidates: readonly PoolCandidateDraft[], routeFrom: readonly RouteFromDraft[]): Promise<WriteFailure | undefined>
+  /**
    * Install or restart the local Laya gateway.
    * @param action - the operation.
    * @returns settlement once the operation and the following read finished; a
@@ -161,7 +208,7 @@ export function messageOf(error: unknown): string {
  * @param remotes - the Remote methods the page calls.
  * @returns the controller; nothing is read until {@link ModelRoutingController.probe} or `load`.
  */
-export function createModelRoutingController(api: Pick<IApiClient, 'settings'>, remotes: ModelRoutingRemotes): ModelRoutingController {
+export function createModelRoutingController(api: Pick<IApiClient, 'settings' | 'llm'>, remotes: ModelRoutingRemotes): ModelRoutingController {
   const store = createSnapshotStore<ModelRoutingState>({
     availability: 'unknown',
     status: 'idle',
@@ -173,6 +220,10 @@ export function createModelRoutingController(api: Pick<IApiClient, 'settings'>, 
     writable: false,
     judgment: null,
     router: null,
+    gate: null,
+    pool: null,
+    models: null,
+    routingError: null,
   })
   let generation = 0
 
@@ -219,6 +270,31 @@ export function createModelRoutingController(api: Pick<IApiClient, 'settings'>, 
     })
   }
 
+  /**
+   * Read the router's gate and pool status and the model catalog; called by the
+   * current read only, while the `model-router` section is exposed. A router the
+   * Host does not serve (`*-unavailable`) leaves them absent without an error.
+   */
+  const readRouting = async (current: number): Promise<void> => {
+    const settle = <T>(call: () => Promise<RemoteOutcome<T>>): Promise<RemoteOutcome<T>> =>
+      call().catch((error: unknown) => ({ ok: false as const, error: { code: 'internal', message: messageOf(error) } }))
+    const catalog = api.llm.models({}).then(
+      (response): RemoteOutcome<ModelProviderGroup[]> => response.result.ok
+        ? { ok: true, value: response.result.value.groups }
+        : { ok: false, error: { code: response.result.error.code, message: response.result.error.message } },
+      (error: unknown): RemoteOutcome<ModelProviderGroup[]> => ({ ok: false, error: { code: 'internal', message: messageOf(error) } }),
+    )
+    const [gate, pool, models] = await Promise.all([settle(remotes.gate), settle(remotes.poolStatus), catalog])
+    if (current !== generation) return
+    const failures = [gate, pool, models].flatMap(outcome => outcome.ok || isAbsent(outcome.error.code) ? [] : [outcome.error.message])
+    store.update((s) => {
+      s.gate = gate.ok ? gate.value : null
+      s.pool = pool.ok ? pool.value : null
+      s.models = models.ok ? models.value : null
+      s.routingError = failures[0] ?? null
+    })
+  }
+
   const probe = async (): Promise<void> => {
     await readEngines(++generation)
   }
@@ -244,24 +320,31 @@ export function createModelRoutingController(api: Pick<IApiClient, 'settings'>, 
       return
     }
     const { namespaces, writable } = result.value
+    const router = namespaces.find(view => view.ns === MODEL_ROUTER_NS) ?? null
     store.update((s) => {
       s.status = 'ready'
       s.writable = writable
       s.judgment = namespaces.find(view => view.ns === JUDGMENT_NS) ?? null
-      s.router = namespaces.find(view => view.ns === MODEL_ROUTER_NS) ?? null
+      s.router = router
+      if (router === null) {
+        s.gate = null
+        s.pool = null
+        s.models = null
+        s.routingError = null
+      }
     })
-    await readLaya(engines, current)
+    await Promise.all([readLaya(engines, current), router === null ? undefined : readRouting(current)])
   }
 
   const refresh = (): Promise<void> => store.getSnapshot().status === 'idle' ? probe() : load()
 
-  /** Write one field and re-read the page. */
-  const write = async (ns: string, path: string, value: unknown, revision: number | undefined): Promise<WriteFailure | undefined> => {
+  /** Set top-level fields of one section in one write, then re-read the page. */
+  const write = async (ns: string, fields: Record<string, unknown>, revision: number | undefined): Promise<WriteFailure | undefined> => {
     let failure: WriteFailure | undefined
     try {
       const response = await api.settings.mutate({
         ns,
-        ops: [{ op: 'set', path: [path], value }],
+        ops: Object.entries(fields).map(([path, value]) => ({ op: 'set' as const, path: [path], value })),
         ...revision === undefined ? {} : { expectedRevision: revision },
       })
       if (!response.result.ok) {
@@ -282,9 +365,10 @@ export function createModelRoutingController(api: Pick<IApiClient, 'settings'>, 
     probe,
     load,
     refresh,
-    selectEngine: engine => write(JUDGMENT_NS, 'engine', engine, store.getSnapshot().judgment?.revision),
-    setClassifier: enabled => write(JUDGMENT_NS, 'enabled', enabled, store.getSnapshot().judgment?.revision),
-    setDefaultMode: mode => write(MODEL_ROUTER_NS, 'initialMode', mode, store.getSnapshot().router?.revision),
+    selectEngine: engine => write(JUDGMENT_NS, { engine }, store.getSnapshot().judgment?.revision),
+    setClassifier: enabled => write(JUDGMENT_NS, { enabled }, store.getSnapshot().judgment?.revision),
+    setDefaultMode: mode => write(MODEL_ROUTER_NS, { initialMode: mode }, store.getSnapshot().router?.revision),
+    savePool: (candidates, routeFrom) => write(MODEL_ROUTER_NS, { candidates, routeFrom }, store.getSnapshot().router?.revision),
     runLaya: async (action) => {
       store.update((s) => { s.layaAction = action; s.layaError = null })
       let failure: string | null = null

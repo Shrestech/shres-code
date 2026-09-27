@@ -888,6 +888,76 @@ export interface ModelRoutingGateView {
   stateMaxChars: number
 }
 
+/** One `routeFrom` entry as the pool status reports it. */
+export interface ModelRoutingPoolBase {
+  /** Provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. */
+  objective: ModelRoutingObjective
+  /** Whether per-turn entry from a `quota` route is allowed. */
+  allowEveryTurn: boolean
+  /** Whether the llm runtime registers the provider route now. */
+  registered: boolean
+  /** The model's declared context window, in tokens, when its adapter states one. */
+  contextWindow?: number
+}
+
+/** How the router's eligibility check judges one pool model from one `routeFrom` base. */
+export interface ModelRoutingPoolEligibility {
+  /** Provider route of the base. */
+  provider: string
+  /** Model id of the base. */
+  model: string
+  /**
+   * The router's eligibility result for this pair, before any conversation:
+   * the result a turn without images gets.
+   */
+  reason: ModelRoutingCandidateEligibilityReason
+}
+
+/** One pool model as the pool status reports it. */
+export interface ModelRoutingPoolCandidate {
+  /** Configuration id, as the route question names it. */
+  id: string
+  /** Provider route of the pool model. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** The configured effort, when one is set. */
+  reasoningEffort?: string
+  /** The configured description. */
+  description: string
+  /** Whether the llm runtime registers the provider route now. */
+  registered: boolean
+  /** The model's declared context window, in tokens, when its adapter states one. */
+  contextWindow?: number
+  /** Declared input modalities, when the adapter states them. */
+  inputModalities?: string[]
+  /** Efforts the model's route offers, in adapter order, when it exposes reasoning control. */
+  efforts?: string[]
+  /** Whether the route's usage reports prompt-cache counts, when the adapter declares it. */
+  cacheUsage?: 'reported' | 'unreported'
+  /** Whether the same provider and model is also a `routeFrom` entry. */
+  alsoRouteFrom: boolean
+  /** The eligibility result from each `routeFrom` base, in `routeFrom` order. */
+  eligibility: ModelRoutingPoolEligibility[]
+}
+
+/**
+ * The configured pool and `routeFrom` allowlist, each model with the facts its
+ * adapter declares and the router's eligibility result for every
+ * (base, pool model) pair. JSON only; computed from the configuration in
+ * force and the llm runtime's registrations when read.
+ */
+export interface ModelRoutingPoolStatus {
+  /** The `routeFrom` entries, in configuration order. */
+  routeFrom: ModelRoutingPoolBase[]
+  /** The pool, in configuration order. */
+  candidates: ModelRoutingPoolCandidate[]
+}
+
 /** One logged decision with the position and config a drill-down renders. */
 export interface ModelRoutingDecisionDetail {
   /** Seq of the `model-routing/decision` event. */
@@ -902,6 +972,69 @@ export interface ModelRoutingDecisionDetail {
   decision: ModelRoutingDecision
   /** Configuration in force now. */
   gate: ModelRoutingGateView
+}
+
+/**
+ * The window of a workspace statistics read: a session is in it when its
+ * latest decision falls within the last 24 hours, the last 7 days, or ever.
+ */
+export type ModelRoutingStatsRange = '24h' | '7d' | 'all'
+
+/** A `modelRouting/stats` request: one workspace's sessions over one window. */
+export interface ModelRoutingStatsRequest {
+  /** Registry id of the workspace whose sessions are rolled up. */
+  workspaceId: string
+  range: ModelRoutingStatsRange
+}
+
+/** One session's row in the workspace statistics. */
+export interface ModelRoutingWorkspaceSession {
+  sessionId: string
+  /** Time of the session's latest decision, epoch milliseconds. */
+  lastDecisionAt: number
+  /** The session's decisions. */
+  decisions: number
+  /** The session's steps with a call. */
+  steps: number
+  /** Of those, steps a pool model served. */
+  downgradedSteps: number
+}
+
+/**
+ * Routing statistics across one workspace's sessions, rolled up from each
+ * session's `modelRoutingStats` value. A session counts whole: its totals
+ * are included when its latest decision falls in the range, not only the
+ * decisions within it.
+ */
+export interface ModelRoutingWorkspaceStats {
+  workspaceId: string
+  range: ModelRoutingStatsRange
+  /** When the host rolled these up, epoch milliseconds. */
+  computedAt: number
+  sessions: {
+    /** Unarchived sessions the workspace accounts. */
+    members: number
+    /**
+     * Members whose statistics were read: live for an attached session, else
+     * the persisted projection cache's value on the current unit version.
+     * The rest have none until they are opened.
+     */
+    summarized: number
+    /** Summarized sessions whose latest decision falls in the range. */
+    inRange: number
+    /** In-range sessions rolled up, most recent decision first. */
+    included: number
+    /** Whether more sessions were in range than the cap includes. */
+    capped: boolean
+  }
+  /** Summed counts of the included sessions. */
+  counts: ModelRoutingStatsSnapshot['counts']
+  /** Decision reasons across the included sessions, largest count first, then by reason. */
+  reasons: ModelRoutingStatsSnapshot['reasons']
+  /** Cold prefills after routed switches and routed returns across the included sessions. */
+  routedSwitches: { count: number; tokens: number }
+  /** The included sessions, most recent decision first. */
+  rows: ModelRoutingWorkspaceSession[]
 }
 
 declare module '@shres-code/shres-code-session/types' {

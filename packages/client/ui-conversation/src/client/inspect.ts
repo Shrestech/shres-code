@@ -2,6 +2,7 @@
  * Cross-view inspect handoff: the persisted-snapshot read of the chat store's
  * `inspect` field and the `reveal` write that addresses one view.
  */
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
 import type { InspectRequest } from './contract/views.ts'
 
 /** 'conversation.view' entry id of the Trajectory view, the target of chat's call inspection. */
@@ -61,5 +62,67 @@ export function createReveal(actions: RevealActions): (request: InspectRequest) 
     actions.setInspect(request.target.kind === 'none' ? null : request)
     actions.setView(request.view)
     actions.setActivityOpen(false)
+  }
+}
+
+/**
+ * Every mounted session's reveal, and at most one request waiting for a
+ * session whose body has not mounted: the latest one wins, and it is applied
+ * after the session's registration records its reveal, outside that render.
+ */
+export class SessionReveals {
+  private readonly reveals = new Map<SessionId, (request: InspectRequest) => void>()
+  private readonly pending = new Map<SessionId, InspectRequest>()
+
+  /** @param canReveal - whether a 'conversation.view' entry with this id is registered. */
+  constructor(private readonly canReveal: (view: string) => boolean) {}
+
+  /**
+   * Record a session's reveal and apply a request waiting for it.
+   * @param sessionId - the session whose body mounted.
+   * @param reveal - its reveal.
+   * @returns whether the session had no reveal recorded before.
+   */
+  record(sessionId: SessionId, reveal: (request: InspectRequest) => void): boolean {
+    const fresh = !this.reveals.has(sessionId)
+    this.reveals.set(sessionId, reveal)
+    const waiting = this.pending.get(sessionId)
+    if (waiting !== undefined) {
+      this.pending.delete(sessionId)
+      // The registration records its reveal while it renders; the write waits
+      // until that render is done.
+      queueMicrotask(() => { this.reveals.get(sessionId)?.(waiting) })
+    }
+    return fresh
+  }
+
+  /**
+   * Drop a session's reveal when its scope ends.
+   * @param sessionId - the session.
+   */
+  forget(sessionId: SessionId): void {
+    this.reveals.delete(sessionId)
+  }
+
+  /**
+   * A mounted session's reveal.
+   * @param sessionId - the session.
+   * @returns its reveal, or undefined while its body is not mounted.
+   */
+  get(sessionId: SessionId): ((request: InspectRequest) => void) | undefined {
+    return this.reveals.get(sessionId)
+  }
+
+  /**
+   * Reveal a view in one session: at once while its body is mounted, else when it next mounts.
+   * @param sessionId - the session.
+   * @param request - the view and target.
+   * @throws Error naming the view when no 'conversation.view' entry has its id.
+   */
+  reveal(sessionId: SessionId, request: InspectRequest): void {
+    if (!this.canReveal(request.view)) throw new Error(`ui-conversation: no conversation view "${request.view}" to reveal`)
+    const reveal = this.reveals.get(sessionId)
+    if (reveal === undefined) this.pending.set(sessionId, request)
+    else reveal(request)
   }
 }

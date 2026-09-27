@@ -86,6 +86,7 @@
     "apps/web/tests/team-roster-models.e2e.ts",
     "apps/web/tests/routing-view.e2e.ts",
     "apps/web/tests/routing-chip-fit.e2e.ts",
+    "apps/web/tests/routing-overview.e2e.ts",
     "apps/web/tests/background-job-list.e2e.ts",
     "apps/web/tests/bash-abort-row.e2e.ts",
     "apps/web/tests/skill-tool-row.e2e.ts",

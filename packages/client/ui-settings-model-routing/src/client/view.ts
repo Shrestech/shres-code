@@ -9,9 +9,20 @@ import type {
   JudgmentEngineView,
   LayaGatewayState,
   LayaGatewayView,
+  ModelProviderGroup,
   SettingsNamespaceView,
 } from '@shres-code/shres-code-api-remotes/client'
+import type {
+  ModelRoutingCalibration,
+  ModelRoutingCandidateEligibilityReason,
+  ModelRoutingGateView,
+  ModelRoutingObjective,
+  ModelRoutingPoolCandidate,
+  ModelRoutingPoolStatus,
+} from '@shres-code/shres-code-model-router/client'
 import type { ModelRoutingKey } from './locales.ts'
+import { ROUTER_CONSUMER } from './model.ts'
+import type { PoolCandidateDraft, RouteFromDraft } from './model.ts'
 
 /** Section copy, as the slot renderer's `t` seat supplies it. */
 export type Translate = (key: ModelRoutingKey, params?: Record<string, unknown>) => string
@@ -165,34 +176,199 @@ export function ignoredOverrides(snapshot: JudgmentEnginesSnapshot): { consumer:
 }
 
 /**
- * How the router gates one engine's answers, read from `model-router.operatingPoints`:
- * `refused` for a verbalized engine whose operating point does not set
- * `acceptVerbalized` (the router keeps the strong model without asking), then
- * `calibrated` when its operating point names `calibratedBy`, `point` when
- * one without it applies, and `global` when none names the engine.
+ * How the router gates one engine's answers, as its gate read reports it.
+ * @param gate - the router's gate view, when the Host serves it.
+ * @param engine - the engine's registry id.
+ * @returns the calibration, or undefined when the router reports none for the engine.
  */
-export type RoutingCalibration =
-  | { readonly kind: 'calibrated'; readonly by: string }
-  | { readonly kind: 'point' }
-  | { readonly kind: 'global' }
-  | { readonly kind: 'refused' }
+export function engineCalibration(gate: ModelRoutingGateView | null, engine: string): ModelRoutingCalibration | undefined {
+  return gate?.engines.find(entry => entry.engine === engine)?.calibration
+}
 
 /**
- * The router's gate for one engine.
- * @param router - the resolved `model-router` section, when the Host exposes it.
- * @param engine - the engine the router asks.
- * @returns the gate kind, and the evaluator of a calibrated operating point.
+ * The engine the router asks now: the router's override while the consumer is
+ * declared, else the selected engine. The thresholds card and the pool
+ * editor's judge hint read the same engine through this one helper.
+ * @param snapshot - the engine view, when it has been read.
+ * @returns the registry id, or undefined when no view is read.
  */
-export function routingCalibration(router: SettingsNamespaceView | null, engine: JudgmentEngineView): RoutingCalibration {
-  const value = router?.value
-  const points = typeof value === 'object' && value !== null ? (value as { operatingPoints?: unknown }).operatingPoints : undefined
-  const point = Array.isArray(points)
-    ? points.find((entry): entry is { engine: unknown; calibratedBy?: unknown; acceptVerbalized?: unknown } =>
-      typeof entry === 'object' && entry !== null && (entry as { engine?: unknown }).engine === engine.id)
-    : undefined
-  if (engine.calibration === 'verbalized' && point?.acceptVerbalized !== true) return { kind: 'refused' }
-  if (point === undefined) return { kind: 'global' }
-  return typeof point.calibratedBy === 'string' && point.calibratedBy.length > 0
-    ? { kind: 'calibrated', by: point.calibratedBy }
-    : { kind: 'point' }
+export function routerEngine(snapshot: JudgmentEnginesSnapshot | null): string | undefined {
+  if (snapshot === null) return undefined
+  return consumerRoutes(snapshot).find(route => route.consumer === ROUTER_CONSUMER)?.engineId ?? snapshot.selection.engine
+}
+
+/** The pool and allowlist a section stores, as the editor edits them. */
+export interface PoolSection {
+  readonly candidates: PoolCandidateDraft[]
+  readonly routeFrom: RouteFromDraft[]
+}
+
+/** A string field of a stored entry, or undefined. */
+function stringAt(entry: Record<string, unknown>, key: string): string | undefined {
+  const value = entry[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+/**
+ * Read the pool and `routeFrom` from the resolved `model-router` section.
+ * @param router - the resolved section.
+ * @returns the pool and the allowlist; entries that are not objects are skipped.
+ */
+export function poolSection(router: SettingsNamespaceView): PoolSection {
+  const value = typeof router.value === 'object' && router.value !== null ? router.value as Record<string, unknown> : {}
+  const entries = (key: string): Record<string, unknown>[] => {
+    const list = value[key]
+    return Array.isArray(list) ? list.filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null) : []
+  }
+  return {
+    candidates: entries('candidates').map((entry) => {
+      const effort = stringAt(entry, 'reasoningEffort')
+      return {
+        id: stringAt(entry, 'id') ?? '',
+        provider: stringAt(entry, 'provider') ?? '',
+        model: stringAt(entry, 'model') ?? '',
+        ...effort === undefined ? {} : { reasoningEffort: effort },
+        description: stringAt(entry, 'description') ?? '',
+      }
+    }),
+    routeFrom: entries('routeFrom').map((entry) => {
+      const objective = stringAt(entry, 'objective')
+      return {
+        provider: stringAt(entry, 'provider') ?? '',
+        model: stringAt(entry, 'model') ?? '',
+        ...objective === undefined ? {} : { objective: objective as ModelRoutingObjective },
+        ...typeof entry['allowEveryTurn'] === 'boolean' ? { allowEveryTurn: entry['allowEveryTurn'] } : {},
+      }
+    }),
+  }
+}
+
+/** One model the catalog lists. */
+export interface CatalogModel {
+  readonly provider: string
+  readonly providerName: string
+  readonly model: string
+  readonly name: string
+  readonly efforts?: readonly string[]
+}
+
+/**
+ * Flatten the catalog into its models, in provider then provider-preferred order.
+ * @param models - the catalog groups.
+ * @returns every listed model.
+ */
+export function catalogModels(models: readonly ModelProviderGroup[]): CatalogModel[] {
+  return models.flatMap(group => group.models.map(model => ({
+    provider: group.id,
+    providerName: group.name,
+    model: model.id,
+    name: model.name,
+    ...model.reasoning === undefined ? {} : { efforts: model.reasoning.efforts.map(effort => effort.id) },
+  })))
+}
+
+/**
+ * A model's display name: the catalog's name, else the route.
+ * @param catalog - the catalog models.
+ * @param provider - the provider route.
+ * @param model - the model id.
+ * @returns the name.
+ */
+export function modelLabel(catalog: readonly CatalogModel[], provider: string, model: string): string {
+  return catalog.find(entry => entry.provider === provider && entry.model === model)?.name ?? `${provider}/${model}`
+}
+
+/**
+ * A pool id derived from a model id: its last path segment, lower-cased, with
+ * every run of other characters turned into one hyphen, made unique among the
+ * ids already taken and never the reserved `keep-current`.
+ * @param model - the model id.
+ * @param taken - the ids in use.
+ * @returns the id.
+ */
+export function poolIdFor(model: string, taken: ReadonlySet<string>): string {
+  const last = model.substring(model.lastIndexOf('/') + 1)
+  const base = last.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'model'
+  let id = base === 'keep-current' ? 'keep-current-model' : base
+  for (let suffix = 2; taken.has(id); suffix += 1) id = `${base}-${suffix}`
+  return id
+}
+
+/**
+ * A token count in compact form: `1M`, `200k`, `131k`.
+ * @param tokens - the count.
+ * @returns the text.
+ */
+export function tokensText(tokens: number): string {
+  if (tokens >= 1_000_000 && tokens % 100_000 === 0) return `${String(tokens / 1_000_000)}M`
+  if (tokens >= 1_000) return `${String(Math.round(tokens / 1_000))}k`
+  return String(tokens)
+}
+
+/** The copy explaining why a pool model cannot route from a base, by eligibility result. */
+const WHY: Record<Exclude<ModelRoutingCandidateEligibilityReason, 'eligible' | 'equals-base' | 'context-too-small'>, ModelRoutingKey> = {
+  'base-unavailable': 'whyBaseUnavailable',
+  'base-context-unknown': 'whyBaseContextUnknown',
+  'candidate-unavailable': 'whyCandidateUnavailable',
+  'candidate-invalid': 'whyCandidateInvalid',
+  'difficulty-effort-invalid': 'whyDifficultyEffort',
+  'image-capability-unknown': 'whyImageUnknown',
+  'image-incompatible': 'whyImageIncompatible',
+  'context-unknown': 'whyContextUnknown',
+  'max-tokens-exceeds-context': 'whyMaxTokens',
+  'hosted-tools-incompatible': 'whyHostedTools',
+  'thinking-mode-incompatible': 'whyThinkingMode',
+}
+
+/** One capability or token note beside a pool model. */
+export interface PoolNote {
+  readonly text: string
+  readonly title?: string
+  readonly tone: 'ok' | 'warn' | 'neutral'
+}
+
+/**
+ * The notes beside one pool model, from the router's pool status: where it is
+ * eligible from, where it never is and why, cross-membership with Route from,
+ * an unregistered route, and a provider that reports no cache counts. Notes are
+ * capability and token facts only.
+ * @param candidate - the model's pool status.
+ * @param pool - the whole pool status, for the bases' context windows.
+ * @param catalog - the catalog, for display names.
+ * @param t - section copy.
+ * @returns the notes, in display order.
+ */
+export function poolNotes(
+  candidate: ModelRoutingPoolCandidate,
+  pool: ModelRoutingPoolStatus,
+  catalog: readonly CatalogModel[],
+  t: Translate,
+): PoolNote[] {
+  const notes: PoolNote[] = []
+  if (!candidate.registered) notes.push({ text: t('noteUnregistered'), title: t('noteUnregisteredTitle'), tone: 'warn' })
+  for (const result of candidate.eligibility) {
+    const base = modelLabel(catalog, result.provider, result.model)
+    const baseWindow = pool.routeFrom.find(entry => entry.provider === result.provider && entry.model === result.model)?.contextWindow
+    switch (result.reason) {
+      case 'eligible':
+        notes.push({ text: t('noteEligible', { base }), tone: 'ok' })
+        break
+      // Cross-membership says it: a model is never a downgrade from itself.
+      case 'equals-base':
+        break
+      case 'context-too-small':
+        notes.push(candidate.contextWindow === undefined || baseWindow === undefined
+          ? { text: t('noteNeverEligible', { base, why: t('whyContextUnknown') }), tone: 'warn' }
+          : {
+            text: t('noteNeverEligibleContext', { base, candidate: tokensText(candidate.contextWindow), limit: tokensText(baseWindow) }),
+            tone: 'warn',
+          })
+        break
+      default:
+        notes.push({ text: t('noteNeverEligible', { base, why: t(WHY[result.reason]) }), tone: 'warn' })
+    }
+  }
+  if (candidate.alsoRouteFrom) notes.push({ text: t('noteAlsoRouteFrom'), title: t('noteAlsoRouteFromTitle'), tone: 'warn' })
+  if (candidate.cacheUsage === 'unreported') notes.push({ text: t('noteCacheUnreported'), title: t('noteCacheUnreportedTitle'), tone: 'neutral' })
+  return notes
 }

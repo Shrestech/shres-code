@@ -9,6 +9,7 @@
 import { Context, Service } from '@shres-code/cordis'
 import type {
   GenerateOptions,
+  LlmCacheUsage,
   LlmConfigurableProvider,
   LlmDiscoveredModel,
   LlmFailure,
@@ -302,6 +303,18 @@ const THINKING_MODES: ReadonlySet<unknown> = new Set<LlmThinkingMode>(['adaptive
  */
 function isThinkingMode(value: unknown): boolean {
   return value === undefined || THINKING_MODES.has(value)
+}
+
+/** Cache-count reporting values an adapter may declare. */
+const CACHE_USAGES: ReadonlySet<unknown> = new Set<LlmCacheUsage>(['reported', 'unreported'])
+
+/**
+ * Whether an adapter-reported cache-count reporting value is absent or one the seam defines.
+ * @param value - the adapter's `cacheUsage` field.
+ * @returns true for a value the seam may pass through.
+ */
+function isCacheUsage(value: unknown): boolean {
+  return value === undefined || CACHE_USAGES.has(value)
 }
 
 /**
@@ -634,6 +647,7 @@ export class LlmRuntime extends Service {
         || (model.description !== undefined && typeof model.description !== 'string')
         || !isPromptCacheTtl(model.promptCacheTtlMs)
         || !isThinkingMode(model.thinkingMode)
+        || !isCacheUsage(model.cacheUsage)
         || seen.has(model.id)
       ) {
         throw new LlmError(`adapter returned invalid or duplicate model metadata for provider "${provider}"`, 'INVALID_CATALOG')
@@ -650,6 +664,7 @@ export class LlmRuntime extends Service {
         ...hostedTools === undefined ? {} : { hostedTools },
         ...model.promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs: model.promptCacheTtlMs },
         ...model.thinkingMode === undefined ? {} : { thinkingMode: model.thinkingMode },
+        ...model.cacheUsage === undefined ? {} : { cacheUsage: model.cacheUsage },
       }
     })
   }
@@ -732,6 +747,13 @@ export class LlmRuntime extends Service {
         'INVALID_MODEL_THINKING_MODE',
       )
     }
+    const cacheUsage = resolved.cacheUsage
+    if (!isCacheUsage(cacheUsage)) {
+      throw new LlmError(
+        `adapter returned an invalid cache-count reporting value for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_CACHE_USAGE',
+      )
+    }
     const info: LlmResolvedModelInfo = {
       provider,
       id: model,
@@ -744,6 +766,7 @@ export class LlmRuntime extends Service {
       ...acceptsTemperature === undefined ? {} : { acceptsTemperature },
       ...promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs },
       ...thinkingMode === undefined ? {} : { thinkingMode },
+      ...cacheUsage === undefined ? {} : { cacheUsage },
     }
     const reasoning = resolved.reasoning
     if (reasoning === undefined) return info

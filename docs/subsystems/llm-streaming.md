@@ -489,6 +489,13 @@ interface LlmModelInfo {
    * adapter does not declare it.
    */
   thinkingMode?: LlmThinkingMode
+  /**
+   * Whether this route's usage reports prompt-cache counts: `reported` calls
+   * carry `cacheReadTokens` (a miss as 0), and `unreported` calls carry none,
+   * so their input may include cached tokens. Absent means the adapter does
+   * not declare it.
+   */
+  cacheUsage?: LlmCacheUsage
 }
 ```
 
@@ -970,7 +977,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:311`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:324`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -1019,5 +1026,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:69`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:70`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createModelRoutingController, isAbsent, messageOf } from '../src/client/model.ts'
-import { JUDGMENT, LAYA_VIEW, ROUTER, TYPESAFE, namespace, ok, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
+import { GATE, JUDGMENT, LAYA_VIEW, MODELS, POOL, ROUTER, TYPESAFE, namespace, ok, remoteFail, remoteOk, scripted, snapshot } from './fixtures.client.ts'
 
 describe('model routing page controller', () => {
   it('probes only the engine view and marks the dispatcher composed', async () => {
@@ -203,5 +203,77 @@ describe('model routing page controller', () => {
     await controller.load()
     expect(controller.store.getSnapshot().judgment?.value).toBeNull()
     expect(ok(1).result.value).toBe(1)
+  })
+
+  it('reads the router\'s gate, pool status, and the model catalog while the model-router section is exposed', async () => {
+    const s = scripted()
+    const controller = createModelRoutingController(s.api, s.remotes)
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ gate: GATE, pool: POOL, models: MODELS, routingError: null })
+
+    // A Host that stops exposing the section clears them without reading.
+    s.describe.mockResolvedValueOnce(ok({ writable: true, hasDocument: true, namespaces: [JUDGMENT] }))
+    s.remotes.gate.mockClear()
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ router: null, gate: null, pool: null, models: null, routingError: null })
+    expect(s.remotes.gate).not.toHaveBeenCalled()
+  })
+
+  it('reports a router or catalog read failure, and none for a router the Host does not serve', async () => {
+    const s = scripted()
+    const controller = createModelRoutingController(s.api, s.remotes)
+    s.remotes.gate.mockResolvedValueOnce(remoteFail('service-unavailable', 'modelRouting is not served'))
+    s.remotes.poolStatus.mockResolvedValueOnce(remoteFail('service-unavailable', 'modelRouting is not served'))
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ gate: null, pool: null, models: MODELS, routingError: null })
+
+    s.remotes.poolStatus.mockRejectedValueOnce(new Error('pool socket closed'))
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ gate: GATE, pool: null, routingError: 'pool socket closed' })
+
+    s.models.mockResolvedValueOnce({ rpcId: 'm' as never, result: { ok: false, error: { code: 'internal', message: 'catalog failed' } } } as never)
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ pool: POOL, models: null, routingError: 'catalog failed' })
+
+    s.models.mockRejectedValueOnce(new Error('catalog socket closed'))
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ models: null, routingError: 'catalog socket closed' })
+  })
+
+  it('discards a stale routing read', async () => {
+    const s = scripted()
+    const controller = createModelRoutingController(s.api, s.remotes)
+    let release: (() => void) | undefined
+    s.remotes.gate.mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => { resolve(remoteOk({ ...GATE, downgradeThreshold: 0.5 })) }
+    }))
+    const slow = controller.load()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await controller.load()
+    release?.()
+    await slow
+    expect(controller.store.getSnapshot().gate).toEqual(GATE)
+  })
+
+  it('writes the pool and routeFrom in one write with the section revision, and returns a rejection with its field path', async () => {
+    const s = scripted()
+    const controller = createModelRoutingController(s.api, s.remotes)
+    await controller.load()
+    const candidates = [{ id: 'flash', provider: 'ollama-cloud', model: 'm', description: 'd' }]
+    const routeFrom = [{ provider: 'claude-session', model: 'opus', objective: 'dollars' as const }]
+    await expect(controller.savePool(candidates, routeFrom)).resolves.toBeUndefined()
+    expect(s.mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'model-router',
+      ops: [{ op: 'set', path: ['candidates'], value: candidates }, { op: 'set', path: ['routeFrom'], value: routeFrom }],
+      expectedRevision: 7,
+    })
+    s.mutate.mockResolvedValueOnce({ rpcId: 'p' as never, result: { ok: false, error: {
+      code: 'settings-rejected', message: 'ModelRouterConfig.candidates["flash"].provider "ollama-cloud" is not a registered route',
+      details: { ns: 'model-router', path: ['candidates', 0, 'provider'] },
+    } } } as never)
+    await expect(controller.savePool(candidates, routeFrom)).resolves.toEqual({
+      message: 'ModelRouterConfig.candidates["flash"].provider "ollama-cloud" is not a registered route',
+      path: ['candidates', 0, 'provider'],
+    })
   })
 })

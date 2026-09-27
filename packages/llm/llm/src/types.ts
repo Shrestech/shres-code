@@ -372,7 +372,17 @@ export interface LlmModelInfo {
    * adapter does not declare it.
    */
   thinkingMode?: LlmThinkingMode
+  /**
+   * Whether this route's usage reports prompt-cache counts: `reported` calls
+   * carry `cacheReadTokens` (a miss as 0), and `unreported` calls carry none,
+   * so their input may include cached tokens. Absent means the adapter does
+   * not declare it.
+   */
+  cacheUsage?: LlmCacheUsage
 }
+
+/** Whether a route's usage reports prompt-cache counts; see {@link LlmModelInfo.cacheUsage}. */
+export type LlmCacheUsage = 'reported' | 'unreported'
 
 /** Provider-owned context capacity for one exact provider/model route. */
 export interface LlmModelContext {

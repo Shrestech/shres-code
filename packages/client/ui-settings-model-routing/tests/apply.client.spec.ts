@@ -1,4 +1,5 @@
-/** Model routing settings registration: availability gating, invalidations, and HMR disposal. */
+// @vitest-environment jsdom
+/** Model routing settings registration: availability gating, invalidations, HMR disposal, and the overview's reads. */
 import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
@@ -13,7 +14,7 @@ import { LAYA_VIEW, remoteFail, remoteOk, scripted, snapshot } from './fixtures.
 
 usePinnedBrowserLanguages('en-US')
 
-/** A client root with the slot registry, locale, remote double, the two Remote namespaces, and a scripted settings wire. */
+/** A client root with the slot registry, locale, sessions, remote double, the three Remote namespaces, and a scripted settings wire. */
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
@@ -23,16 +24,20 @@ async function bench() {
   // The generated namespaces hang off `ctx.remote` and are also inject keys of their own.
   const judgmentEngines = { snapshot: s.remotes.snapshot }
   const laya = { gatewayStatus: s.remotes.layaStatus, installGateway: s.remotes.layaInstall, restartGateway: s.remotes.layaRestart }
-  Object.assign(remote, { judgmentEngines, laya })
+  const modelRouting = { gate: s.remotes.gate, poolStatus: s.remotes.poolStatus, stats: vi.fn(() => new Promise(() => {})) }
+  Object.assign(remote, { judgmentEngines, laya, modelRouting })
   ctx.provide('remote.judgmentEngines', judgmentEngines)
   ctx.provide('remote.laya', laya)
+  ctx.provide('remote.modelRouting', modelRouting)
+  const sessions = { open: vi.fn() }
+  ctx.provide('sessions', sessions as never)
   ctx.provide('connection', { api: s.api, isLoopback: true } as never)
   const slots = ctx.get('slots') as SlotRegistry
   const declare = (): (() => void) => slots.register({
     name: 'root',
     children: { 'settings.section': { kind: 'list', scope: 'root' } },
   } as never, () => null)
-  return { ctx, slots, remote, s, declare }
+  return { ctx, slots, remote, s, declare, modelRouting, sessions }
 }
 
 /** Let queued probes and reads settle. */
@@ -42,7 +47,7 @@ async function settle(): Promise<void> {
 
 describe('ui-settings-model-routing browser apply', () => {
   it('declares the services it binds, and its node half does nothing', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.judgmentEngines', 'remote.laya'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'sessions', 'remote', 'remote.judgmentEngines', 'remote.laya', 'remote.modelRouting'])
     nodeApply()
   })
 
@@ -59,6 +64,9 @@ describe('ui-settings-model-routing browser apply', () => {
     expect(entry.locale).toBe('settings.modelRouting')
     const injected = entry.inject?.() as unknown as ModelRoutingSectionInjected
     expect(injected.hooks.snapshot).toBe(injected.controller.store)
+    expect(injected.hooks.overview).toBe(injected.overview.store)
+    // No conversation service is composed, so the rows offer no Routing view link.
+    expect(injected.openRoutingView).toBeUndefined()
     expect(b.s.describe).not.toHaveBeenCalled()
   })
 
@@ -81,7 +89,7 @@ describe('ui-settings-model-routing browser apply', () => {
     expect(b.slots.entries('settings.section')).toHaveLength(0)
   })
 
-  it('refreshes a loaded page on engine, judgment, model-router, and connection invalidations only', async () => {
+  it('refreshes a loaded page on engine, judgment, model-router, adapter, and connection invalidations only', async () => {
     const b = await bench()
     b.declare()
     await b.ctx.plugin({ inject: [...inject], apply }).await()
@@ -101,9 +109,11 @@ describe('ui-settings-model-routing browser apply', () => {
     await settle()
     b.remote.$dispatch('judgment/engines-updated', [])
     await settle()
+    b.remote.$dispatch('llm/adapters-updated', [])
+    await settle()
     b.ctx.emit('connection/reset')
     await settle()
-    expect(reads()).toBe(before + 4)
+    expect(reads()).toBe(before + 5)
   })
 
   it('withdraws the page and every listener when the plugin unloads (HMR), and registers again on reload', async () => {
@@ -151,6 +161,47 @@ describe('ui-settings-model-routing browser apply', () => {
     expect(b.s.remotes.layaStatus).toHaveBeenCalled()
     expect(b.s.remotes.layaInstall).toHaveBeenCalledTimes(1)
     expect(b.s.remotes.layaRestart).toHaveBeenCalledTimes(1)
+    // The router's gate and pool status, and the model catalog, are read with the page.
+    expect(b.s.remotes.gate).toHaveBeenCalled()
+    expect(b.s.remotes.poolStatus).toHaveBeenCalled()
+    expect(b.s.models).toHaveBeenCalled()
+    expect(controller.store.getSnapshot()).toMatchObject({ gate: { downgradeThreshold: 0.8 }, pool: { candidates: [{ id: 'flash' }, { id: 'glm' }] } })
     void vi
+  })
+
+  it('reads the workspace overview through modelRouting.stats, and stops reading when disposed', async () => {
+    const b = await bench()
+    b.declare()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    await settle()
+    const injected = b.slots.entries('settings.section')[0]!.inject?.() as unknown as ModelRoutingSectionInjected
+    const stop = injected.overview.watch('w1')
+    expect(b.modelRouting.stats).toHaveBeenCalledWith({ workspaceId: 'w1', range: '24h' })
+    stop()
+    await fiber.dispose()
+  })
+
+  it('opens a session\'s Routing view by revealing it there and then selecting the session', async () => {
+    const b = await bench()
+    const calls: string[] = []
+    const reveal = vi.fn((sessionId: string, request: unknown) => { calls.push(`reveal ${sessionId} ${JSON.stringify(request)}`) })
+    const conversation = b.ctx.plugin({ name: 'conversation-double', apply: (inner: Context) => { inner.provide('conversation', { reveal } as never) } })
+    await conversation.await()
+    b.sessions.open.mockImplementation((sessionId: string) => { calls.push(`open ${sessionId}`) })
+    b.declare()
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    await settle()
+    const injected = b.slots.entries('settings.section')[0]!.inject?.() as unknown as ModelRoutingSectionInjected
+    injected.openRoutingView!('s7')
+    expect(calls).toEqual(['reveal s7 {"view":"routing","target":{"kind":"none"}}', 'open s7'])
+
+    // A reveal that throws selects nothing, and the caller sees the failure.
+    reveal.mockImplementationOnce(() => { throw new Error('ui-conversation: no conversation view "routing" to reveal') })
+    expect(() => { injected.openRoutingView!('s8') }).toThrow('no conversation view "routing"')
+    expect(b.sessions.open).toHaveBeenCalledTimes(1)
+    // The service left between the mount and the click.
+    await conversation.dispose()
+    expect(() => { injected.openRoutingView!('s9') }).toThrow('no conversation service to reveal the Routing view in')
   })
 })

@@ -17,7 +17,7 @@ import type {
   DetailsInjected,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
-import { createReveal, TRAJECTORY_VIEW_ID } from './inspect.ts'
+import { createReveal, SessionReveals, TRAJECTORY_VIEW_ID } from './inspect.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
@@ -177,8 +177,9 @@ export function apply(ctx: Context): void {
   // Each session's reveal, recorded by the strict session registration that
   // owns that session's chat-store instance. The composer bar is
   // session-maybe scoped, and one store handle mounts under one scope, so the
-  // bar reads a session's reveal from here instead of mounting the store.
-  const reveals = new Map<SessionId, (request: InspectRequest) => void>()
+  // bar reads a session's reveal from here instead of mounting the store; the
+  // service face reveals in a session that has not mounted yet through it.
+  const reveals = new SessionReveals(canReveal)
 
   /**
    * Build one session's reveal over its chat-store actions and record it for
@@ -189,11 +190,9 @@ export function apply(ctx: Context): void {
    */
   const sessionReveal = (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ((request: InspectRequest) => void) => {
     const reveal = createReveal(actions)
-    const tracked = reveals.has(sessionId)
-    reveals.set(sessionId, reveal)
     // The entry leaves with the session's scope, so a closed session keeps none.
-    if (!tracked) {
-      sessions.binding(sessionId)?.ctx.effect(() => () => { reveals.delete(sessionId) }, 'ui-conversation: session reveal')
+    if (reveals.record(sessionId, reveal)) {
+      sessions.binding(sessionId)?.ctx.effect(() => () => { reveals.forget(sessionId) }, 'ui-conversation: session reveal')
     }
     return reveal
   }
@@ -496,7 +495,7 @@ export function apply(ctx: Context): void {
   // registers itself as `conversation` and lives on its own child fiber.
   // Presentation registrants depend directly on their slot declarations;
   // this service remains only where conversation actions are required.
-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, imageInput: composerImageInput })
+  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, imageInput: composerImageInput, reveals })
 
   // The plan strip rides the input dock above the queue rows (same posture).
   ctx.plugin(todoDockEntry)

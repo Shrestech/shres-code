@@ -3313,6 +3313,9 @@ importers:
       '@shres-code/shres-code-client-test-runtime':
         specifier: workspace:^
         version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-conversation':
+        specifier: workspace:^
+        version: link:../ui-conversation
       '@shres-code/shres-code-client-ui-settings':
         specifier: workspace:^
         version: link:../ui-settings
@@ -3325,6 +3328,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -7424,18 +7430,33 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
       '@shres-code/shres-code-session-persistence-jsonl':
         specifier: workspace:^
         version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
+      '@shres-code/shres-code-session-projection-cache':
+        specifier: workspace:^
+        version: link:../../session/session-projection-cache
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-storage':
+        specifier: workspace:^
+        version: link:../../storage/storage
+      '@shres-code/shres-code-storage-domain':
+        specifier: workspace:^
+        version: link:../../storage/storage-domain
+      '@shres-code/shres-code-storage-json':
+        specifier: workspace:^
+        version: link:../../storage/storage-json
       '@shres-code/shres-code-subagent':
         specifier: workspace:^
         version: link:../../subagent/subagent
@@ -7460,6 +7481,9 @@ importers:
       '@shres-code/shres-code-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol
+      '@shres-code/shres-code-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/llm/token-meter:
     dependencies:

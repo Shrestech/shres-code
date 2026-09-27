@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -22,6 +22,12 @@ import type { MockLlmBehavior, MockLlmServer } from '@shres-code/shres-code-llm-
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import SessionProjectionCache from '@shres-code/shres-code-session-projection-cache'
+import Storage from '@shres-code/shres-code-storage'
+// Function plugins: the Loader reads each namespace's `name`/`inject`/`apply`.
+import * as StorageDomain from '@shres-code/shres-code-storage-domain'
+import * as StorageJson from '@shres-code/shres-code-storage-json'
+import WorkspaceRegistry from '@shres-code/shres-code-workspace'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolRuntime from '@shres-code/shres-code-tools'
@@ -127,6 +133,8 @@ interface SpineOptions {
   readonly subagents?: boolean
   /** Router `hold` as a YAML flow mapping, replacing the default `{ minSteps: 3 }`. */
   readonly hold?: string
+  /** Compose storage, session persistence, the persisted projection cache, and the workspace registry. */
+  readonly workspaceStats?: boolean
 }
 
 /** `inherited` of every `subagent/child-route` dispatch the observer saw. */
@@ -180,6 +188,23 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
         "- name: '@shres-code/shres-code-agent/invariant'",
       ]
       : [],
+    ...options.workspaceStats === true ? [
+      "- name: '@shres-code/shres-code-storage'",
+      "- name: '@shres-code/shres-code-storage-json'",
+      '  config:',
+      `    root: '${join(root, 'storages')}'`,
+      "- name: '@shres-code/shres-code-storage-domain'",
+      '  config:',
+      '    backend: json',
+      "- name: '@shres-code/shres-code-session-persistence-jsonl'",
+      '  config:',
+      `    root: '${join(root, 'sessions')}'`,
+      "- name: '@shres-code/shres-code-session-projection-cache'",
+      '  config:',
+      '    writeEveryEvents: 1000',
+      '    writeIntervalMs: 600000',
+      "- name: '@shres-code/shres-code-workspace'",
+    ] : [],
     ...options.subagents === true ? [
       "- name: '@shres-code/shres-code-session-persistence-jsonl'",
       '  config:',
@@ -231,6 +256,11 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     ['@shres-code/shres-code-token-meter', TokenMeter],
     ['@shres-code/shres-code-compaction-basic', BasicCompactionEngine],
     ['@shres-code/shres-code-session-persistence-jsonl', JsonlSessionPersistence],
+    ['@shres-code/shres-code-storage', Storage],
+    ['@shres-code/shres-code-storage-json', StorageJson],
+    ['@shres-code/shres-code-storage-domain', StorageDomain],
+    ['@shres-code/shres-code-session-projection-cache', SessionProjectionCache],
+    ['@shres-code/shres-code-workspace', WorkspaceRegistry],
     ['@shres-code/shres-code-subagent', SubagentRuntime],
     ['@shres-code/shres-code-subagent-spawn-in-process', SubagentSpawn],
     ['@shres-code/shres-code-subagent-fork-in-process', SubagentFork],
@@ -705,6 +735,75 @@ describe('real Loader composition', () => {
     expect(detail).toMatchObject({ seq: last.seq, time: last.time, turn: 2, step: 1, decision: last.data })
     expect(detail.gate).toMatchObject({ downgradeThreshold: 0.7, downgradeMargin: 0.5, hold: { minSteps: 3 } })
     expect(detail.gate).toEqual(loaded.modelRouting.gateView())
+  })
+
+  it('rolls up a workspace\'s live and cached per-session statistics into their sum', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success'], { workspaceStats: true })
+    const cwd = join(root!, 'project')
+    await mkdir(cwd)
+    const workspace = await loaded.workspaceRegistry.create(cwd)
+
+    // One session routed and then closed, so the persisted projection cache
+    // serves it; the other stays attached and is read live.
+    const closed = await loaded.agentLoop.createAgent(loaded, {
+      sessionId: SessionId('workspace-closed'),
+      meta: { cwd: await realpath(cwd) },
+      agentOptions: { provider: PROVIDER, model: MANUAL_MODEL },
+    })
+    await pinManualRoute(loaded, closed.agent)
+    await turn(closed.agent, 'First easy turn.')
+    await turn(closed.agent, 'Second easy turn.')
+    const closedStats = foldModelRoutingStats(closed.agent.session.events)
+    await workspace.attachSession(closed.agent.session.id)
+    await closed.dispose()
+    await vi.waitFor(() => {
+      expect(loaded.sessions.get(SessionId('workspace-closed'))).toBeUndefined()
+    })
+    // The log's durable flush settles after the dispose resolves.
+    const header = await vi.waitFor(async () => {
+      const found = (await loaded.sessionPersistence.list()).find(meta => meta.id === 'workspace-closed')
+      if (found === undefined) throw new Error('workspace-closed is not persisted yet')
+      return found
+    })
+    await vi.waitFor(() => {
+      expect(loaded.sessionProjectionCache.cachedSnapshot(header)?.values.modelRoutingStats).toEqual(closedStats)
+    })
+
+    const live = createAgent(loaded, 'workspace-live', await realpath(cwd))
+    await pinManualRoute(loaded, live)
+    await turn(live, 'Another easy turn.')
+    await workspace.attachSession(live.session.id)
+    const liveStats = loaded.sessionProjections.snapshot(live.session).values.modelRoutingStats!
+
+    // Settled read: both folds must still hold their barrier values when the
+    // rollup reads them, or the sum races the projection cache's write-behind.
+    await vi.waitFor(() => {
+      expect(loaded.sessionProjectionCache.cachedSnapshot(header)?.values.modelRoutingStats).toEqual(closedStats)
+      expect(loaded.sessionProjections.snapshot(live.session).values.modelRoutingStats!).toEqual(liveStats)
+    })
+
+    const stats = await loaded.modelRouting.workspaceStats({ workspaceId: workspace.id, range: 'all' })
+    expect(stats.sessions).toEqual({ members: 2, summarized: 2, inRange: 2, included: 2, capped: false })
+    for (const key of Object.keys(stats.counts) as (keyof typeof stats.counts)[]) {
+      expect(stats.counts[key], key).toBe(closedStats.counts[key] + liveStats.counts[key])
+    }
+    const reasonCounts = new Map<string, number>()
+    for (const entry of [...closedStats.reasons, ...liveStats.reasons]) {
+      reasonCounts.set(entry.reason, (reasonCounts.get(entry.reason) ?? 0) + entry.count)
+    }
+    expect(Object.fromEntries(stats.reasons.map(entry => [entry.reason, entry.count]))).toEqual(Object.fromEntries(reasonCounts))
+    const routed = (value: typeof liveStats) => value.cold
+      .filter(row => row.cause === 'routed-switch' || row.cause === 'routed-return')
+      .reduce((sum, row) => ({ count: sum.count + row.count, tokens: sum.tokens + row.tokens }), { count: 0, tokens: 0 })
+    expect(stats.routedSwitches).toEqual({
+      count: routed(closedStats).count + routed(liveStats).count,
+      tokens: routed(closedStats).tokens + routed(liveStats).tokens,
+    })
+    // The live session decided last, so it leads.
+    expect(stats.rows).toEqual([
+      { sessionId: 'workspace-live', lastDecisionAt: liveStats.recent[0]!.t, decisions: liveStats.counts.decisions, steps: liveStats.counts.steps, downgradedSteps: liveStats.counts.downgradedSteps },
+      { sessionId: 'workspace-closed', lastDecisionAt: closedStats.recent[0]!.t, decisions: closedStats.counts.decisions, steps: closedStats.counts.steps, downgradedSteps: closedStats.counts.downgradedSteps },
+    ])
   })
 })
 

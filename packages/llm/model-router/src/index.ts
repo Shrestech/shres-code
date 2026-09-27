@@ -68,12 +68,17 @@ import type {
   JudgmentService,
 } from '@shres-code/shres-code-judgment'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
-import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
+import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import { installSettingsSection, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Remote, bindTypertRemote } from '@shres-code/shres-code-typert-protocol'
-// Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children.
+// Type-only edges: resolve `ctx.commands` and `ctx.sessionProjections` for the optional children,
+// and the optional services the workspace statistics read reads through.
 import type {} from '@shres-code/shres-code-commands'
 import type {} from '@shres-code/shres-code-session-projection'
+import type {} from '@shres-code/shres-code-session-persistence'
+import type {} from '@shres-code/shres-code-session-projection-cache'
+import type { WorkspaceId } from '@shres-code/shres-code-workspace'
 import {
   DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD,
   DEFAULT_ENTRY_SCORE_CEILING,
@@ -114,6 +119,8 @@ import {
   viewStats,
 } from './stats.ts'
 import type { ModelRoutingStatsState } from './stats.ts'
+import { summarizeSession, workspaceStats } from './workspace-stats.ts'
+import type { SessionSummary } from './workspace-stats.ts'
 import type { RoutingState as RoutingStateCandidate } from './state.ts'
 import { assessModelRoutingCandidates } from './eligibility.ts'
 import type { ModelRoutingJudgmentFailures, ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
@@ -127,12 +134,18 @@ import type {
   ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
   ModelRoutingOperatingPoint,
+  ModelRoutingPoolBase,
+  ModelRoutingPoolCandidate,
+  ModelRoutingPoolStatus,
   ModelRoutingProjection,
   ModelRoutingReason,
   ModelRoutingRouteFrom,
   ModelRoutingThresholds,
   ModelRoutingSelection,
   ModelRoutingSelectionView,
+  ModelRoutingStatsRequest,
+  ModelRoutingStatsSnapshot,
+  ModelRoutingWorkspaceStats,
 } from './types.ts'
 // The `modelRouting` projection-key and session-event declarations live in
 // src/types.ts (their one home); this re-export keeps the module edge in the
@@ -652,9 +665,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     })
     installSettingsSection(ctx, MODEL_ROUTER_SETTINGS_NAMESPACE, ModelRoutingController.Config, config, {
       // A stored section this router could not act on is refused where it is
-      // written, naming the offending key.
-      validate: (next) => {
-        resolveConfig(next)
+      // written, naming the offending key. The live route check runs on a
+      // write only, never on a load or reload, and only for the routes the
+      // write adds or changes.
+      validate: (next, cause) => {
+        const resolved = resolveConfig(next)
+        if (cause === 'write') this.assertRegisteredRoutes(resolved, this.config())
       },
       setSource: (next) => {
         this.source = next
@@ -875,6 +891,105 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   }
 
   /**
+   * The pool and `routeFrom` allowlist in force, each model with the facts its
+   * adapter declares, and the router's own eligibility result for every
+   * (base, pool model) pair, computed as a turn without images would compute it.
+   * Makes no model request.
+   * @returns the pool status.
+   */
+  @Remote
+  async poolStatus(): Promise<ModelRoutingPoolStatus> {
+    const config = this.config()
+    const llm = this.ctx.get('llm')
+    const registered = new Set((llm?.listProviders() ?? []).map(provider => provider.id))
+    const infoOf = async (provider: string, model: string): Promise<LlmResolvedModelInfo | undefined> => {
+      if (llm === undefined || !registered.has(provider)) return undefined
+      try {
+        return await llm.resolveModelInfo(provider, model)
+      } catch {
+        // An adapter that cannot describe the model states no facts; the
+        // eligibility result below names why it cannot route.
+        return undefined
+      }
+    }
+    const routeFrom: ModelRoutingPoolBase[] = await Promise.all(config.routeFrom.map(async (entry) => {
+      const info = await infoOf(entry.provider, entry.model)
+      return {
+        provider: entry.provider,
+        model: entry.model,
+        objective: entry.objective,
+        allowEveryTurn: entry.allowEveryTurn,
+        registered: registered.has(entry.provider),
+        ...info?.context === undefined ? {} : { contextWindow: info.context.contextWindow },
+      }
+    }))
+    const byBase = llm === undefined
+      ? []
+      : await Promise.all(config.routeFrom.map(async entry => ({
+        entry,
+        assessments: (await assessModelRoutingCandidates(
+          llm,
+          { provider: entry.provider, model: entry.model },
+          [],
+          config.candidates,
+          config.difficultyToEffort,
+        )).assessments,
+      })))
+    const candidates: ModelRoutingPoolCandidate[] = await Promise.all(config.candidates.map(async (candidate) => {
+      const info = await infoOf(candidate.provider, candidate.model)
+      return {
+        id: candidate.id,
+        provider: candidate.provider,
+        model: candidate.model,
+        ...candidate.reasoningEffort === undefined ? {} : { reasoningEffort: String(candidate.reasoningEffort) },
+        description: candidate.description,
+        registered: registered.has(candidate.provider),
+        ...info?.context === undefined ? {} : { contextWindow: info.context.contextWindow },
+        ...info?.inputModalities === undefined ? {} : { inputModalities: [...info.inputModalities] },
+        ...info?.reasoning === undefined ? {} : { efforts: info.reasoning.efforts.map(effort => String(effort.id)) },
+        ...info?.cacheUsage === undefined ? {} : { cacheUsage: info.cacheUsage },
+        alsoRouteFrom: config.routeFrom.some(entry => entry.provider === candidate.provider && entry.model === candidate.model),
+        // Each base's check assesses every pool model once, keyed by its unique id.
+        eligibility: byBase.flatMap(({ entry, assessments }) => assessments
+          .filter(assessment => assessment.id === candidate.id)
+          .map(assessment => ({ provider: entry.provider, model: entry.model, reason: assessment.reason }))),
+      }
+    }))
+    return { routeFrom, candidates }
+  }
+
+  /**
+   * Refuse a written pool model or `routeFrom` entry whose provider route the
+   * llm runtime does not register. Only the entries the write adds, or whose
+   * provider or model it changes, are checked: an entry already in force is
+   * not re-judged, so a route that went away does not block an unrelated
+   * edit. The model id is not checked, because catalogs are advisory; the
+   * eligibility check decides at run time.
+   * @param next - the section being written.
+   * @param previous - the section in force.
+   * @throws SettingsFieldError at the entry's `provider` naming the route.
+   */
+  private assertRegisteredRoutes(next: ResolvedModelRouterConfig, previous: ResolvedModelRouterConfig): void {
+    const registered = new Set((this.ctx.get('llm')?.listProviders() ?? []).map(provider => provider.id))
+    const inForce = (entries: readonly { provider: string; model: string }[], provider: string, model: string): boolean =>
+      entries.some(entry => entry.provider === provider && entry.model === model)
+    for (const [index, candidate] of next.candidates.entries()) {
+      if (registered.has(candidate.provider) || inForce(previous.candidates, candidate.provider, candidate.model)) continue
+      throw new SettingsFieldError(
+        ['candidates', index, 'provider'],
+        `ModelRouterConfig.candidates["${candidate.id}"].provider "${candidate.provider}" is not a registered route`,
+      )
+    }
+    for (const [index, entry] of next.routeFrom.entries()) {
+      if (registered.has(entry.provider) || inForce(previous.routeFrom, entry.provider, entry.model)) continue
+      throw new SettingsFieldError(
+        ['routeFrom', index, 'provider'],
+        `ModelRouterConfig.routeFrom["${entry.provider}/${entry.model}"].provider "${entry.provider}" is not a registered route`,
+      )
+    }
+  }
+
+  /**
    * One logged decision, verbatim, with the turn and step it was logged in and
    * the gate configuration in force now.
    * @param agent - the session's Agent.
@@ -891,6 +1006,80 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       throw new Error(`session "${agent.session.id}" logs no model-routing/decision at seq ${String(seq)}`)
     }
     return { seq, time: event.time, ...positionBefore(events, index), decision: event.data, gate: this.gateView() }
+  }
+
+  /**
+   * Routing statistics across one workspace's unarchived sessions, for the
+   * Settings overview: each session's `modelRoutingStats` value, rolled up
+   * over the sessions whose latest decision falls in the range. An attached
+   * session's value is its live one and a cold session's is the persisted
+   * projection cache's; no session log is read, so a cold session without a
+   * cached value on the current unit version is counted as not summarized.
+   * @param request - the workspace and the range.
+   * @returns the workspace statistics.
+   * @throws when this host composes no workspace registry or the workspace is unknown.
+   */
+  @Remote('stats')
+  async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats> {
+    const registry = this.ctx.get('workspaceRegistry')
+    if (registry === undefined) throw new Error('modelRouting.stats: this host composes no workspace registry')
+    // The wire carries the id as a plain string; the registry brands it.
+    const workspace = registry.get(request.workspaceId as WorkspaceId)
+    if (workspace === undefined) throw new Error(`modelRouting.stats: no workspace "${request.workspaceId}"`)
+    const archived = new Set(registry.archivedSessionIds)
+    const members = workspace.sessionIds.filter(id => !archived.has(id))
+    const values = await this.storedStats(members)
+    const summaries: SessionSummary[] = []
+    for (const [sessionId, stats] of values) {
+      const summary = summarizeSession(sessionId, stats)
+      if (summary !== undefined) summaries.push(summary)
+    }
+    return workspaceStats({
+      workspaceId: request.workspaceId,
+      range: request.range,
+      now: Date.now(),
+      members: members.length,
+      summarized: values.size,
+      summaries,
+    })
+  }
+
+  /**
+   * The `modelRoutingStats` value of each session that has one: the live
+   * value of an attached session, else the persisted projection cache's
+   * identity-checked value, which lists session headers without reading any
+   * log. A cached value that fails to view is logged and left out.
+   * @param ids - the sessions to read.
+   * @returns the values found, by session id.
+   */
+  private async storedStats(ids: readonly SessionId[]): Promise<Map<SessionId, ModelRoutingStatsSnapshot>> {
+    const values = new Map<SessionId, ModelRoutingStatsSnapshot>()
+    const projections = this.ctx.get('sessionProjections')
+    const cold = new Set<SessionId>()
+    for (const id of ids) {
+      // An optional peer like the cache and persistence below: a host whose
+      // fiber carries no sessions service summarizes only cached members.
+      const session = this.ctx.get('sessions')?.get(id)
+      if (session === undefined) {
+        cold.add(id)
+        continue
+      }
+      const value = projections?.snapshot(session).values.modelRoutingStats
+      if (value !== undefined) values.set(id, value)
+    }
+    const cache = this.ctx.get('sessionProjectionCache')
+    const persistence = this.ctx.get('sessionPersistence')
+    if (cold.size === 0 || cache === undefined || persistence === undefined) return values
+    for (const header of await persistence.list()) {
+      if (!cold.has(header.id)) continue
+      try {
+        const value = cache.cachedSnapshot(header)?.values.modelRoutingStats
+        if (value !== undefined) values.set(header.id, value)
+      } catch (error) {
+        this.ctx.logger.warn('modelRouting.stats: cached statistics of "%s" failed to view; the session is not summarized: %s', header.id, String(error))
+      }
+    }
+    return values
   }
 
   /**
