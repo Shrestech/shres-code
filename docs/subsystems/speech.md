@@ -22,6 +22,16 @@ interface SpeechUserSettings {
    * require explicit confirm before they reach the coding agent.
    */
   talkMode: boolean
+  /**
+   * User-layer STT pin. Empty resolves through the composition config
+   * (`sttProvider` / `sttProviders`); a non-empty id must be a registered
+   * provider and wins over every composition selection field.
+   */
+  sttProvider: string
+  /** User-layer TTS pin, with the same precedence as {@link sttProvider}. */
+  ttsProvider: string
+  /** OpenAI-compatible endpoint profile; empty fields inherit composition config. */
+  cloud: SpeechCloudSettings
 }
 ```
 

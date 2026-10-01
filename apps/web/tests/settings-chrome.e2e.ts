@@ -102,26 +102,25 @@ describe('web e2e: settings page and Preferences', () => {
     await expect.poll(() => dialog.getByRole('button', { name: 'Shield', exact: true }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('page')
     await dialog.getByRole('heading', { name: 'Shield', exact: true }).waitFor({ timeout: 10_000 })
     expect(await dialog.getByRole('switch').count()).toBeGreaterThan(0)
-    // Plugins is a read-only projection of the same assembled Loader tree.
+    // Plugins is a projection of the same assembled Loader tree.
     // Capture one stable shipped row rather than the whole inventory so adding
     // an unrelated plugin does not rewrite this surface's golden.
-    await page.getByRole('button', { name: 'Customize', exact: true }).click()
-    const customize = page.getByRole('region', { name: 'Customize' })
-    await customize.waitFor({ timeout: 10_000 })
-    await customize.getByRole('button', { name: 'Plugins', exact: true }).click()
-    await customize.getByRole('heading', { name: 'Plugins', exact: true }).waitFor({ timeout: 10_000 })
-    await customize.getByRole('tab', { name: 'Plugin list', exact: true }).click()
-    const pluginRow = customize.locator(PLUGIN_ROW_SELECTOR)
+    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    const plugins = page.getByRole('region', { name: 'Plugins', exact: true })
+    await plugins.waitFor({ timeout: 10_000 })
+    await plugins.getByRole('heading', { name: 'Plugins', exact: true, level: 1 }).waitFor({ timeout: 10_000 })
+    await plugins.getByRole('tab', { name: 'Plugin list', exact: true }).click()
+    const pluginRow = plugins.locator(PLUGIN_ROW_SELECTOR)
     await pluginRow.waitFor({ timeout: 10_000 })
     const expectedPluginCount = [...scaffold.ctx.loader.entries()]
       .filter(entry => !entry.options.group)
       .length
-    expect(await customize.getByRole('searchbox', { name: 'Search plugins' }).count()).toBe(1)
-    expect(await customize.locator('[data-plugin-entry]').count()).toBe(expectedPluginCount)
-    expect(await customize.locator('[data-plugin-count]').getAttribute('data-plugin-count'))
+    expect(await plugins.getByRole('searchbox', { name: 'Search plugins' }).count()).toBe(1)
+    expect(await plugins.locator('[data-plugin-entry]').count()).toBe(expectedPluginCount)
+    expect(await plugins.locator('[data-plugin-count]').getAttribute('data-plugin-count'))
       .toBe(String(expectedPluginCount))
-    expect(await customize.getByRole('button', { name: 'Plugins', exact: true }).getAttribute('aria-current')).toBe('page')
-    expect(await customize.getByRole('tab', { name: 'Plugin list', exact: true }).getAttribute('aria-selected')).toBe('true')
+    expect(await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Plugins', exact: true }).getAttribute('aria-current')).toBe('page')
+    expect(await plugins.getByRole('tab', { name: 'Plugin list', exact: true }).getAttribute('aria-selected')).toBe('true')
     const pluginsSnapshot = await captureStableAria(
       page,
       PLUGIN_ROW_SELECTOR,
@@ -130,7 +129,7 @@ describe('web e2e: settings page and Preferences', () => {
     await compareOrRefreshGolden(PLUGINS_EXPECTED, pluginsSnapshot, MODE)
     // Close path 1: Escape.
     await page.keyboard.press('Escape')
-    await expect.poll(() => page.getByRole('region', { name: 'Customize' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(() => page.getByRole('region', { name: 'Plugins' }).count(), { timeout: 5_000 }).toBe(0)
     await expect.poll(() => page.getByRole('region', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
     expect(await trigger.getAttribute('aria-expanded')).toBe('false')
     // Close path 2: the header close button (focus lands there on open).

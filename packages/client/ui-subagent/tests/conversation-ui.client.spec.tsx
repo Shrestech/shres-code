@@ -330,18 +330,21 @@ describe('SubagentCatalogAction', () => {
     const usageById = {
       running: {
         uncachedInputTokens: 1_000,
+        unreportedInputTokens: 0,
         outputTokens: 200,
         cacheReadTokens: 3_000,
         cacheWriteTokens: 400,
       },
       finished: {
         uncachedInputTokens: 123,
+        unreportedInputTokens: 0,
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
       },
       interrupted: {
         uncachedInputTokens: 123_000_000,
+        unreportedInputTokens: 0,
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheWriteTokens: 0,

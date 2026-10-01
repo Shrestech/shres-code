@@ -1,0 +1,34 @@
+{
+  "subscriptionProviders": [
+    "claude-session",
+    "codex-session",
+    "cursor-session",
+    "grok-session"
+  ],
+  "localProviders": [
+    "ollama-local"
+  ],
+  "priceProviders": {
+    "anthropic": "anthropic",
+    "claude-session": "anthropic",
+    "codex-session": "openai",
+    "deepseek": "deepseek",
+    "deepseek-official": "deepseek",
+    "grok-session": "xai",
+    "moonshot": "moonshot",
+    "ollama": "ollama",
+    "openai": "openai",
+    "xai": "xai",
+    "xai-apikey": "xai",
+    "zai": "zai"
+  },
+  "judgeEnginePriceProviders": {},
+  "vendorPlanJudgeEngines": [
+    "typesafe"
+  ],
+  "localJudgeEngines": [
+    "bench-random",
+    "laya",
+    "shield"
+  ]
+}

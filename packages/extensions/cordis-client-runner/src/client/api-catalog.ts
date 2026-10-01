@@ -809,7 +809,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StoreSpec',
-    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    actions: A;\n}',
+    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    transient?: readonly (keyof T & string)[];\n    actions: A;\n}',
   },
   {
     name: 'ThemeDefinition',
@@ -842,10 +842,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolResultNode',
     declaration: 'export interface ToolResultNode {\n    kind: \'tool-result\';\n    seq: number;\n    time: number;\n    callId: string;\n    call: {\n        name: string;\n        argsRaw: string;\n    } | null;\n    callTime: number | null;\n    content: readonly ContentBlock[];\n    isError: boolean;\n    error?: {\n        name: string;\n        code: string;\n    };\n    meta?: unknown;\n    callView: ToolCallView | null;\n    resultView: ToolResultView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
-  },
-  {
-    name: 'Translate',
-    declaration: 'export type Translate<K extends string = string> = (key: K, params?: Record<string, unknown>) => string;',
   },
   {
     name: 'TranslateNS',

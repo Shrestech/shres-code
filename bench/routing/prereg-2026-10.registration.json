@@ -1,0 +1,236 @@
+{
+  "schema": "shres-code/routing-measurement@1",
+  "registration": "prereg-2026-10",
+  "draftedAt": "2026-09-27",
+  "registeredAt": null,
+  "status": "draft",
+  "authorizes": "confirmatory preparation only; real-spend runs require explicit owner approval; default-on requires a confirmatory decision and owner approval",
+  "question": "On quota routes, does cold-point routing with the local Laya judge reduce strong-model tokens without a meaningful loss of task success, compared with always-strong?",
+  "decisionRule": "PR 17 default-on only if H1 through H5, the screens (no warm turn judged, zero lost turns, zero invariant failures), and the Laya replay gate all pass; otherwise off, shadow recommended.",
+  "methodOfRecord": {
+    "gate": "bench/analysis/routing-gate.js",
+    "gaps": "bench/runner/gaps.js",
+    "arms": "bench/runner/arms.js"
+  },
+  "arms": {
+    "S": {
+      "runnerName": "route-strong",
+      "overlay": "bench/routing/route-strong.patch.yml",
+      "keyEnv": "ANTHROPIC_API_KEY_S"
+    },
+    "R": {
+      "runnerName": "route-coldpoint",
+      "overlay": "bench/routing/route-coldpoint.patch.yml",
+      "keyEnv": "ANTHROPIC_API_KEY_R"
+    },
+    "N": {
+      "runnerName": "route-random",
+      "overlay": "bench/routing/random-matched.patch.yml",
+      "keyEnv": "ANTHROPIC_API_KEY_N"
+    },
+    "C": {
+      "runnerName": "route-cheap",
+      "overlay": "bench/routing/route-cheap.patch.yml",
+      "keyEnv": null
+    },
+    "T": {
+      "runnerName": "route-static",
+      "overlay": "bench/routing/static-tier.patch.yml",
+      "keyEnv": "ANTHROPIC_API_KEY_T",
+      "levels": [
+        "L3"
+      ]
+    }
+  },
+  "gapDistribution": {
+    "unit": "seconds",
+    "cdfAnchors": [
+      [
+        0,
+        0
+      ],
+      [
+        60,
+        0.28
+      ],
+      [
+        180,
+        0.52
+      ],
+      [
+        300,
+        0.706
+      ],
+      [
+        600,
+        0.8
+      ],
+      [
+        1200,
+        0.87
+      ],
+      [
+        1800,
+        0.91
+      ],
+      [
+        2700,
+        0.93
+      ],
+      [
+        3600,
+        0.943
+      ],
+      [
+        5400,
+        0.965
+      ],
+      [
+        7200,
+        0.978
+      ],
+      [
+        10800,
+        0.99
+      ],
+      [
+        21600,
+        1
+      ]
+    ],
+    "measuredQuantiles": {
+      "pOver300s": 0.294,
+      "pOver3600s": 0.057
+    },
+    "interiorAnchors": "interpolated; replaceable only before the calibration run",
+    "perTrialSeed": "derived per (task, repeat) from the experiment --gap-seed so paired arms share the trial's gaps",
+    "capL1L2": 1200000,
+    "capL3": null,
+    "minimumOver300sPerTrial": true
+  },
+  "operatingPoint": {
+    "selectionRule": "the threshold and margin that maximize coverage subject to false-downgrade <= 10% and coverage >= 15% of cold points on the replay curve",
+    "layaGate": {
+      "aurocMin": 0.7,
+      "falseDowngradeMax": 0.1,
+      "coverageMin": 0.15,
+      "eceMax": 0.1,
+      "eceFallback": "thresholds read only from the replay curve when ECE exceeds 0.10"
+    },
+    "provisional": {
+      "engine": "laya",
+      "downgradeThreshold": 0.8,
+      "downgradeMargin": 0.1,
+      "calibratedBy": null,
+      "note": "provisional overlays never carry calibratedBy: the router treats its presence as calibrated, so bench/routing/write-registration.js writes the id, the threshold, and the margin together only after a passed gate"
+    },
+    "writtenBefore": "any confirmatory trial; the runner refuses confirmatory runs unless the registration has replayGate passed, the overlay's calibratedBy equals the registration's, and the overlay values equal the registration's",
+    "soleWriter": "bench/routing/write-registration.js"
+  },
+  "randomMatched": {
+    "rule": "a seeded draw per consult selects the candidate with probability p equal to R's realized entry rate at cold points in the calibration run",
+    "draw": "u = hash(seed, sessionId, turn, step); deterministic and replayable without state; answers carry probability 1 and confidence 1",
+    "provisional": {
+      "entryRate": 0.3,
+      "seed": 20261016
+    },
+    "engine": "bench-random"
+  },
+  "cacheIsolation": {
+    "armOrder": "seeded shuffle per task via --arm-seed; seed pinned in the run manifest",
+    "perArmKeys": {
+      "S": "ANTHROPIC_API_KEY_S",
+      "R": "ANTHROPIC_API_KEY_R",
+      "N": "ANTHROPIC_API_KEY_N",
+      "T": "ANTHROPIC_API_KEY_T",
+      "C": "experiment --api-key-env"
+    },
+    "nonce": "--nonce appends a logged, model-visible nonce line to each trial's first user message",
+    "temperature": null
+  },
+  "gate": {
+    "module": "bench/analysis/routing-gate.js",
+    "h1": {
+      "margin": 0.05,
+      "alpha": 0.025,
+      "sided": "one",
+      "method": "cluster-robust (CR1) by task on paired success differences",
+      "hardStratum": "H1 must also pass within the hard stratum: a separate CR1 bound over hard-task pairs only. Missing or insufficient hard data (fewer than two hard tasks with pairs) records hard.status 'insufficient-data' and refuses the pass instead of defaulting.",
+      "moduleRule": "computeRoutingGate: H1.pass = overall bound AND evaluated hard-stratum bound both above -delta"
+    },
+    "secondaryFamily": {
+      "alpha": 0.05,
+      "correction": "holm",
+      "members": [
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ]
+    },
+    "screens": {
+      "warmTurnsJudged": 0,
+      "lostTurns": 0,
+      "invariantFailures": 0,
+      "routeFailedRecoveries": "reported, never gated"
+    },
+    "power": {
+      "formula": "ceil(7.849 * p_disc / delta^2)",
+      "oneSidedAlpha": 0.025,
+      "power": 0.8,
+      "underpoweredRule": "observed p_disc above the level's design value cannot pass H1 at that level"
+    },
+    "secondaries": {
+      "holm": "family alpha 0.05 over H2-H5 one-sided p-values",
+      "h3": "ratio <= 0.80 with two-sided 95% CI excluding 1",
+      "h4": "p95 critical-path <= 50 ms per turn",
+      "h5": "cold-write one-sided 95% upper <= 1.05"
+    }
+  },
+  "levels": {
+    "L1": {
+      "cap": 1000,
+      "pairs": 120,
+      "decides": "NO-GO only"
+    },
+    "L2": {
+      "cap": 2300,
+      "pairs": 300,
+      "decides": "GO/NO-GO main-conversation cold-point routing",
+      "staged": "L1's first 120 pairs first; stop-for-harm boundary preregistered with O'Brien-Fleming spending before stage 1"
+    },
+    "L3": {
+      "cap": 3850,
+      "pairs": 480,
+      "decides": "GO/NO-GO with margin, plus T vs S at 180 pairs (exploratory)",
+      "extra": "C x3 and T x3; real gaps over 1 hour"
+    },
+    "selection": "owner decision D12"
+  },
+  "ownerDecisionsPending": [
+    "D12 bench level",
+    "TTL probe (§2.1.1): long vs 5-minute posture statement",
+    "TypeSafe terms clause (vi)"
+  ],
+  "modelIds": {
+    "strong": {
+      "route": "anthropic/claude-opus-5-5",
+      "provenance": "id proven as claude-session subscription id and price row only; metered pi-ai profile hand-declared from spec metadata (1M/128k, adaptive thinking, no temperature); API acceptance on a metered key UNPROVEN until the owner-approved first real run"
+    },
+    "cheap": {
+      "route": "deepseek-official/deepseek-v4-flash",
+      "provenance": "the only id the adapter declares; billed at V4.1-Flash rates through the 2026-09-26 alias snapshot row; deepseek-v4.1-flash stays unresolved"
+    }
+  },
+  "priceSnapshotAlias": {
+    "file": "bench/prices/2026-09-26.json",
+    "row": "deepseek/deepseek-v4-flash",
+    "derived": "verbatim copy of the 2026-09-24 deepseek-v4.1-flash row with a citing note; published snapshots are never edited"
+  },
+  "armT": {
+    "composition": "initialMode on, routeFrom Opus, childPolicies judge:false, NO judgment service composed",
+    "rationale": "shadow means no request is rewritten, children included; a shadow parent with live children is rejected (aegis §10.2)",
+    "audit": "zero downgraded main-conversation decisions; at least one routed child-decision per delegating task"
+  },
+  "rulings": "aegis §10 of design/pr16-measurement.md, against source at 7c0cfd06c8"
+}

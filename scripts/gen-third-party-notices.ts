@@ -88,7 +88,72 @@ const PYTHON_METADATA: Record<string, { license: string; repo: string; role: str
   pydantic: { license: 'MIT', repo: 'https://github.com/pydantic/pydantic', role: 'runtime dependency of `shres-code-sdk`' },
   hatchling: { license: 'MIT', repo: 'https://github.com/pypa/hatch', role: 'build backend' },
   pytest: { license: 'MIT', repo: 'https://github.com/pytest-dev/pytest', role: 'test-only' },
+  'laya-mlx': {
+    license: 'Apache-2.0',
+    repo: 'https://github.com/mizorewww/laya-mlx',
+    role: 'runtime dependency of `shres-laya-gateway` on Apple silicon; installed by `/laya install`, not redistributed',
+  },
+  'huggingface-hub': {
+    license: 'Apache-2.0',
+    repo: 'https://github.com/huggingface/huggingface_hub',
+    role: 'runtime dependency of `shres-laya-gateway`; downloads the pinned checkpoint during `/laya install` only',
+  },
 }
+
+/**
+ * Components the local Laya gateway loads that its direct requirements do not
+ * name. Each entry names the file that pins it and a token that file must
+ * contain, so a removed pin fails generation instead of leaving a stale row.
+ */
+const LAYA_RUNTIME_COMPONENTS = [
+  {
+    name: 'mlx',
+    license: 'MIT',
+    repo: 'https://github.com/ml-explore/mlx',
+    role: 'array runtime of `laya-mlx`, locked in `python/laya-gateway/uv.lock`',
+    pinSource: 'python/laya-gateway/uv.lock',
+    pinToken: 'name = "mlx"',
+  },
+  {
+    name: 'Laya',
+    license: 'Apache-2.0',
+    repo: 'https://github.com/NandhaKishorM/laya',
+    role: 'model architecture, question rendering, and confidence calculation that `laya-mlx` reimplements (see the notice below)',
+    pinSource: 'python/laya-gateway/README.md',
+    pinToken: 'https://github.com/NandhaKishorM/laya',
+  },
+]
+
+/**
+ * Model checkpoints pinned by `python/*\/manifests/*.json`. The generator
+ * fails when a manifest names a repository this map misses.
+ */
+const MODEL_CHECKPOINTS: Record<string, { license: string; role: string }> = {
+  'convaiinnovations/laya-typed-decisions': {
+    license: 'Apache-2.0',
+    role: 'weights downloaded by `/laya install` at the pinned revision and verified file by file; not redistributed',
+  },
+}
+
+/**
+ * `laya-mlx`'s NOTICE, reproduced verbatim as Apache-2.0 section 4(d) asks of
+ * derivative distributions. `verifyLayaNotice` has no network access, so this
+ * text is updated together with the `laya-mlx` pin.
+ */
+const LAYA_MLX_NOTICE = `laya-mlx
+Copyright 2026 laya-mlx contributors
+
+This product includes software derived from Laya:
+https://github.com/NandhaKishorM/laya
+Copyright Convai Innovations and Laya contributors. Licensed under Apache-2.0.
+Upstream source revision: 573e5b62696ba441230cd6be71d593331b5d23af
+
+The token sequence construction, question rendering, confidence calculation,
+presets, email utilities and language router are adapted from Laya.
+The neural network is reimplemented using Apple's MLX, following Laya's
+DecisionModel and the ModernBERT architecture in Hugging Face Transformers.
+Model weights are downloaded separately from Convai Innovations on Hugging Face;
+they are not included in this repository.`
 
 type PythonMetadata = typeof PYTHON_METADATA
 
@@ -583,6 +648,44 @@ function verifyBuildTimePins(): void {
   }
 }
 
+/** Verify each Laya runtime component pin still appears in its owning file. */
+function verifyLayaRuntimePins(): void {
+  for (const component of LAYA_RUNTIME_COMPONENTS) {
+    const text = readFileSync(resolve(root, component.pinSource), 'utf8')
+    if (!text.includes(component.pinToken)) {
+      throw new Error(`gen-third-party-notices: ${component.pinSource} no longer references ${component.name}; update LAYA_RUNTIME_COMPONENTS.`)
+    }
+  }
+}
+
+/**
+ * Read the checkpoints pinned by `python/*\/manifests/*.json`.
+ * @param manifests - complete manifest file contents.
+ * @param metadata - disclosure metadata keyed by repository.
+ * @returns one row per pinned repository and revision, in repository order.
+ */
+export function collectModelCheckpoints(
+  manifests: string[],
+  metadata: Record<string, { license: string; role: string }> = MODEL_CHECKPOINTS,
+): { repo: string; revision: string; license: string; role: string }[] {
+  const rows = manifests.map((text) => {
+    const parsed = JSON.parse(text) as { repo?: unknown; revision?: unknown }
+    if (typeof parsed.repo !== 'string' || typeof parsed.revision !== 'string') {
+      throw new Error('gen-third-party-notices: a checkpoint manifest has no repo and revision.')
+    }
+    const entry = metadata[parsed.repo]
+    if (entry === undefined) throw new Error(`gen-third-party-notices: checkpoint ${parsed.repo} is missing from MODEL_CHECKPOINTS.`)
+    return { repo: parsed.repo, revision: parsed.revision, ...entry }
+  })
+  return rows.sort((a, b) => `${a.repo}@${a.revision}`.localeCompare(`${b.repo}@${b.revision}`))
+}
+
+/** Checkpoints pinned by the manifests under `python/`. */
+function collectCheckpoints(): { repo: string; revision: string; license: string; role: string }[] {
+  const manifests = globSync('python/*/manifests/*.json', { cwd: root }).sort()
+  return collectModelCheckpoints(manifests.map(path => readFileSync(resolve(root, path), 'utf8')))
+}
+
 /** SPDX identifiers this project may ship without further review. */
 const PERMISSIVE_LICENSES = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', '0BSD', 'Unlicense', 'CC0-1.0', 'BlueOak-1.0.0', 'Python-2.0'])
 
@@ -664,11 +767,13 @@ ${rows.join('\n')}
  */
 export function render(): string {
   verifyBuildTimePins()
+  verifyLayaRuntimePins()
   const npm = collectNpmDeps()
   const runtimeDeps = npm.filter(dep => dep.runtime)
   const devDeps = npm.filter(dep => !dep.runtime)
   const vendored = collectVendored()
   const python = collectPython()
+  const checkpoints = collectCheckpoints()
   const patched = collectPatched()
   const claudeDistribution = runtimeDeps.some(
     dep => dep.name === CLAUDE_AGENT_SDK_PACKAGE,
@@ -697,7 +802,7 @@ Shres Code is licensed under [MIT](LICENSE). It depends on the third-party softw
 
 This file lists **direct** dependencies declared by the workspace and the explicitly disclosed official Claude platform payload closure. It is generated from the workspace manifests by \`scripts/gen-third-party-notices.ts\`: a pre-commit hook regenerates it whenever a staged file changes one of its inputs, and \`scripts/gen-third-party-notices.spec.ts\` asserts in the test lane that the committed bytes match. Deleting a manifest runs no hook, so that case is caught by the assertion instead. Run \`pnpm run verify-third-party-notices\` for the standalone check.
 
-The complete npm transitive closure, including the Landlock launcher workspace, is recorded with exact pinned versions in [\`pnpm-lock.yaml\`](pnpm-lock.yaml) — inspect it with \`pnpm licenses list\`. The Python closure is recorded separately in [\`python/sdk/uv.lock\`](python/sdk/uv.lock).
+The complete npm transitive closure, including the Landlock launcher workspace, is recorded with exact pinned versions in [\`pnpm-lock.yaml\`](pnpm-lock.yaml) — inspect it with \`pnpm licenses list\`. The Python closures are recorded separately in [\`python/sdk/uv.lock\`](python/sdk/uv.lock) and [\`python/laya-gateway/uv.lock\`](python/laya-gateway/uv.lock).
 
 ## Vendored source (\`vendor/\`)
 
@@ -724,7 +829,7 @@ External packages **directly declared** only by repository tooling, test infrast
 
 ${renderNpmTable(devDeps)}
 ${renderNonPermissiveNote(nonPermissiveDev)}
-## Python SDK dependencies (\`python/\`)
+## Python dependencies (\`python/\`)
 
 Direct dependencies of the \`pyproject.toml\` manifests, plus \`uv\` as the development workflow tool.
 
@@ -732,6 +837,21 @@ Direct dependencies of the \`pyproject.toml\` manifests, plus \`uv\` as the deve
 | --- | --- | --- |
 ${python.map(dep => `| [\`${dep.name}\`](${dep.repo}) | ${dep.license} | ${dep.role} |`).join('\n')}
 | [\`uv\`](https://github.com/astral-sh/uv) | MIT / Apache-2.0 | development workflow tool |
+
+## Local Laya judgment runtime (\`python/laya-gateway\`)
+
+The \`/laya install\` action installs the gateway's locked Python closure and downloads the pinned checkpoint into the user's runtime directory. Shres Code does not redistribute these components; they are listed because the gateway loads them.
+
+| Component | License | Role |
+| --- | --- | --- |
+${LAYA_RUNTIME_COMPONENTS.map(component => `| [\`${component.name}\`](${component.repo}) | ${component.license} | ${component.role} |`).join('\n')}
+${checkpoints.map(checkpoint => `| [\`${checkpoint.repo}\`](https://huggingface.co/${checkpoint.repo}/tree/${checkpoint.revision}) | ${checkpoint.license} | ${checkpoint.role} |`).join('\n')}
+
+\`laya-mlx\` carries the following NOTICE, reproduced verbatim:
+
+\`\`\`text
+${LAYA_MLX_NOTICE}
+\`\`\`
 
 ## Fetched at build time
 

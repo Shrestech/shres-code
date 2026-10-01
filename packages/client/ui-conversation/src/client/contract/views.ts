@@ -26,6 +26,26 @@ export type SelectionTarget = CallSelectionTarget | FileSelectionTarget
 export interface ViewTab { id: string; label: string }
 
 /**
+ * What one conversation view is asked to show. `call` names a tool call.
+ * `event` names a session-event seq; the receiving view resolves it to the
+ * record containing that event or, failing that, the nearest earlier record.
+ * `none` only selects the view: `reveal` stores no request for it, so no view
+ * receives or acknowledges one.
+ */
+export type InspectTarget =
+  | { readonly kind: 'call'; readonly callId: CallId }
+  | { readonly kind: 'event'; readonly seq: number }
+  | { readonly kind: 'none' }
+
+/** One cross-view handoff: the view to select and the target it shows. */
+export interface InspectRequest {
+  /** 'conversation.view' entry id that receives the target. */
+  readonly view: string
+  /** The target the receiving view opens. */
+  readonly target: InspectTarget
+}
+
+/**
  * Per-session state shared by conversation, chat-view, and details slots.
  * Unknown persisted view ids fall back to the stable Chat view.
  */
@@ -37,9 +57,17 @@ export interface ChatStoreState {
   /** Active conversation view id ('conversation.view' entry id); null falls back to Chat. */
   view: string | null
   /**
-   * One-shot inspect handoff: chat writes the call to reveal, the trajectory
-   * view consumes it and acknowledges by clearing. Read with `?? null` —
-   * persisted snapshots from before this field rehydrate without it.
+   * One-shot cross-view handoff: `reveal` writes it, and the view it addresses
+   * applies it and acknowledges by clearing it. Persisted snapshots are read
+   * through `readInspectRequest`: a snapshot without the field and any
+   * unrecognized value read as null, and the legacy `{ callId }` value reads as
+   * a Trajectory call target.
    */
-  inspect: { callId: CallId } | null
+  inspect: InspectRequest | null
+  /**
+   * Whether the session's Activity popover is open. `reveal` closes it, and
+   * so does leaving the session. The field is transient in the persisted
+   * store, so a reload starts it closed.
+   */
+  activityOpen: boolean
 }

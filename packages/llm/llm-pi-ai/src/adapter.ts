@@ -41,8 +41,11 @@ import {
 import type {
   GenerateOptions,
   LlmModelInfo,
+  Message,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  LlmCacheUsage,
+  LlmThinkingMode,
   ReasoningEffortId as ReasoningEffortIdType,
   ResolvedRetryPolicy,
   StreamChunk,
@@ -50,11 +53,12 @@ import type {
 import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
 import type { HostedTool } from '@shres-code/shres-code-llm'
+import { resolveCacheUsage } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls, promotableCallNames } from './hosted-tools/index.ts'
 import type { HostedToolsPlan } from './hosted-tools/index.ts'
-import { SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
+import { PROMPT_CACHE_KEY_FIELDS, SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -65,7 +69,7 @@ interface PiAiSnapshot {
   models: Models
 }
 
-/** Constructor options for {@link PiAiAdapter}: the two resolution hooks the plugin owns. */
+/** Constructor options for {@link PiAiAdapter}: the resolution and observation hooks the route's owner supplies. */
 export interface PiAiAdapterOptions {
   /** Current validated profiles by provider route; called once per operation. */
   profiles: () => ReadonlyMap<string, ResolvedPiAiProviderProfile>
@@ -83,16 +87,49 @@ export interface PiAiAdapterOptions {
   /**
    * Observe one assistant history message degrading to provider-neutral
    * conversion because its stored replay state is unusable by this build.
+   * Every request rebuilds history from the session's durable messages, so
+   * such a message degrades on every request; the adapter calls this hook
+   * once per message, the first time it degrades.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
   /**
    * Rewrite one outgoing provider request payload before it is sent. pi-ai
-   * hands the hook the request body it built for the model; returning a value
-   * replaces it and returning `undefined` keeps it (which still lets the hook
-   * mutate the body in place). Deployment-owned so a route can splice
-   * provider-specific request fields, such as xAI's `service_tier`.
+   * hands the hook the request body it built for the model, together with the
+   * provider, the model, and the session this request belongs to; returning a
+   * value replaces it and returning `undefined` keeps it (which still lets the
+   * hook mutate the body in place).
+   *
+   * Deployment-owned, and the escape hatch for a vendor request field this
+   * package does not model: a route can splice provider-specific fields such as
+   * xAI's `service_tier`, or a cache-key spelling
+   * {@link PROMPT_CACHE_KEY_FIELDS} does not cover. The hook runs last, after
+   * the hosted-tools and prompt-cache-key splices, so it observes the final
+   * body.
    */
-  onPayload?: (payload: unknown, request: { provider: string; model: string }) => unknown
+  onPayload?: (payload: unknown, request: PiAiPayloadRequest) => unknown
+  /**
+   * Prompt-cache lifetime to declare on one model's metadata, in milliseconds,
+   * or `undefined` to declare none. The route's owner supplies it because only
+   * the owner knows which upstream serves the route and how long that upstream
+   * keeps a prefix; the protocol alone does not determine it.
+   */
+  promptCacheTtlMs?: (provider: string, model: string) => number | undefined
+}
+
+/**
+ * The request one {@link PiAiAdapterOptions.onPayload | payload hook} observes.
+ *
+ * The session id is derived from the seam's own `GenerateOptions.sessionId`
+ * rather than restated, so the brand and the optionality cannot drift from the
+ * field this context mirrors.
+ */
+export interface PiAiPayloadRequest {
+  /** Provider route key selecting the profile that built this request. */
+  provider: string
+  /** Exact model id the request names (`GenerateOptions.model`). */
+  model: string
+  /** Session the request belongs to; absent for a call the loop did not stamp. */
+  sessionId?: GenerateOptions['sessionId']
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -171,6 +208,21 @@ function resolveReasoningLevel(
 }
 
 /**
+ * The temperature fact pi-ai's request builder acts on. An Anthropic-protocol
+ * model whose compat declares `supportsTemperature: false` has a stated
+ * temperature omitted from the request without any error, so the route
+ * declares that refusal instead of letting a caller's value vanish.
+ * @param model - the resolved pi-ai model.
+ * @returns `{ acceptsTemperature: false }` for that refusal, otherwise nothing.
+ */
+function temperatureInfo(model: Model<Api>): { acceptsTemperature?: false } {
+  if (model.api !== 'anthropic-messages') return {}
+  // Model<Api>'s compat is a union over every protocol; the api check selects Anthropic's.
+  const compat = model.compat as { supportsTemperature?: boolean } | undefined
+  return compat?.supportsTemperature === false ? { acceptsTemperature: false } : {}
+}
+
+/**
  * Selectable reasoning efforts for one model, or nothing at all.
  *
  * A model that carries no reasoning metadata — every hand-declared one, and
@@ -220,6 +272,15 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
  */
 export class PiAiAdapter extends LlmAdapter {
   private snapshot: PiAiSnapshot | undefined
+
+  /**
+   * Model sources of history messages whose replay degradation was already
+   * reported. Every request built from a session's history shares that
+   * session's durable message objects, so a message's source identifies it
+   * across requests. Held weakly: the tracking leaves with the session's
+   * history, so a long-running host does not accumulate it.
+   */
+  private readonly reportedReplayDegrades = new WeakSet<Message['source']>()
 
   constructor(private readonly config: PiAiAdapterOptions) {
     super()
@@ -290,6 +351,33 @@ export class PiAiAdapter extends LlmAdapter {
     return tools === undefined ? {} : { hostedTools: [...tools] }
   }
 
+  /**
+   * The thinking mode an Anthropic Messages route runs, or nothing for other
+   * protocols: pi-ai sends adaptive thinking to a model whose compat sets
+   * `forceAdaptiveThinking`, a fixed thinking budget to any other reasoning
+   * model, and no thinking to a non-reasoning one.
+   */
+  private thinkingModeOf(model: Model<Api>): { thinkingMode: LlmThinkingMode } | Record<string, never> {
+    if (model.api !== 'anthropic-messages') return {}
+    if (!model.reasoning) return { thinkingMode: 'none' }
+    const compat = model.compat as { forceAdaptiveThinking?: boolean } | undefined
+    return { thinkingMode: compat?.forceAdaptiveThinking === true ? 'adaptive' : 'budget' }
+  }
+
+  /** Whether one model's usage reports cache counts, as its requests are mapped. */
+  private cacheUsageOf(profile: ResolvedPiAiProviderProfile, model: Model<Api>): { cacheUsage: LlmCacheUsage } {
+    return { cacheUsage: resolveCacheUsage(profile.cacheUsage, model.api) }
+  }
+
+  /** The owner-declared prompt-cache lifetime for one model, or nothing to declare none. */
+  private promptCacheTtlOf(
+    provider: string,
+    modelId: string,
+  ): { promptCacheTtlMs: number } | Record<string, never> {
+    const ttl = this.config.promptCacheTtlMs?.(provider, modelId)
+    return ttl === undefined ? {} : { promptCacheTtlMs: ttl }
+  }
+
   override providerInfo(provider: string): LlmProviderInfo {
     // The configured name, not the route key: `displayName` exists so a
     // deployment can label a route, and a label only the configuration surface
@@ -311,6 +399,9 @@ export class PiAiAdapter extends LlmAdapter {
         name: model.name,
         inputModalities: [...model.input],
         ...this.hostedToolsOf(profile, model.id),
+        ...this.promptCacheTtlOf(provider, model.id),
+        ...this.thinkingModeOf(model),
+        ...this.cacheUsageOf(profile, model),
       }))
     })
   }
@@ -334,9 +425,13 @@ export class PiAiAdapter extends LlmAdapter {
         name: resolvedModel.name,
         inputModalities: [...resolvedModel.input],
         ...this.hostedToolsOf(profile, model),
+        ...this.promptCacheTtlOf(provider, model),
+        ...this.thinkingModeOf(resolvedModel),
+        ...this.cacheUsageOf(profile, resolvedModel),
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),
+        ...temperatureInfo(resolvedModel),
       }
     })
   }
@@ -357,8 +452,21 @@ export class PiAiAdapter extends LlmAdapter {
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
+    const cacheUsage = resolveCacheUsage(profile.cacheUsage, model.api)
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
     const hosted = this.hostedPlanOf(profile, model, options.model, options.hostedTools)
+    // Whether a cache key goes out is decided per request for the model actually
+    // being sent: one route's catalog can span protocols, so the field is looked
+    // up on the resolved model's protocol, never on the route. A profile asking
+    // for session affinity on a protocol that declares no such field sends
+    // nothing, which is not an error; a request with no session id has no key to
+    // send either.
+    const cacheKeyField = profile.promptCacheKey === 'session'
+      ? PROMPT_CACHE_KEY_FIELDS[model.api]
+      : undefined
+    const cacheKey = cacheKeyField === undefined || options.sessionId === undefined
+      ? undefined
+      : { field: cacheKeyField, value: String(options.sessionId) }
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -376,23 +484,26 @@ export class PiAiAdapter extends LlmAdapter {
       if (containsImage && attachments === undefined) {
         throw new LlmError('pi-ai image input requires the durable attachment service', 'UNSUPPORTED_CONTENT')
       }
-      const onReplayDegrade = (reason: string): void => {
+      const onReplayDegrade = (reason: string, message: Message): void => {
+        if (this.reportedReplayDegrades.has(message.source)) return
+        this.reportedReplayDegrades.add(message.source)
         this.config.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
       }
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade)
-      // Hosted tools ride pi-ai's payload hook, then the route's own onPayload
-      // hook runs on the (possibly replaced) body: splicing here (rather than
-      // forking pi-ai) keeps the shared adapter on the stock dependency, and
-      // chaining the hosted result into the route hook keeps both effects on
-      // the one payload pi-ai sends. Only a final non-undefined result
+      // Everything this package splices rides pi-ai's one payload hook, in
+      // order: hosted tools, then the vendor prompt cache key, then the route's
+      // own onPayload hook. Splicing here (rather than forking pi-ai) keeps the
+      // shared adapter on the stock dependency, and chaining the results keeps
+      // every effect on the one payload pi-ai sends — the deployment hook last,
+      // so it observes the final body. Only a final non-undefined result
       // replaces the outgoing payload; a hook that mutates in place and
       // returns undefined keeps its own mutation.
       // The hosted call names this request may promote; narrowed once the final
       // payload shows which client tools were actually declared.
       let promotable: ReadonlySet<string> = new Set(hosted?.callNames ?? [])
-      const onPayload = hosted === undefined && this.config.onPayload === undefined
+      const onPayload = hosted === undefined && cacheKey === undefined && this.config.onPayload === undefined
         ? undefined
         : (payload: unknown): unknown => {
           let current = payload
@@ -400,8 +511,18 @@ export class PiAiAdapter extends LlmAdapter {
             const spliced = applyHostedToolsPayload(current, hosted)
             if (spliced !== undefined) current = spliced
           }
+          if (cacheKey !== undefined) {
+            // Spreading is the whole splice: pi-ai hands the hook the request
+            // params object it built and is about to serialize, so the body
+            // needs no shape inspection the way the hosted-tools splice does.
+            current = { ...(current as Record<string, unknown>), [cacheKey.field]: cacheKey.value }
+          }
           if (this.config.onPayload !== undefined) {
-            const result = this.config.onPayload(current, { provider: options.provider, model: model.id })
+            const result = this.config.onPayload(current, {
+              provider: options.provider,
+              model: model.id,
+              ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
+            })
             if (result !== undefined) current = result
           }
           if (hosted !== undefined) promotable = promotableCallNames(hosted.callNames, current)
@@ -426,6 +547,7 @@ export class PiAiAdapter extends LlmAdapter {
       // provider can accept an oversized prompt silently.
       const translated = toStreamChunks(
         events,
+        cacheUsage,
         SILENT_OVERFLOW_PROTOCOLS.has(model.api) ? model.contextWindow : undefined,
       )
       const iterator = promotes

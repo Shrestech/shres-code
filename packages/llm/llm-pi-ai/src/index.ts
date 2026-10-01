@@ -67,7 +67,7 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 
 export { PiAiAdapter } from './adapter.ts'
-export type { PiAiAdapterOptions } from './adapter.ts'
+export type { PiAiAdapterOptions, PiAiPayloadRequest } from './adapter.ts'
 export {
   HOSTED_WEB_SEARCH_NAME,
   HOSTED_X_SEARCH_NAME,
@@ -97,6 +97,7 @@ export type {
   PiAiModality,
   PiAiModelOverride,
   PiAiModelProfile,
+  PiAiPromptCacheKey,
   PiAiProviderProfile,
   PiAiReasoningEfforts,
   PiAiThinkingFormat,

@@ -6,22 +6,24 @@ import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
   IconFolderOpen16, IconFollowsystemOutline16, IconPersonalizationOutline16,
   IconMicOutline16, IconCodeOutline16, IconThinkOutline16,
-  IconSearchOutline16, IconSettingsOutline16,
+  IconSearchOutline16, IconSettingsOutline16, IconBranchOutline16,
 } from '@shres-code/shres-code-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 
-type Destination = 'settings' | 'teams' | 'customize'
+type Destination = 'settings' | 'teams' | 'plugins' | 'customize'
 
 /** Unknown contributed sections remain discoverable in Settings. */
 function destination(id: string): Destination {
   if (id === 'teams') return 'teams'
-  if (id === 'plugins' || id === 'agent-presets') return 'customize'
+  if (id === 'plugins') return 'plugins'
+  if (id === 'agent-presets') return 'customize'
   return 'settings'
 }
 
 function NavIcon({ id }: { id: string }) {
   if (id === 'models') return <IconDataOutline16 size={18} />
+  if (id === 'model-routing') return <IconBranchOutline16 size={18} />
   if (id === 'appearance') return <IconFollowsystemOutline16 size={18} />
   if (id === 'audio') return <IconMicOutline16 size={18} />
   if (id === 'jspace') return <IconThinkOutline16 size={18} />
@@ -47,7 +49,8 @@ export function SettingsRoot({
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const heading = useRef<HTMLHeadingElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
-  const opener = useRef<HTMLButtonElement | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const shownPage = useRef(page)
   const search = useRef<HTMLInputElement>(null)
   const titleId = useId()
   const open = page !== null
@@ -67,6 +70,26 @@ export function SettingsRoot({
   const sectionId = active?.id === 'appearance' ? 'general' : active?.id
   const title = activeDestination === 'settings' ? t('title') : t(`navigation.${activeDestination}`)
   const general = active?.id === 'general'
+
+  // A destination another plugin opened (ctx.settingsPages) gets what the
+  // shell's own links give: opening Settings records the control that had
+  // focus for the return on close and clears a stale nav filter, and a filter
+  // that would hide the shown section is cleared. Runs before the heading
+  // takes focus.
+  useEffect(() => {
+    const previous = shownPage.current
+    shownPage.current = page
+    if (page === previous) return
+    if (page === null) {
+      opener.current = null
+      return
+    }
+    if (previous === null && opener.current === null) {
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement && focused !== document.body) opener.current = focused
+    }
+    if (previous === null || !filtered.some(row => row.id === page)) setQuery('')
+  }, [page, filtered])
 
   useEffect(() => {
     if (!open) return
@@ -99,7 +122,7 @@ export function SettingsRoot({
       <button className={css.wordmark} onClick={() => { navigate(null) }} aria-label={t('navigation.home')}>SHRES</button>
       <nav className={css.destinations} aria-label={t('navigation.label')}>
         <button className={clsx(css.destination, !open && css.selected)} aria-current={!open ? 'page' : undefined} onClick={() => { navigate(null) }}>{t('navigation.workspace')}</button>
-        {(['teams', 'customize'] as const).map((group) => {
+        {(['teams', 'plugins', 'customize'] as const).map((group) => {
           const first = rows.find(row => destination(row.id) === group)
           return first === undefined ? null : <button key={group}
             className={clsx(css.destination, open && activeDestination === group && css.selected)}

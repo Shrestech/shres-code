@@ -1,9 +1,13 @@
-/** BrowserSkill install, control, and teardown section, registered into Web Settings. */
+/** BrowserSkill install, control, and teardown contribution to the Plugins page. */
 
 import type {} from '@shres-code/shres-code-client-locale/client'
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
-import { BrowserSkillSettingsSection, type BrowserSkillSettingsSectionInjected } from './BrowserSkillSettingsSection.tsx'
+import {
+  BrowserSkillSettingsSection,
+  BrowserSkillUnavailableError,
+  type BrowserSkillSettingsSectionInjected,
+} from './BrowserSkillSettingsSection.tsx'
 import { en, type BrowserSkillLocaleKey } from './locales.ts'
 
 export type { BrowserSkillSettingsSectionInjected, BrowserSkillSettingsSectionProps } from './BrowserSkillSettingsSection.tsx'
@@ -18,6 +22,9 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'settings.browserSkill'
+
+/** Bundle package name that owns the BrowserSkill host and client rows. */
+const BUNDLE_NAME = '@shres-code/shres-code-browser-bundle'
 
 /** Services required by the Settings registration and the generated Remote face. */
 export const inject = ['slots', 'locale', 'remote', 'remote.browserSkill']
@@ -37,15 +44,20 @@ async function unwrap<T>(
   >,
 ): Promise<T> {
   const result = await receipt
-  if (!result.ok) throw new Error('browserSkill.' + op + ' failed: ' + result.error.code + ': ' + result.error.message)
+  if (!result.ok) {
+    const message = 'browserSkill.' + op + ' failed: ' + result.error.code + ': ' + result.error.message
+    if (result.error.code === 'service-unavailable' || result.error.code === 'method-unavailable') {
+      throw new BrowserSkillUnavailableError(message)
+    }
+    throw new Error(message)
+  }
   return result.value
 }
 
-/** Contribute the BrowserSkill section to the Settings navigation. */
+/** Contribute BrowserSkill's feature-owned configuration to the shared Plugins manager. */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-browserskill: dictionaries')
 
-  const t = ctx.locale.bind(NS)
   const face = (): BrowserSkillSettingsSectionInjected => ({
     status: () => unwrap('status', ctx.remote.browserSkill.status()),
     begin: (verb, keepProfile) => unwrap('begin', ctx.remote.browserSkill.begin(
@@ -58,11 +70,9 @@ export function apply(ctx: ClientContext): void {
     uninstall: (token, keepProfile) => unwrap('uninstall', ctx.remote.browserSkill.uninstall({ token, keepProfile })),
   })
 
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'browserSkill',
-    order: 16,
-    label: () => t('nav'),
+  ctx.slots.inject('settings.plugins.bundle', () => ctx.slots.register({
+    name: 'settings.plugins.bundle',
+    key: BUNDLE_NAME,
     locale: NS,
     inject: face,
   }, BrowserSkillSettingsSection))

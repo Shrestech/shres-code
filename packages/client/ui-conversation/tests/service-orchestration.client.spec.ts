@@ -10,6 +10,7 @@ import { makeTranslate, SlotTestRuntime } from '@shres-code/shres-code-client-te
 import type { QueuedMessage, SessionFace } from '@shres-code/shres-code-client-runtime/client'
 import { ComposerBlockRegistry } from '../src/client/input/blocks.ts'
 import { ComposerImageInputRegistry } from '../src/client/input/image-input.ts'
+import { SessionReveals } from '../src/client/inspect.ts'
 import { InputHub } from '../src/client/input/hub.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from '../src/client/service.ts'
 import { en } from '../src/client/locales.ts'
@@ -31,6 +32,7 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
     input: hub,
     blocks: new ComposerBlockRegistry(),
     imageInput: new ComposerImageInputRegistry(),
+    reveals: new SessionReveals(() => true),
   })
   await fiber.await()
   const root = runtime.ctx.get('conversation') as ConversationController
@@ -143,6 +145,7 @@ describe('ConversationController', () => {
       input: new InputHub(bare, makeTranslate(en, {})),
       blocks: new ComposerBlockRegistry(),
       imageInput: new ComposerImageInputRegistry(),
+      reveals: new SessionReveals(() => true),
     }).await()
     const orphan = bare.get('conversation') as ConversationController
     await expect(orphan.send('x')).rejects.toThrow(/sessions service unavailable/)

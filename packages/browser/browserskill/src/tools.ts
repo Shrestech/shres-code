@@ -66,7 +66,7 @@ function ownerOf(exec: ToolExecution): SessionId {
 
 function failure(result: Failure): Failure {
   return result.reason === 'not-ready'
-    ? { ...result, detail: 'The browser is not ready. Ask the user to open Settings → BrowserSkill.' }
+    ? { ...result, detail: 'The browser is not ready. Ask the user to open Plugins → BrowserSkill.' }
     : result
 }
 

@@ -3,7 +3,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { TrajectoryTable } from '../src/client/TrajectoryTable.tsx'
+import { en } from '../src/client/locales.ts'
+import type { TrajectoryCellProps } from '../src/client/trajectory-record.ts'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
 
 afterEach(() => {
@@ -1057,7 +1060,7 @@ describe('TrajectoryTable', () => {
       <TrajectoryTable
         turns={CALL_TURNS}
         {...FOLD_PROPS}
-        inspectCallId="call-1"
+        inspectTarget={{ kind: 'call', callId: 'call-1' }}
         onInspectApplied={onInspectApplied}
       />,
     )
@@ -1073,12 +1076,360 @@ describe('TrajectoryTable', () => {
       <TrajectoryTable
         turns={CALL_TURNS}
         {...FOLD_PROPS}
-        inspectCallId="call-missing"
+        inspectTarget={{ kind: 'call', callId: 'call-missing' }}
         onInspectApplied={onInspectApplied}
       />,
     )
 
     expect(screen.getByRole('row', { name: /TOOL/ }).getAttribute('aria-selected')).toBe('false')
     expect(onInspectApplied).not.toHaveBeenCalled()
+  })
+
+  /** Loaded ledger from seq 3: a user record, an assistant record at seq 5, and a tool call at seq 8. */
+  function eventTurns(firstSeq = 3): readonly TrajectoryTurnModel[] {
+    return [{
+      turn: 1,
+      groups: [
+        { title: 'Message', cells: [{ index: 1, kind: 'user', text: 'go', sourceSeq: firstSeq, timeSeconds: 0 }] },
+        {
+          title: 'Step 1',
+          cells: [
+            { index: 2, kind: 'message', text: 'Checking', outputDetail: 'Checking', sourceSeq: 5, timeSeconds: 1 },
+            {
+              index: 3, kind: 'tool', text: 'bash · {"command":"pwd"}', inputDetail: '{"command":"pwd"}',
+              callId: 'call-8', sourceSeq: 8, timeSeconds: 0.1,
+            },
+          ],
+        },
+      ],
+    }]
+  }
+
+  function rowSelected(container: HTMLElement, index: number): string | null {
+    return container.querySelector(`tr[data-record-index="${index}"]`)?.getAttribute('aria-selected') ?? null
+  }
+
+  it('an event target opens the record its event produced and acknowledges once', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        inspectTarget={{ kind: 'event', seq: 8 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 3)).toBe('true')
+    expect(screen.getByRole('complementary', { name: 'Event details' })).toBeTruthy()
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target with no record of its own opens the nearest earlier record', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        inspectTarget={{ kind: 'event', seq: 7 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 2)).toBe('true')
+    expect(rowSelected(view.container, 3)).toBe('false')
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target before the loaded history stays pending until its page loads', () => {
+    const onInspectApplied = vi.fn()
+    const target = { kind: 'event', seq: 1 } as const
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        historyStartSeq={3}
+        hasOlderRecords
+        inspectTarget={target}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(onInspectApplied).not.toHaveBeenCalled()
+    expect(screen.queryByRole('complementary', { name: 'Event details' })).toBeNull()
+
+    // The older page lands: the user record now starts the history at seq 1.
+    view.rerender(
+      <TrajectoryTable
+        turns={eventTurns(1)}
+        {...FOLD_PROPS}
+        historyStartSeq={1}
+        hasOlderRecords={false}
+        inspectTarget={target}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(rowSelected(view.container, 1)).toBe('true')
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+  })
+
+  it('an event target no record precedes is acknowledged without opening a record', () => {
+    const onInspectApplied = vi.fn()
+    const view = render(
+      <TrajectoryTable
+        turns={eventTurns()}
+        {...FOLD_PROPS}
+        historyStartSeq={0}
+        inspectTarget={{ kind: 'event', seq: 1 }}
+        onInspectApplied={onInspectApplied}
+      />,
+    )
+    expect(onInspectApplied).toHaveBeenCalledOnce()
+    expect(view.container.querySelector('tr[aria-selected="true"]')).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Event details' })).toBeNull()
+  })
+
+  const ROUTING_FOLD_PROPS = { ...FOLD_PROPS, t: makeTranslate(en) }
+  const EXPLAIN = 'Explain this routing decision in the Routing view'
+
+  function routingCell(overrides: Partial<TrajectoryCellProps>): TrajectoryCellProps {
+    return { index: 1, kind: 'routing', text: '', timeSeconds: 0, ...overrides }
+  }
+
+  const ROUTING_TURNS: readonly TrajectoryTurnModel[] = [{
+    turn: 1,
+    groups: [
+      {
+        title: 'Message',
+        cells: [{ index: 1, kind: 'user', text: 'go', timeSeconds: 0 }],
+      },
+      {
+        title: 'Step 1',
+        cells: [
+          routingCell({
+            index: 2,
+            sourceSeq: 6,
+            startedAt: 6,
+            text: 'downgraded · gate-passed',
+            routing: {
+              outcome: 'downgraded',
+              reason: 'gate-passed',
+              confidence: 0.9,
+              selection: {
+                candidateId: 'flash',
+                provider: 'deepseek-official',
+                model: 'deepseek-v4-flash',
+              },
+              streak: { kind: 'entered', turn: 3 },
+              quiet: false,
+            },
+          }),
+          {
+            index: 3,
+            kind: 'message',
+            text: '',
+            outputDetail: 'ROUTED_OK',
+            timeSeconds: 1,
+          },
+          routingCell({
+            index: 4,
+            sourceSeq: 9,
+            startedAt: 9,
+            text: 'kept-strong · thin-margin',
+            routing: {
+              outcome: 'kept-strong',
+              reason: 'thin-margin',
+              confidence: 0.5,
+              quiet: true,
+            },
+          }),
+          {
+            index: 5,
+            kind: 'message',
+            text: '',
+            outputDetail: 'STRONG_AGAIN',
+            timeSeconds: 1,
+          },
+          routingCell({
+            index: 6,
+            sourceSeq: 12,
+            startedAt: 12,
+            text: 'kept-strong · escalated',
+            routing: {
+              outcome: 'kept-strong',
+              reason: 'escalated',
+              streak: { kind: 'exited', reason: 'escalated' },
+              quiet: false,
+            },
+          }),
+        ],
+      },
+    ],
+  }]
+
+  it('renders a decision with its outcome, reason, confidence, route, and entering streak', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const row = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(row.getAttribute('data-kind')).toBe('routing')
+    expect(row.querySelector('[data-routing="decision"]')).toBeTruthy()
+    expect(screen.getByText('downgraded · gate passed')).toBeTruthy()
+    expect(screen.getByText('confidence 0.90')).toBeTruthy()
+    expect(screen.getByText('deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('streak entered · turn 3')).toBeTruthy()
+    expect(screen.queryByText('Routed')).toBeNull()
+    // No reveal target was provided, so no row offers Explain.
+    expect(screen.queryByRole('button', { name: EXPLAIN })).toBeNull()
+  })
+
+  it('offers a keyboard-operable Explain on every ROUTING row that reveals its decision seq', () => {
+    const onExplainRouting = vi.fn()
+    const onToggleTurn = vi.fn()
+    render(
+      <TrajectoryTable
+        turns={ROUTING_TURNS}
+        {...ROUTING_FOLD_PROPS}
+        onToggleTurn={onToggleTurn}
+        onExplainRouting={onExplainRouting}
+      />,
+    )
+    const explains = screen.getAllByRole('button', { name: EXPLAIN })
+    expect(explains).toHaveLength(3)
+    const explain = explains[0]!
+    const row = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(row.contains(explain)).toBe(true)
+    // A native button: in the tab order, activated by Enter and Space.
+    expect(explain.tagName).toBe('BUTTON')
+    expect(explain.getAttribute('type')).toBe('button')
+    expect(explain.tabIndex).toBe(0)
+    expect(explain.textContent).toBe('Explain')
+
+    // The activation keys stay with the button; the row does not select itself.
+    fireEvent.keyDown(explain, { key: 'Enter' })
+    fireEvent.keyDown(explain, { key: ' ' })
+    expect(row.getAttribute('aria-selected')).toBe('false')
+    // Other keys still reach the row's own handling.
+    fireEvent.keyDown(explain, { key: 'ArrowDown' })
+    fireEvent.doubleClick(explain)
+    expect(onToggleTurn).not.toHaveBeenCalled()
+
+    fireEvent.click(explain)
+    expect(onExplainRouting).toHaveBeenCalledExactlyOnceWith(6)
+    expect(row.getAttribute('aria-selected')).toBe('false')
+    fireEvent.click(explains[2]!)
+    expect(onExplainRouting).toHaveBeenLastCalledWith(12)
+  })
+
+  it('offers no Explain on a ROUTING row without a decision seq', () => {
+    render(
+      <TrajectoryTable
+        turns={[{
+          turn: 1,
+          groups: [{
+            title: 'Step 1',
+            cells: [routingCell({
+              index: 1,
+              text: 'kept-strong · thin-margin',
+              routing: { outcome: 'kept-strong', reason: 'thin-margin', quiet: true },
+            })],
+          }],
+        }]}
+        {...ROUTING_FOLD_PROPS}
+        onExplainRouting={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('row', { name: /ROUTING/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: EXPLAIN })).toBeNull()
+  })
+
+  it('collapses a kept-strong decision that changed nothing to the quiet marker', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const quiet = screen.getByRole('row', { name: /ROUTING, kept strong · thin top-two margin/ })
+    expect(quiet.querySelector('[data-routing="quiet"]')).toBeTruthy()
+    expect(screen.getByText('kept strong · thin top-two margin')).toBeTruthy()
+    // The distinction from a decision row: no route, confidence, or streak chip,
+    // even though the quiet decision's judgment answered with a confidence.
+    expect(quiet.querySelector('[data-routing-confidence]')).toBeNull()
+    expect(quiet.querySelector('[data-routing-selection]')).toBeNull()
+    expect(quiet.querySelector('[data-routing-streak]')).toBeNull()
+    expect(screen.queryByText('confidence 0.50')).toBeNull()
+    expect(screen.queryByText('Routed')).toBeNull()
+  })
+
+  it('renders the streak exit a decision caused', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const row = screen.getByRole('row', { name: /ROUTING, kept strong · escalated to the stronger model/ })
+    expect(row.querySelector('[data-routing="decision"]')).toBeTruthy()
+    expect(screen.getByText('kept strong · escalated to the stronger model')).toBeTruthy()
+    expect(screen.getByText('streak ended · escalated to the stronger model')).toBeTruthy()
+  })
+
+  it('keeps a routing row outside its turn collapse, which folds content only', () => {
+    render(
+      <TrajectoryTable
+        turns={ROUTING_TURNS}
+        {...ROUTING_FOLD_PROPS}
+        collapsedTurns={new Set([1])}
+      />,
+    )
+
+    expect(screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ROUTING, kept strong · thin top-two margin/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ROUTING, kept strong · escalated/ })).toBeTruthy()
+    expect(screen.queryByText('ROUTED_OK')).toBeNull()
+    expect(screen.queryByText('STRONG_AGAIN')).toBeNull()
+  })
+
+  it('carries the effective route on the request row and badges the routed one', () => {
+    render(
+      <TrajectoryTable
+        turns={TURNS}
+        requestNumbers={[{
+          seq: 2,
+          turn: 1,
+          step: 1,
+          group: 'Step 1',
+          number: 1,
+          route: { provider: 'deepseek-official', model: 'deepseek-v4-flash', routed: true },
+        }]}
+        {...ROUTING_FOLD_PROPS}
+      />,
+    )
+
+    const row = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    expect(row?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(screen.getByText('deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('Routed')).toBeTruthy()
+  })
+
+  it('leaves the badge off a request row still on the session selection', () => {
+    render(
+      <TrajectoryTable
+        turns={TURNS}
+        requestNumbers={[{
+          seq: 2,
+          turn: 1,
+          step: 1,
+          group: 'Step 1',
+          number: 1,
+          route: { provider: 'deepseek-official', model: 'deepseek-v4.1', routed: false },
+        }]}
+        {...ROUTING_FOLD_PROPS}
+      />,
+    )
+
+    const route = screen.getByText('deepseek-official/deepseek-v4.1').closest('[data-request-route]')
+    expect(route?.getAttribute('data-request-route')).toBe('selection')
+    expect(screen.queryByText('Routed')).toBeNull()
+  })
+
+  it('opens a routing row own facts without a tool schema section', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    fireEvent.keyDown(screen.getByRole('row', { name: /ROUTING, downgraded/ }), { key: 'Enter' })
+
+    const details = screen.getByRole('complementary', { name: 'Event details' })
+    expect(details.textContent).toContain('Routing')
+    expect(details.textContent).toContain('confidence 0.90')
+    expect(screen.queryByText('Schema')).toBeNull()
   })
 })

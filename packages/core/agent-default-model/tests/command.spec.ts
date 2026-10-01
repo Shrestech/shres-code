@@ -1,8 +1,10 @@
 /** `/model` parsing, listing, and session-local switch. */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@shres-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
+import { agentEvents, modelSelectionInstalled, provideModelSelection } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import { LlmError, ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
 import { SettingsProvider } from '@shres-code/shres-code-settings'
@@ -238,12 +240,19 @@ describe('/model command', () => {
     expect(ctx.agentDefaultModel.selectionFor(agent).current).toEqual({
       provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high',
     })
+    expect(agent.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([{ provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' }])
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({
       provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high',
     })
     const cleared = await ctx.commands.execute(agent, '/model openai gpt-4.1', new AbortController().signal)
     expect(cleared?.result.text).toBe('model: openai gpt-4.1')
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'openai', model: 'gpt-4.1' })
+    expect(agent.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([
+        { provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' },
+        { provider: 'openai', model: 'gpt-4.1' },
+      ])
     await ctx.fiber.dispose()
   })
 
@@ -382,25 +391,108 @@ describe('/model command', () => {
 })
 
 describe('selectionFor()', () => {
-  it('prefers a process-local pick, then the logged header, then the live default', async () => {
+  it('prefers an explicit event, then the logged header, then the live default', async () => {
     const ctx = new Context()
     await ctx.plugin(MemorySettings)
+    await ctx.plugin(SessionStore)
     await ctx.plugin(AgentDefaultModelConfig, { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
-    let header: { config: ModelSelection } | undefined
-    const session = { requestHeader: () => header } as Agent['session']
+    const session = ctx.sessions.create(SessionId('sel'))
     const agent = { id: 'sel', session, ctx } as unknown as Agent
     const first = ctx.agentDefaultModel.selectionFor(agent)
     expect(first.current).toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
     expect(ctx.agentDefaultModel.selectionFor(agent)).toBe(first)
 
-    header = { config: { provider: 'openai', model: 'gpt-4.1' } }
+    session.append('request/header', {
+      header: { config: { provider: 'openai', model: 'gpt-4.1' } },
+      reason: 'initial',
+    })
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1' })
-    header = { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('high') } }
+    session.append('request/header', {
+      header: { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('high') } },
+      reason: 'change',
+    })
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' })
 
     const next: ModelSelection = { provider: 'ollama-local', model: 'llama3.2' }
     first.current = next
     expect(first.current).toEqual(next)
+    expect(session.events.filter(event => event.type === 'agent/model-selection')).toHaveLength(1)
+    await ctx.fiber.dispose()
+  })
+})
+
+/** TEST DOUBLE: the smallest `ctx.modelRouting`, which records each consult and keeps the route. */
+class RecordingRouting extends Service {
+  readonly bases: ModelSelection[] = []
+
+  constructor(ctx: Context) {
+    super(ctx, 'modelRouting')
+  }
+
+  stickySelection(): ModelSelection | undefined {
+    return undefined
+  }
+
+  resolveRequest(_agent: Agent, _turn: number, _step: number, base: ModelSelection): Promise<ModelSelection | undefined> {
+    this.bases.push(base)
+    return Promise.resolve(undefined)
+  }
+}
+
+/** Assemble the prompt and run one request through the agent's waterfall. */
+async function request(ctx: Context, agent: Agent): Promise<LlmCallConfig> {
+  await ctx.systemPrompt.assemble()
+  return agentEvents(ctx, agent).waterfall(
+    'agent/request',
+    { turn: 1, step: 0, content: { messages: [], system: '', tools: [] }, signal: new AbortController().signal },
+    () => Promise.resolve({ provider: 'resolved', model: 'resolved-model' }),
+  )
+}
+
+describe('selectionFor() across a reload of the service', () => {
+  it('withdraws the selection when its fiber is disposed, so a reloaded instance provides its own', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(RecordingRouting)
+    const routing = ctx.get('modelRouting') as unknown as RecordingRouting
+    const session = ctx.sessions.create(SessionId('reloaded'))
+    const agent = { id: 'reloaded', session, ctx } as unknown as Agent
+
+    const first = await ctx.plugin(AgentDefaultModelConfig, { provider: 'old-provider', model: 'old-model' })
+    expect(ctx.agentDefaultModel.selectionFor(agent).current).toEqual({ provider: 'old-provider', model: 'old-model' })
+    await request(ctx, agent)
+    expect(routing.bases).toEqual([{ provider: 'old-provider', model: 'old-model' }])
+
+    // The provider unloads: the slot empties and the hook stays, taking the
+    // manual route of an agent with no provided selection.
+    await first.dispose()
+    expect(modelSelectionInstalled(agent)).toBe(true)
+    await request(ctx, agent)
+    expect(routing.bases.at(-1)).toEqual({ provider: 'resolved', model: 'resolved-model' })
+
+    // The reloaded instance provides its own selection, and each request is consulted once.
+    await ctx.plugin(AgentDefaultModelConfig, { provider: 'new-provider', model: 'new-model' })
+    expect(ctx.agentDefaultModel.selectionFor(agent).current).toEqual({ provider: 'new-provider', model: 'new-model' })
+    await request(ctx, agent)
+    expect(routing.bases).toHaveLength(3)
+    expect(routing.bases.at(-1)).toEqual({ provider: 'new-provider', model: 'new-model' })
+    await ctx.fiber.dispose()
+  })
+
+  it('releases the withdrawal when the agent is disposed, leaving a later provider free', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentDefaultModelConfig, { provider: 'p', model: 'm' })
+    const session = ctx.sessions.create(SessionId('released'))
+    const agent = { id: 'released', session, ctx } as unknown as Agent
+    ctx.agentDefaultModel.selectionFor(agent)
+    expect(() => { provideModelSelection(agent, { current: undefined, assembled: undefined }) })
+      .toThrow('already has a model selection provider')
+    ctx.emit('agent/disposed', { agent })
+    ctx.emit('agent/disposed', { agent })
+    const withdraw = provideModelSelection(agent, { current: undefined, assembled: undefined })
+    withdraw()
     await ctx.fiber.dispose()
   })
 })

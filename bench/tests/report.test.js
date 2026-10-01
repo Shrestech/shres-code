@@ -12,13 +12,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { validateReportData } from '../schema/report-data.js'
+import { emptyMetrics } from '../runner/metrics.js'
 import { buildExperiment, loadArm, parseArgs, resolveExperimentDir } from '../report/build.js'
 import { contentType, resolveRequest, serve } from '../report/serve.js'
 
 const FIXED_NOW = '2026-08-18T00:00:00.000Z'
 
 /**
- * Fabricate a valid Trial record.
+ * Fabricate a valid Trial record. Metrics derive from the runner's own empty
+ * record so the fixture satisfies the schema whenever a metric is added.
  * @param {object} overrides - fields to override on the default record.
  * @returns {import('../schema/trial.js').Trial}
  */
@@ -33,34 +35,12 @@ function trial(overrides) {
     failureMode: null,
     verifier: { command: 'node verify.mjs', exitCode: 0 },
     metrics: {
+      ...emptyMetrics(),
       inputTokens: 1000,
       outputTokens: 200,
       durationMs: 30_000,
       turns: 6,
       toolCalls: 8,
-      identicalRetries: 0,
-      checkpoints: 0,
-      shipPasses: 0,
-      tokensIncludingDescendants: null,
-      costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0,
-      danglingCard: null,
-      verifiedCheckpointShare: null,
-      coverageRefusalThenPad: 0,
-      noopNoteRefusals: 0,
-      noteCapRefusals: 0,
-      sessionQueryCalls: null,
-      compactionCount: 0,
-      pressureFired: false,
-      gateRefusals: null,
-      debateCalls: null,
-      runsLogged: null,
-      verifySatisfiedRate: null,
-      unverifiedRunRefusals: null,
-      ledgerDecisions: null,
-      deferredShare: null,
-      ledgerAbandoned: null,
-      unverifiedAcceptRecovery: null,
-      thinDebates: null,
       ...metricsOverride,
     },
     sessionFile: null,
@@ -389,12 +369,8 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       exitCode: 0,
       timedOut: false,
       metrics: {
-        inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
-        tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0, danglingCard: null, verifiedCheckpointShare: null,
-        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0, sessionQueryCalls: null,
-        compactionCount: 0, pressureFired: false,
-        gateRefusals: null, debateCalls: null, runsLogged: null, verifySatisfiedRate: null, unverifiedRunRefusals: null,
-        ledgerDecisions: null, deferredShare: null, ledgerAbandoned: null, unverifiedAcceptRecovery: null, thinDebates: null,
+        ...emptyMetrics(),
+        inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3,
       },
       startedAt: '2026-08-18T00:00:00.000Z',
       endedAt: '2026-08-18T00:00:05.000Z',

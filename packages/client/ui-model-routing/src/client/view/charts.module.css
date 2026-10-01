@@ -1,0 +1,228 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-base);
+  min-width: 0;
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cardTitles {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.cardSubtitle,
+.note,
+.empty,
+.detail {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.detail {
+  min-height: 18px;
+}
+
+.tableToggle {
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.tableToggle[aria-pressed='true'] {
+  background: var(--dsw-alias-fill-tsp-secondary);
+}
+
+.tableToggle:focus-visible,
+.mark:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.axisText,
+.valueText,
+.thresholdText,
+.markerGlyph {
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.axisText {
+  fill: var(--dsw-alias-chart-axis);
+}
+
+.valueText {
+  fill: var(--dsw-alias-label-secondary);
+}
+
+.thresholdText {
+  fill: var(--dsw-alias-chart-threshold);
+}
+
+.markerGlyph {
+  fill: var(--dsw-alias-label-secondary);
+}
+
+.gridLine {
+  stroke: var(--dsw-alias-chart-grid);
+  stroke-width: 1;
+}
+
+.thresholdLine {
+  stroke: var(--dsw-alias-chart-threshold);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.percentileLine {
+  stroke: var(--dsw-alias-label-secondary);
+  stroke-width: 1;
+}
+
+.switchZone {
+  fill: var(--dsw-alias-fill-tsp-secondary);
+}
+
+.mark {
+  outline: none;
+}
+
+.markAction {
+  cursor: pointer;
+}
+
+.slotStrong { fill: var(--dsw-alias-chart-strong); }
+.slot1 { fill: var(--dsw-alias-chart-series-1); }
+.slot2 { fill: var(--dsw-alias-chart-series-2); }
+.slot3 { fill: var(--dsw-alias-chart-series-3); }
+.slot4 { fill: var(--dsw-alias-chart-series-4); }
+.slot5 { fill: var(--dsw-alias-chart-series-5); }
+.slotOther,
+.neutralBar { fill: var(--dsw-alias-chart-axis); }
+
+/* Would-have segment in G1: hatched over the strong bar the step really ran. */
+.hatch {
+  fill: var(--dsw-alias-chart-axis);
+  fill-opacity: 0.45;
+  stroke: var(--dsw-alias-chart-axis);
+  stroke-dasharray: 3 3;
+}
+
+.failedBar { fill: var(--dsw-alias-state-error-primary); }
+
+.groupSwitched { fill: var(--dsw-alias-chart-series-1); background: var(--dsw-alias-chart-series-1); }
+.groupJudge { fill: var(--dsw-alias-chart-grid); stroke: var(--dsw-alias-chart-axis); background: var(--dsw-alias-chart-grid); }
+.groupClosed { fill: var(--dsw-alias-chart-series-3); background: var(--dsw-alias-chart-series-3); }
+.groupEngine { fill: var(--dsw-alias-chart-strong); background: var(--dsw-alias-chart-strong); }
+
+.token_cacheRead { opacity: 0.35; }
+.token_cacheWrite { opacity: 1; }
+.token_uncached { opacity: 0.7; }
+.token_unreported { opacity: 0.2; }
+.token_output { opacity: 0.55; }
+
+.cacheWrite {
+  stroke: var(--dsw-alias-chart-threshold);
+  stroke-width: 1.5;
+}
+
+.dot { stroke: var(--dsw-alias-bg-base); stroke-width: 0.5; }
+.dotKept { fill: var(--dsw-alias-chart-axis); }
+.dotDown { fill: var(--dsw-alias-chart-series-1); }
+.dotError { fill: var(--dsw-alias-state-warn-primary); }
+.dotMargin { fill: var(--dsw-alias-label-tertiary); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.table th,
+.table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  text-align: left;
+}
+
+.table th {
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+}
+
+.tableWrap {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tableToggle {
+    transition: background-color 120ms ease;
+  }
+}

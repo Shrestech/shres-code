@@ -42,7 +42,7 @@ export async function openSessionActivity(page: Page): Promise<Locator> {
  * @param view - The registered view to make active.
  * @returns A promise that settles after the view is selected.
  */
-export async function selectSessionView(page: Page, view: 'Chat' | 'Trajectory'): Promise<void> {
+export async function selectSessionView(page: Page, view: 'Chat' | 'Trajectory' | 'Routing'): Promise<void> {
   const panel = await openSessionActivity(page)
   await panel.getByRole('button', { name: view, exact: true }).click()
 }

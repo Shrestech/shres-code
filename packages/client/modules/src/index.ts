@@ -14,9 +14,8 @@
  * set with all current entries and flushes synchronously, so first scan and
  * steady state share one implementation. Package metadata (including the
  * negative "not a client package" verdict) is cached per name and never
- * expires — plugin-set changes take effect on restart; bundle content
- * changes reach the graph only through
- * {@link ClientModuleRegistry.rebuilt}.
+ * expires; settled loader transitions update the graph, while bundle content
+ * changes reach it through {@link ClientModuleRegistry.rebuilt}.
  * @module @shres-code/shres-code-client-modules
  */
 
@@ -194,6 +193,7 @@ export class ClientModuleRegistry extends Service {
   private readonly dirty = new Set<string>()
   private readonly resolvePkgJson: (spec: string) => string
   private flushQueued = false
+  private disposed = false
   private composed: WebBootGraph
 
   /**
@@ -219,12 +219,7 @@ export class ClientModuleRegistry extends Service {
       const entryName = fiber.entry?.options.name
       if (entryName === undefined) return
       this.dirty.add(entryName)
-      if (this.flushQueued) return
-      this.flushQueued = true
-      queueMicrotask(() => {
-        this.flushQueued = false
-        this.flush((err) => { ctx.logger.warn(err) })
-      })
+      this.scheduleFlush(ctx)
     })
 
     // Activation pass: the initial scan IS the incremental path over the
@@ -246,6 +241,42 @@ export class ClientModuleRegistry extends Service {
       () => ctx.webServer.tapIndex(html => injectBootManifest(html, this.composed)),
       'client-modules: boot manifest injection',
     )
+    // Register this last so disposal marks the service inactive before the
+    // earlier route and listener effects can finish. A loader await already in
+    // flight then drops its result instead of publishing a graph for a dead
+    // service.
+    ctx.effect(
+      () => () => {
+        this.disposed = true
+        this.dirty.clear()
+      },
+      'client-modules: graph flush lifetime',
+    )
+  }
+
+  /** Schedule one loader-settled graph flush and coalesce events while it waits. */
+  private scheduleFlush(ctx: Context): void {
+    if (this.disposed || this.flushQueued) return
+    this.flushQueued = true
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          // The entry event fires when a fiber is constructed, before its
+          // dependency wait and apply effect have necessarily settled. Wait
+          // for the Loader quiescence point so graph consumers never import a
+          // row whose host entry is still pending.
+          try {
+            await ctx.loader.await()
+          } catch (error) {
+            if (!this.disposed) ctx.logger.warn(error)
+          }
+          if (!this.disposed) this.flush((err) => { ctx.logger.warn(err) })
+        } finally {
+          this.flushQueued = false
+          if (!this.disposed && this.dirty.size > 0) this.scheduleFlush(ctx)
+        }
+      })()
+    })
   }
 
   /**

@@ -8,12 +8,16 @@
  */
 
 import {
+  listProfileBundles,
+  setBundleEnabled,
+  setPluginEnabled,
   beginPluginInstall,
   nodePnpmRunner,
   pluginStates,
   removePlugin,
 } from '@shres-code/shres-code-app-boot'
 import type {
+  ProfileRuntime,
   InstallBegin,
   PluginStateEntry,
   RemoveOutcome,
@@ -26,6 +30,8 @@ import {
 } from '@shres-code/shres-code-skill-filesystem/install'
 import type { SkillInstallRoots } from '@shres-code/shres-code-skill-filesystem/install'
 import type {
+  ManagedBundle,
+  PluginActivationOutcome,
   SkillInstallOutcome,
   SkillRemoveOutcome,
 } from './types.ts'
@@ -53,6 +59,13 @@ export interface InstalledSkillRow {
  * pnpm runner is resolved here so gateway callers never handle it.
  */
 export interface PluginAdminCore {
+  listBundles(runtime: ProfileRuntime): Promise<ManagedBundle[]>
+  setBundleEnabled(
+    runtime: ProfileRuntime, name: string, enabled: boolean, options: PluginAdminCoreOptions,
+  ): Promise<PluginActivationOutcome>
+  setPluginEnabled(
+    runtime: ProfileRuntime, request: { id: string; moduleName: string; enabled: boolean }, options: PluginAdminCoreOptions,
+  ): Promise<PluginActivationOutcome>
   beginPluginInstall(profileDir: string, spec: string, options: PluginAdminCoreOptions): Promise<InstallBegin>
   removePlugin(profileDir: string, name: string, options: PluginAdminCoreOptions): Promise<RemoveOutcome>
   pluginStates(profileDir: string, bootBundles: readonly string[]): Promise<PluginStateEntry[]>
@@ -73,6 +86,27 @@ export function resolveSkillRoots(cwd: string, override?: SkillInstallRoots): Sk
 
 /** Production core: the shared app-boot plugin core plus the shared skill-filesystem installer. */
 export const nodePluginAdminCore: PluginAdminCore = {
+  listBundles: async (runtime) => {
+    const rows = runtime.control !== undefined ? await runtime.control.listBundles()
+      : runtime.installAnchor === undefined ? [] : await listProfileBundles(runtime.profileDir, runtime.bootBundles, {
+        installAnchor: runtime.installAnchor, ...runtime.shippedBundles === undefined ? {} : { shippedBundles: runtime.shippedBundles },
+      })
+    return runtime.pluginMutations === 'enabled' ? rows : rows.map(row => ({ ...row, readOnlyReason: 'Plugin changes are unavailable on this host.' }))
+  },
+  setBundleEnabled: (runtime, name, enabled, options) => runtime.control !== undefined
+    ? runtime.control.setBundleEnabled(name, enabled, options.signal)
+    : runtime.installAnchor === undefined ? Promise.resolve({ kind: 'unsupported' })
+      : setBundleEnabled(runtime.profileDir, name, enabled, {
+        ...options, runner: nodePnpmRunner, installAnchor: runtime.installAnchor,
+        ...runtime.shippedBundles === undefined ? {} : { shippedBundles: runtime.shippedBundles },
+      }),
+  setPluginEnabled: (runtime, request, options) => runtime.control !== undefined
+    ? runtime.control.setPluginEnabled(request, options.signal)
+    : runtime.installAnchor === undefined ? Promise.resolve({ kind: 'unsupported' })
+      : setPluginEnabled(runtime.profileDir, request, {
+        ...options, runner: nodePnpmRunner, installAnchor: runtime.installAnchor,
+        ...runtime.shippedBundles === undefined ? {} : { shippedBundles: runtime.shippedBundles },
+      }),
   beginPluginInstall: (profileDir, spec, options) =>
     beginPluginInstall(profileDir, spec, { runner: nodePnpmRunner, signal: options.signal, invokingCwd: options.invokingCwd }),
   removePlugin: (profileDir, name, options) =>

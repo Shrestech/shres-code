@@ -172,12 +172,23 @@ export interface FinishReasonMap {
 export type FinishReason = FinishReasonMap[keyof FinishReasonMap]
 
 /**
- * Token accounting for one model call (cache fields are optional).
+ * Token accounting for one model call.
  *
- * Counts are DISJOINT: `inputTokens` is uncached input only; cached input is
- * reported separately as `cacheReadTokens`/`cacheWriteTokens` (billed input =
- * sum of the three). Adapters whose providers fold cache hits into a total
- * prompt count (DeepSeek's `prompt_tokens`) subtract them out.
+ * Counts are DISJOINT: `inputTokens` excludes every cache count the provider
+ * reported, so billed input is `inputTokens` plus the reported cache counts.
+ * Adapters whose providers fold cache hits into a total prompt count
+ * (DeepSeek's `prompt_tokens`) subtract them out.
+ *
+ * `cacheReadTokens` decides whether a call's cache counts are reported.
+ * Present (including 0): the provider reported cache use for this call.
+ * Absent: it did not, and `inputTokens` may then include cached input.
+ * `cacheWriteTokens` is reported only alongside a read count; a provider that
+ * reports cache hits but has no write concept omits it. Adapters MUST emit a
+ * reported zero, MUST NOT emit an unreported count, and MUST NOT emit
+ * `cacheWriteTokens` without `cacheReadTokens`. The LLM stream invariant
+ * rejects that shape, and every consumer reads a usage carrying it as
+ * unreported, with its write counted as unreported input. Consumers read the
+ * counts through `cacheCount` and `promptTokens`.
  */
 export interface TokenUsage {
   inputTokens: number
@@ -323,6 +334,14 @@ export interface LlmDiscoveredModel {
   audioOutput?: boolean
 }
 
+/**
+ * How a model reasons when a request enables reasoning: `adaptive` lets the
+ * provider decide how much to think within the requested effort, `budget`
+ * spends a fixed thinking-token budget the adapter derives from the effort, and
+ * `none` does not reason.
+ */
+export type LlmThinkingMode = 'adaptive' | 'budget' | 'none'
+
 /** One adapter-discovered model; catalog membership is advisory, not request validation. */
 export interface LlmModelInfo {
   /** Provider route that owns this model entry. */
@@ -340,7 +359,30 @@ export interface LlmModelInfo {
    * absent declares none, so the local tool catalog applies unchanged.
    */
   hostedTools?: readonly HostedTool[]
+  /**
+   * Prompt-cache lifetime this route requests, in milliseconds: how long a
+   * cached prefix stays readable after the start of the request that wrote or
+   * last read it, generation time included. `0` declares that the route writes
+   * no prompt cache. The value states what the adapter asks for; an upstream
+   * may retain a prefix for less. Absent means the adapter does not know.
+   */
+  promptCacheTtlMs?: number
+  /**
+   * How this route reasons when a request enables reasoning. Absent means the
+   * adapter does not declare it.
+   */
+  thinkingMode?: LlmThinkingMode
+  /**
+   * Whether this route's usage reports prompt-cache counts: `reported` calls
+   * carry `cacheReadTokens` (a miss as 0), and `unreported` calls carry none,
+   * so their input may include cached tokens. Absent means the adapter does
+   * not declare it.
+   */
+  cacheUsage?: LlmCacheUsage
 }
+
+/** Whether a route's usage reports prompt-cache counts; see {@link LlmModelInfo.cacheUsage}. */
+export type LlmCacheUsage = 'reported' | 'unreported'
 
 /** Provider-owned context capacity for one exact provider/model route. */
 export interface LlmModelContext {
@@ -377,6 +419,13 @@ export interface LlmResolvedModelInfo extends LlmModelInfo {
   defaultMaxTokens?: number
   /** Adapter-owned selectable reasoning levels when exposed. */
   reasoning?: LlmModelReasoningInfo
+  /**
+   * `false` when this route rejects or discards a stated
+   * {@link GenerateOptions.temperature} for this model. Absent when the adapter
+   * makes no claim, so a caller that must not have its temperature dropped
+   * treats only `false` as refusal.
+   */
+  acceptsTemperature?: boolean
 }
 
 /**

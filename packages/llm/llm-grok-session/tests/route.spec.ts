@@ -25,3 +25,9 @@ describe('resolveRoute headers', () => {
     expect(() => resolveRoute({ cliVersion: '  ' } as Section)).toThrow(/cliVersion must be non-empty/)
   })
 })
+
+describe('cache-count reporting', () => {
+  it('declares reported cache counts for xAI Responses', () => {
+    expect(resolveRoute({}).cacheUsage).toBe('reported')
+  })
+})

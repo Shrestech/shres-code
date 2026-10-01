@@ -1,0 +1,171 @@
+/* The routing chip mirrors the plan chip's pill; routing is a mode rather than
+   a warning, so it carries the neutral business state. */
+
+/* The chip's controls and text are flex items of the composer's trailing
+   group, so the idle and error text can shrink with an ellipsis while the
+   controls keep their width. */
+.wrap {
+  display: contents;
+}
+
+.chip,
+.details,
+.restore {
+  flex: none;
+}
+
+/* Shrinks before the model seat: the full sentence is in the title. The
+   minimum keeps a hoverable ellipsis in a narrow composer. */
+.idle,
+.error {
+  flex: 0 1000 auto;
+  min-width: 2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 34px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.chipOff {
+  background: var(--dsw-alias-button-tool-bar-fill);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.chipOn {
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* Shadow judges without ever switching, so it renders as a dashed outline with
+   neutral text: it never looks like an active switch. */
+.chipShadow {
+  background: var(--dsw-alias-button-tool-bar-fill);
+  border: 1px dashed var(--dsw-alias-border-l3);
+  padding: 1px 7px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.chip:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.idle {
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.restore {
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.restore:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.restore:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.restore:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Routing details: opens this session's Routing view. */
+.details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.details:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-button-tool-bar-fill);
+}
+
+.details:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+/* Remote-judge confirm: the warning uses the warning surface. */
+.confirmWarning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-state-warn-secondary);
+  border-radius: 8px;
+  background: var(--dsw-alias-fill-tsp-secondary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmSettings {
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}

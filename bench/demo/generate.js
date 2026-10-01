@@ -72,6 +72,23 @@ const TEMPERATURE = 0
 const BASE_TIME = Date.parse('2026-08-17T09:00:00.000Z')
 const MARKER_FILE = 'demo'
 
+/**
+ * Jev routing/compaction metrics, all null: no demo arm composes the model
+ * router or compaction-jev, so the demo carries the fields as "never measured"
+ * rather than a synthesized zero.
+ */
+const JEV_NULL_FIELDS = Object.freeze({
+  cacheHitShare: null,
+  cacheUnreportedShare: null,
+  modelTransitions: null,
+  downgradedStreaks: null,
+  downgradedShare: null,
+  keptStrongShare: null,
+  routingHintCount: null,
+  jevCompactionAcceptedBelowThreshold: null,
+  jevSelectionDegraded: null,
+})
+
 /** Arms with jspace enabled. */
 const JSPACE_ARMS = new Set(['on', 'on-sq', 'on-sq-verified', 'on-adaptive'])
 /** Arms with session-query mounted. */
@@ -257,6 +274,7 @@ function forensicsFields(rng, arm, resolved, checkpoints, stratum, turns) {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    ...JEV_NULL_FIELDS,
   }
 }
 
@@ -337,6 +355,7 @@ function sumPhaseMetrics(phases) {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    ...JEV_NULL_FIELDS,
   }
   for (const phase of phases) {
     for (const field of ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']) {

@@ -79,7 +79,7 @@ turn/start
 turn/end
 ```
 
-`turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
+`turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`. The `agent/request` payload includes detached, deep-frozen messages, rendered system text, and tool schemas for the assembled request; listeners may replace only the returned call configuration.
 
 Only `tool-call` blocks reach the `tools/execute` pipeline. A `server-tool-call` block — a hosted tool the provider executed on the model's behalf (for example a provider-native web search) — is structurally excluded by the loop's `isLocalToolCall` dispatch predicate: it is logged in `assistant/message` content and rendered generically but never looked up, executed, or correlated by tool name.
 
@@ -108,6 +108,8 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Goal | Mechanism |
 |---|---|
 | Add a model provider | register its adapter on `ctx.llm` |
+| Route each turn across models | mount `@shres-code/shres-code-model-router`; it consults `ctx.judgment` and may replace the manual route with an allowlisted downgrade |
+| Route a fresh delegated child to another model | listen to the `subagent/child-route` waterfall; explicit routes, fork children, and team seats are never asked |
 | Add a model-facing capability | register on `ctx.tools`; its schema joins prompt assembly |
 | Give one session a different capability set | compose an agent preset; a service row there needs an `isolate` realm |
 | Add shell execution | register a `ctx.shell` backend; the local one spawns through `ctx.subprocess` |

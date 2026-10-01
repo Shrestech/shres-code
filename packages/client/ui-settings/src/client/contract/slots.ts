@@ -47,6 +47,19 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      */
     'settings.plugins.tab': { kind: 'list'; scope: 'root'; owner: SettingsPluginsTabOwnerProps }
     /**
+     * Feature-owned configuration for one selected and active plugin bundle.
+     * The Plugins manager dispatches by the exact bundle package name and
+     * supplies the generic bundle state; inactive bundles never reach this
+     * slot, so a feature cannot accidentally offer controls for a disabled
+     * runtime.
+     */
+    'settings.plugins.bundle': {
+      kind: 'keyed'
+      scope: 'root'
+      owner: SettingsPluginsBundleOwnerProps
+      keyProps: { [bundleName: string]: SettingsPluginsBundleOwnerProps }
+    }
+    /**
      * Root-scoped onboarding steps contributed by settings features. The
      * shell mounts one ordered step at a time; the active registrant either
      * completes itself or keeps ownership until the user completes its sole
@@ -88,6 +101,34 @@ export interface SettingsPluginsTabOwnerProps {
   children?: never
 }
 
+/** State the generic Plugins manager shares with one active bundle feature. */
+export interface SettingsPluginsBundle {
+  /** Exact bundle package name used as the keyed slot identity. */
+  name: string
+  /** Package description, when the active profile can read one. */
+  description?: string
+  /** Installed package version, when known. */
+  version?: string
+  /** Whether the profile manifest selects this bundle. */
+  selected: boolean
+  /** Whether the last applied composition contains this bundle. */
+  active: boolean
+  /** Whether the running installation supplies this bundle. */
+  shipped: boolean
+  /** Why profile selection cannot be changed through the manager. */
+  readOnlyReason?: string
+  /** A package resolution or composition diagnostic. */
+  error?: string
+  /** Loader entry identities contributed by this bundle. */
+  rows: readonly string[]
+}
+
+/** Owner share for a keyed feature configuration slot. */
+export interface SettingsPluginsBundleOwnerProps {
+  /** Bundle metadata supplied by the generic Plugins manager. */
+  bundle: SettingsPluginsBundle
+}
+
 /** Owner share of the settings trigger content. */
 export interface SettingsTriggerOwnerProps {
   /** Whether the trigger displays its text label. */
@@ -104,8 +145,9 @@ export interface SettingsHeaderOwnerProps {
  * Owner share of a settings section entry. The shell owns page visibility
  * and navigation; a section's data arrives through its own inject faces and
  * stores. `close` is the one shell affordance a section receives, for flows
- * that leave settings altogether (starting a session from a section) — the
- * onboarding coordinator's `openSection`/`complete` precedent, inverted.
+ * that leave settings altogether (starting a session from a section); a link
+ * to another section goes through `ctx.settingsPages`, delivered as a callback
+ * in the section's inject face.
  */
 export interface SettingsSectionOwnerProps {
   /** Return to the workspace. */

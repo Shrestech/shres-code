@@ -47,6 +47,7 @@ const REQUIRED_MEMBERS = [
 ] as const
 const REQUIRED_PACKAGES = [
   '@shres-code/shres-code-base',
+  '@shres-code/shres-code-browser-bundle',
   '@shres-code/shres-code-web-app',
   '@shres-code/shres-code-web-frontend',
 ] as const

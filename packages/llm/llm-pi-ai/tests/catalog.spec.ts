@@ -99,8 +99,9 @@ describe('hand-declared providers', () => {
     const server = await mockServer([])
     const ctx = await harness(gateway(`${server.url}/v1`))
 
+    // A chat-completions route that declares nothing reports no cache counts.
     expect(await ctx.llm.listModels('acme-gateway')).toEqual([
-      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text'] },
+      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text'], cacheUsage: 'unreported' },
     ])
     const info = await ctx.llm.resolveModelInfo('acme-gateway', 'acme-large')
     expect(info).toMatchObject({
@@ -109,7 +110,11 @@ describe('hand-declared providers', () => {
       name: 'Acme Large',
       context: { contextWindow: 65_536 },
       defaultMaxTokens: 4096,
+      cacheUsage: 'unreported',
     })
+    // A route's declaration wins over its protocol.
+    const declared = await harness(gateway(`${server.url}/v1`, { cacheUsage: 'reported' }))
+    expect((await declared.llm.resolveModelInfo('acme-gateway', 'acme-large')).cacheUsage).toBe('reported')
   })
 
   it('offers no reasoning control it could not honour', async () => {
@@ -636,13 +641,20 @@ describe('per-model reasoning efforts', () => {
   it('narrows a catalog model’s levels in place', () => {
     const [catalogModel] = getBuiltinModels('deepseek')
     if (catalogModel === undefined) throw new Error('the installed catalog ships no deepseek model')
-    expect(getSupportedThinkingLevels(catalogModel as Model<Api>)).toEqual(['off', 'low', 'high', 'max'])
+    // The installed catalog owns the level list — it tracks the dependency, not
+    // this package. Require the levels the overlay keeps and require the overlay
+    // to narrow the catalog set rather than inherit it.
+    const catalogLevels = getSupportedThinkingLevels(catalogModel as Model<Api>)
+    expect(catalogLevels).toContain('off')
+    expect(catalogLevels).toContain('high')
 
     const model = modelOf({
       deepseek: { models: [{ id: catalogModel.id, reasoningEfforts: { off: null, high: 'high' } }] },
     }, 'deepseek')
 
-    expect(getSupportedThinkingLevels(model)).toEqual(['off', 'high'])
+    const narrowed = getSupportedThinkingLevels(model)
+    expect(narrowed).toEqual(['off', 'high'])
+    expect(narrowed.length).toBeLessThan(catalogLevels.length)
     // Only the reasoning fields change; identity and capacities stay catalog.
     expect(model.name).toBe(catalogModel.name)
     expect(model.contextWindow).toBe(catalogModel.contextWindow)

@@ -8,6 +8,7 @@ const packageNames = [
   'shres-code',
   'shres-code-desktop-host',
   'shres-code-base',
+  'shres-code-browser-bundle',
   'shres-code-web-app',
   'shres-code-web-frontend',
 ] as const

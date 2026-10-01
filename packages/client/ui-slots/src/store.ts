@@ -39,11 +39,20 @@ export type BakedActions<T, A extends ActionsDecl<T>> = {
 /**
  * Store declaration spec: initial-state factory (a lambda so every instance
  * gets a fresh state), optional persistence key (mechanical, framework-run),
- * and the actions write set.
+ * the top-level fields persistence leaves out, and the actions write set.
  */
 export interface StoreSpec<T, A extends ActionsDecl<T>> {
   init: () => T
   persist?: string
+  /**
+   * Top-level fields of an object state kept out of persistence: never
+   * written, and taken from `init` when a persisted value is restored
+   * (including a value written before the field was transient), so a page
+   * load starts them fresh. Only top-level fields: a nested path cannot be
+   * named. Declaring it fails loud, naming the field, when `persist` is
+   * absent or `init()` does not produce a listed field.
+   */
+  transient?: readonly (keyof T & string)[]
   actions: A
 }
 

@@ -11,7 +11,9 @@
  *
  * Consumed bench/stats API (kept narrow on purpose):
  * - aggregate.summarizeCells(trials) -> ReportCell[] (Wilson ci95 included).
- * - aggregate.summarizeArm(arm, trials) -> ReportArmSummary (ci95, stderr included).
+ * - aggregate.summarizeArm(arm, trials) -> ReportArmSummary (ci95, stderr included;
+ *   the forensics and Jev routing/compaction aggregates ride along, so every
+ *   per-arm results.json and the ui/data.js payload carry them).
  * - intervals.bootstrapDeltaCi(pairs) -> bootstrap CI on the paired pass-rate
  *   delta from matched outcomes [{ off: boolean, on: boolean }].
  * - paired.pairOutcomes(offTrials, onTrials) -> { pairs, wins, losses, ties }
@@ -29,6 +31,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { validateTrial } from '../schema/trial.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { REPORT_STRATA, validateReportData } from '../schema/report-data.js'
+import { buildVerdicts } from './verdicts.js'
 import { summarizeArm, summarizeCells } from '../stats/aggregate.js'
 import { bootstrapDeltaCi } from '../stats/intervals.js'
 import { gradeComparison, mcnemarExactP, pairOutcomes } from '../stats/paired.js'
@@ -50,6 +53,8 @@ const BASELINE_ARM = 'off'
  * @property {string} generatedAt - ISO 8601.
  * @property {import('../schema/report-data.js').ReportArmSummary} summary
  * @property {import('../schema/report-data.js').ReportCell[]} cells
+ * @property {import('./verdicts.js').ReportVerdict[]} verdicts - the pre-registered
+ *   verdicts that read this arm, so a per-arm file carries its own screens.
  */
 
 /**
@@ -269,14 +274,35 @@ export async function buildExperiment(experimentDir, options = {}) {
   const armSummaries = []
   /** @type {import('../schema/trial.js').Trial[]} */
   const allTrials = []
+  /** @type {Map<string, { summary: import('../schema/report-data.js').ReportArmSummary, cells: import('../schema/report-data.js').ReportCell[] }>} */
+  const perArm = new Map()
   for (const [arm, { trials }] of arms) {
     const armCells = summarizeCells(trials)
     const summary = summarizeArm(arm, trials)
     cells.push(...armCells)
     armSummaries.push(summary)
     allTrials.push(...trials)
+    perArm.set(arm, { summary, cells: armCells })
+  }
+
+  // The pre-registered verdict block reads the whole experiment: the two
+  // routing arms and the two compaction arms of the Jev ladder, whose baseline
+  // is a treatment arm rather than `off`, which is why it is not a
+  // `comparisons` entry. An experiment without those arms reports five
+  // not-evaluable verdicts rather than no claim.
+  const verdicts = buildVerdicts(allTrials)
+
+  for (const [arm, { summary, cells: armCells }] of perArm) {
     /** @type {ArmResults} */
-    const results = { version: 1, experiment, arm, generatedAt, summary, cells: armCells }
+    const results = {
+      version: 1,
+      experiment,
+      arm,
+      generatedAt,
+      summary,
+      cells: armCells,
+      verdicts: verdicts.filter(verdict => verdict.arms.includes(arm)),
+    }
     await writeFile(join(experimentDir, arm, 'results.json'), JSON.stringify(results, null, 2) + '\n')
   }
 
@@ -306,6 +332,7 @@ export async function buildExperiment(experimentDir, options = {}) {
     cells,
     arms: armSummaries,
     comparisons,
+    verdicts,
     trials: allTrials,
   }
   validateReportData(report)

@@ -16,6 +16,9 @@ function validateRunEnd(start: SubagentRunInfo, end: SubagentRunEndInfo, fail: I
   if (start.provider !== end.provider || start.id !== end.id || start.local !== end.local) {
     fail(`subagent/end identity diverges from subagent/start for run ${JSON.stringify(end.runId)}`)
   }
+  if (start.subagentRouteRequestId !== end.subagentRouteRequestId) {
+    fail(`subagent/end route-request id diverges from subagent/start for run ${JSON.stringify(end.runId)}`)
+  }
 }
 
 /** Install provider-registry and start/end pairing checks. */

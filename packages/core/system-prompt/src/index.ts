@@ -72,6 +72,19 @@ export interface PromptSection {
    * More than one effective complete section makes assembly fail.
    */
   readonly complete?: boolean
+  /**
+   * `'static'`, the meaning when omitted, declares that this section renders
+   * the same bytes on every assembly for a fixed configuration. `'conditional'`
+   * declares that it may appear, disappear, or change between assemblies.
+   * Every effective conditional section must be ordered after every static
+   * section, otherwise assembly fails, so a toggle cannot change the bytes of
+   * the tool and static-section prefix. How much of that prefix a provider's
+   * cache reuses depends on where its cache boundaries fall. A toggle still
+   * invalidates cached conversation messages, which follow the system prompt;
+   * text that changes during a session belongs in
+   * {@link SystemPrompt.context} where possible.
+   */
+  readonly stability?: 'static' | 'conditional'
 }
 
 /** Dynamic model context materialized as a durable user-role snapshot. */
@@ -175,6 +188,20 @@ function orderTools(tools: ToolSchema[], toolOrder: string[] | undefined, knownN
   const rest = tools.filter(tool => !listed.has(tool.name)).sort(compareToolNames)
   return toolOrder.flatMap(name =>
     name === TOOL_ORDER_REST ? rest : tools.filter(tool => tool.name === name))
+}
+
+/**
+ * Reject an order-sorted effective section list in which a static section is
+ * ordered at or after the first conditional section. Equal orders fail too:
+ * registration order breaks ties, and it depends on plugin load order.
+ */
+function assertConditionalSectionsLast(sections: readonly PromptSection[]): void {
+  const firstConditional = sections.find(section => section.stability === 'conditional')
+  if (firstConditional === undefined) return
+  const blocking = sections.findLast(section => section.stability !== 'conditional' && section.order >= firstConditional.order)
+  if (blocking !== undefined) {
+    throw new Error(`conditional prompt section "${firstConditional.name}" (order ${firstConditional.order}) must be ordered after static prompt section "${blocking.name}" (order ${blocking.order}); a conditional section ahead of static text changes the cached prompt prefix whenever it toggles`)
+  }
 }
 
 /** Lexicographic (code-unit) name comparison — locale-independent, so the order is identical on every machine. */
@@ -459,7 +486,9 @@ export class SystemPrompt extends Service {
    * canonical ordering, then run the assembly waterfall. Scoped sections and
    * variables shadow globals. The returned waterfall value is authoritative
    * except that an effective complete section is restored afterwards as the
-   * sole prompt section.
+   * sole prompt section. Rejects more than one effective complete section and,
+   * while none is active, an effective conditional section that is not ordered
+   * after every static section.
    * @param context - the optional scope and plugin-defined assembly fields.
    * @returns the post-waterfall assembly with any complete prompt enforced.
    */
@@ -506,6 +535,9 @@ export class SystemPrompt extends Service {
     if (completeSections.length > 1) {
       throw new Error(`multiple complete prompt sections are active: ${completeSections.map(section => JSON.stringify(section.name)).join(', ')}`)
     }
+    // A complete section is the whole rendered prompt, so the order of the
+    // sections it replaces cannot change the cached prefix.
+    if (completeSections.length === 0) assertConditionalSectionsLast(sectionDefinitions)
     let completeSection: AssembledSection | undefined
     const sections = sectionDefinitions
       .map((section) => {

@@ -3,6 +3,7 @@
   - navigation "Main navigation":
     - button "Workspace"
     - button "Teams"
+    - button "Plugins"
     - button "Customize"
   - button "workspace":
     - img

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { SettingsProvider, SettingsConflictError, deepEqualJson, installSettingsSection, settingsNamespace, type SettingsNamespace, type SettingsScope, type SettingsUpdateSource } from '../src/index.ts'
+import { SettingsProvider, SettingsConflictError, SettingsFieldError, deepEqualJson, installSettingsSection, settingsNamespace, type SettingsNamespace, type SettingsScope, type SettingsUpdateSource, type SettingsValidationCause } from '../src/index.ts'
 import { MemorySettings } from './memory.ts'
 
 /** A provider implementing only the three primitives: the Service Definition owns initialization. */
@@ -118,6 +118,43 @@ describe('registration', () => {
 
     await ctx.settings.update(ns, { fontSize: 18 })
     expect(scope.get()).toMatchObject({ fontSize: 18 })
+  })
+
+  it('tells the owner validation which operation produced the value', async () => {
+    const { ctx } = await boot({ doc: { 'ui-theme': { fontSize: 12 } } })
+    const ns = settingsNamespace('ui-theme')
+    const causes: SettingsValidationCause[] = []
+    ctx.settings.register(ns, ThemeSchema, {
+      validate: (_value, cause) => {
+        causes.push(cause)
+      },
+    })
+
+    await ctx.settings.update(ns, { fontSize: 14 })
+    await ctx.settings.replace(ns, { fontSize: 15 })
+    await ctx.settings.mutate(ns, [{ op: 'set', path: ['fontSize'], value: 16 }])
+    ;(ctx.settings as unknown as { publish(doc: Record<string, unknown>): void })
+      .publish({ 'ui-theme': { fontSize: 17 } })
+
+    expect(causes).toEqual(['register', 'write', 'write', 'write', 'reload'])
+  })
+
+  it('refuses a write with the field error its owner names, path intact', async () => {
+    const { ctx } = await boot()
+    const ns = settingsNamespace('ui-theme')
+    ctx.settings.register(ns, ThemeSchema, {
+      validate: (value) => {
+        if (value.fontSize < 10) throw new SettingsFieldError(['fontSize'], `font size ${String(value.fontSize)} is unreadable`)
+      },
+    })
+
+    const refused = await ctx.settings.update(ns, { fontSize: 4 }).then(() => undefined, (error: unknown) => error)
+
+    expect(refused).toBeInstanceOf(SettingsFieldError)
+    expect((refused as SettingsFieldError).path).toEqual(['fontSize'])
+    expect((refused as SettingsFieldError).message).toBe('font size 4 is unreadable')
+    expect(Object.isFrozen((refused as SettingsFieldError).path)).toBe(true)
+    expect(() => new SettingsFieldError([], 'no field')).toThrow('SettingsFieldError path must name a field')
   })
 
   it('fails the registration itself when the already-stored section is unserviceable', async () => {
@@ -761,6 +798,25 @@ describe('installSettingsSection', () => {
       expect(changes).toBe(3)
     })
     expect(current()).toEqual({ theme: 'entry' })
+  })
+
+  it('passes the consumer validation through with its cause', async () => {
+    const { ctx } = await boot({ doc: { 'helper-ns': { theme: 'user' } } })
+    const seen: Array<[string, SettingsValidationCause]> = []
+    installSettingsSection(ctx, settingsNamespace('helper-ns'), HelperSchema, { theme: 'entry' }, {
+      setSource: () => {},
+      onChange: () => {},
+      validate: (value, cause) => {
+        seen.push([value.theme, cause])
+        if (value.theme === 'unknown') throw new SettingsFieldError(['theme'], 'theme "unknown" is not installed')
+      },
+    })
+    await vi.waitFor(() => {
+      expect(seen).toEqual([['user', 'register']])
+    })
+
+    await expect(ctx.settings.update(settingsNamespace('helper-ns'), { theme: 'unknown' })).rejects.toThrow('theme "unknown" is not installed')
+    expect(seen).toEqual([['user', 'register'], ['unknown', 'write']])
   })
 
   it('stays silent when the consumer itself unloads', async () => {

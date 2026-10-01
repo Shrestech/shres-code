@@ -1,0 +1,14 @@
+# Generation pilot route; credentials use the shipped ZAI_API_KEY provider.
+- id: llm-pi-ai
+  config:
+    providers:
+      zai:
+        apiKeyEnv: ZAI_API_KEY
+        hostedTools:
+          webSearch: true
+        models:
+          - id: glm-5.3
+- id: agent-default-model
+  config:
+    provider: zai
+    model: glm-5.3

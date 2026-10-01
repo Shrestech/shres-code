@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { TokenUsage } from '@shres-code/shres-code-llm/types'
+import { addTokenUsage } from '@shres-code/shres-code-llm/usage'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationSnapshot,
   SnapshotStore,
@@ -18,6 +20,8 @@ import {
   appendTrajectoryPartialLayout, deriveTrajectoryLayout,
   type TrajectoryTurnModel,
 } from './layout.ts'
+import { ROUTING_VIEW_ID } from './trajectory-inspect.ts'
+import { trajectoryRequestRoute } from './trajectory-routing.ts'
 import {
   trajectoryTimelineFocusIndexes,
   type TrajectoryTimelineMode,
@@ -94,33 +98,34 @@ function requestUsage(value: unknown): TrajectoryUsage | undefined {
   }
 }
 
+/** Read a display usage back into the provider usage it was copied from. */
+function tokenUsageOf(usage: TrajectoryUsage): TokenUsage {
+  return {
+    inputTokens: usage.input ?? 0,
+    outputTokens: usage.output ?? 0,
+    ...(usage.cacheRead === undefined ? {} : { cacheReadTokens: usage.cacheRead }),
+    ...(usage.cacheWrite === undefined ? {} : { cacheWriteTokens: usage.cacheWrite }),
+    ...(usage.reasoning === undefined ? {} : { reasoningTokens: usage.reasoning }),
+  }
+}
+
+/**
+ * Add one request's usage to the running total. The sum follows the cache
+ * presence contract: a cache count stays shown only while every request
+ * reported it.
+ */
 function addUsage(
   total: TrajectoryUsage | undefined,
   usage: TrajectoryUsage | undefined,
 ): TrajectoryUsage | undefined {
   if (usage === undefined) return total
-  return {
-    ...(total?.input === undefined && usage.input === undefined
-      ? {}
-      : { input: (total?.input ?? 0) + (usage.input ?? 0) }),
-    ...(total?.cacheRead === undefined && usage.cacheRead === undefined
-      ? {}
-      : { cacheRead: (total?.cacheRead ?? 0) + (usage.cacheRead ?? 0) }),
-    ...(total?.cacheWrite === undefined && usage.cacheWrite === undefined
-      ? {}
-      : { cacheWrite: (total?.cacheWrite ?? 0) + (usage.cacheWrite ?? 0) }),
-    ...(total?.output === undefined && usage.output === undefined
-      ? {}
-      : { output: (total?.output ?? 0) + (usage.output ?? 0) }),
-    ...(total?.reasoning === undefined && usage.reasoning === undefined
-      ? {}
-      : { reasoning: (total?.reasoning ?? 0) + (usage.reasoning ?? 0) }),
-  }
+  if (total === undefined) return usage
+  return requestUsage(addTokenUsage(tokenUsageOf(total), tokenUsageOf(usage)))
 }
 
 export function TrajectoryView({
   useSession, useDuration, loadOlder, setActualDuration,
-  inspect, onInspectDone, t,
+  inspect, onInspectDone, reveal, canReveal, t,
 }: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
   const [collapsedAssistants, setCollapsedAssistants] =
@@ -152,6 +157,8 @@ export function TrajectoryView({
   const runningCalls = inspection.runningCalls
   const requests = inspection.requests
   const callSchemas = inspection.callSchemas
+  const routing = inspection.routing
+  const routingChildren = inspection.routingChildren
   const requestNumbers = useMemo<readonly TrajectoryRequestNumber[]>(() => {
     const assistantsByStep = new Map<string, AssistantMessageNode>()
     for (const node of nodes) {
@@ -195,9 +202,15 @@ export function TrajectoryView({
         const turn = request?.turn ?? node?.turn
         const step = request?.step ?? node?.step
         if (turn === undefined || step === undefined) continue
-        const provider = request?.provenance?.provider ?? node?.provenance?.provider
-        const model = request?.provenance?.model ?? node?.provenance?.model
+        // The effective route the request actually used: a settled request
+        // reports it on its answer, and a running or interrupted one only on
+        // the header it was assembled from.
         const requestConfig = request?.requestConfig ?? node?.requestConfig
+        const provider = request?.provenance?.provider ?? node?.provenance?.provider
+          ?? requestConfig?.provider
+        const model = request?.provenance?.model ?? node?.provenance?.model
+          ?? requestConfig?.model
+        const route = trajectoryRequestRoute(turn, step, entry.seq, provider, model, routing)
         numbered.push({
           seq: entry.seq,
           turn,
@@ -217,6 +230,7 @@ export function TrajectoryView({
           ...(provider === undefined ? {} : { provider }),
           ...(model === undefined ? {} : { model }),
           ...(requestConfig === undefined ? {} : { requestConfig }),
+          ...(route === undefined ? {} : { route }),
           ...(usage === undefined ? {} : { usage }),
           ...(cumulativeUsage === undefined ? {} : { cumulativeUsage }),
         })
@@ -249,7 +263,7 @@ export function TrajectoryView({
 
     return numbered
   }, [
-    nodes, requests,
+    nodes, requests, routing,
   ])
   const partialTurn = partial?.turn ?? null
   const partialStep = partial?.step ?? null
@@ -265,11 +279,13 @@ export function TrajectoryView({
       callSchemas,
       decisions: inspection.decisions,
       jspace: inspection.jspace,
+      routing,
+      routingChildren,
     })
     return { turns, lastIndex: lastCellIndex(turns) }
   }, [
     nodes, eventLocations, partialTurn, partialStep,
-    runningCalls, requests, callSchemas, inspection.decisions, inspection.jspace,
+    runningCalls, requests, callSchemas, inspection.decisions, inspection.jspace, routing, routingChildren,
   ])
   const timelinePartialSignature = partialStructureSignature(partial)
   const timelinePartial = useMemo<ConversationSnapshot['partial']>(() => partial === null
@@ -379,7 +395,9 @@ export function TrajectoryView({
         turn.groups.reduce(
           (count, group) =>
             count + group.cells.filter(cell =>
-              cell.requestOnly !== true && cell.kind !== 'system').length,
+              cell.requestOnly !== true
+              && cell.kind !== 'system'
+              && cell.kind !== 'routing').length,
           0,
         ) > 1)
       .flatMap(turn => turn.turn === null ? [] : [turn.turn]),
@@ -451,6 +469,16 @@ export function TrajectoryView({
     return loadOlder()
   }, [loadOlder])
 
+  // Explain renders only while a routing view is registered to receive the
+  // reveal; canReveal reads the view ledger, so this follows registrations.
+  const canExplain = reveal !== undefined && canReveal?.(ROUTING_VIEW_ID) === true
+  const explainRouting = useMemo(
+    () => canExplain
+      ? (seq: number) => { reveal({ view: ROUTING_VIEW_ID, target: { kind: 'event', seq } }) }
+      : undefined,
+    [canExplain, reveal],
+  )
+
   return (
     <div className={css.root} data-conversation-composer-overlay="">
       <TrajectoryToolbar
@@ -505,8 +533,9 @@ export function TrajectoryView({
           onToggleTurn={toggleTurn}
           collapsedAssistants={collapsedAssistants}
           onToggleAssistant={toggleAssistant}
-          inspectCallId={inspect?.callId ?? null}
+          inspectTarget={inspect?.target ?? null}
           onInspectApplied={onInspectDone}
+          onExplainRouting={explainRouting}
           t={t}
         />
       </div>

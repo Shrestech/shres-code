@@ -1267,7 +1267,7 @@ function notReady(state: BrowserSkillState): BrowserSkillCommandResult<never> {
   return {
     ok: false,
     reason: 'not-ready',
-    detail: `BrowserSkill browser is not ready (state ${state.kind}); open it from Settings → BrowserSkill`,
+    detail: `BrowserSkill browser is not ready (state ${state.kind}); open it from Plugins → BrowserSkill`,
   }
 }
 

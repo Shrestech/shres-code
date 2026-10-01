@@ -36,6 +36,11 @@
     "examples": {
       "entry": [
         "headless-agent/tests/fixtures/cli-mock-llm.ts",
+        "headless-agent/tests/fixtures/model-router-resume-driver.ts",
+        "headless-agent/tests/fixtures/model-router-select-driver.ts",
+        "headless-agent/tests/fixtures/model-router-snapshot-fixture.ts",
+        "headless-agent/tests/fixtures/model-router-unmount-driver.ts",
+        "headless-agent/tests/fixtures/browser-bundle/driver.ts",
         "headless-agent/tests/fixtures/semantic-checkpoint-agent.ts",
         "headless-agent/tests/fixtures/subagent-diagnostic-agent.ts",
         "headless-agent/tests/fixtures/subagent-inheritance-agent.ts",
@@ -150,9 +155,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@shres-code/shres-code-api-gateway"
       ]
     },
     "packages/client/ui-primitives": {
@@ -466,6 +468,36 @@
       ]
     },
     "packages/code-runtime/code-runtime-worker-thread": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/judgment-laya": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/judgment-typesafe": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/llm/llm-claude-session": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
@@ -887,9 +919,23 @@
         "@shres-code/.+"
       ]
     },
+    "packages/bundle/browser": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@shres-code/shres-code-browserskill",
+        "@shres-code/shres-code-client-ui-browserskill"
+      ]
+    },
     "packages/bundle/headless": {
       "ignoreDependencies": [
-        "@shres-code/shres-code-code-runtime-worker-thread"
+        "@shres-code/shres-code-code-runtime-worker-thread",
+        "@shres-code/shres-code-judgment-dispatch",
+        "@shres-code/shres-code-judgment-laya",
+        "@shres-code/shres-code-judgment-shield",
+        "@shres-code/shres-code-judgment-typesafe",
+        "@shres-code/shres-code-model-router"
       ]
     },
     "packages/bundle/web-app": {

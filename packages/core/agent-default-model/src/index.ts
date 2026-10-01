@@ -6,7 +6,7 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { installModelSelection } from '@shres-code/shres-code-agent'
+import { provideModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-commands'
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
@@ -123,9 +123,17 @@ export class AgentDefaultModelConfig extends Service {
 
   private source: () => AgentDefaultModelSettings
   private readonly selections = new WeakMap<Agent, LiveModelSelectionRef>()
+  /** This service's own context, whose fiber owns every provided selection. */
+  private readonly home: Context
+  /** Early withdrawal of each provided selection, run when its agent is disposed. */
+  private readonly releases = new WeakMap<Agent, () => void>()
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'agentDefaultModel')
+    this.home = ctx
+    // A disposed agent needs no selection: release its withdrawal effect now
+    // instead of holding it until this service unloads.
+    ctx.on('agent/disposed', ({ agent }) => { this.releases.get(agent)?.() }, { global: true })
     const entry: AgentDefaultModelSettings = { provider: config.provider, model: config.model }
     this.source = () => entry
     installSettingsSection(ctx, AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, AGENT_DEFAULT_MODEL_SETTINGS_SCHEMA, entry, {
@@ -185,10 +193,14 @@ export class AgentDefaultModelConfig extends Service {
   }
 
   /**
-   * Install or return the session-local model selection that prompt assembly snapshots.
+   * Provide or return the session-local model selection the agent's
+   * model-selection hook applies, which prompt assembly snapshots. The
+   * selection is withdrawn when this service's fiber is disposed, so a
+   * reloaded instance provides its own.
    *
-   * Precedence, resolved on every read: a selection made in this process, else
-   * the session's latest logged request/header, else the live default.
+   * Explicit selections are logged as `agent/model-selection` and survive
+   * resume and fork. Without one, the session's manual route precedes the live
+   * default; a composed router reports the base beneath its routed header.
    *
    * @param agent - the Agent whose request waterfall should observe this selection.
    * @returns the shared mutable selection for this Agent.
@@ -196,27 +208,29 @@ export class AgentDefaultModelConfig extends Service {
   selectionFor(agent: Agent): LiveModelSelectionRef {
     const installed = this.selections.get(agent)
     if (installed !== undefined) return installed
-    let picked: ModelSelection | undefined
     const readDefault = (): ModelSelection => this.currentSelection()
     const selectionRef: LiveModelSelectionRef = {
       get current(): ModelSelection {
-        if (picked !== undefined) return picked
-        const logged = agent.session.requestHeader()?.config
-        if (logged === undefined) return readDefault()
-        return {
-          provider: logged.provider,
-          model: logged.model,
-          ...logged.reasoningEffort === undefined
-            ? {}
-            : { reasoningEffort: logged.reasoningEffort },
-        }
+        return selectionInForce(agent) ?? readDefault()
       },
       set current(next: ModelSelection) {
-        picked = next
+        agent.session.append('agent/model-selection', {
+          provider: next.provider,
+          model: next.model,
+          ...next.reasoningEffort === undefined ? {} : { reasoningEffort: next.reasoningEffort },
+        })
       },
       assembled: undefined,
     }
-    installModelSelection(agent.ctx, selectionRef)
+    const withdraw = provideModelSelection(agent, selectionRef)
+    // The selection belongs to this service's fiber: a reload withdraws it, and
+    // the replacement instance provides its own.
+    const release = this.home.effect(() => withdraw, 'agentDefaultModel.selectionFor()')
+    this.releases.set(agent, () => {
+      this.releases.delete(agent)
+      // The withdrawal is synchronous; the disposer's promise settles with it.
+      void release()
+    })
     this.selections.set(agent, selectionRef)
     return selectionRef
   }

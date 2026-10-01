@@ -3,12 +3,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@shres-code/shres-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions, ResumeAgentOptions } from '@shres-code/shres-code-agent'
 import AgentDefaultModelConfig from '@shres-code/shres-code-agent-default-model'
 import { createAssistantMessage } from '@shres-code/shres-code-llm'
-import SessionStore from '@shres-code/shres-code-session'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, UserMessage } from '@shres-code/shres-code-session'
 import { apply, Config, internals } from '../src/index.ts'
+import type { Config as RunnerConfig } from '../src/index.ts'
 
 const originalInternals = { ...internals }
 afterEach(() => { Object.assign(internals, originalInternals) })
@@ -47,51 +48,70 @@ function appendTurn(
   })
 }
 
-/** Mount the real registries around a small scripted Agent factory. */
-async function bench(script: Script): Promise<{
+/** The observed create/resume calls of one bench factory. */
+interface Bench {
   ctx: Context
-  run(): Promise<{ code: number; out: string; err: string; order: string[] }>
-}> {
+  created: CreateAgentOptions[]
+  resumed: ResumeAgentOptions[]
+  run(overrides?: Partial<RunnerConfig>): Promise<{ code: number; out: string; err: string; order: string[] }>
+}
+
+/** Mount the real registries around a small scripted Agent factory. */
+async function bench(script: Script): Promise<Bench> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentDefaultModelConfig, { provider: 'test-provider', model: 'test-model' })
+  const created: CreateAgentOptions[] = []
+  const resumed: ResumeAgentOptions[] = []
+  const mountAgent = async (ownerCtx: Context, options: CreateAgentOptions | ResumeAgentOptions): Promise<AgentHandle> => {
+    const resuming = 'resumeSessionId' in options
+    const id = resuming ? options.resumeSessionId : options.sessionId
+    const meta = resuming ? undefined : options.meta
+    const session = ctx.sessions.create(id, {
+      ...meta === undefined ? {} : { meta },
+    })
+    let idle = Promise.resolve()
+    const agent = {} as Agent
+    const agentCtx = ownerCtx.extend({ agent })
+    Object.assign(agent, {
+      id: session.id,
+      options: options.agentOptions ?? {},
+      session,
+      inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+      status: 'idle',
+      ctx: agentCtx,
+      cancel: () => {},
+      runMaintenance: () => Promise.reject(new Error('not used')),
+      send: () => {},
+      followup: (message: UserMessage) => {
+        agent.inbox.append('next-turn', message)
+        idle = Promise.resolve().then(() => script.afterPrompt(session, message))
+      },
+      steer: () => {},
+      inject: () => {},
+      whenIdle: () => idle,
+    } satisfies Partial<Agent>)
+    await options.setup?.(agentCtx)
+    script.before?.(session)
+    ctx.agents.register(agent)
+    return { agent, dispose: () => Promise.resolve() }
+  }
   ctx.agents.setFactory({
     async createAgent(ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle> {
-      const session = ctx.sessions.create(options.sessionId, {
-        ...options.meta === undefined ? {} : { meta: options.meta },
-      })
-      let idle = Promise.resolve()
-      const agent = {} as Agent
-      const agentCtx = ownerCtx.extend({ agent })
-      Object.assign(agent, {
-        id: session.id,
-        options: options.agentOptions ?? {},
-        session,
-        inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
-        status: 'idle',
-        ctx: agentCtx,
-        cancel: () => {},
-        runMaintenance: () => Promise.reject(new Error('not used')),
-        send: () => {},
-        followup: (message: UserMessage) => {
-          agent.inbox.append('next-turn', message)
-          idle = Promise.resolve().then(() => script.afterPrompt(session, message))
-        },
-        steer: () => {},
-        inject: () => {},
-        whenIdle: () => idle,
-      } satisfies Partial<Agent>)
-      await options.setup?.(agentCtx)
-      script.before?.(session)
-      ctx.agents.register(agent)
-      return { agent, dispose: () => Promise.resolve() }
+      created.push(options)
+      return mountAgent(ownerCtx, options)
     },
-    resume: () => Promise.reject(new Error('not used')),
+    async resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle> {
+      resumed.push(options)
+      return mountAgent(ownerCtx, options)
+    },
   })
   return {
     ctx,
-    run: async () => {
+    created,
+    resumed,
+    run: async (overrides: Partial<RunnerConfig> = {}) => {
       let out = ''
       let err = ''
       const order: string[] = []
@@ -101,9 +121,21 @@ async function bench(script: Script): Promise<{
       const exited = new Promise<number>((resolve) => {
         ctx.provide('appExit', (code: number) => { order.push('exit'); resolve(code) })
       })
-      apply(ctx, { task: 'do the thing' })
+      apply(ctx, { task: 'do the thing', ...overrides })
       return { code: await exited, out, err, order }
     },
+  }
+}
+
+/**
+ * A sessionPersistence stand-in whose `inspect` reports the configured cwd per id and
+ * rejects unknown ids with the coordinator's not-found message.
+ */
+function inspecting(headers: Record<string, string>): unknown {
+  return {
+    inspect: (id: SessionId) => headers[id] === undefined
+      ? Promise.reject(new Error(`session "${id}" not found`))
+      : Promise.resolve({ meta: { cwd: headers[id] }, events: [] }),
   }
 }
 
@@ -175,6 +207,75 @@ describe('headless runner', () => {
   it('exits 1 when the owned interval contains no turn', async () => {
     const test = await bench({ afterPrompt: () => {} })
     expect(await test.run()).toMatchObject({ code: 1, out: '\n', err: '' })
+    await test.ctx.fiber.dispose()
+  })
+
+  it('creates a fresh session under the explicit id when one is given', async () => {
+    const test = await bench({
+      afterPrompt(session, message) { appendTurn(session, 1, message, 'named id answer', true) },
+    })
+    const result = await test.run({ sessionId: SessionId('bench-named') })
+    expect(result).toMatchObject({ code: 0, out: 'named id answer\n' })
+    expect(test.created[0]?.sessionId).toBe('bench-named')
+    await test.ctx.fiber.dispose()
+  })
+
+  it('resumes the persisted session and summarizes only its own interval', async () => {
+    const test = await bench({
+      before(session) {
+        const setupMessage = {
+          role: 'user', content: [{ type: 'text', text: 'earlier' }], source: { kind: 'user' }, id: 'earlier',
+        } as UserMessage
+        appendTurn(session, 0, setupMessage, 'pre-task noise', true)
+      },
+      afterPrompt(session, message) { appendTurn(session, 1, message, 'resumed answer', true) },
+    })
+    test.ctx.provide('sessionPersistence', inspecting({ 'bench-session': process.cwd() }))
+    const result = await test.run({ resume: SessionId('bench-session') })
+    expect(result).toEqual({ code: 0, out: 'resumed answer\n', err: '', order: ['flush', 'exit'] })
+    expect(test.created).toHaveLength(0)
+    expect(test.resumed).toHaveLength(1)
+    expect(test.resumed[0]?.resumeSessionId).toBe('bench-session')
+    // The durable log route wins because this spawn passes no provider/model.
+    expect(test.resumed[0]?.agentOptions).toBeUndefined()
+    expect(test.resumed[0]?.setup).toBeTypeOf('function')
+    await test.ctx.fiber.dispose()
+  })
+
+  it('exits 1 with the not-found message for an unknown resume id', async () => {
+    const test = await bench({ afterPrompt: () => {} })
+    test.ctx.provide('sessionPersistence', inspecting({}))
+    const result = await test.run({ resume: SessionId('missing') })
+    expect(result).toEqual({ code: 1, out: '', err: 'shres: session "missing" not found\n', order: ['exit'] })
+    expect(test.resumed).toHaveLength(0)
+    await test.ctx.fiber.dispose()
+  })
+
+  it('exits 1 with a named error when session persistence is not configured', async () => {
+    const test = await bench({ afterPrompt: () => {} })
+    const result = await test.run({ resume: SessionId('bench-session') })
+    expect(result).toEqual({
+      code: 1,
+      out: '',
+      err: 'shres: cannot resume "bench-session": session persistence is not configured (load a shres-session-persistence backend)\n',
+      order: ['exit'],
+    })
+    expect(test.resumed).toHaveLength(0)
+    await test.ctx.fiber.dispose()
+  })
+
+  it('exits 1 when the persisted session was started in another directory', async () => {
+    const test = await bench({ afterPrompt: () => {} })
+    test.ctx.provide('sessionPersistence', inspecting({ 'bench-session': '/elsewhere/project' }))
+    const result = await test.run({ resume: SessionId('bench-session') })
+    expect(result).toEqual({
+      code: 1,
+      out: '',
+      err: 'shres: cannot resume "bench-session": the session was started in a different directory'
+        + ' (persisted: /elsewhere/project, current: ' + process.cwd() + ')\n',
+      order: ['exit'],
+    })
+    expect(test.resumed).toHaveLength(0)
     await test.ctx.fiber.dispose()
   })
 
@@ -261,5 +362,14 @@ describe('headless runner', () => {
   it('validates config: the task is required', () => {
     expect(() => new Config({} as never)).toThrow()
     expect(new Config({ task: 'x' })).toEqual({ task: 'x' })
+    expect(() => new Config({ task: 'x', resume: SessionId('') })).toThrow()
+    expect(new Config({ task: 'x', sessionId: SessionId('a'), resume: SessionId('b') }))
+      .toEqual({ task: 'x', sessionId: 'a', resume: 'b' })
+  })
+
+  it('rejects a config that names both session identities', () => {
+    const ctx = new Context()
+    expect(() => { apply(ctx, { task: 't', sessionId: SessionId('a'), resume: SessionId('b') }) })
+      .toThrow('sessionId and resume are mutually exclusive')
   })
 })

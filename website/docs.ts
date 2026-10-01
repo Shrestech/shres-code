@@ -252,6 +252,8 @@ const subsystemGroups = [
   ]],
   ['Model and context', [
     ['llm-streaming.md', 'LLM streaming'],
+    ['judgment.md', 'Typed judgment'],
+    ['model-router.md', 'Model routing'],
     ['token-meter.md', 'Token metering'],
     ['system-prompt.md', 'System prompts'],
     ['compaction.md', 'Compaction'],

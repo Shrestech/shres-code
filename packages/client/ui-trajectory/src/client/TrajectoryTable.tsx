@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { CSSProperties, ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
+  IconBranchOutline16,
   IconChevronRightOutline14,
   IconSettingsOutline16,
   IconSparkle16,
@@ -13,13 +14,17 @@ import {
   Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
 import { structuredPatch } from 'diff'
+import { promptTokens } from '@shres-code/shres-code-llm/usage'
 import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import type {
   AssistantRequestConfig, ConversationPromptSnapshot,
 } from '@shres-code/shres-code-client-runtime/client'
+import type { InspectTarget } from '@shres-code/shres-code-client-ui-conversation/client'
 import type { NS } from './locales.ts'
+import { ROUTING_BREAK_KEYS, ROUTING_OUTCOME_KEYS, ROUTING_REASON_KEYS } from './locales.ts'
 import type {
-  AssistantMetricDetail, TrajectoryCellKind, TrajectoryCellProps, TrajectorySourceBlock,
+  AssistantMetricDetail, TrajectoryCellKind, TrajectoryCellProps, TrajectoryRequestRoute,
+  TrajectoryRoutingRow, TrajectorySourceBlock,
 } from './trajectory-record.ts'
 import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
 import {
@@ -27,6 +32,7 @@ import {
 } from './trajectory-virtual-rows.ts'
 import type { TrajectoryVirtualRow } from './trajectory-virtual-rows.ts'
 import type { TrajectoryTurnModel } from './layout.ts'
+import { resolveInspectRecord } from './trajectory-inspect.ts'
 import { trajectoryPreviewText } from './trajectory-preview.ts'
 import css from './TrajectoryTable.module.css'
 
@@ -45,6 +51,7 @@ const KIND_LABEL: Record<TrajectoryCellKind, string> = {
   message: 'ASSISTANT',
   tool: 'TOOL',
   subtool: 'SUBTOOL',
+  routing: 'ROUTING',
 }
 
 function ToolWrenchIcon(): ReactNode {
@@ -116,6 +123,7 @@ const KIND_ICON: Record<TrajectoryCellKind, ReactNode> = {
   message: <IconSparkle16 size={13} />,
   tool: <ToolWrenchIcon />,
   subtool: <ToolWrenchIcon />,
+  routing: <IconBranchOutline16 size={13} />,
 }
 
 interface TableRecord {
@@ -385,10 +393,18 @@ export interface TrajectoryTableProps {
   collapsedAssistants: ReadonlySet<string>
   /** Toggle tool calls under one assistant record. */
   onToggleAssistant: (id: string) => void
-  /** One-shot cross-view inspect: open and scroll to this call's record. */
-  inspectCallId?: string | null
-  /** Acknowledge a consumed (or unresolvable) inspect request. */
+  /**
+   * One-shot cross-view inspect: open and scroll to the record the target
+   * resolves to (`resolveInspectRecord`); a pending target retries as records load.
+   */
+  inspectTarget?: InspectTarget | null
+  /** Acknowledge an applied inspect target, or an event target no record precedes. */
   onInspectApplied?: (() => void) | undefined
+  /**
+   * Reveal one routing decision, by its event seq, in the routing view. Absent
+   * hides the Explain control on ROUTING rows.
+   */
+  onExplainRouting?: ((seq: number) => void) | undefined
   /** Translate a trajectory dictionary key. */
   t: TranslateNS<typeof NS>
 }
@@ -410,6 +426,8 @@ interface TrajectoryRequestNumberBase {
   provider?: string
   model?: string
   requestConfig?: AssistantRequestConfig
+  /** Effective route the request ran on, when its turn was judged. */
+  route?: TrajectoryRequestRoute
   usage?: TrajectoryUsage
   cumulativeUsage?: TrajectoryUsage
 }
@@ -437,6 +455,23 @@ export interface TrajectoryUsage {
   reasoning?: number
 }
 
+/** Marker records that annotate a turn without being its content. */
+function isAnnotationKind(kind: TrajectoryCellKind): boolean {
+  return kind === 'system' || kind === 'routing'
+}
+
+/** Translated outcome and reason line one routing row reads. */
+function routingRowText(row: TrajectoryRoutingRow, t: TranslateNS<typeof NS>): string {
+  const verdict = `${t(ROUTING_OUTCOME_KEYS[row.outcome])} · ${t(ROUTING_REASON_KEYS[row.reason])}`
+  // A shadow decision names what live routing would have done; it switched
+  // nothing.
+  if (row.shadow === undefined) return verdict
+  const simulated = row.shadow.switched
+    ? t('routing.shadow.switched', { model: row.shadow.model ?? '' })
+    : t('routing.shadow.kept')
+  return `${verdict} · ${simulated}`
+}
+
 function flattenRecords(turns: readonly TrajectoryTurnModel[]): TableRecord[] {
   return turns.flatMap((turn, section) => {
     let firstInSection = true
@@ -444,7 +479,7 @@ function flattenRecords(turns: readonly TrajectoryTurnModel[]): TableRecord[] {
       return group.cells.map((cell, index) => {
         const turnStart = firstInSection
           && cell.requestOnly !== true
-          && cell.kind !== 'system'
+          && !isAnnotationKind(cell.kind)
           && (cell.kind !== 'compacted' || turn.turn === null)
         if (turnStart) firstInSection = false
         return {
@@ -481,7 +516,7 @@ function filterRecords(
       || previous.section !== record.section
       || previous.group !== record.group
     record.turnStart = !startedSections.has(record.section)
-      && record.cell.kind !== 'system'
+      && !isAnnotationKind(record.cell.kind)
       && (record.cell.kind !== 'compacted' || record.turn === null)
     if (record.turnStart) startedSections.add(record.section)
     record.turnEnd = next === undefined || next.section !== record.section
@@ -499,16 +534,23 @@ function requestKey(turn: number | null, group: string): string {
   return `${turn}\u0000${group}`
 }
 
+/** Whether a request boundary may sit on this row: input and routing rows precede the request's own output. */
+function ownsRequestBoundary(cell: TrajectoryCellProps): boolean {
+  return cell.kind !== 'user' && cell.kind !== 'context' && cell.kind !== 'routing'
+}
+
 function indexRequestBoundaries(records: readonly TableRecord[]): ReadonlyMap<string, number> {
   const boundaries = new Map<string, number>()
   for (const record of records) {
     const key = requestKey(record.turn, record.group)
     if (boundaries.has(key)) continue
     if (requestStep(record.group) === undefined) {
-      if (record.groupStart) boundaries.set(key, record.cell.index)
+      if (record.groupStart && ownsRequestBoundary(record.cell)) {
+        boundaries.set(key, record.cell.index)
+      }
       continue
     }
-    if (record.cell.kind === 'user' || record.cell.kind === 'context') continue
+    if (!ownsRequestBoundary(record.cell)) continue
     boundaries.set(key, record.cell.index)
   }
   return boundaries
@@ -584,9 +626,9 @@ function collapseTurnRecords(
   return records.flatMap((record) => {
     if (record.turn === null || !collapsedTurns.has(record.turn)) return [record]
     const turnRecords = recordsByTurn.get(record.turn) ?? [record]
-    if (record.cell.requestOnly === true || record.cell.kind === 'system') return [record]
+    if (record.cell.requestOnly === true || isAnnotationKind(record.cell.kind)) return [record]
     const contentRecords = turnRecords.filter(candidate =>
-      candidate.cell.requestOnly !== true && candidate.cell.kind !== 'system')
+      candidate.cell.requestOnly !== true && !isAnnotationKind(candidate.cell.kind))
     if (contentRecords.length <= 1) return [record]
     if (record.cell.index !== contentRecords[0]?.cell.index) return []
     return [
@@ -728,7 +770,12 @@ function inputTotal(usage: TrajectoryUsage): number | undefined {
     && usage.cacheRead === undefined
     && usage.cacheWrite === undefined
   ) return undefined
-  return (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+  return promptTokens({
+    inputTokens: usage.input ?? 0,
+    outputTokens: 0,
+    ...(usage.cacheRead === undefined ? {} : { cacheReadTokens: usage.cacheRead }),
+    ...(usage.cacheWrite === undefined ? {} : { cacheWriteTokens: usage.cacheWrite }),
+  })
 }
 
 function UsageRows({ usage }: { usage: TrajectoryUsage | undefined }) {
@@ -748,13 +795,19 @@ function UsageRows({ usage }: { usage: TrajectoryUsage | undefined }) {
           <dd>{usage.cacheRead} tok</dd>
         </div>
       )}
+      {usage.cacheRead === undefined && usage.input !== undefined && (
+        <div className={css.requestTokenDetail}>
+          <dt>Cached</dt>
+          <dd>not reported</dd>
+        </div>
+      )}
       {usage.cacheWrite !== undefined && (
         <div className={css.requestTokenDetail}>
           <dt>Cache created</dt>
           <dd>{usage.cacheWrite} tok</dd>
         </div>
       )}
-      {usage.input !== undefined && (
+      {usage.input !== undefined && usage.cacheRead !== undefined && (
         <div className={css.requestTokenDetail}>
           <dt>Other</dt>
           <dd>{usage.input} tok</dd>
@@ -919,6 +972,9 @@ function detailTabs(record: TableRecord): readonly DetailTabItem[] {
       { id: 'raw', label: 'Raw Output' },
     ]
   }
+  if (record.cell.kind === 'routing') {
+    return [{ id: 'overview', label: 'Summary' }]
+  }
   if (isMarkdownRecord(record)) {
     return [
       { id: 'overview', label: 'Summary' },
@@ -1042,6 +1098,87 @@ function RecordListText({
         </span>
       )}
     </>
+  )
+}
+
+/** Route, confidence, and streak facts a changed decision row adds. */
+function RoutingDetail({ row, t }: { row: TrajectoryRoutingRow; t: TranslateNS<typeof NS> }) {
+  return (
+    <>
+      {row.confidence !== undefined && (
+        <span className={css.routingChip} data-routing-confidence="">
+          {t('routing.confidence', { value: row.confidence.toFixed(2) })}
+        </span>
+      )}
+      {row.selection !== undefined && (
+        <span className={css.routingChip} data-routing-selection="">
+          {row.selection.provider + '/' + row.selection.model}
+        </span>
+      )}
+      {row.streak !== undefined && (
+        <span className={css.routingStreak} data-routing-streak={row.streak.kind}>
+          {row.streak.kind === 'entered'
+            ? t('routing.streak.entered', { turn: row.streak.turn })
+            : t('routing.streak.exited', { reason: t(ROUTING_BREAK_KEYS[row.streak.reason]) })}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
+ * One routing decision's ledger line: outcome and reason always, and the route,
+ * confidence, and streak transition only when the decision changed something.
+ */
+function RoutingRecord({ row, t }: { row: TrajectoryRoutingRow; t: TranslateNS<typeof NS> }) {
+  return (
+    <span className={css.routingSummary} data-routing={row.quiet ? 'quiet' : 'decision'}>
+      <span className={css.routingLine}>{routingRowText(row, t)}</span>
+      {row.quiet ? null : <RoutingDetail row={row} t={t} />}
+    </span>
+  )
+}
+
+/**
+ * The ROUTING row's Explain link: a native button, so Tab reaches it and Enter
+ * or Space activates it. It keeps its click and activation keys from the row,
+ * whose own handlers select the record.
+ */
+function RoutingExplain({ seq, onExplain, t }: {
+  seq: number
+  onExplain: (seq: number) => void
+  t: TranslateNS<typeof NS>
+}) {
+  return (
+    <button
+      type="button"
+      className={css.routingExplain}
+      aria-label={t('routing.explain.label')}
+      onClick={(event) => {
+        event.stopPropagation()
+        onExplain(seq)
+      }}
+      onDoubleClick={(event) => { event.stopPropagation() }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+      }}
+    >
+      {t('routing.explain')}
+    </button>
+  )
+}
+
+/** Effective route one request row ran on, badged when it is not the session selection. */
+function RequestRoute({ route, t }: { route: TrajectoryRequestRoute; t: TranslateNS<typeof NS> }) {
+  return (
+    <span className={css.requestRoute} data-request-route={route.routed ? 'routed' : 'selection'}>
+      <span className={css.requestRouteModel}>{route.provider + '/' + route.model}</span>
+      {route.routed && (
+        <span className={css.routedBadge} data-routing-badge="routed">
+          {t('routing.badge.routed')}
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -1789,8 +1926,9 @@ export function TrajectoryTable({
   onToggleTurn,
   collapsedAssistants,
   onToggleAssistant,
-  inspectCallId = null,
+  inspectTarget = null,
   onInspectApplied,
+  onExplainRouting,
   t,
 }: TrajectoryTableProps) {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -2108,20 +2246,25 @@ export function TrajectoryTable({
     if (target !== undefined) openRecordSummary(target)
   }
 
-  // Cross-view inspect handoff: resolve the requested call to its record,
-  // open its summary, and remember the row to scroll once the un-collapsed
-  // ledger has rendered. Not-found leaves the request pending (`turns` in the
-  // deps retries as history pages in); the ack clears the store field.
+  // Cross-view inspect handoff: resolve the target to its record, open its
+  // summary, and remember the row to scroll once the un-collapsed ledger has
+  // rendered. A pending target retries as `turns` and the history window
+  // change; the ack clears the store field.
   const openRecordSummaryRef = useRef(openRecordSummary)
   openRecordSummaryRef.current = openRecordSummary
   useEffect(() => {
-    if (inspectCallId === null) return
-    const target = flattenRecords(turns).find(record => record.cell.callId === inspectCallId)
-    if (target === undefined) return
-    openRecordSummaryRef.current(target)
-    pendingScrollRecordId.current = trajectoryRecordId(target.cell)
+    if (inspectTarget === null) return
+    const resolved = resolveInspectRecord(flattenRecords(turns), inspectTarget, {
+      startSeq: historyStartSeq,
+      hasOlder: hasOlderRecords,
+    })
+    if (resolved === 'pending') return
+    if (resolved !== 'absent') {
+      openRecordSummaryRef.current(resolved)
+      pendingScrollRecordId.current = trajectoryRecordId(resolved.cell)
+    }
     onInspectApplied?.()
-  }, [inspectCallId, turns, onInspectApplied])
+  }, [inspectTarget, turns, historyStartSeq, hasOlderRecords, onInspectApplied])
   useEffect(() => {
     const id = pendingScrollRecordId.current
     if (id === null) return
@@ -2383,6 +2526,9 @@ export function TrajectoryTable({
                   const sectionActive = record.turn === null
                     ? activeSection === record.section
                     : activeTurn === record.turn
+                  const rowText = record.cell.routing === undefined
+                    ? listDisplayText
+                    : routingRowText(record.cell.routing, t)
                   return (
                     <tr
                       tabIndex={isRequestOnly ? -1 : 0}
@@ -2391,7 +2537,7 @@ export function TrajectoryTable({
                         ? `Collapsed ${record.collapsedSummaryKind} summary, ${record.collapsedSummary}`
                         : isRequestOnly
                           ? `Request ${request ?? ''}, compaction`
-                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}${record.cell.shield === undefined ? '' : `, ${shieldBadgeLabel(record.cell.shield.verdict)}`}${record.cell.jspace === undefined ? '' : `, ${jspaceBadgeLabel(record.cell.jspace.kind)}`}`}
+                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${rowText || 'no content'}${record.cell.shield === undefined ? '' : `, ${shieldBadgeLabel(record.cell.shield.verdict)}`}${record.cell.jspace === undefined ? '' : `, ${jspaceBadgeLabel(record.cell.jspace.kind)}`}`}
                       aria-selected={!isCollapsedSummary && !isRequestOnly && selectedIndex === record.cell.index}
                       data-kind={record.cell.kind}
                       data-trajectory-row-key={trajectoryVirtualRecordKey(record)}
@@ -2531,7 +2677,9 @@ export function TrajectoryTable({
                                             ? css.assistantVioletBright
                                             : record.cell.kind === 'subtool'
                                               ? css.subtoolAmber
-                                              : css[record.cell.kind]
+                                              : record.cell.kind === 'routing'
+                                                ? css.routingTag
+                                                : css[record.cell.kind]
                                 }`}
                                 data-role-kind={record.cell.kind}
                               >
@@ -2552,62 +2700,74 @@ export function TrajectoryTable({
                         </div>
                       </td>
                       <td className={css.content}>
-                        {isRequestOnly
-                          ? null
-                          : record.collapsedSummary !== undefined
-                            ? (
-                              <span className={css.collapsedTurnContent} title={record.collapsedSummary}>
-                                <span className={css.collapsedTurnEllipsis}>…</span>
-                                <span className={css.collapsedTurnText}>{record.collapsedSummary}</span>
-                              </span>
-                            )
-                            : (
-                              <span
-                                className={resultText === undefined ? css.contentText : css.resultPreview}
-                                title={resultText === undefined
-                                  ? listDisplayText
-                                  : `${listDisplayText} → ${resultText}`}
-                              >
-                                <span className={resultText === undefined ? undefined : css.resultRequest}>
-                                  <RecordListText
-                                    displayText={displayText}
-                                    toolCallOnly={toolCallOnly}
-                                    toolCallText={toolCallText}
-                                  />
+                        {record.cell.routing !== undefined
+                          ? (
+                            <span className={css.routingCell}>
+                              <RoutingRecord row={record.cell.routing} t={t} />
+                              {onExplainRouting !== undefined && record.cell.sourceSeq !== undefined && (
+                                <RoutingExplain seq={record.cell.sourceSeq} onExplain={onExplainRouting} t={t} />
+                              )}
+                            </span>
+                          )
+                          : isRequestOnly
+                            ? null
+                            : record.collapsedSummary !== undefined
+                              ? (
+                                <span className={css.collapsedTurnContent} title={record.collapsedSummary}>
+                                  <span className={css.collapsedTurnEllipsis}>…</span>
+                                  <span className={css.collapsedTurnText}>{record.collapsedSummary}</span>
                                 </span>
-                                {resultText !== undefined && (
-                                  <span className={record.cell.isError ? `${css.inlineResult} ${css.error}` : css.inlineResult}>
-                                    <span className={css.arrow}>→</span>
-                                    <span className={resultText === 'No output'
-                                      ? `${css.inlineResultText} ${css.noOutputText}`
-                                      : css.inlineResultText}
-                                    >
-                                      {resultText}
+                              )
+                              : (
+                                <span
+                                  className={resultText === undefined ? css.contentText : css.resultPreview}
+                                  title={resultText === undefined
+                                    ? listDisplayText
+                                    : `${listDisplayText} → ${resultText}`}
+                                >
+                                  <span className={resultText === undefined ? undefined : css.resultRequest}>
+                                    <RecordListText
+                                      displayText={displayText}
+                                      toolCallOnly={toolCallOnly}
+                                      toolCallText={toolCallText}
+                                    />
+                                  </span>
+                                  {resultText !== undefined && (
+                                    <span className={record.cell.isError ? `${css.inlineResult} ${css.error}` : css.inlineResult}>
+                                      <span className={css.arrow}>→</span>
+                                      <span className={resultText === 'No output'
+                                        ? `${css.inlineResultText} ${css.noOutputText}`
+                                        : css.inlineResultText}
+                                      >
+                                        {resultText}
+                                      </span>
                                     </span>
-                                  </span>
-                                )}
-                                {record.cell.shield !== undefined && (
-                                  <span
-                                    className={`${css.shieldBadge} ${record.cell.shield.verdict === 'deny'
-                                      ? css.shieldBlocked
-                                      : record.cell.shield.verdict === 'ask'
-                                        ? css.shieldAsked
-                                        : css.shieldObserved}`}
-                                    data-shield-verdict={record.cell.shield.verdict}
-                                  >
-                                    {shieldBadgeLabel(record.cell.shield.verdict)}
-                                  </span>
-                                )}
-                                {record.cell.jspace !== undefined && (
-                                  <span
-                                    className={`${css.shieldBadge} ${css.jspaceBadge}`}
-                                    data-jspace={record.cell.jspace.kind}
-                                  >
-                                    {jspaceBadgeLabel(record.cell.jspace.kind)}
-                                  </span>
-                                )}
-                              </span>
-                            )}
+                                  )}
+                                  {record.cell.shield !== undefined && (
+                                    <span
+                                      className={`${css.shieldBadge} ${record.cell.shield.verdict === 'deny'
+                                        ? css.shieldBlocked
+                                        : record.cell.shield.verdict === 'ask'
+                                          ? css.shieldAsked
+                                          : css.shieldObserved}`}
+                                      data-shield-verdict={record.cell.shield.verdict}
+                                    >
+                                      {shieldBadgeLabel(record.cell.shield.verdict)}
+                                    </span>
+                                  )}
+                                  {record.cell.jspace !== undefined && (
+                                    <span
+                                      className={`${css.shieldBadge} ${css.jspaceBadge}`}
+                                      data-jspace={record.cell.jspace.kind}
+                                    >
+                                      {jspaceBadgeLabel(record.cell.jspace.kind)}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                        {requestInfo?.route !== undefined && (
+                          <RequestRoute route={requestInfo.route} t={t} />
+                        )}
                       </td>
                     </tr>
                   )
@@ -3079,6 +3239,12 @@ export function TrajectoryTable({
                       <dd>{jspaceBadgeLabel(selected.cell.jspace.kind)}</dd>
                     </div>
                   )}
+                  {selected.cell.routing !== undefined && (
+                    <div>
+                      <dt>Routing</dt>
+                      <dd><RoutingRecord row={selected.cell.routing} t={t} /></dd>
+                    </div>
+                  )}
                   {selected.cell.shield !== undefined && (
                     <>
                       <div>
@@ -3116,39 +3282,41 @@ export function TrajectoryTable({
                   )}
                 </dl>
                 <div className={css.overviewSections}>
-                  {isMarkdownRecord(selected)
-                    ? (
-                      <>
-                        <OverviewSection label="Preview" onOpen={() => { activateTab('rendered') }}>
-                          <MarkdownRecordContent
-                            record={selected}
-                            rendered
-                            preview
-                            thinkingExpanded={thinkingExpanded}
-                            onThinkingExpandedChange={setThinkingExpanded}
-                            onOpenCall={openCallSummary}
-                            t={t}
-                          />
-                        </OverviewSection>
-                      </>
-                    )
-                    : (
-                      <>
-                        {selected.cell.inputDetail && (
-                          <OverviewSection label="Payload" onOpen={() => { activateTab('input') }}>
-                            <RecordPayload record={selected} direction="input" preview />
+                  {selected.cell.kind === 'routing'
+                    ? null
+                    : isMarkdownRecord(selected)
+                      ? (
+                        <>
+                          <OverviewSection label="Preview" onOpen={() => { activateTab('rendered') }}>
+                            <MarkdownRecordContent
+                              record={selected}
+                              rendered
+                              preview
+                              thinkingExpanded={thinkingExpanded}
+                              onThinkingExpandedChange={setThinkingExpanded}
+                              onOpenCall={openCallSummary}
+                              t={t}
+                            />
                           </OverviewSection>
-                        )}
-                        {selected.cell.outputDetail && (
-                          <OverviewSection label="Result" onOpen={() => { activateTab('output') }}>
-                            <RecordPayload record={selected} direction="output" preview />
+                        </>
+                      )
+                      : (
+                        <>
+                          {selected.cell.inputDetail && (
+                            <OverviewSection label="Payload" onOpen={() => { activateTab('input') }}>
+                              <RecordPayload record={selected} direction="input" preview />
+                            </OverviewSection>
+                          )}
+                          {selected.cell.outputDetail && (
+                            <OverviewSection label="Result" onOpen={() => { activateTab('output') }}>
+                              <RecordPayload record={selected} direction="output" preview />
+                            </OverviewSection>
+                          )}
+                          <OverviewSection label="Schema" onOpen={() => { activateTab('schema') }}>
+                            <RecordSchema record={selected} preview />
                           </OverviewSection>
-                        )}
-                        <OverviewSection label="Schema" onOpen={() => { activateTab('schema') }}>
-                          <RecordSchema record={selected} preview />
-                        </OverviewSection>
-                      </>
-                    )}
+                        </>
+                      )}
                   {selectedAssistantRequestTarget !== undefined && (
                     <OverviewSection
                       label="Request Timing"

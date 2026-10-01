@@ -1,0 +1,57 @@
+# Keyless model-routing composition for the headless stream-json snapshot:
+# the shipping `cordis.yml` spine with the routed turn served by a loopback
+# stub, the router composed with routing OFF, so the same fixture runs without a routing decision.
+
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        config:
+          baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are headless-agent, a coding assistant.
+
+            Verify your work by running the code or tests. Keep answers brief and
+            factual.
+      - insert:
+          - id: agent-default-model
+            name: '@shres-code/shres-code-agent-default-model'
+            config:
+              provider: deepseek-official
+              model: deepseek-v4-pro
+          - id: model-router
+            name: '@shres-code/shres-code-model-router'
+            config:
+              initialMode: off
+              candidates:
+                - id: flash
+                  provider: deepseek-official
+                  model: deepseek-v4-flash
+                  description: a small, well-scoped change in familiar code
+              routeFrom:
+                - provider: deepseek-official
+                  model: deepseek-v4-pro
+                  objective: dollars
+              downgradeThreshold: 0.7
+              downgradeMargin: 0.5
+              hold:
+                minSteps: 3
+              routeInstructions: Pick the cheapest route that can finish this turn.
+              difficultyInstructions: Rate how much reasoning this turn needs.
+          - id: judgment-dispatch
+            name: '@shres-code/shres-code-judgment-dispatch'
+            config:
+              defaultEngine: snapshot
+          - id: model-router-snapshot-fixture
+            name: './tests/fixtures/model-router-snapshot-fixture.ts'

@@ -630,6 +630,13 @@ export interface CompactionPolicyConfig {
   summarizationProvider?: string
   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
   summarizationModel?: string
+  /**
+   * Route the summary runs on when no summarization pair is set. `manual`
+   * summarizes on the session's manual route, the entry route of a held model-
+   * routing streak rather than the routed candidate; `request` summarizes on
+   * the latest request's route. Defaults to `manual`.
+   */
+  summarizationRoute?: SummarizationRoute
   /** Provider generation cap for summarization. Defaults to `8192`. */
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
@@ -650,9 +657,95 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
   /** Exact routed model id to match within `provider`. */
   model: string
 }
+
+/** Which route a summary without a configured summarization pair runs on. */
+export type SummarizationRoute = 'manual' | 'request'
 ```
 
-Source: [`packages/compaction/compaction-basic/src/types.ts:43`](../packages/compaction/compaction-basic/src/types.ts)
+Source: [`packages/compaction/compaction-basic/src/types.ts:53`](../packages/compaction/compaction-basic/src/types.ts)
+
+<a id="shres-codeshres-code-compaction-jev"></a>
+
+## `@shres-code/shres-code-compaction-jev`
+
+```ts config-catalog
+/** Jev compaction configuration: the inherited policy plus the judgment fields. */
+export interface JevCompactionConfig extends BasicCompactionConfig {
+  /** Judgment tier the scoring and verification calls run at. Defaults to `accurate`. */
+  tier?: 'fast' | 'accurate'
+  /** The segment load-bearingness question text. Required. */
+  segmentScoreInstructions: string
+  /**
+   * Ordered score levels for the segment question, lowest first. Defaults to a
+   * five-level rubric. A score question needs ordered levels, which the seam
+   * requires; the rubric is Config on the consumer, like the model-router's
+   * difficulty levels.
+   */
+  segmentScoreLevels?: string[]
+  /**
+   * The per-sub-span-edge boundary question text. Required. Phrased as the
+   * hazard: a high probability means this edge cuts through work that belongs
+   * together, which is what `boundaryThreshold` marks unsafe.
+   */
+  boundaryInstructions: string
+  /** The overall draft-quality score question text. Required. */
+  verifyInstructions: string
+  /** The named binary checks the battery runs beside the overall score. Required, at least one. */
+  verifyChecks: JevVerifyCheckConfig[]
+  /** Ordered score levels for the overall question, lowest first. Defaults to a five-level rubric. */
+  verifyScoreLevels?: string[]
+  /** Segment questions per judgment ask. Defaults to 4; a larger span is chunked. */
+  maxSegmentsPerCall?: number
+  /** Per-segment character cap for scoring, head and tail kept. Defaults to 2000. */
+  segmentMaxChars?: number
+  /** Character cap for the draft plus original region a verification reads. Defaults to 6000. */
+  verifyMaxChars?: number
+  /** Load-bearingness score at or above which a segment is rescued. Defaults to 3. */
+  rescueScore?: number
+  /** Confidence at or above which a score is trusted. Defaults to 0.6. */
+  segmentConfidence?: number
+  /** Maximum rescued segments per compaction; `0` disables rescue. Defaults to 2. */
+  maxRescues?: number
+  /** Boundary hazard probability at or above which an edge is unsafe. Defaults to 0.4. */
+  boundaryThreshold?: number
+  /** Wobble band below the boundary threshold that also counts as unsafe. Defaults to 0.15. */
+  boundaryMargin?: number
+  /** Maximum surface nodes one edge may move. Defaults to 2. */
+  maxBoundaryAdjustment?: number
+  /** Verify-check probability at or above which a check passes. Defaults to 0.7. */
+  verifyThreshold?: number
+  /** Wobble band below the verify threshold treated as not verified. Defaults to 0.1. */
+  verifyMargin?: number
+  /** Overall score at or above which a draft passes. Defaults to 4. */
+  verifyScore?: number
+  /** Provider route for the escalation draft; pair with `escalationModel`, or omit both for the conversation target. */
+  escalationProvider?: string
+  /** Model for the escalation draft; pair with `escalationProvider`. */
+  escalationModel?: string
+  /** Escalation drafts after a failed verification. Defaults to 1. */
+  maxEscalations?: number
+  /** What a draft that failed every escalation attempt does. Defaults to `accept-logged`. */
+  onVerifyFailure?: JevOnVerifyFailure
+}
+
+/** One named binary check of the verification battery. */
+export interface JevVerifyCheckConfig {
+  /** Stable name recorded on the verification event. */
+  name: string
+  /**
+   * The binary question text, phrased as the hazard (a high probability means
+   * the draft breaks this rule). The consumer owns the text; the seam adds none.
+   */
+  instructions: string
+}
+
+/** What a draft that fails its verification battery does. */
+export type JevOnVerifyFailure = 'accept-logged' | 'fail-attempt'
+```
+
+Depends on: [`BasicCompactionConfig`](#shres-codeshres-code-compaction-basic)
+
+Source: [`packages/compaction/compaction-jev/src/config.ts:27`](../packages/compaction/compaction-jev/src/config.ts)
 
 <a id="shres-codeshres-code-compaction-tool-result-pruner"></a>
 
@@ -833,10 +926,16 @@ Requires: `agentDefaultModel` · `agents` · `sessions`
 export interface Config {
   /** The prompt text for the single run. */
   task: string
+  /** Explicit id for the fresh session; absent means a generated id. */
+  sessionId?: SessionId
+  /** Persisted session to continue instead of creating a fresh one; mutually exclusive with `sessionId`. */
+  resume?: SessionId
 }
 ```
 
-Source: [`packages/bundle/headless/src/index.ts:30`](../packages/bundle/headless/src/index.ts)
+Depends on: [`SessionId`](subsystems/core.md)
+
+Source: [`packages/bundle/headless/src/index.ts:34`](../packages/bundle/headless/src/index.ts)
 
 <a id="shres-codeshres-code-hooks-claude-code"></a>
 
@@ -1129,6 +1228,343 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-judgment-bench-random"></a>
+
+## `@shres-code/shres-code-judgment-bench-random`
+
+Requires: `judgmentEngines`
+
+```ts config-catalog
+/** Plugin config: the matched entry rate and the draw seed. */
+export interface Config {
+  /** Probability that one consult selects the downgrade candidate. */
+  entryRate: number
+  /** 32-bit seed of the consult draw hash. */
+  seed: number
+}
+```
+
+Source: [`packages/llm/judgment-bench-random/src/index.ts:35`](../packages/llm/judgment-bench-random/src/index.ts)
+
+<a id="shres-codeshres-code-judgment-dispatch"></a>
+
+## `@shres-code/shres-code-judgment-dispatch`
+
+```ts config-catalog
+/** Composition configuration of the dispatcher. */
+export interface JudgmentDispatchConfig {
+  /**
+   * Registry id of the engine that answers every ask the `judgment` settings
+   * do not route elsewhere. Required: the dispatcher never picks an engine by
+   * registration order.
+   */
+  defaultEngine: string
+}
+```
+
+Source: [`packages/llm/judgment-dispatch/src/config.ts:11`](../packages/llm/judgment-dispatch/src/config.ts)
+
+<a id="shres-codeshres-code-judgment-guardrails"></a>
+
+## `@shres-code/shres-code-judgment-guardrails`
+
+```ts config-catalog
+/**
+ * Composition config of the guardrails observer; also the
+ * `judgment-guardrails` settings section.
+ *
+ * The observer ships off. `enabled: false` makes no ask and writes no session
+ * event, so a composed-but-off deployment's log is byte-identical to one without
+ * this package.
+ */
+export interface GuardrailsConfig {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /**
+   * Text of the binary question asked about one tool call's input: whether it
+   * attempts to override instructions or act against the user's interest.
+   * Required: the judgment engine owns no prose.
+   */
+  injectionInstructions: string
+  /**
+   * What each side of the binary question means. Required: a bare yes/no
+   * question leaves the engine to guess what "yes" is being asked.
+   */
+  injectionCriteria: GuardInjectionCriteria
+  /**
+   * Text of the score question asked about the same state: how severe the input
+   * would be if it is hostile. Required, like every other question text.
+   */
+  severityInstructions: string
+  /**
+   * Ordered severity levels for the score question, lowest first. Required: the
+   * level count fixes the score scale, so a package default would mislabel every
+   * deployment that reads severity at another resolution.
+   */
+  severityLevels: string[]
+  /** Caps the judged state is assembled under; an omitted field takes its own default. */
+  state?: GuardStateCaps
+  /** Judgment tier each check runs at. Default `fast`. */
+  tier?: JudgmentTier
+}
+
+/** The two sides of the injection question, as the engine reads them. */
+export interface GuardInjectionCriteria {
+  /** What a positive noul answer means for this deployment. */
+  readonly yes: string
+  /** What a negative noul answer means for this deployment. */
+  readonly no: string
+}
+
+/** The caps one state is assembled under. */
+export interface GuardStateCaps {
+  /**
+   * Hard cap on the state text in characters, defaulting to
+   * {@link DEFAULT_STATE_MAX_CHARS}. The state never exceeds it; when content is
+   * dropped the state ends with a note naming how many characters it lost.
+   */
+  readonly maxChars: number
+  /**
+   * Hard cap on the argument excerpt in characters, defaulting to
+   * {@link DEFAULT_STATE_MAX_ARG_CHARS}. The excerpt is context for the
+   * classifier; the call it was cut from stays in the log.
+   */
+  readonly maxArgChars: number
+}
+```
+
+Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
+
+Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
+
+<a id="shres-codeshres-code-judgment-laya"></a>
+
+## `@shres-code/shres-code-judgment-laya`
+
+Requires: `subprocess` · `judgmentEngines`
+
+```ts config-catalog
+/** Configuration for the supervised local Laya judgment gateway. */
+export interface LayaJudgmentConfig {
+  /** The pinned checkpoint and its manifest digest. */
+  model: LayaJudgmentModel
+  /** Token window of the pinned checkpoint; the gateway must report the same limit. */
+  checkpointContext: 512 | 1024
+  /** Inference precision passed to laya-mlx. */
+  dtype?: 'float16' | 'float32'
+  /** Absolute directory holding the virtual environment, its uv-managed Python, the uv package cache, and the install marker. */
+  runtimeDir?: string
+  /** Absolute Hugging Face home holding downloaded checkpoints. */
+  hfHome?: string
+  /** Absolute path of the `python/laya-gateway` project. */
+  gatewayProject?: string
+  /** `uv` executable: an absolute path or a name on PATH. */
+  uvPath?: string
+  /** Version of the uv-managed CPython the virtual environment uses, `major.minor`. */
+  python?: string
+  /** Questions per gateway inference batch. */
+  batchSize?: number
+  /** Deadline for the first readiness line, health check, and smoke ask, in milliseconds. */
+  startupTimeoutMs?: number
+  /** Deadline for one judgment request, in milliseconds. */
+  requestTimeoutMs?: number
+  /** SIGTERM-to-SIGKILL grace when stopping the gateway, in milliseconds. */
+  shutdownGraceMs?: number
+  /** Deadline for each install step, in milliseconds. */
+  installTimeoutMs?: number
+  /** Maximum serialized UTF-8 request body, enforced by both the provider and the gateway. */
+  maxRequestBytes?: number
+  /** Maximum response body accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Crash-restart budget. */
+  restart?: LayaRestartPolicy
+}
+
+/** The pinned checkpoint the local gateway serves. */
+export interface LayaJudgmentModel {
+  /** Hugging Face repository, `owner/name`. */
+  repo: string
+  /** 40-character commit sha of the pinned revision. */
+  revision: string
+  /**
+   * SHA-256 of the exact bytes of the gateway project's
+   * `manifests/<revision>.json`, which pins every checkpoint file's digest.
+   */
+  manifestSha256: string
+}
+
+/** Crash-restart budget for the supervised gateway. */
+export interface LayaRestartPolicy {
+  /** Restarts allowed inside one {@link windowMs}; one more leaves the gateway unavailable. */
+  maxRestarts?: number
+  /** Sliding window over which restarts are counted, in milliseconds. */
+  windowMs?: number
+  /** First restart delay; each consecutive failure doubles it. */
+  backoffMs?: number
+  /** Largest restart delay. */
+  maxBackoffMs?: number
+}
+```
+
+Source: [`packages/llm/judgment-laya/src/types.ts:33`](../packages/llm/judgment-laya/src/types.ts)
+
+<a id="shres-codeshres-code-judgment-llm"></a>
+
+## `@shres-code/shres-code-judgment-llm`
+
+Requires: `judgmentEngines` · `llm`
+
+```ts config-catalog
+/** Composition config for one LLM judgment engine. */
+export interface LlmJudgmentConfig {
+  /** Registered `ctx.llm` provider route that answers every ask. */
+  provider: string
+  /** Model id on that route. */
+  model: string
+  /**
+   * Where that route sends the state: `local` only when this machine serves
+   * the route's endpoint, `remote` for every other route, a LAN host
+   * included. Required, because the llm seam records no route locality and a
+   * provider's name proves nothing.
+   */
+  egress: LlmJudgmentEgress
+  /** Adapter-owned reasoning effort for the judge request; validated against the model. */
+  reasoningEffort?: string
+  /**
+   * Largest state, after redaction, one ask may send. Enforced as a UTF-8 byte
+   * count: every tokenizer emits at most one token per byte, so a state within
+   * this many bytes stays within this many tokens.
+   */
+  maxStateTokens: number
+  /** Bound on one ask's model request in milliseconds; defaults to {@link DEFAULT_TIMEOUT_MS}. */
+  timeoutMs?: number
+  /**
+   * Sampling temperature for the judge request. A route that declares the
+   * model refuses a stated temperature leaves the engine `unconfigured`.
+   */
+  temperature?: number
+}
+
+/**
+ * Where the configured route sends the judged state. `local` means this
+ * machine: the route's endpoint is served by this host. A route that serves
+ * from any other host, a machine on the same LAN included, is `remote`,
+ * whatever its name.
+ */
+export type LlmJudgmentEgress = 'local' | 'remote'
+```
+
+Source: [`packages/llm/judgment-llm/src/config.ts:22`](../packages/llm/judgment-llm/src/config.ts)
+
+<a id="shres-codeshres-code-judgment-shield"></a>
+
+## `@shres-code/shres-code-judgment-shield`
+
+Requires: `judgmentEngines`
+
+```ts config-catalog
+/** Configuration for the loopback-only typed-judgment gateway. */
+export interface ShieldJudgmentConfig {
+  /** Loopback HTTP(S) endpoint hosting `/v1/judgments`. */
+  endpoint: string
+  /** Explicit artifact id for each judgment tier. */
+  models: ShieldJudgmentModels
+  /** Maximum time spent waiting for the gateway response, in milliseconds. */
+  timeoutMs?: number
+  /** Maximum UTF-8 response body size accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Maximum complete serialized UTF-8 request body size; align with the gateway's body limit. */
+  maxRequestBytes?: number
+  /** Interval between readiness probes (a TCP connection to the endpoint), in milliseconds. */
+  readinessIntervalMs?: number
+}
+
+/** The two pinned model artifacts a judgment tier resolves to. */
+export interface ShieldJudgmentModels {
+  /** Artifact serving the explicit `fast` tier. */
+  fast: string
+  /** Artifact serving `accurate` and asks that omit a tier. */
+  accurate: string
+}
+```
+
+Source: [`packages/llm/judgment-shield/src/types.ts:16`](../packages/llm/judgment-shield/src/types.ts)
+
+<a id="shres-codeshres-code-judgment-typesafe"></a>
+
+## `@shres-code/shres-code-judgment-typesafe`
+
+Requires: `judgmentEngines`
+
+```ts config-catalog
+/**
+ * Composition config of the TypeSafe judgment engine.
+ *
+ * Schemastery rejects a wrong type at plugin load; {@link resolveConfig} from
+ * `./config.ts` re-judges every field, including unknown and misspelled keys,
+ * because programmatic construction bypasses the schema.
+ */
+export interface TypesafeJudgmentConfig {
+  /**
+   * Credential reference (environment-variable name) holding the API key.
+   * Required with no default: which environment reference holds the key is the
+   * deployment's decision, and the reference is resolved per ask through the
+   * credentials seam.
+   */
+  apiKeyRef: string
+  /** Vendor endpoint base without a trailing slash; defaults to the public API. */
+  endpoint?: string
+  /** Model id per judgment tier; defaults to `jev-preview` and `jev-latest`. */
+  models?: TypesafeJudgmentModels
+  /**
+   * Deadline for one vendor request in milliseconds, defaulting to 30000. An
+   * ask that outlives it fails with `UNAVAILABLE` naming the figure. The
+   * deadline is armed once per ask, so it also bounds a retry and its wait.
+   */
+  timeoutMs?: number
+  /** Bounded transient-failure retry; omitted takes every default in {@link TypesafeJudgmentRetry}. */
+  retry?: TypesafeJudgmentRetry
+}
+
+/** Model id each judgment tier resolves to. */
+export interface TypesafeJudgmentModels {
+  /** Model serving the `fast` tier. */
+  fast: string
+  /** Model serving the `accurate` tier, and every ask that omits a tier. */
+  accurate: string
+}
+
+/**
+ * Bounded transient-failure retry for one ask.
+ *
+ * The vendor's documented transient responses are the rate-limit 429 and the
+ * overloaded 529; its 401 and 422 are deterministic refusals that a repeat
+ * cannot change, so they are not retried unless a deployment names them here.
+ */
+export interface TypesafeJudgmentRetry {
+  /**
+   * Retries allowed after the first request, defaulting to 1. `0` disables
+   * retry and leaves every refusal to the caller, which is how the engine
+   * behaved before this field existed.
+   */
+  maxRetries?: number
+  /**
+   * Fixed delay before each retry in milliseconds, defaulting to 300. `0`
+   * retries on the next timer turn. The ask's `timeoutMs` deadline stays armed
+   * through the wait, so a wait that outlives it fails as a timeout.
+   */
+  delayMs?: number
+  /**
+   * HTTP statuses eligible for retry, defaulting to the vendor's documented
+   * transient 429 and 529. A status this list omits fails on its first
+   * response, and the list must not be empty while `maxRetries` is positive.
+   */
+  statuses?: number[]
+}
+```
+
+Source: [`packages/llm/judgment-typesafe/src/types.ts:52`](../packages/llm/judgment-typesafe/src/types.ts)
+
 <a id="shres-codeshres-code-ledger"></a>
 
 ## `@shres-code/shres-code-ledger`
@@ -1172,6 +1608,12 @@ export interface Config {
   models?: ClaudeSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to `DEFAULT_REFRESH_LEEWAY_MS`. */
   refreshLeewayMs?: number
+  /**
+   * Prompt-cache retention every request asks for; defaults to
+   * `DEFAULT_CACHE_RETENTION`. `long` asks for the one-hour cache and `none`
+   * disables prompt caching.
+   */
+  cacheRetention?: ClaudeSessionCacheRetention
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -1203,11 +1645,14 @@ export interface ClaudeSessionModelConfig {
     supportsTemperature?: boolean
   }
 }
+
+/** Prompt-cache retention the route requests: pi-ai's `none`, `short`, or `long`. */
+export type ClaudeSessionCacheRetention = NonNullable<PiAiProviderProfile['cacheRetention']>
 ```
 
-Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts) · [`PiAiProviderProfile`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:139`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -1460,7 +1905,7 @@ export interface DeepSeekCatalogModel {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:106`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/index.ts:111`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="shres-codeshres-code-llm-grok-session"></a>
 
@@ -1615,6 +2060,17 @@ export interface PiAiProviderProfile {
    * to answer instead.
    */
   defaultInput?: PiAiModality[]
+  /**
+   * Whether this route's requests carry the vendor's prompt cache key, with
+   * the request's session id as its value (default `off`).
+   *
+   * A key is sent only where the exact model's wire protocol declares such a
+   * field (`PROMPT_CACHE_KEY_FIELDS`), and only to a request the loop stamped
+   * with a session id. A profile whose protocol has no field sends nothing —
+   * not an error, because what a vendor spells as a cache key is a property of
+   * its wire format rather than of the configuration.
+   */
+  promptCacheKey?: PiAiPromptCacheKey
   /** Provider request headers; Harness attribution wins reserved names. */
   headers?: Record<string, string>
   /** Provider-neutral pi-ai reasoning level. */
@@ -1623,6 +2079,13 @@ export interface PiAiProviderProfile {
   thinkingBudgets?: ThinkingBudgets
   /** Prompt-cache retention preference. */
   cacheRetention?: CacheRetention
+  /**
+   * Whether this route's provider reports prompt-cache counts on every call.
+   * pi-ai reports 0 both for a cache miss and for a response that carried no
+   * cache counts, so only the route can say which a 0 means. Omission resolves
+   * per model from its protocol through {@link resolveCacheUsage}.
+   */
+  cacheUsage?: PiAiCacheUsage
   /** Streaming transport preference. */
   transport?: Transport
   /** HTTP/provider SDK timeout in milliseconds. */
@@ -1763,6 +2226,20 @@ export interface PiAiHostedTools {
 export type PiAiModality = Model<Api>['input'][number]
 
 /**
+ * How one route's requests identify their prompt cache. `session` sends each
+ * request's session id as the vendor's cache key, so every turn of one session
+ * stays in one cache domain; `off` sends nothing.
+ */
+export type PiAiPromptCacheKey = 'session' | 'off'
+
+/**
+ * Whether a route's provider reports prompt-cache counts on every call.
+ * `reported`: usage carries both cache counts, zeros included. `unreported`:
+ * usage carries neither, and `inputTokens` is the whole prompt.
+ */
+export type PiAiCacheUsage = 'reported' | 'unreported'
+
+/**
  * Selectable reasoning efforts for one model: each key is a level the model
  * offers (and selectors show), and its value is the wire spelling dispatch
  * sends for it. `off` alone may leave its value empty — "supported, send
@@ -1788,7 +2265,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template' | 'baseten'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:213`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:247`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -2063,6 +2540,324 @@ export interface Config {
 ```
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
+
+<a id="shres-codeshres-code-model-router"></a>
+
+## `@shres-code/shres-code-model-router`
+
+```ts config-catalog
+/** Composition config of the model router; also the `model-router` settings section. */
+export interface ModelRouterConfig {
+  /**
+   * Deployment mode for sessions without an explicit user choice: `off`, `on`,
+   * or `shadow`, which judges and logs without rewriting a request. Changes
+   * commit between requests.
+   */
+  initialMode: ModelRoutingInitialMode
+  /**
+   * The one shared pool of downgrade candidates, whose relative capability and
+   * cost the deployment owns. An empty pool leaves every turn on the manual
+   * route with `no-candidates`.
+   */
+  candidates?: ModelRoutingCandidateConfig[]
+  /**
+   * Strong routes routing may start from, each with its billing objective. A
+   * manual route not listed here keeps its model with `base-unlisted` and no
+   * judgment call. Must be non-empty unless `initialMode` is `off`.
+   */
+  routeFrom?: ModelRoutingRouteFromConfig[]
+  /**
+   * Ordered child-route rules. First match wins. An empty list (the default)
+   * never routes a child. Each `candidate` must be a pool id.
+   */
+  childPolicies?: ModelRoutingChildPolicyConfig[]
+  /** Consecutive counted child failures that suspend one pool candidate. Defaults to 2. */
+  childRouteErrors?: number
+  /**
+   * Two-option child-route question text. Required when any rule sets `judge`.
+   */
+  childRouteInstructions?: string
+  /**
+   * Route confidence at or above which a candidate may be selected. Required.
+   * The global default for any engine without an operating point.
+   */
+  downgradeThreshold: number
+  /**
+   * Required top-two probability margin (`top1 - top2`) for a selection.
+   * Required. The global default for any engine without an operating point.
+   */
+  downgradeMargin: number
+  /**
+   * Gate thresholds per judgment engine, which replace the global defaults
+   * for the engine each names. At most one per engine. A `verbalized` engine
+   * gates only through a point that sets `acceptVerbalized`.
+   */
+  operatingPoints?: ModelRoutingOperatingPointConfig[]
+  /** Streak horizon and cap, in model steps. */
+  hold?: ModelRoutingHoldConfig
+  /** Entry side of the difficulty band. */
+  difficulty?: ModelRoutingDifficultyConfig
+  /**
+   * Turns after the one whose `escalated`, `current-preferred`, or
+   * `route-failed` decision ended a streak that keep the manual route without
+   * judgment, logged as `reentry-cooldown`. The ending turn itself stays on the
+   * manual route either way. `0` disables the cooldown. Defaults to 2.
+   */
+  reentryCooldownTurns?: number
+  /** The choice question text asked about the conversation state. Required. */
+  routeInstructions: string
+  /**
+   * The difficulty question text. Required by stickiness (`hold.minSteps > 0`),
+   * `hardHint`, and `difficultyToEffort`. When configured, every consult asks
+   * it and checks the difficulty limit before allowing a downgrade.
+   */
+  difficultyInstructions?: string
+  /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
+  difficultyLevels?: string[]
+  /** Escalate-back operating point. */
+  escalateBack?: ModelRoutingEscalateBackConfig
+  /**
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
+   */
+  maxRouteErrors?: number
+  /** What a failed judgment call does to the turn. Defaults to `fallback`. */
+  onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * Milliseconds one judgment call may take before the router records it as
+   * `engine-unavailable` with `engineFailure.code` `DEADLINE`; a turn
+   * cancellation still cancels the turn. At most 30000. Defaults to 1500.
+   */
+  judgmentDeadlineMs?: number
+  /** How failed judgment calls affect a held streak and later consults. */
+  judgmentFailures?: ModelRoutingJudgmentFailuresConfig
+  /** The prompt-cache facts the quota cold-point policy reads. */
+  coldPoints?: ModelRoutingColdPointsConfig
+  /**
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
+  /**
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
+   */
+  difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
+  /**
+   * Optional advisory hint while the manual route stands. Omitted — or a
+   * valueless key — means not configured, so a deployment without it is not
+   * asked for the difficulty question.
+   */
+  hardHint?: ModelRoutingHardHintConfig
+  /** The state window each judgment call reads. */
+  state?: ModelRoutingStateConfig
+  /** Judgment tier each call runs at. Defaults to `fast`. */
+  tier?: 'fast' | 'accurate'
+}
+
+/** The mode a session without an explicit user choice starts in. */
+export type ModelRoutingInitialMode = ModelRoutingMode
+
+/**
+ * One allowlisted downgrade candidate as configuration states it: plain
+ * strings, because a composition file carries no brands. Resolution brands the
+ * effort into {@link ModelRoutingCandidate}.
+ */
+export interface ModelRoutingCandidateConfig {
+  /** Stable id a decision records, for logs and configuration surfaces. */
+  id: string
+  /** Registered provider route this candidate runs on. */
+  provider: string
+  /** Provider-owned model id this candidate runs. */
+  model: string
+  /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
+  reasoningEffort?: string
+  /**
+   * Tasks this candidate can handle, included with its model identity in every
+   * judgment question. Required, at most 160 characters.
+   */
+  description: string
+}
+
+/** One strong route that routing may start from, as configuration states it. */
+export interface ModelRoutingRouteFromConfig {
+  /** Registered provider route of the strong model. */
+  provider: string
+  /** Provider-owned model id of the strong model. */
+  model: string
+  /** How this strong route is billed. Required. */
+  objective: ModelRoutingObjective
+  /**
+   * Allow per-turn entry from a `quota` route, as `dollars` and `latency`
+   * routes enter. Without it a quota route starts a downgrade only at a cold
+   * point of its prompt cache and returns at the next one; set it for bench
+   * arms that measure per-turn entry.
+   */
+  allowEveryTurn?: boolean
+}
+
+/** One ordered child-route rule, as configuration states it. */
+export interface ModelRoutingChildPolicyConfig {
+  /** Match constraints; empty is a catch-all and is allowed only as the last rule. */
+  match: ModelRoutingChildPolicyMatchConfig
+  /** Pool candidate id this rule selects. */
+  candidate: string
+  /** When true, ask the selected engine keep-current vs this candidate. Defaults to false. */
+  judge?: boolean
+}
+
+/**
+ * The gate thresholds one judgment engine is operated at, as configuration
+ * states them. Thresholds do not transfer between engines, so a point applies
+ * only to the engine it names.
+ */
+export interface ModelRoutingOperatingPointConfig {
+  /** Registry id of the engine this point applies to. */
+  engine: string
+  /** Route confidence at or above which a candidate may be selected. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. */
+  downgradeMargin: number
+  /** Id of the preregistration whose replay set these thresholds; absence marks them uncalibrated. */
+  calibratedBy?: string
+  /**
+   * Allow gating on an engine whose descriptor declares `verbalized`
+   * calibration. Without it such an engine is refused as `engine-uncalibrated`.
+   */
+  acceptVerbalized?: boolean
+}
+
+/**
+ * The streak horizon, counted in model steps: every `step/start` the loop logs
+ * while a downgrade is held advances it, including later steps of the turn that
+ * entered the streak.
+ */
+export interface ModelRoutingHoldConfig {
+  /**
+   * Steps a downgrade is held through a failed gate or a different candidate
+   * before either may end it. `0` disables stickiness, so each eligible
+   * cold-point or per-turn consult is judged on its own. Defaults to 20.
+   */
+  minSteps?: number
+  /**
+   * Steps after which the next consult ends a held downgrade with `hold-cap`,
+   * whatever the judgment would answer. Defaults to 40.
+   */
+  maxSteps?: number
+}
+
+/** The entry side of the difficulty band. */
+export interface ModelRoutingDifficultyConfig {
+  /**
+   * Difficulty at or above which a streak is not entered. A held streak ends
+   * only at `escalateBack.scoreThreshold`, so scores between the two hold but
+   * do not enter. Must not exceed `escalateBack.scoreThreshold`. Defaults to
+   * level 2 of the five-level rubric.
+   */
+  entryScoreCeiling?: number
+}
+
+/** The escalation operating point. */
+export interface ModelRoutingEscalateBackConfig {
+  /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
+  scoreThreshold?: number
+}
+
+/** What a failed judgment call means for the turn. */
+export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
+
+/** How failed judgment calls affect a held streak and later consults. */
+export interface ModelRoutingJudgmentFailuresConfig {
+  /**
+   * Consecutive failed judgment calls a held streak survives, keeping its
+   * candidate with `judgment-failure-held`; the next failure ends it. `0`
+   * ends a held streak at the first failure. Defaults to 2.
+   */
+  holdTolerance?: number
+  /**
+   * Consecutive failed judgment calls that open the breaker. Only an answered
+   * call resets the count, so after the breaker closes one more failure opens
+   * it again. Defaults to 3.
+   */
+  breakerThreshold?: number
+  /**
+   * Turns after the turn of the latest failure during which an open breaker
+   * keeps the manual route with `breaker-open` and no judgment call. `0`
+   * disables the breaker. Defaults to 5.
+   */
+  breakerOpenTurns?: number
+}
+
+/** The prompt-cache facts the quota cold-point policy reads. */
+export interface ModelRoutingColdPointsConfig {
+  /**
+   * Cache lifetime, in milliseconds, assumed for a manual model whose metadata
+   * declares no `promptCacheTtlMs`. A positive integer of at most 86,400,000.
+   * Defaults to 300000, the common five-minute prompt-cache lifetime.
+   */
+  unknownTtlMs?: number
+}
+
+/** What a failed downgraded request means for its step. */
+export type ModelRoutingInTurnFallback = 'manual' | 'off'
+
+/** The optional difficulty-to-effort lift. */
+export interface ModelRoutingDifficultyToEffortConfig {
+  /**
+   * Difficulty score, on the step that enters a streak, at or above which the
+   * entered route runs at {@link reasoningEffort}. Must be below
+   * `difficulty.entryScoreCeiling`, because no streak is entered at or above it.
+   */
+  scoreThreshold: number
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
+  reasoningEffort: string
+}
+
+/** The advisory-hint operating point. */
+export interface ModelRoutingHardHintConfig {
+  /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
+  scoreThreshold?: number
+}
+
+/** The state window one judgment call reads. */
+export interface ModelRoutingStateConfig {
+  /** Prior user messages of the conversation to include before the current turn's. Defaults to 2. */
+  contextTurns?: number
+  /** Hard cap on the assembled state text, in characters. Defaults to 12000. */
+  maxChars?: number
+  /** Maximum complete context alternatives offered to a tokenizer-aware provider. Defaults to 8. */
+  maxFitCandidates?: number
+}
+
+/**
+ * The routing mode in force: `off` never judges, `on` judges and may rewrite a
+ * request, and `shadow` judges and logs every decision but never rewrites one.
+ */
+export type ModelRoutingMode = 'off' | 'on' | 'shadow'
+
+/**
+ * How a strong route that routing may start from is billed, which fixes what
+ * routing away from it saves: `quota` for a subscription or credit plan,
+ * `dollars` for a metered key, `latency` for a route chosen for speed.
+ */
+export type ModelRoutingObjective = 'quota' | 'dollars' | 'latency'
+
+/** Match fields one child-route policy may constrain. An empty object is a catch-all. */
+export interface ModelRoutingChildPolicyMatchConfig {
+  /** Delegation consumer kind. */
+  kind?: 'subagent' | 'workflow'
+  /** Exact tool-facing agent type, such as `explore`. */
+  agentType?: string
+}
+```
+
+Source: [`packages/llm/model-router/src/config.ts:133`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 
@@ -3086,7 +3881,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:185`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:225`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 
@@ -3357,7 +4152,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:186`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:213`](../packages/core/system-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-terminal-bash"></a>
 
@@ -4413,6 +5208,162 @@ export interface Config {
 
 Source: [`packages/wiki/wiki-librarian/src/resolve.ts:11`](../packages/wiki/wiki-librarian/src/resolve.ts)
 
+<a id="shres-codeshres-code-worker-escalation"></a>
+
+## `@shres-code/shres-code-worker-escalation`
+
+```ts config-catalog
+/**
+ * Composition config of the worker escalation ladder; also the
+ * `worker-escalation` settings section.
+ *
+ * The ladder ships off. `enabled: false` writes no session event and sends no
+ * mail, so a composed-but-off deployment's log is byte-identical to one
+ * without this package.
+ */
+export interface WorkerEscalationConfig {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** Per-trigger rows; an omitted row takes its own defaults. */
+  triggers?: WorkerEscalationTriggerTable
+  /**
+   * Continue resolutions one goal epoch may take before the ladder reports the
+   * worker blocked instead. `0` reports at the first firing trigger, which
+   * keeps the terminal reachable without any continue. Default 3.
+   */
+  maxContinues?: number
+  /**
+   * Delegation depth the ladder engages within. Root sessions (depth 0) are
+   * never engaged; the cap must be at least 1. Default 1.
+   */
+  maxArbiterDepth?: number
+  /**
+   * Completed steps between two decisions on one session, so a standing
+   * trigger cannot write a decision per event. Default 2.
+   */
+  minStepsBetween?: number
+  /** `tool/call` signals the worker digest retains. Default 12. */
+  maxDigestTools?: number
+  /** Character cap on the rendered worker digest. Default 4000. */
+  maxDigestChars?: number
+  /**
+   * Character cap on each bounded excerpt: an error excerpt, a tool-argument
+   * excerpt, the assignment, and each later team message. Default 200.
+   */
+  maxExcerptChars?: number
+  /** Character cap on each tool-argument excerpt inside the tool window. Default 80. */
+  maxArgChars?: number
+  /**
+   * Instructions of the Stage 1 ask's two-option choice question. Required: the
+   * judgment engine owns no prose, so the package that composes the ask owns
+   * the text, and a deployment that omits it fails at load rather than asking
+   * an unstated question.
+   */
+  progressInstructions: string
+  /**
+   * Confidence the ask's answer must reach for its gate to pass, from 0
+   * through 1. An answer below it resolves `continue` with
+   * `low-confidence`. Default 0.8, the routing operating point.
+   */
+  confidence?: number
+  /**
+   * Top-two probability margin (`top1 - top2`) the ask's answer must reach for
+   * its gate to pass, from 0 through 1. An answer below it resolves
+   * `continue` with `thin-margin`. Default 0.1, the routing operating point
+   * and above the measured wobble of a rented classifier's borderline answers.
+   */
+  margin?: number
+  /** Judgment tier the ask runs at: `fast` or `accurate`. Default `accurate`. */
+  judgmentTier?: JudgmentTier
+  /**
+   * Whether a firing trigger also asks the human, through the user-questions
+   * seam, to escalate this worker to the Lead now or let it keep working. The
+   * chosen option is logged on the decision and nothing is executed on it; the
+   * terminal asks nothing. That seam admits only a live runtime root, so a worker
+   * owned by its parent is asked as the Team root supervising it, and one with no
+   * live Team root is refused as `delegated-caller`. Default false.
+   */
+  askToEscalate?: boolean
+}
+
+/** The per-trigger table: one row per trigger, each independently enabled and counted. */
+export interface WorkerEscalationTriggerTable {
+  /** Error-burst row. */
+  errorBurst?: EscalationErrorBurstConfig
+  /** Attempt-count row. */
+  attemptCount?: EscalationAttemptCountConfig
+  /** Repeat-run-length row. */
+  repeatRunLength?: EscalationRepeatRunLengthConfig
+  /** Step-budget row. */
+  stepBudgetExhausted?: EscalationStepBudgetExhaustedConfig
+  /** Turn-failure-streak row. */
+  turnFailureStreak?: EscalationTurnFailureStreakConfig
+}
+
+/** The `errorBurst` row: consecutive errored tool results. */
+export interface EscalationErrorBurstConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Consecutive errored tool results that count as a burst. Sandbox denials and
+   * charter-discrimination probe runs are transparent — they neither count nor
+   * reset the run. {@link DEFAULT_TRIGGER_THRESHOLDS.errorBurst} when omitted.
+   */
+  burst?: number
+}
+
+/** The `attemptCount` row: distinct failed approaches on one goal epoch. */
+export interface EscalationAttemptCountConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Distinct failed approaches since the goal epoch's anchor that count as
+   * stuck. A passing checkpoint restarts the count, so verified progress
+   * clears the failures before it. {@link DEFAULT_TRIGGER_THRESHOLDS.attemptCount}
+   * when omitted.
+   */
+  attempts?: number
+}
+
+/** The `repeatRunLength` row: identical-call chains. */
+export interface EscalationRepeatRunLengthConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Identical-call chain length that counts as stuck, using the
+   * repeat-tool-reminder guard's own chain identity and reset rules.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.repeatRunLength} when omitted.
+   */
+  runLength?: number
+}
+
+/** The `stepBudgetExhausted` row: the per-turn step budget stopped a turn. */
+export interface EscalationStepBudgetExhaustedConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Step-budget stops on the current goal epoch that count as stuck.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.stepBudgetExhausted} when omitted.
+   */
+  exhaustions?: number
+}
+
+/** The `turnFailureStreak` row: durable turn failures. */
+export interface EscalationTurnFailureStreakConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Consecutive durable turn failures that count as stuck.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.turnFailureStreak} when omitted.
+   */
+  streak?: number
+}
+```
+
+Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
+
+Source: [`packages/team/worker-escalation/src/config.ts:153`](../packages/team/worker-escalation/src/config.ts)
+
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
 ## `@shres-code/shres-code-workflow-worker-thread`
@@ -4469,6 +5420,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-jspace` ([`packages/client/ui-jspace/src/index.ts`](../packages/client/ui-jspace/src/index.ts))
 - `@shres-code/shres-code-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
 - `@shres-code/shres-code-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
+- `@shres-code/shres-code-client-ui-model-routing` ([`packages/client/ui-model-routing/src/index.ts`](../packages/client/ui-model-routing/src/index.ts))
 - `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@shres-code/shres-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
@@ -4476,6 +5428,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-jspace` ([`packages/client/ui-settings-jspace/src/index.ts`](../packages/client/ui-settings-jspace/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-model-routing` ([`packages/client/ui-settings-model-routing/src/index.ts`](../packages/client/ui-settings-model-routing/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
@@ -4538,6 +5491,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@shres-code/shres-code-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
 - `@shres-code/shres-code-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
+- `@shres-code/shres-code-judgment` — abstract `JudgmentService` ([`packages/llm/judgment/src/index.ts`](../packages/llm/judgment/src/index.ts))
 - `@shres-code/shres-code-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
 - `@shres-code/shres-code-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
 - `@shres-code/shres-code-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))
@@ -4560,6 +5514,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-atomic-write` ([`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts))
 - `@shres-code/shres-code-base` ([`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts))
 - `@shres-code/shres-code-brand` ([`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts))
+- `@shres-code/shres-code-browser-bundle` ([`packages/bundle/browser/src/index.ts`](../packages/bundle/browser/src/index.ts))
 - `@shres-code/shres-code-client-schema-form` ([`packages/client/schema-form/src/index.ts`](../packages/client/schema-form/src/index.ts))
 - `@shres-code/shres-code-client-test-runtime` ([`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts))
 - `@shres-code/shres-code-client-ui-attachment` ([`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts))
@@ -4577,6 +5532,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
 - `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-progress-signals` ([`packages/team/progress-signals/src/index.ts`](../packages/team/progress-signals/src/index.ts))
 - `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
 - `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assertServiceable, Config, resolveProfiles } from '../src/config.ts'
+import { assertServiceable, Config, resolveCacheUsage, resolveProfiles } from '../src/config.ts'
+import { supportedProtocols } from '../src/provider.ts'
 
 /** Validate one hand-declared route, with the caller's fields layered onto it. */
 const routeWith = (profile: Record<string, unknown>): (() => unknown) =>
@@ -35,6 +36,33 @@ describe('reasoning schema boundary', () => {
   it('rejects a thinking format outside the offered set', () => {
     expect(configWith({ compat: { thinkingFormat: 'quantum' } })).toThrow(/expected/)
     expect(configWith({ compat: { thinkingFormat: 'baseten' } })).toThrow(/expected/)
+  })
+})
+
+describe('prompt cache key boundary', () => {
+  it('rejects a policy outside the offered set where it is written', () => {
+    expect(routeWith({ promptCacheKey: 'always' })).toThrow(/expected/)
+    expect(routeWith({ promptCacheKey: 'off' })).not.toThrow()
+  })
+
+  it('defaults to off and keeps a declared session policy', () => {
+    const declared = resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test',
+        models: [{ id: 'm' }],
+      },
+    })
+    expect(declared.get('acme-gateway')?.promptCacheKey).toBe('off')
+    const requested = resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test',
+        models: [{ id: 'm' }],
+        promptCacheKey: 'session',
+      },
+    })
+    expect(requested.get('acme-gateway')?.promptCacheKey).toBe('session')
   })
 })
 
@@ -161,5 +189,38 @@ describe('hosted-tools declaration boundary', () => {
     expect(resolved.get('acme-gateway')?.hostedTools.get('a')).toEqual(['web_search', 'x_search'])
     expect(resolved.get('acme-gateway')?.hostedTools.get('b')).toEqual(['web_search'])
     expect(resolved.get('acme-gateway')?.hostedTools.get('c')).toBeUndefined()
+  })
+})
+
+describe('cache-count reporting', () => {
+  it('accepts a declared reporting mode and rejects one outside the offered set', () => {
+    expect(routeWith({ cacheUsage: 'reported' })).not.toThrow()
+    expect(routeWith({ cacheUsage: 'unreported' })).not.toThrow()
+    expect(routeWith({ cacheUsage: 'sometimes' })).toThrow(/expected/)
+  })
+
+  it('resolves every supported protocol without a declaration', () => {
+    for (const api of supportedProtocols()) {
+      expect(['reported', 'unreported']).toContain(resolveCacheUsage(undefined, api))
+    }
+    expect(resolveCacheUsage(undefined, 'anthropic-messages')).toBe('reported')
+    expect(resolveCacheUsage(undefined, 'openai-responses')).toBe('reported')
+    expect(resolveCacheUsage(undefined, 'openai-completions')).toBe('unreported')
+  })
+
+  it('lets the route declaration win over the protocol guarantee', () => {
+    expect(resolveCacheUsage('reported', 'openai-completions')).toBe('reported')
+    expect(resolveCacheUsage('unreported', 'anthropic-messages')).toBe('unreported')
+  })
+
+  it('treats the whole OpenAI Responses family as reporting', () => {
+    expect(resolveCacheUsage(undefined, 'azure-openai-responses')).toBe('reported')
+    expect(resolveCacheUsage(undefined, 'openai-codex-responses')).toBe('reported')
+  })
+
+  it('resolves a catalog protocol without a reporting guarantee to unreported', () => {
+    for (const api of ['google-generative-ai', 'google-vertex', 'bedrock-converse-stream', 'mistral-conversations']) {
+      expect(resolveCacheUsage(undefined, api)).toBe('unreported')
+    }
   })
 })

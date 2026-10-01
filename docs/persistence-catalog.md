@@ -115,7 +115,48 @@ Sources: [`packages/core/session/src/types.ts:350`](../packages/core/session/src
 }
 ```
 
-Source: [`packages/core/agent/src/types.ts:19`](../packages/core/agent/src/types.ts)
+Source: [`packages/core/agent/src/types.ts:44`](../packages/core/agent/src/types.ts)
+
+<a id="agentmodel-selection--log-only"></a>
+
+#### `agent/model-selection` — log-only
+
+```ts persistence-catalog
+/**
+ * Explicit session model selection for subsequent prompt assembly. The
+ * latest selection remains authoritative across routed requests, resume,
+ * and fork; an absent effort selects the provider's default behavior.
+ * This non-surface event records intent even when the chosen route matches
+ * the last request header.
+ */
+'agent/model-selection': Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
+```
+
+Source: [`packages/core/agent/src/types.ts:21`](../packages/core/agent/src/types.ts)
+
+<a id="agentroute-base--log-only"></a>
+
+#### `agent/route-base` — log-only
+
+```ts persistence-catalog
+/**
+ * The manual route beneath a routed request. The model-selection hook
+ * appends it before the request's `request/header` when a composed
+ * `ctx.modelRouting` ran a route that differs from the manual route in
+ * provider, model, or effort, so a reader without the router recovers the
+ * route the agent returns to (`manualBaseOfLastHeader`). Required on read:
+ * a build that skipped it would resume on the routed candidate. The two
+ * routes differ, and each has a nonempty provider and model.
+ */
+'agent/route-base': {
+  /** The manual route the request was routed from. */
+  manual: Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
+  /** The route the request ran. */
+  routed: Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
+}
+```
+
+Source: [`packages/core/agent/src/types.ts:32`](../packages/core/agent/src/types.ts)
 
 ### `agent-preset/*`
 
@@ -333,6 +374,22 @@ Source: [`packages/compaction/compaction/src/types.ts:73`](../packages/compactio
 
 Source: [`packages/compaction/compaction/src/types.ts:96`](../packages/compaction/compaction/src/types.ts)
 
+<a id="compactionselection--log-only"></a>
+
+#### `compaction/selection` — log-only
+
+```ts persistence-catalog
+/**
+ * One semantic selection decision: log-only, append-only, and written once
+ * per automatic compaction attempt before any summarization call. It records
+ * what the selection considered, what it rescued, and how it moved the
+ * sub-span edges, which is the evidence the bench reads.
+ */
+'compaction/selection': CompactionSelectionEvent
+```
+
+Source: [`packages/compaction/compaction-jev/src/types.ts:149`](../packages/compaction/compaction-jev/src/types.ts)
+
 <a id="compactionstart--log-only"></a>
 
 #### `compaction/start` — log-only
@@ -404,6 +461,47 @@ Types: [ContentBlock](subsystems/core.md) · [TokenUsage](subsystems/llm-streami
 
 Source: [`packages/compaction/compaction/src/types.ts:35`](../packages/compaction/compaction/src/types.ts)
 
+<a id="compactionverification--log-only"></a>
+
+#### `compaction/verification` — log-only
+
+```ts persistence-catalog
+/**
+ * One verify-cascade attempt: log-only, append-only, and written for every
+ * verification of a draft, including the degraded case where the inherited
+ * summarizer's output was accepted without a battery.
+ */
+'compaction/verification': CompactionVerificationEvent
+```
+
+Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/compaction/compaction-jev/src/types.ts)
+
+### `escalation/*`
+
+<a id="escalationdecision--log-only"></a>
+
+#### `escalation/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One worker-escalation ladder decision. Log-only and append-only: the
+ * decision records what the ladder resolved for a firing trigger, never a
+ * model-visible message of its own. Writers pass `{ ignorable: true }`.
+ * @param trigger - trigger that fired.
+ * @param triggerSeq - session event seq of the event satisfying it.
+ * @param choice - continue, the ask's needs-help option where its answer passed the gate, or report blocked to the Lead.
+ * @param engine - engine class that answered or could not; absent for the deterministic terminal, which consults nothing.
+ * @param reason - why this decision resolved the way it did.
+ * @param confidence - confidence the ask reported, where an engine answered.
+ * @param margin - top-two probability margin of the answer's distribution, where an engine answered.
+ * @param ask - what the ask-to-escalate resolved, where `askToEscalate` is on and the decision is not the terminal.
+ * @param aging - aging fold state this decision records for its goal epoch.
+ */
+'escalation/decision': EscalationDecision
+```
+
+Source: [`packages/team/worker-escalation/src/types.ts:230`](../packages/team/worker-escalation/src/types.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>
@@ -459,6 +557,35 @@ Source: [`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain
 ```
 
 Source: [`packages/llm/tool-grok-x-search/src/types.ts:56`](../packages/llm/tool-grok-x-search/src/types.ts)
+
+### `guard/*`
+
+<a id="guarddecision--log-only"></a>
+
+#### `guard/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One guardrails check of one committed tool call. Log-only and
+ * append-only: the observer reads the call's input, asks the judgment engine
+ * about it, and records the answer. Nothing is blocked, rewritten, or
+ * surfaced to a model, and the event carries no verdict — the operating
+ * points of any acting rung are deliberately absent until a labeled set says
+ * what they should be. Writers pass `{ ignorable: true }`.
+ * @param outcome - observed when both answers were read, degraded otherwise.
+ * @param reason - why this check resolved the way it did.
+ * @param stateHash - hash of the state the judgment read, never a gate.
+ * @param stateSeqs - session event seqs the state was assembled from.
+ * @param injection - the noul answer's probability, where an engine answered.
+ * @param severity - the score answer's score and confidence, where an engine answered.
+ * @param engine - engine that answered, where one did.
+ * @param model - exact model that answered, where one did.
+ * @param latencyMs - duration of the judgment call, where one was made.
+ */
+'guard/decision': GuardDecision
+```
+
+Source: [`packages/llm/judgment-guardrails/src/types.ts:106`](../packages/llm/judgment-guardrails/src/types.ts)
 
 ### `hook/*`
 
@@ -742,6 +869,81 @@ Source: [`packages/llm/llm-retry/src/types.ts:9`](../packages/llm/llm-retry/src/
 ```
 
 Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src/types.ts)
+
+### `model-routing/*`
+
+<a id="model-routingchild-decision--log-only"></a>
+
+#### `model-routing/child-decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One child's routing decision at spawn: log-only, append-only, written on
+ * the parent session before the child exists. Not ignorable.
+ */
+'model-routing/child-decision': ModelRoutingChildDecision
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1349`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingchild-outcome--log-only"></a>
+
+#### `model-routing/child-outcome` — log-only
+
+```ts persistence-catalog
+/**
+ * One accounting turn's classified outcome for a routed child: log-only,
+ * append-only, on the parent session. Not ignorable.
+ */
+'model-routing/child-outcome': ModelRoutingChildOutcome
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1354`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingconfiguration--log-only"></a>
+
+#### `model-routing/configuration` — log-only
+
+```ts persistence-catalog
+/**
+ * Committed deployment mode for a live session without an explicit user
+ * selection. Log-only, non-surface, whole-value replace. Changes during
+ * an open turn commit at its next accepted pre-step.
+ */
+'model-routing/configuration': ModelRoutingModeRecord
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1332`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingdecision--log-only"></a>
+
+#### `model-routing/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One request's routing decision: log-only, append-only, and written after
+ * the consult resolved the route, so a changed `request/header` that follows it
+ * records the route it selected.
+ */
+'model-routing/decision': ModelRoutingDecision
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1344`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingmode--log-only"></a>
+
+#### `model-routing/mode` — log-only
+
+```ts persistence-catalog
+/**
+ * The routing mode in force from this point on: log-only, non-surface,
+ * whole-value replace. The last `model-routing/mode` wins; a log with none
+ * folds to off through {@link foldModelRouting}.
+ */
+'model-routing/mode': ModelRoutingModeRecord
+```
+
+Source: [`packages/llm/model-router/src/types.ts:1338`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

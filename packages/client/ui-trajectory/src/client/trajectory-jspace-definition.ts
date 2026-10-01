@@ -1,10 +1,10 @@
 import type { Context } from '@shres-code/cordis'
 import type {
-  ConversationLocation, ConversationNodeDefinition, ConversationPreviousContext,
+  ConversationNodeDefinition, ConversationPreviousContext,
 } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: SessionEventMap merge for jspace/card and jspace/closed.
 import type { JspaceCard } from '@shres-code/shres-code-jspace/client'
-import { trajectoryNode } from './trajectory-definition-common.ts'
+import { trajectoryNode, trajectoryTurnStep } from './trajectory-definition-common.ts'
 import type { TrajectoryJSpaceBadge } from './trajectory-record.ts'
 
 /** Folded card facts used to classify the next native event. */
@@ -14,12 +14,6 @@ interface JSpaceTrajectoryState {
   readonly checkedCount: number
   readonly turn?: number
   readonly step?: number
-}
-
-function locationTurnStep(location: ConversationLocation): Pick<JSpaceTrajectoryState, 'turn' | 'step'> {
-  if (location.kind === 'step') return { turn: location.turn.turn, step: location.step.step }
-  if (location.kind === 'turn') return { turn: location.turn.turn }
-  return {}
 }
 
 function classifyCard(
@@ -38,7 +32,7 @@ const trajectoryJSpaceDefinition: ConversationNodeDefinition<JSpaceTrajectorySta
     ? { id: String(event.seq), role: 'start' }
     : null,
   start: (_context, match, reader) => {
-    const loc = locationTurnStep(match.location)
+    const loc = trajectoryTurnStep(match.location)
     if (match.event.type === 'jspace/closed') {
       return { kind: 'closed', seq: match.event.seq, checkedCount: 0, ...loc }
     }

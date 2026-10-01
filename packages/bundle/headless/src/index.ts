@@ -1,8 +1,9 @@
 /**
  * @shres-code/shres-code-headless — one-shot direct Agent driver. The bundle patch
  * rides over shres-base without Host, HTTP, or browser plugins; this runner
- * creates one Agent through the core registry, drives the task to quiescence,
- * flushes its Session, prints the final assistant text, and exits.
+ * creates one Agent through the core registry (fresh, or resumed from a
+ * persisted session), drives the task to quiescence, flushes its Session,
+ * prints the final assistant text, and exits.
  *
  * @module @shres-code/shres-code-headless
  */
@@ -10,15 +11,18 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
+import type { AgentHandle, AgentSetup } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-agent-default-model'
 import type {} from '@shres-code/shres-code-first-run-setup'
 import { createUserMessage } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
-// Empty type imports carry the loader Context merge for the settlement await
-// and the cmdline Context merge for the appExit host value.
+// Empty type imports carry the loader Context merge for the settlement await,
+// the cmdline Context merge for the appExit host value, and the persistence
+// Context merge for the resume pre-checks.
 import type {} from '@shres-code/cordis-plugin-loader'
 import type {} from '@shres-code/shres-code-cmdline'
+import type {} from '@shres-code/shres-code-session-persistence'
 
 /** Stable Cordis plugin name. */
 export const name = 'headless-runner'
@@ -30,11 +34,17 @@ export const inject = ['agentDefaultModel', 'agents', 'sessions']
 export interface Config {
   /** The prompt text for the single run. */
   task: string
+  /** Explicit id for the fresh session; absent means a generated id. */
+  sessionId?: SessionId
+  /** Persisted session to continue instead of creating a fresh one; mutually exclusive with `sessionId`. */
+  resume?: SessionId
 }
 
 export const Config: z<Config> = z.object({
   task: z.string().required(),
-})
+  sessionId: z.string().min(1),
+  resume: z.string().min(1),
+}) as z<Config>
 
 /** Outcome of one owned run interval. */
 interface RunOutcome {
@@ -87,12 +97,40 @@ function fail(io: HeadlessIo, error: unknown): void {
 }
 
 /**
- * Run one task through a freshly created Agent and request process exit.
+ * Continue a persisted session. The pre-checks fail loud before anything is
+ * published, and the acquisition passes no `agentOptions` provider/model, so the
+ * durable route the log records — an explicit selection, the router's sticky
+ * state, the manual base beneath a routed header, or the last header — wins
+ * through `selectionFor → selectionInForce` instead of this spawn's composition
+ * default.
+ * @param ctx - plugin context carrying the Agent, default model, and persistence services.
+ * @param resume - the persisted session id to continue.
+ * @param setup - resume-time composition shared with the fresh-session path.
+ * @returns the owned resumed handle.
+ */
+async function resumeAgent(ctx: Context, resume: SessionId, setup: AgentSetup): Promise<AgentHandle> {
+  const persistence = ctx.get('sessionPersistence')
+  if (persistence === undefined) {
+    throw new Error(`cannot resume "${resume}": session persistence is not configured (load a shres-session-persistence backend)`)
+  }
+  // Read the persisted header without publishing or committing recovery: a
+  // session started in another directory must not adopt this spawn's cwd.
+  const persisted = await persistence.inspect(resume)
+  const cwd = process.cwd()
+  if (persisted.meta.cwd !== cwd) {
+    throw new Error(`cannot resume "${resume}": the session was started in a different directory (persisted: ${persisted.meta.cwd}, current: ${cwd})`)
+  }
+  return ctx.agents.resume({ resumeSessionId: resume, setup })
+}
+
+/**
+ * Run one task through one Agent — created fresh, or resumed from a persisted
+ * session — and request process exit.
  * @param ctx - plugin context carrying the Agent, default model, Session, and launcher IO services.
- * @param task - one-shot task text.
+ * @param config - validated task and session-identity config.
  * @param io - process-facing effects.
  */
-async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
+async function run(ctx: Context, config: Config, io: HeadlessIo): Promise<void> {
   // Loader siblings mount concurrently. Await the complete application before
   // creating an Agent so its scoped tools and adapters are not half-composed.
   await ctx.get('loader')?.await()
@@ -107,25 +145,28 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   const firstRun = ctx.get('firstRunSetup')
   if (firstRun !== undefined) await firstRun.ensureReady()
   const selection = defaultModel.currentSelection()
+  const setup: AgentSetup = (agentCtx) => {
+    const agent = agentCtx.agent
+    /* v8 ignore next -- the factory assigns agentCtx.agent before setup runs */
+    if (agent === undefined) throw new Error('headless-runner: agent setup has no scoped agent')
+    defaultModel.selectionFor(agent)
+  }
   // This bundle composes no preset roster, so the model-facing rows sit in the
   // host plane and the agent reads them from the global layer. A deployment
   // that DOES configure one has to join it here first
   // (@shres-code/shres-code-agent-presets README, "Composing a child agent").
-  const { agent } = await agents.create({
-    sessionId: SessionId(`session-${randomUUID()}`),
-    meta: { cwd: process.cwd() },
-    agentOptions: { provider: selection.provider, model: selection.model },
-    setup: (agentCtx) => {
-      const agent = agentCtx.agent
-      /* v8 ignore next -- the factory assigns agentCtx.agent before setup runs */
-      if (agent === undefined) throw new Error('headless-runner: agent setup has no scoped agent')
-      defaultModel.selectionFor(agent)
-    },
-  })
+  const { agent } = config.resume === undefined
+    ? await agents.create({
+      sessionId: config.sessionId ?? SessionId(`session-${randomUUID()}`),
+      meta: { cwd: process.cwd() },
+      agentOptions: { provider: selection.provider, model: selection.model },
+      setup,
+    })
+    : await resumeAgent(ctx, config.resume, setup)
   await agent.whenIdle()
   const firstSeq = agent.session.seq
   agent.followup(createUserMessage({
-    content: [{ type: 'text', text: task }],
+    content: [{ type: 'text', text: config.task }],
     source: { kind: 'user' },
   }))
   await agent.whenIdle()
@@ -141,9 +182,12 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
 /**
  * Mount the one-shot direct driver.
  * @param ctx - plugin context carrying core services and the launcher-provided exit request.
- * @param config - validated task config.
+ * @param config - validated task and session-identity config.
  */
 export function apply(ctx: Context, config: Config): void {
+  if (config.sessionId !== undefined && config.resume !== undefined) {
+    throw new Error('headless-runner: sessionId and resume are mutually exclusive')
+  }
   // Read through the global service store, not the property proxy: appExit is
   // an optional host value, never an injected dependency.
   const exit = ctx.get('appExit')
@@ -151,5 +195,5 @@ export function apply(ctx: Context, config: Config): void {
     throw new Error('headless-runner: the launcher must provide ctx.appExit before the tree mounts')
   }
   const io: HeadlessIo = { stdout: internals.stdout, stderr: internals.stderr, exit }
-  void run(ctx, config.task, io).catch((error: unknown) => { fail(io, error) })
+  void run(ctx, config, io).catch((error: unknown) => { fail(io, error) })
 }

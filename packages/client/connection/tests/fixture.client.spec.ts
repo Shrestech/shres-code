@@ -8,7 +8,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId, WorkspaceId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import type { HostFrame, MuxFrame, RpcMessage, RpcRequest } from '../src/client/api.ts'
-import { FixtureApiClient, createFixtureApi } from '../src/client/fixture.ts'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import { FixtureApiClient, createFixtureApi, tokenUsageOf } from '../src/client/fixture.ts'
 
 const sid = (id: string): SessionId => id as SessionId
 const req = <P>(payload: P): RpcRequest<P> => ({ rpcId: RpcId(`t-${Math.abs(Math.sin(reqCount++)).toString(36).slice(2, 10)}`), payload })
@@ -50,6 +51,25 @@ async function collect<F>(stream: AsyncIterable<RpcRequest<F>>, abort: AbortCont
   }
   return frames
 }
+
+describe('tokenUsageOf', () => {
+  it('buckets a write carried without a read count as unreported input, like token-meter', () => {
+    const message = (step: number, usage: Record<string, number>): SessionEvent => ({
+      type: 'assistant/message', seq: step, time: step, data: { turn: 1, step, usage },
+    }) as unknown as SessionEvent
+    const log = [
+      message(1, { inputTokens: 100, outputTokens: 5, cacheWriteTokens: 10 }),
+      message(2, { inputTokens: 20, outputTokens: 3, cacheReadTokens: 60, cacheWriteTokens: 20 }),
+    ]
+    expect(tokenUsageOf(log)).toEqual({
+      uncachedInputTokens: 20,
+      unreportedInputTokens: 110,
+      outputTokens: 8,
+      cacheReadTokens: 60,
+      cacheWriteTokens: 20,
+    })
+  })
+})
 
 describe('createFixtureApi', () => {
   it('serves the session list sorted by updatedAt desc and echoes rpcIds on every unary', async () => {
@@ -153,6 +173,7 @@ describe('createFixtureApi', () => {
         goal: null,
         tokenUsage: {
           uncachedInputTokens: 0,
+          unreportedInputTokens: 0,
           outputTokens: 0,
           cacheReadTokens: 0,
           cacheWriteTokens: 0,

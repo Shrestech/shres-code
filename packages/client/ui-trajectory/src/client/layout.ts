@@ -21,6 +21,8 @@ import type {
   TrajectoryJSpaceBadge,
 } from './trajectory-record.ts'
 import { formatElapsedSeconds } from './trajectory-record.ts'
+import type { TrajectoryRoutingDecision } from './trajectory-contract.ts'
+import { trajectoryRoutingRow } from './trajectory-routing.ts'
 
 /** One Message or Step group inside a turn. */
 export interface TrajectoryGroupModel {
@@ -47,6 +49,17 @@ export interface TrajectoryLayoutInput {
   decisions?: readonly TrajectoryShieldMatch[]
   /** Folded J-Space badges; attached onto existing rows only. */
   jspace?: readonly TrajectoryJSpaceBadge[]
+  /** Folded routing decisions; each renders as its own row at its seq. */
+  routing?: readonly TrajectoryRoutingDecision[]
+  /** Folded child-route decisions; each a CHILD-ROUTE row at its seq. */
+  routingChildren?: readonly {
+    readonly seq: number
+    readonly time: number
+    readonly outcome: 'routed' | 'kept'
+    readonly reason: string
+    readonly model?: string
+    readonly shadow?: true
+  }[]
 }
 
 /** Decision fields used to match an existing user/context/tool cell. */
@@ -123,6 +136,20 @@ type OrderedLayoutEntry =
     seq: number
     request: AssistantRequestView
   }
+  | {
+    kind: 'routing'
+    seq: number
+    decision: TrajectoryRoutingDecision
+  }
+  | {
+    kind: 'routing-child'
+    seq: number
+    time: number
+    outcome: 'routed' | 'kept'
+    reason: string
+    model?: string
+    shadow?: true
+  }
 
 function layoutEntryOrder(entry: OrderedLayoutEntry): number {
   return entry.kind === 'system' && entry.change.kind === 'initial'
@@ -162,7 +189,7 @@ function inputCellDetail(node: InputNode): Pick<
 export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly TrajectoryTurnModel[] {
   const {
     nodes, eventLocations, partial, runningCalls, requests = [], callSchemas,
-    decisions = [], jspace = [],
+    decisions = [], jspace = [], routing = [], routingChildren = [],
   } = input
   const resultByCall = indexResults(nodes)
   const callById = new Map<string, ToolCallBlock>(resultByCall)
@@ -182,6 +209,7 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
   const standaloneCompactions: TurnBucket[] = []
   let index = 0
   let prevAbsTime: number | null = null
+  let previousRoutingDecision: TrajectoryRoutingDecision | undefined
   let lastAssistantTurn: number | null = null
 
   const bucket = (turn: number) => {
@@ -276,6 +304,20 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
         seq: request.startSeq,
         request,
       })),
+    ...routing.map(decision => ({
+      kind: 'routing' as const,
+      seq: decision.seq,
+      decision,
+    })),
+    ...routingChildren.map(child => ({
+      kind: 'routing-child' as const,
+      seq: child.seq,
+      time: child.time,
+      outcome: child.outcome,
+      reason: child.reason,
+      ...child.model === undefined ? {} : { model: child.model },
+      ...child.shadow === true ? { shadow: true as const } : {},
+    })),
   ].sort((left, right) => layoutEntryOrder(left) - layoutEntryOrder(right))
 
   for (const entry of entries) {
@@ -373,6 +415,52 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
       if (request.turn === null) standaloneCompactions.push(compaction)
       else bucket(request.turn).groups.push(...compaction.groups)
       prevAbsTime = finiteTime(request.completedAt) ?? finiteTime(request.startedAt) ?? prevAbsTime
+      continue
+    }
+    if (entry.kind === 'routing-child') {
+      const turn = enclosingPromptTurn(nodes, entry.seq, partial) ?? 1
+      const suffix = entry.shadow === true ? ' (shadow)' : ''
+      const text = entry.outcome === 'routed'
+        ? `Subagent routed to ${entry.model ?? 'pool'}${suffix}`
+        : `Subagent kept your model: ${entry.reason}${suffix}`
+      const laid: LaidCell = {
+        absTime: finiteTime(entry.time),
+        cell: {
+          index: ++index,
+          kind: 'routing',
+          text,
+          sourceSeq: entry.seq,
+          timeSeconds: 0,
+          startedAt: finiteTime(entry.time),
+        },
+      }
+      pushMessage(turn, laid)
+      prevAbsTime = finiteTime(entry.time) ?? prevAbsTime
+      continue
+    }
+    if (entry.kind === 'routing') {
+      const { decision } = entry
+      // A decision outside any turn still belongs to the turn that consumes it:
+      // the consult runs while assembling that turn's first request.
+      const turn = decision.turn ?? enclosingPromptTurn(nodes, decision.seq, partial)
+      const laid: LaidCell = {
+        absTime: finiteTime(decision.time),
+        cell: {
+          index: ++index,
+          kind: 'routing',
+          // The logged ids, not display copy: the row's rendered line is
+          // translated at its consumer, and search and the timeline read these.
+          text: `${decision.outcome} · ${decision.reason}`,
+          sourceSeq: decision.seq,
+          routing: trajectoryRoutingRow(decision, previousRoutingDecision),
+          timeSeconds: 0,
+          startedAt: finiteTime(decision.time),
+        },
+      }
+      if (decision.step === undefined) pushMessage(turn, laid)
+      else pushStep(turn, decision.step, [laid])
+      previousRoutingDecision = decision
+      prevAbsTime = finiteTime(decision.time) ?? prevAbsTime
       continue
     }
     const { node, nodeIndex: i } = entry
@@ -1119,12 +1207,17 @@ function firstVisibleTurn(
   return turns.length === 0 ? 1 : Math.min(...turns)
 }
 
-/** Copy provider usage onto a Message cell when present. */
+/**
+ * Copy provider usage onto a Message cell when present. The read count decides
+ * whether the cache counts are reported, so a write carried without a read is
+ * shown as unreported input, never as a cache write.
+ */
 function attachUsage(cell: TrajectoryCellProps, usage: UsageLike | undefined): void {
   if (usage === undefined) return
-  if (usage.inputTokens !== undefined) cell.input = usage.inputTokens
+  const reported = usage.cacheReadTokens !== undefined
+  if (usage.inputTokens !== undefined) cell.input = usage.inputTokens + (reported ? 0 : usage.cacheWriteTokens ?? 0)
   if (usage.cacheReadTokens !== undefined) cell.cacheRead = usage.cacheReadTokens
-  if (usage.cacheWriteTokens !== undefined) cell.cacheWrite = usage.cacheWriteTokens
+  if (reported && usage.cacheWriteTokens !== undefined) cell.cacheWrite = usage.cacheWriteTokens
   if (usage.outputTokens !== undefined) cell.output = usage.outputTokens
   if (usage.reasoningTokens !== undefined) cell.think = usage.reasoningTokens
 }

@@ -164,6 +164,9 @@ importers:
       '@shres-code/shres-code-base':
         specifier: workspace:^
         version: link:../../packages/bundle/base
+      '@shres-code/shres-code-browser-bundle':
+        specifier: workspace:^
+        version: link:../../packages/bundle/browser
       '@shres-code/shres-code-client-ui-agent-preset':
         specifier: workspace:^
         version: link:../../packages/client/ui-agent-preset
@@ -533,6 +536,9 @@ importers:
       '@shres-code/shres-code-cmdline':
         specifier: workspace:^
         version: link:../../packages/boot/cmdline
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../packages/llm/judgment
       '@shres-code/shres-code-pwsh-local':
         specifier: workspace:^
         version: link:../../packages/shell/pwsh-local
@@ -587,6 +593,9 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:*
         version: link:../packages/core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:*
+        version: link:../packages/core/agent-default-model
       '@shres-code/shres-code-agent-instructions':
         specifier: workspace:*
         version: link:../packages/context/agent-instructions
@@ -683,6 +692,18 @@ importers:
       '@shres-code/shres-code-jspace-prompt':
         specifier: workspace:*
         version: link:../packages/jspace/jspace-prompt
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:*
+        version: link:../packages/llm/judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:*
+        version: link:../packages/llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-llm':
+        specifier: workspace:*
+        version: link:../packages/llm/judgment-llm
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:*
+        version: link:../packages/llm/judgment-typesafe
       '@shres-code/shres-code-ledger':
         specifier: workspace:*
         version: link:../packages/ledger/ledger
@@ -698,6 +719,9 @@ importers:
       '@shres-code/shres-code-llm-grok-session':
         specifier: workspace:*
         version: link:../packages/llm/llm-grok-session
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:*
+        version: link:../packages/test-support/llm-mock-server
       '@shres-code/shres-code-llm-pi-ai':
         specifier: workspace:*
         version: link:../packages/llm/llm-pi-ai
@@ -713,6 +737,9 @@ importers:
       '@shres-code/shres-code-lsp-stdio':
         specifier: workspace:*
         version: link:../packages/lsp/lsp-stdio
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:*
+        version: link:../packages/llm/model-router
       '@shres-code/shres-code-permission-presets':
         specifier: workspace:*
         version: link:../packages/interaction/permission-presets
@@ -1080,6 +1107,12 @@ importers:
       '@shres-code/shres-code-browserskill':
         specifier: workspace:^
         version: link:../../browser/browserskill
+      '@shres-code/shres-code-client-connection':
+        specifier: workspace:^
+        version: link:../../client/connection
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
       '@shres-code/shres-code-commands':
         specifier: workspace:^
         version: link:../../interaction/commands
@@ -1104,12 +1137,24 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../../llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-laya':
+        specifier: workspace:^
+        version: link:../../llm/judgment-laya
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
       '@shres-code/shres-code-message-feedback':
         specifier: workspace:^
         version: link:../../feedback/message-feedback
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -1128,6 +1173,12 @@ importers:
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/attachment/attachment:
     devDependencies:
@@ -1171,6 +1222,9 @@ importers:
       npm-package-arg:
         specifier: ^14.0.0
         version: 14.0.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1637,6 +1691,22 @@ importers:
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
 
+  packages/bundle/browser:
+    dependencies:
+      '@shres-code/shres-code-browserskill':
+        specifier: workspace:^
+        version: link:../../browser/browserskill
+      '@shres-code/shres-code-client-ui-browserskill':
+        specifier: workspace:^
+        version: link:../../client/ui-browserskill
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+
   packages/bundle/headless:
     dependencies:
       '@shres-code/schemastery':
@@ -1648,6 +1718,21 @@ importers:
       '@shres-code/shres-code-code-runtime-worker-thread':
         specifier: workspace:^
         version: link:../../code-runtime/code-runtime-worker-thread
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../../llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-laya':
+        specifier: workspace:^
+        version: link:../../llm/judgment-laya
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../../llm/judgment-shield
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:^
+        version: link:../../llm/judgment-typesafe
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -1676,6 +1761,9 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
 
   packages/bundle/web-app:
     dependencies:
@@ -1691,9 +1779,6 @@ importers:
       '@shres-code/shres-code-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
-      '@shres-code/shres-code-browserskill':
-        specifier: workspace:^
-        version: link:../../browser/browserskill
       '@shres-code/shres-code-client-connection':
         specifier: workspace:^
         version: link:../../client/connection
@@ -1715,9 +1800,6 @@ importers:
       '@shres-code/shres-code-client-ui-agent-team':
         specifier: workspace:^
         version: link:../../client/ui-agent-team
-      '@shres-code/shres-code-client-ui-browserskill':
-        specifier: workspace:^
-        version: link:../../client/ui-browserskill
       '@shres-code/shres-code-client-ui-commands':
         specifier: workspace:^
         version: link:../../client/ui-commands
@@ -1754,6 +1836,9 @@ importers:
       '@shres-code/shres-code-client-ui-message-feedback':
         specifier: workspace:^
         version: link:../../client/ui-message-feedback
+      '@shres-code/shres-code-client-ui-model-routing':
+        specifier: workspace:^
+        version: link:../../client/ui-model-routing
       '@shres-code/shres-code-client-ui-model-selection':
         specifier: workspace:^
         version: link:../../client/ui-model-selection
@@ -1775,6 +1860,9 @@ importers:
       '@shres-code/shres-code-client-ui-settings-jspace':
         specifier: workspace:^
         version: link:../../client/ui-settings-jspace
+      '@shres-code/shres-code-client-ui-settings-model-routing':
+        specifier: workspace:^
+        version: link:../../client/ui-settings-model-routing
       '@shres-code/shres-code-client-ui-settings-models':
         specifier: workspace:^
         version: link:../../client/ui-settings-models
@@ -2716,6 +2804,9 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   packages/client/ui-message-feedback:
     devDependencies:
@@ -2767,6 +2858,58 @@ importers:
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
+
+  packages/client/ui-model-routing:
+    dependencies:
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
+      '@shres-code/shres-code-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@shres-code/shres-code-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-conversation':
+        specifier: workspace:^
+        version: link:../ui-conversation
+      '@shres-code/shres-code-client-ui-primitives':
+        specifier: workspace:^
+        version: link:../ui-primitives
+      '@shres-code/shres-code-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@shres-code/shres-code-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@shres-code/shres-code-client-web-react':
+        specifier: workspace:^
+        version: link:../web-react
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
+      '@types/react':
+        specifier: ~19.2.18
+        version: 19.2.18
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
 
   packages/client/ui-model-selection:
     devDependencies:
@@ -3155,6 +3298,58 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ~19.2.18
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+
+  packages/client/ui-settings-model-routing:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
+      '@shres-code/shres-code-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@shres-code/shres-code-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-conversation':
+        specifier: workspace:^
+        version: link:../ui-conversation
+      '@shres-code/shres-code-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@shres-code/shres-code-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@shres-code/shres-code-client-web-react':
+        specifier: workspace:^
+        version: link:../web-react
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3684,6 +3879,12 @@ importers:
       '@shres-code/shres-code-jspace':
         specifier: workspace:^
         version: link:../../jspace/jspace
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@shres-code/shres-code-shield':
         specifier: workspace:^
         version: link:../../guard/shield
@@ -4049,6 +4250,70 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/compaction/compaction-jev:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-compaction':
+        specifier: workspace:^
+        version: link:../compaction
+      '@shres-code/shres-code-compaction-basic':
+        specifier: workspace:^
+        version: link:../compaction-basic
+      '@shres-code/shres-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../../llm/judgment-dispatch
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:^
+        version: link:../../llm/judgment-typesafe
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-token-meter':
+        specifier: workspace:^
+        version: link:../../llm/token-meter
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
   packages/compaction/compaction-tool-result-pruner:
     dependencies:
       '@shres-code/schemastery':
@@ -4285,6 +4550,9 @@ importers:
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../system-prompt
 
   packages/core/agent-loop:
     dependencies:
@@ -5852,12 +6120,18 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
       '@shres-code/shres-code-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
       '@shres-code/shres-code-brand':
         specifier: workspace:^
         version: link:../../util/brand
+      '@shres-code/shres-code-host-plugin-inventory':
+        specifier: workspace:^
+        version: link:../plugin-inventory
       '@shres-code/shres-code-host-remote-control':
         specifier: workspace:^
         version: link:../remote-control
@@ -6487,6 +6761,308 @@ importers:
         specifier: workspace:^
         version: link:../llm
 
+  packages/llm/judgment:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+
+  packages/llm/judgment-bench-random:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+
+  packages/llm/judgment-dispatch:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+
+  packages/llm/judgment-guardrails:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+
+  packages/llm/judgment-laya:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      '@shres-code/shres-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-commands':
+        specifier: workspace:^
+        version: link:../../interaction/commands
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../judgment-shield
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../model-router
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@shres-code/shres-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
+      '@shres-code/shres-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+
+  packages/llm/judgment-llm:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
+  packages/llm/judgment-shield:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
+  packages/llm/judgment-typesafe:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
   packages/llm/llm:
     dependencies:
       '@shres-code/schemastery':
@@ -6825,6 +7401,133 @@ importers:
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+
+  packages/llm/model-router:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 1.3.0
+        version: 1.3.0(zod@4.4.3)
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-acp':
+        specifier: workspace:^
+        version: link:../../acp/acp
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-commands':
+        specifier: workspace:^
+        version: link:../../interaction/commands
+      '@shres-code/shres-code-compaction-basic':
+        specifier: workspace:^
+        version: link:../../compaction/compaction-basic
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-judgment-dispatch':
+        specifier: workspace:^
+        version: link:../judgment-dispatch
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../judgment-shield
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:^
+        version: link:../judgment-typesafe
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
+      '@shres-code/shres-code-llm-retry':
+        specifier: workspace:^
+        version: link:../llm-retry
+      '@shres-code/shres-code-sdk-jsonrpc-server':
+        specifier: workspace:^
+        version: link:../../sdk/server
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
+      '@shres-code/shres-code-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@shres-code/shres-code-session-projection-cache':
+        specifier: workspace:^
+        version: link:../../session/session-projection-cache
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-storage':
+        specifier: workspace:^
+        version: link:../../storage/storage
+      '@shres-code/shres-code-storage-domain':
+        specifier: workspace:^
+        version: link:../../storage/storage-domain
+      '@shres-code/shres-code-storage-json':
+        specifier: workspace:^
+        version: link:../../storage/storage-json
+      '@shres-code/shres-code-subagent':
+        specifier: workspace:^
+        version: link:../../subagent/subagent
+      '@shres-code/shres-code-subagent-fork-in-process':
+        specifier: workspace:^
+        version: link:../../subagent/subagent-fork-in-process
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../../subagent/subagent-spawn-in-process
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-token-meter':
+        specifier: workspace:^
+        version: link:../token-meter
+      '@shres-code/shres-code-tool-subagent':
+        specifier: workspace:^
+        version: link:../../subagent/tool-subagent
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+      '@shres-code/shres-code-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/llm/token-meter:
     dependencies:
@@ -8755,6 +9458,12 @@ importers:
       '@shres-code/shres-code-agent-default-model':
         specifier: workspace:^
         version: link:../../core/agent-default-model
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
       '@shres-code/shres-code-agent-presets':
         specifier: workspace:^
         version: link:../../preset/agent-presets
@@ -8785,6 +9494,9 @@ importers:
       '@shres-code/shres-code-session-persistence':
         specifier: workspace:^
         version: link:../../session/session-persistence
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
@@ -8797,6 +9509,12 @@ importers:
       '@shres-code/shres-code-storage-domain':
         specifier: workspace:^
         version: link:../../storage/storage-domain
+      '@shres-code/shres-code-subagent-fork-in-process':
+        specifier: workspace:^
+        version: link:../subagent-fork-in-process
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../subagent-spawn-in-process
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
@@ -9220,12 +9938,21 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
       '@shres-code/cordis-plugin-loader':
         specifier: workspace:^
         version: link:../../../vendor/loader
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -9238,6 +9965,12 @@ importers:
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../../llm/llm-deepseek
+      '@shres-code/shres-code-llm-mock-server':
+        specifier: workspace:^
+        version: link:../../test-support/llm-mock-server
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -9442,6 +10175,76 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+
+  packages/team/progress-signals:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
+      '@shres-code/shres-code-sandbox':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-step-budget':
+        specifier: workspace:^
+        version: link:../../guard/step-budget
+
+  packages/team/worker-escalation:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../agent-team
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-progress-signals':
+        specifier: workspace:^
+        version: link:../progress-signals
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@shres-code/shres-code-user-questions':
+        specifier: workspace:^
+        version: link:../../interaction/user-questions
 
   packages/terminal/terminal:
     devDependencies:
@@ -9843,6 +10646,9 @@ importers:
       '@shres-code/shres-code-tool-cordis':
         specifier: workspace:^
         version: link:../../extensions/tool-cordis
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../protocol
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../registry

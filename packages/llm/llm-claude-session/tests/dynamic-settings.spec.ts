@@ -53,6 +53,8 @@ describe('llm-claude-session settings lifecycle', () => {
     // schema refuses it first, with the field named.
     await expect(ctx!.settings.update(NS, { refreshLeewayMs: -1 }))
       .rejects.toThrow(/\$\.refreshLeewayMs expected number >= 0 but got -1/)
+    await expect(ctx!.settings.update(NS, { cacheRetention: 'forever' }))
+      .rejects.toThrow(/\$\.cacheRetention expected "none" \| "short" \| "long" but got "forever"/)
     // Every refusal left the live route exactly as it was.
     expect(ctx!.llm.listProviders().map(provider => provider.id)).toEqual(['claude-session'])
     expect(ctx!.llm.listConfigurableProviders().map(entry => entry.displayName)).toEqual(['Claude (subscription)'])
@@ -90,6 +92,26 @@ describe('llm-claude-session settings lifecycle', () => {
     expect(ctx!.llm.listProviders().map(provider => provider.id)).toEqual(['claude-session'])
     expect((await ctx!.llm.listModels('claude-session')).map(model => model.id))
       .toEqual(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5'])
+  })
+
+  it('republishes the route with the new lifetime when cacheRetention changes', async () => {
+    await boot()
+    let published = 0
+    ctx!.on('llm/adapters-updated', () => { published += 1 })
+    expect((await ctx!.llm.listModels('claude-session'))[0]?.promptCacheTtlMs).toBe(300_000)
+
+    await ctx!.settings.update(NS, { cacheRetention: 'long' })
+
+    // Listings refresh on the registry notification, so the change must
+    // publish one for the new lifetime to reach them.
+    expect(published).toBe(1)
+    expect((await ctx!.llm.listModels('claude-session'))[0]?.promptCacheTtlMs).toBe(3_600_000)
+    const assembler = new BlockAssembler()
+    for await (const chunk of ctx!.llm.stream({ provider: 'claude-session', model: 'claude-opus-5', system: 'Be brief.', messages: [] })) {
+      assembler.push(chunk)
+    }
+    expect(assembler.finish).toEqual({ kind: 'stop' })
+    expect(JSON.stringify(upstream!.requests.at(-1)!.body)).toContain('"ttl":"1h"')
   })
 
   it('enabled: false in settings withdraws the route and restoring re-registers it', async () => {

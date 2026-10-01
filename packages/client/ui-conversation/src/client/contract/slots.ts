@@ -20,7 +20,7 @@ import type {
 import type { createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
-import type { CallId, CallSelectionTarget, ViewTab } from './views.ts'
+import type { CallId, CallSelectionTarget, InspectRequest, ViewTab } from './views.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -230,6 +230,16 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * a model here.
      */
     'conversation.input.model': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
+    /**
+     * The named model-routing seat immediately left of the model-select seat —
+     * one occupant, so taking it means rendering the whole routing affordance
+     * yourself. The owner share adds the session's `reveal` to `locked` (see
+     * {@link RoutingControlOwnerProps}), so the control can open a conversation
+     * view such as the Routing view. Same renders-nothing-while-empty contract as
+     * the plan seat: a host composing no router registers no routing projection,
+     * and the seat then draws nothing.
+     */
+    'conversation.input.modelRouting': { kind: 'single'; scope: 'session'; owner: RoutingControlOwnerProps }
   }
 
   /**
@@ -294,10 +304,25 @@ export interface InputZone {
  * toolview hole).
  */
 export interface ConvViewOwnerProps {
-  /** One-shot inspect request from another view (chat's Inspect button); null when idle. */
-  inspect?: { callId: CallId } | null
+  /**
+   * The pending inspect request addressed to this view; null when idle or when
+   * the request addresses another view, which keeps it until that view is the
+   * active one.
+   */
+  inspect?: InspectRequest | null
   /** Acknowledge the inspect request once applied (clears the store field). */
   onInspectDone?: () => void
+  /**
+   * Hand a target to a view: write the request, select that view, and close
+   * the Activity popover. A request to an unregistered view selects nothing
+   * visible (the tab ring falls back to Chat) and waits until the view registers.
+   */
+  reveal?: (request: InspectRequest) => void
+  /**
+   * Whether a 'conversation.view' entry with this id is registered, so a reveal
+   * to it lands. Read it at render: the answer follows the view ledger.
+   */
+  canReveal?: (view: string) => boolean
 }
 
 /**
@@ -453,6 +478,10 @@ export interface ConversationSessionInjected {
   releaseSessionImages: (sessionId: SessionId) => void
   /** Bind the input machine's draft persistence mirror to the session store. */
   bindDraftMirror: (write: (text: string) => void) => () => void
+  /** This session's reveal, delivered to views as {@link ConvViewOwnerProps.reveal}. */
+  reveal: (request: InspectRequest) => void
+  /** View-ledger membership test, delivered to views as {@link ConvViewOwnerProps.canReveal}. */
+  canReveal: (view: string) => boolean
 }
 
 /** Business callbacks injected into the strict session header seat. */
@@ -534,6 +563,11 @@ export interface ComposerBarInjected {
    */
   command: ((line: string) => Promise<boolean>) | undefined
   /**
+   * This session's reveal, handed to the routing control seat as
+   * {@link RoutingControlOwnerProps.reveal}; absent without a session.
+   */
+  reveal?: ((request: InspectRequest) => void) | undefined
+  /**
    * Registrant hooks compartment: the renderer binds these to
    * useNotices/useLexicon (static absent sources without a session — hook
    * order stays constant).
@@ -550,7 +584,7 @@ export interface ComposerBarInjected {
 }
 
 /**
- * Owner share of the two named composer control seats (plan / model): the
+ * Owner share of the named composer control seats (plan / routing / model): the
  * bar passes its disable state; the filling entry owns everything else.
  */
 export interface InputControlOwnerProps {
@@ -558,10 +592,21 @@ export interface InputControlOwnerProps {
   locked: boolean
 }
 
+/** Owner share of the routing control seat: the shared lock plus the session's reveal. */
+export interface RoutingControlOwnerProps extends InputControlOwnerProps {
+  /**
+   * The same reveal the views receive ({@link ConvViewOwnerProps.reveal}): write
+   * the request, select the addressed view, and close the Activity popover.
+   * `{ kind: 'none' }` opens the view with nothing to show. Absent while the
+   * composer has no session.
+   */
+  reveal?: ((request: InspectRequest) => void) | undefined
+}
+
 /** Full composer-bar props: standard kit & owner share & control-seat render share & injected share (hooks bound) & locale seat. */
 export type ComposerBarProps =
   PropsRuntime<'conversation.composer.bar'>
-  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.model'>
+  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.modelRouting' | 'conversation.input.model'>
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
 
@@ -709,7 +754,7 @@ export interface ChatViewInjected {
   loadOlder: () => void
   /** Resolve a session-authorized historical image for inline display. */
   loadImage: (attachment: ImageAttachmentRef) => Promise<string>
-  /** Hand a call off to the trajectory view: write the one-shot inspect target and switch tabs. */
+  /** Hand a call to the Trajectory view: a reveal of that call to the `trajectory` view. */
   inspectCall: (callId: CallId) => void
   /**
    * Per-session scroll memory surviving view switches (in-memory, never

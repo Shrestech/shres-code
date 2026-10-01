@@ -28,6 +28,28 @@ export const DEFAULT_DISPLAY_NAME = 'Claude (subscription)'
 /** Refresh when the token is at or within this distance of its expiry. */
 export const DEFAULT_REFRESH_LEEWAY_MS = 300_000
 
+/** Prompt-cache retention the route requests: pi-ai's `none`, `short`, or `long`. */
+export type ClaudeSessionCacheRetention = NonNullable<PiAiProviderProfile['cacheRetention']>
+
+/**
+ * Retention the route requests when the section names none: Anthropic's
+ * five-minute ephemeral cache, which is also pi-ai's own default. Resolving it
+ * here keeps the process-wide `PI_CACHE_RETENTION` override off this route.
+ */
+export const DEFAULT_CACHE_RETENTION: ClaudeSessionCacheRetention = 'short'
+
+/**
+ * Prompt-cache lifetime Anthropic documents for each retention, in
+ * milliseconds from the start of the request that wrote or last read the
+ * prefix: `short` is the five-minute ephemeral cache, `long` asks for the
+ * one-hour cache, and `none` writes no cache.
+ */
+export const PROMPT_CACHE_TTL_MS: Readonly<Record<ClaudeSessionCacheRetention, number>> = {
+  none: 0,
+  short: 300_000,
+  long: 3_600_000,
+}
+
 /**
  * Reasoning efforts the subscription models accept, in pi-ai's escalation
  * order. `off` stays undeclared: the live 5.x models reject
@@ -133,6 +155,12 @@ export interface Config {
   models?: ClaudeSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to `DEFAULT_REFRESH_LEEWAY_MS`. */
   refreshLeewayMs?: number
+  /**
+   * Prompt-cache retention every request asks for; defaults to
+   * `DEFAULT_CACHE_RETENTION`. `long` asks for the one-hour cache and `none`
+   * disables prompt caching.
+   */
+  cacheRetention?: ClaudeSessionCacheRetention
 }
 
 // Mirrors pi-ai's modality gate (text|image); a pi-ai modality drift fails
@@ -173,6 +201,8 @@ export const Config: z<Config> = z.object({
   // model rather than "use the shipped catalog".
   models: z.array(modelSchema).default(undefined as unknown as never),
   refreshLeewayMs: z.number().step(1).min(0),
+  // No default: an absent field stays absent, and resolveRoute decides it.
+  cacheRetention: z.union(['none', 'short', 'long']),
 })
 
 /** One resolved credential-source spec. */
@@ -215,11 +245,15 @@ export function resolveCredentialSpec(config: Config): CredentialSpec {
  * Resolve the section into the one route's profile, with every deployment
  * default decided here rather than inline at use sites. The profile declares
  * no `headers`: pi-ai owns the OAuth header set, and a route header would
- * replace its betas instead of adding to them (see {@link Config}).
+ * replace its betas instead of adding to them (see {@link Config}). It always
+ * states `cacheRetention`, so pi-ai's `PI_CACHE_RETENTION` environment
+ * fallback never applies to this route.
  * @param config - composition or settings section value.
  * @returns the profile shres-llm-pi-ai's resolution validates and builds.
  */
-export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'displayName'> & { displayName: string } {
+export function resolveRoute(
+  config: Config,
+): Omit<PiAiProviderProfile, 'displayName' | 'cacheRetention'> & { displayName: string; cacheRetention: ClaudeSessionCacheRetention } {
   const baseURL = config.baseURL ?? DEFAULT_BASE_URL
   if (baseURL.length === 0) throw new Error('llm-claude-session: baseURL must be non-empty when set')
   const models = config.models ?? SHIPPED_MODELS
@@ -227,7 +261,10 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'anthropic-messages',
+    // Anthropic Messages reports cache reads and writes in every usage block.
+    cacheUsage: 'reported',
     baseURL,
+    cacheRetention: config.cacheRetention ?? DEFAULT_CACHE_RETENTION,
     models: models.map(model => ({
       id: model.id,
       ...(model.name === undefined ? {} : { name: model.name }),

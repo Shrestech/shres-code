@@ -15,7 +15,7 @@ import ToolRuntime from '@shres-code/shres-code-tools'
 import UserQuestionService from '@shres-code/shres-code-user-questions'
 import LlmRuntime, { LlmAdapter } from '@shres-code/shres-code-llm'
 import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@shres-code/shres-code-llm'
-import { SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
+import { SettingsFieldError, SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import { CredentialProvider } from '@shres-code/shres-code-credentials'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
@@ -353,6 +353,12 @@ describe('settings domain', () => {
     ctx.settings.register(settingsNamespace('ui-conversation'), z.object({
       busyEnter: z.union(['queue', 'steer']).default('queue'),
     }))
+    // The judgment Definition's section is admitted so the Model UI's Classifier
+    // switch is remotely readable and writable like every other exposed product
+    // preference.
+    ctx.settings.register(settingsNamespace('judgment'), z.object({
+      enabled: z.boolean().default(true),
+    }))
     ctx.settings.register(settingsNamespace('shell'), z.object({
       timeoutMs: z.number().default(120_000),
     }))
@@ -377,9 +383,14 @@ describe('settings domain', () => {
 
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.namespaces.map(view => view.ns)).toEqual([
-      'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation',
+      'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation', 'judgment',
       'shell', 'agent-loop', 'web-search-brave', 'web-search-perplexity', 'web-search-deepseek', 'web-search-attached-cli',
     ])
+    const judgment = expectOk(await api.settings.mutate(request({
+      ns: 'judgment',
+      ops: [{ op: 'set', path: ['enabled'], value: false }],
+    })))
+    expect(judgment.value).toEqual({ enabled: false })
     const permission = expectOk(await api.settings.mutate(request({
       ns: 'permission',
       ops: [{ op: 'set', path: ['defaultPreset'], value: 'workspace-write' }],
@@ -480,6 +491,23 @@ describe('settings domain', () => {
     })))
     expect(ctx.settings.describe().find(view => String(view.ns) === 'agent-seats')?.value)
       .toEqual({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
+  })
+
+  // The namespace string must equal `MODEL_ROUTER_SETTINGS_NAMESPACE`; the router
+  // package is not a dependency of this one, so the name is not importable here.
+  it('serves the model-router namespace so the deployment can read and write routing configuration', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('model-router'), z.object({
+      initialMode: z.union(['off', 'on'] as const),
+      candidates: z.array(z.object({ id: z.string(), provider: z.string(), model: z.string() })),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'model-router',
+      ops: [{ op: 'set', path: ['candidates'], value: [{ id: 'cheap', provider: 'openrouter', model: 'kimi-k3' }] }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'model-router')?.value)
+      .toEqual({ candidates: [{ id: 'cheap', provider: 'openrouter', model: 'kimi-k3' }] })
   })
 
   it('serves the speech namespace so General Settings and Talk mode can persist', async () => {
@@ -668,15 +696,51 @@ describe('settings domain', () => {
   })
 
   it.each([
-    ['an invalid namespace name', 'Not A Namespace', {}],
-    ['a schema-invalid patch', 'llm-deepseek', { baseURL: 42 }],
-  ])('rejects %s as settings-rejected', async (_case, ns, patch) => {
+    ['an invalid namespace name', 'Not A Namespace', {}, { ns: 'Not A Namespace' }],
+    ['a schema-invalid patch, naming the field', 'llm-deepseek', { baseURL: 42 }, { ns: 'llm-deepseek', path: ['baseURL'] }],
+  ])('rejects %s as settings-rejected', async (_case, ns, patch, details) => {
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.settings.update(request({ ns, patch })))
     expect(error.code).toBe('settings-rejected')
-    expect(error.details).toEqual({ ns })
+    expect(error.details).toEqual(details)
+  })
+
+  it('names the list index a schema failure reached, and no field for a whole-section schema failure', async () => {
+    const ctx = await harness()
+    // Two exposed product namespaces, standing in for the router's pool list and a whole-section refusal.
+    ctx.settings.register(settingsNamespace('model-router'), z.object({ candidates: z.array(z.object({ id: z.string().required(), weight: z.number() })) }))
+    ctx.settings.register(settingsNamespace('judgment'), z.object({ engine: z.string() }), {
+      validate: (_value, cause) => {
+        if (cause === 'write') throw new z.ValidationError('the section as a whole is refused', {})
+      },
+    })
+    const api = createApiProxy(ctx, DEFAULTS)
+    const item = expectErr(await api.settings.replace(request({ ns: 'model-router', section: { candidates: [{ id: 'a', weight: 1 }, { weight: 2 }] } })))
+    expect(item).toEqual({ code: 'settings-rejected', message: '$.candidates[1].id missing required value', details: { ns: 'model-router', path: ['candidates', 1, 'id'] } })
+    const root = expectErr(await api.settings.replace(request({ ns: 'judgment', section: { engine: 'x' } })))
+    expect(root.details).toEqual({ ns: 'judgment' })
+  })
+
+  it('reports the field an owner validation names, and none for any other refusal', async () => {
+    const ctx = await harness()
+    ctx.settings.register(NS, AdapterConfig, {
+      validate: (value, cause) => {
+        if (cause === 'write' && value.baseURL === 'https://unknown') {
+          throw new SettingsFieldError(['baseURL'], 'baseURL names an endpoint no provider serves')
+        }
+        if (cause === 'write' && value.baseURL === 'https://plain') throw new Error('plain refusal')
+      },
+    })
+    const api = createApiProxy(ctx, DEFAULTS)
+
+    const named = expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://unknown' } })))
+    const plain = expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://plain' } })))
+
+    expect(named).toEqual({ code: 'settings-rejected', message: 'baseURL names an endpoint no provider serves', details: { ns: 'llm-deepseek', path: ['baseURL'] } })
+    expect(plain.code).toBe('settings-rejected')
+    expect(plain.details).toEqual({ ns: 'llm-deepseek' })
   })
 
   it('answers an unregistered namespace exactly like an unexposed one', async () => {

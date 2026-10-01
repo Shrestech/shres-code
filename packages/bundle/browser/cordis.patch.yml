@@ -1,0 +1,12 @@
+# The optional BrowserSkill bundle patch. Apply it after the Web surface so
+# BrowserSkill's host and client rows are selected together as one layer.
+
+- insert:
+    # Runtime downloads and the owned browser start only after local UI consent.
+    - id: browserskill
+      name: '@shres-code/shres-code-browserskill'
+
+    # The BrowserSkill Plugins section contributes to the shared Plugins page
+    # only when this bundle is selected.
+    - id: ui-browserskill
+      name: '@shres-code/shres-code-client-ui-browserskill'

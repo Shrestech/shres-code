@@ -37,7 +37,7 @@ interface ToolProviderResult {
 
 ## Prompt sections
 
-`PromptSection` is a readonly same-process registration contract. Its text may be static or resolved from the current assembly context. One effective `complete` section becomes the sole prompt section after cooperative assembly.
+`PromptSection` is a readonly same-process registration contract. Its text may be static or resolved from the current assembly context. One effective `complete` section becomes the sole prompt section after cooperative assembly. `stability` states whether the section's bytes stay fixed for a session; while no complete section is active, assembly rejects an effective conditional section ordered at or before a static one, so a toggle cannot change the cached tool and static-section prefix.
 
 ```ts type-equiv
 /** One contributed section of the system prompt (registry input). */
@@ -63,6 +63,19 @@ interface PromptSection {
    * More than one effective complete section makes assembly fail.
    */
   readonly complete?: boolean
+  /**
+   * `'static'`, the meaning when omitted, declares that this section renders
+   * the same bytes on every assembly for a fixed configuration. `'conditional'`
+   * declares that it may appear, disappear, or change between assemblies.
+   * Every effective conditional section must be ordered after every static
+   * section, otherwise assembly fails, so a toggle cannot change the bytes of
+   * the tool and static-section prefix. How much of that prefix a provider's
+   * cache reuses depends on where its cache boundaries fall. A toggle still
+   * invalidates cached conversation messages, which follow the system prompt;
+   * text that changes during a session belongs in
+   * {@link SystemPrompt.context} where possible.
+   */
+  readonly stability?: 'static' | 'conditional'
 }
 ```
 
@@ -147,14 +160,16 @@ variable(name: string, provider: (context: AssembleContext) => string | undefine
  * canonical ordering, then run the assembly waterfall. Scoped sections and
  * variables shadow globals. The returned waterfall value is authoritative
  * except that an effective complete section is restored afterwards as the
- * sole prompt section.
+ * sole prompt section. Rejects more than one effective complete section and,
+ * while none is active, an effective conditional section that is not ordered
+ * after every static section.
  * @param context - the optional scope and plugin-defined assembly fields.
  * @returns the post-waterfall assembly with any complete prompt enforced.
  */
 async assemble(context: AssembleContext = {}): Promise<PromptAssembly>
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:338`](../../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:365`](../../packages/core/system-prompt/src/index.ts)
 
 <a id="system-prompt-events"></a>
 

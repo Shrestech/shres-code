@@ -6,10 +6,13 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 |---|---|
 | [core.md](core.md) | how `packages/core` controls the agent loop: the package-by-package loop description, agent creation and ownership (`AgentHandle`), the `Agent` handle's delivery/cancellation/interception contracts, and the repo-wide type patterns (`…Map → derived-union`, branded ids) |
 | [llm-streaming.md](llm-streaming.md) | the `packages/llm` conversation types — `Message`/`ContentBlock`, the assembled model request, the `StreamChunk` wire protocol and adapter contract, `BlockAssembler`, and the `LlmAdapter` provider contract |
+| [judgment.md](judgment.md) | the typed-judgment seam: choice, score, and binary questions, their calibrated answers, the engine contract, the optional egress redaction hook, and the deployment on/off settings section |
+| [model-router.md](model-router.md) | asymmetric model routing: the downgrade allowlist, the two-axis gate, the logged decision and its reasons, the sticky streak as a pure fold, and the `model-router` settings section with the `/route` command |
 | [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
 | [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the session-credential engine shared by the cursor-session adapter and future consumers |
 | [grok-credential.md](grok-credential.md) | the one Grok Build subscription credential: the single-flight session-credential engine shared by the grok-session adapter and future consumers |
 | [codex-credential.md](codex-credential.md) | the one Codex subscription credential: the single-flight ChatGPT-login session engine shared by the codex-session adapter and future consumers |
+| [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the single-flight Cursor-Agent-CLI session-credential engine every cursor route resolves its bearer token through |
 | [claude-credential.md](claude-credential.md) | the one Claude subscription credential: the single-flight OAuth session engine the claude-session adapter refreshes through console.anthropic.com |
 | [scope.md](scope.md) | scoped registration identity, dispatch carriers, and the owned `Scope` context |
 | [typert.md](typert.md) | Remote invocation descriptors, lookup/Context declarations, Typert registries, and the Host Gateway/Client API boundaries |
@@ -39,7 +42,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [filesystem.md](filesystem.md) | the filesystem seam: `FsTarget`, read/write/edit outcomes, observed-file state, `FsErrorCode` |
 | [lsp.md](lsp.md) | the LSP navigation seam: `LspQueryRequest`/`Result`, `LspProvider`/`Service`, four operations, `LspError` |
 | [skills.md](skills.md) | the skill service: discovery priority, `SkillSummary`/`SkillDefinition`, session-prefix catalog, model-facing `skill` loading |
-| [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
+| [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface, and the judgment-backed provider's semantic selection, conservative boundary judgment, and verify-then-escalate cascade |
 | [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
 | [agent-team.md](agent-team.md) | Agent Teams durable records: branded ids, roster/task/mailbox snapshots, and the `team-message` source |
 | [browser.md](browser.md) | owned browser lifecycle, consent and operation records, session identities, and native browser command results |

@@ -55,18 +55,27 @@ export class PluginInventoryGateway extends TypertRemoteService {
    */
   @Remote('list')
   list(): PluginInventorySnapshot {
-    const entries: PluginInventoryEntry[] = []
-    for (const entry of this.ctx.loader.entries()) {
-      if (entry.options.group) continue
-      entries.push({
-        entryId: pluginEntryId(entry.id),
-        moduleName: entry.options.name,
-        enabled: !entry.disabled,
-        fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
-      })
-    }
-    return { entries }
+    return readPluginInventory(this.ctx)
   }
 }
 
 export default PluginInventoryGateway
+
+/**
+ * Project Loader-owned plugin state without caching lifecycle facts.
+ * @param ctx - context with the Loader service.
+ * @returns current non-group entries in Loader order.
+ */
+export function readPluginInventory(ctx: Context): PluginInventorySnapshot {
+  const entries: PluginInventoryEntry[] = []
+  for (const entry of ctx.loader.entries()) {
+    if (entry.options.group) continue
+    entries.push({
+      entryId: pluginEntryId(entry.id),
+      moduleName: entry.options.name,
+      enabled: !entry.disabled,
+      fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
+    })
+  }
+  return { entries }
+}

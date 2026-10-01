@@ -225,6 +225,45 @@ async function mountDeepSeekCard(overrides: Parameters<typeof scriptedFace>[0] =
   return mounted
 }
 
+describe('ModelsSection routing link', () => {
+  /** Mount with a `judgment` namespace exposed, optionally with the injected Settings pages callback. */
+  async function mountWithJudgment(openSettings?: (sectionId: string) => void) {
+    const scripted = scriptedFace()
+    scripted.face.settings.describe.mockImplementation(() => Promise.resolve(ok({
+      writable: true,
+      hasDocument: false,
+      namespaces: [...wireNamespaces(), { ns: 'judgment', schema: {}, value: { enabled: true, engine: 'typesafe' }, applies: 'live', secrets: [], revision: 1 }],
+    })))
+    const controller = new ModelsSettingsStore(scripted.face as unknown as WireFace)
+    await controller.load()
+    render(<ModelsSection
+      controller={controller}
+      useSnapshot={bindSnapshotSelector(controller.store)}
+      api={scripted.face as never}
+      t={t}
+      {...openSettings === undefined ? {} : { openSettings }}
+    />)
+  }
+
+  it('points the classifier and engine settings at Model routing, opening that section', async () => {
+    const openSettings = vi.fn()
+    await mountWithJudgment(openSettings)
+    expect(screen.getByText(en.routingLinkLead, { exact: false })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.routingLinkTarget }))
+    expect(openSettings).toHaveBeenCalledWith('model-routing')
+    expect(screen.queryByRole('switch', { name: /classifier|judgment engine/i })).toBeNull()
+  })
+
+  it('names Model routing as text where the shell offers no navigation, and omits the line without judgment', async () => {
+    await mountWithJudgment()
+    expect(screen.getByText(`${en.routingLinkLead} ${en.routingLinkTarget}`)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.routingLinkTarget })).toBeNull()
+    cleanup()
+    await mountSection()
+    expect(screen.queryByText(en.routingLinkLead, { exact: false })).toBeNull()
+  })
+})
+
 describe('ModelsSection', () => {
   it('renders nothing before the slot injects its dependencies', () => {
     const uninjected = {} as ModelsSectionProps

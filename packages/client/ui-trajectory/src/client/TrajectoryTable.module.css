@@ -1852,3 +1852,99 @@
     box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14);
   }
 }
+
+/* Model-routing rows: one decision per judged turn renders at its seq. A
+   kept-strong decision that changed nothing reads as the quiet marker — same
+   line, no route, confidence, or streak chip. */
+.routingTag {
+  color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-tertiary);
+}
+
+/* The ROUTING cell keeps Explain in view: the summary shrinks and clips its
+   own chips, so a narrow content column never pushes the link out. */
+.routingCell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.routingSummary {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  gap: 8px;
+}
+
+.routingLine {
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+}
+
+.routingSummary[data-routing='quiet'] .routingLine {
+  color: var(--dsw-alias-label-caption);
+}
+
+.routingChip,
+.routingStreak {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  white-space: nowrap;
+}
+
+.routingStreak {
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.routingExplain {
+  flex: none;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font: var(--dsw-font-xxs-12);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.routingExplain:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The request boundary row carries the effective route the request used; the
+   badge appears only when routing moved that route off the session selection. */
+.requestRoute {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-left: 8px;
+  gap: 6px;
+}
+
+.requestRouteModel {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  white-space: nowrap;
+}
+
+.routedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
+  font: var(--dsw-font-xxs-12);
+}

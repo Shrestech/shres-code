@@ -1,0 +1,139 @@
+{
+  "name": "@shres-code/shres-code-model-router",
+  "description": "Asymmetric, cache-sticky model routing: a typed judgment downgrades an allowlisted candidate and a pure fold keeps it until the streak amortizes",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/llm/model-router"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./client": {
+      "types": "./lib/types/client.d.ts",
+      "default": "./lib/types/client.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-commands": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-session-projection-cache": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-workspace": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@shres-code/shres-code-commands": {
+      "optional": true
+    },
+    "@shres-code/shres-code-session-persistence": {
+      "optional": true
+    },
+    "@shres-code/shres-code-session-projection": {
+      "optional": true
+    },
+    "@shres-code/shres-code-session-projection-cache": {
+      "optional": true
+    },
+    "@shres-code/shres-code-settings": {
+      "optional": true
+    },
+    "@shres-code/shres-code-workspace": {
+      "optional": true
+    },
+    "@shres-code/shres-code-subagent": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "1.3.0",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-acp": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-commands": "workspace:^",
+    "@shres-code/shres-code-compaction-basic": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-judgment-dispatch": "workspace:^",
+    "@shres-code/shres-code-judgment-shield": "workspace:^",
+    "@shres-code/shres-code-judgment-typesafe": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-llm-mock-server": "workspace:^",
+    "@shres-code/shres-code-llm-retry": "workspace:^",
+    "@shres-code/shres-code-sdk-jsonrpc-server": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-session-projection-cache": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-settings-file": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/shres-code-storage-domain": "workspace:^",
+    "@shres-code/shres-code-storage-json": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-fork-in-process": "workspace:^",
+    "@shres-code/shres-code-subagent-spawn-in-process": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-token-meter": "workspace:^",
+    "@shres-code/shres-code-tool-subagent": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-workspace": "workspace:^"
+  }
+}

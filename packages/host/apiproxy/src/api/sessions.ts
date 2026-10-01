@@ -139,6 +139,15 @@ export interface ModelCatalogModel {
    * hosted-tool claim and the local tool catalog applies unchanged.
    */
   hostedTools?: string[]
+  /**
+   * Capability markers the route declares for this entry, when disclosed. A
+   * marker names a role the entry fills outside the conversation — a
+   * non-generative engine a product surface binds by role rather than a model
+   * a turn can select — so a picker that offers a conversation turn withdraws
+   * an entry carrying one. The vocabulary is merge-extensible, so an older
+   * client may read a marker it does not act on. Absent declares none.
+   */
+  capabilities?: string[]
 }
 
 /** One provider and the models it advertised successfully. */

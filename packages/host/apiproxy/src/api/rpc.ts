@@ -63,10 +63,13 @@ export interface RpcErrorDetailsMap {
   /** A leading-/ prompt named no registered command; the message names the token. */
   'unknown-command': {}
   /**
-   * A settings write was refused (schema validation, unknown namespace,
-   * read-only provider, or storage failure); the message is the seam's text.
+   * A settings write was refused (schema validation, the namespace owner's
+   * validation, unknown namespace, read-only provider, or storage failure);
+   * the message is the seam's text. `path` locates the offending field when
+   * the owner's validation named one: keys and array indices from the
+   * section root.
    */
-  'settings-rejected': { ns: string }
+  'settings-rejected': { ns: string; path?: (string | number)[] }
   /**
    * A settings namespace exists in the seam but is outside the configuration
    * plane's model-provider boundary, so this proxy neither reads nor writes

@@ -41,10 +41,13 @@ export interface SettingsRegisterOptions<T> {
   applies?: SettingsApplies
   /**
    * Reject a resolved section the owner could not act on, for constraints its
-   * schema cannot express — a cross-field requirement, or one field's validity
-   * depending on another's. Throwing here refuses the *write* that produced the
-   * value, so a caller learns at `update`/`replace`/`mutate` instead of storing
-   * something that would silently disable the owner.
+   * schema cannot express — a cross-field requirement, one field's validity
+   * depending on another's, or a value that must name something a live
+   * service currently holds. Throwing here refuses the *write* that produced
+   * the value, so a caller learns at `update`/`replace`/`mutate` instead of
+   * storing something that would silently disable the owner. Throw
+   * {@link SettingsFieldError} to name the offending field; a configuration
+   * wire reports its path so a form can show the message beside that field.
    *
    * Kept separate from the schema because the schema is also what a
    * configuration surface renders and what an absent section resolves through;
@@ -55,10 +58,45 @@ export interface SettingsRegisterOptions<T> {
    * so an externally edited document cannot strand a running owner. At
    * registration there is no last good value yet, so a stored section that
    * already fails rejects the registration itself — again exactly as a schema
-   * failure does.
+   * failure does. A check against live services should therefore run only for
+   * the `write` cause, and only on the fields the write changes: at
+   * `register` a service a stored value names can register after the owner in
+   * the same load, and a `reload` that fails keeps the previous value in force
+   * with only a warning, which a file edit cannot see.
    * @param value - the resolved section, schema-valid by construction.
+   * @param cause - which operation produced the value.
    */
-  validate?: (value: T) => void
+  validate?: (value: T, cause: SettingsValidationCause) => void
+}
+
+/**
+ * Operation that produced a value handed to {@link SettingsRegisterOptions.validate}:
+ * `register` resolves the stored section as the owner registers, `write`
+ * resolves an `update`, `replace`, or `mutate` before it is persisted, and
+ * `reload` resolves a document the provider observed in storage.
+ */
+export type SettingsValidationCause = 'register' | 'write' | 'reload'
+
+/**
+ * A validation failure attributed to one field of a namespace's resolved
+ * section. Thrown from {@link SettingsRegisterOptions.validate}; it rejects the
+ * write like any other error, and a configuration wire reports {@link path}
+ * alongside the message.
+ */
+export class SettingsFieldError extends Error {
+  /** Keys and array indices from the section root to the offending field. */
+  readonly path: readonly (string | number)[]
+
+  /**
+   * @param path - keys and array indices from the section root to the field; non-empty.
+   * @param message - the reason, naming the field and the rejected value.
+   */
+  constructor(path: readonly (string | number)[], message: string) {
+    if (path.length === 0) throw new TypeError('SettingsFieldError path must name a field')
+    super(message)
+    this.name = 'SettingsFieldError'
+    this.path = Object.freeze([...path])
+  }
 }
 
 /** One registered namespace as surfaced to configuration UIs. */
@@ -327,7 +365,7 @@ interface SettingsRegistration {
   base: unknown
   applies: SettingsApplies
   /** Owner-supplied check for constraints the schema cannot express. */
-  validate?: (value: unknown) => void
+  validate?: (value: unknown, cause: SettingsValidationCause) => void
   resolved: unknown
   /**
    * Monotonic counter over this namespace's RAW user section — bumped by any
@@ -443,8 +481,8 @@ export abstract class SettingsProvider extends Service {
       applies: options?.applies ?? 'live',
       ...options?.validate === undefined
         ? {}
-        : { validate: options.validate as (value: unknown) => void },
-      resolved: deepFreeze(this.resolve(schema, options?.base, this.section(ns), options?.validate)),
+        : { validate: options.validate as (value: unknown, cause: SettingsValidationCause) => void },
+      resolved: deepFreeze(this.resolve(schema, options?.base, this.section(ns), 'register', options?.validate)),
       revision: 0,
       watchers: new Set(),
     }
@@ -634,7 +672,7 @@ export abstract class SettingsProvider extends Service {
         : mode === 'replace'
           ? snapshot
           : (snapshot['ops'] as SettingsPathOp[]).reduce(applyPathOp, current)
-      const next = deepFreeze(this.resolve(registration.schema, registration.base, section, registration.validate))
+      const next = deepFreeze(this.resolve(registration.schema, registration.base, section, 'write', registration.validate))
       await this.persist(ns, section)
       // The write reached storage either way; the cache must say so. Commit
       // only when this registration is still the namespace owner — a fiber
@@ -676,7 +714,7 @@ export abstract class SettingsProvider extends Service {
     for (const registration of this.registrations.values()) {
       let next: unknown
       try {
-        next = deepFreeze(this.resolve(registration.schema, registration.base, this.section(registration.ns), registration.validate))
+        next = deepFreeze(this.resolve(registration.schema, registration.base, this.section(registration.ns), 'reload', registration.validate))
       } catch (error) {
         this.ctx.logger.warn('settings: keeping last good "%s" after invalid stored section', registration.ns)
         this.ctx.logger.warn(error)
@@ -702,14 +740,15 @@ export abstract class SettingsProvider extends Service {
     schema: z<T>,
     base: unknown,
     section: Record<string, unknown> | undefined,
-    validate?: (value: T) => void,
+    cause: SettingsValidationCause,
+    validate?: (value: T, cause: SettingsValidationCause) => void,
   ): T {
     // The merged candidate is untyped by construction; the schema call is the
     // runtime validation that admits it into T.
     const value = schema(mergeLayers(base, section) as never)
     // The owner's own check runs on the admitted value, so it sees defaults
     // and the composition base exactly as the owner will.
-    validate?.(value)
+    validate?.(value, cause)
     return value
   }
 
@@ -838,8 +877,9 @@ export interface SettingsSectionHooks<T> {
    * Reject a resolved section this consumer could not act on, for constraints
    * its schema cannot express. See {@link SettingsRegisterOptions.validate}.
    * @param value - the resolved section, schema-valid by construction.
+   * @param cause - which operation produced the value.
    */
-  validate?: (value: T) => void
+  validate?: (value: T, cause: SettingsValidationCause) => void
 }
 
 /**

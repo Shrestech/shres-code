@@ -23,6 +23,12 @@ export type PiAiReplayBlock =
   | { type: 'tool-call'; thoughtSignature?: string }
   | { type: 'server-tool-call' }
 
+/**
+ * Observer of one assistant history message whose replay state this build
+ * cannot use, called with the diagnostic reason and the degraded message.
+ */
+export type ReplayDegradeObserver = (reason: string, message: Message) => void
+
 /** Replay envelope version this build writes and reads; any other version degrades to provider-neutral history. */
 const PI_AI_REPLAY_VERSION = 3
 
@@ -261,11 +267,13 @@ function replayedAssistant(message: Message, source: ModelMessageSource, rawStat
  * no longer matches the content — therefore degrades the one message to
  * provider-neutral history instead of failing the request.
  * @param message - assistant content with required source and optional adapter-owned replay metadata.
- * @param onDegrade - called with the diagnostic reason when an unusable replay
- *   state falls back to provider-neutral conversion.
+ * @param onDegrade - called with the diagnostic reason and the message when an
+ *   unusable replay state falls back to provider-neutral conversion; the
+ *   conversion is deterministic, so a message degrades to the same bytes on
+ *   every request.
  * @returns a native pi-ai assistant message reconstructed from durable content.
  */
-export function toPiAssistant(message: Message, onDegrade?: (reason: string) => void): AssistantMessage {
+export function toPiAssistant(message: Message, onDegrade?: ReplayDegradeObserver): AssistantMessage {
   const source = message.source
   if (source.kind !== 'model' || source.replayState === undefined) return foreignAssistant(message)
   try {
@@ -274,7 +282,7 @@ export function toPiAssistant(message: Message, onDegrade?: (reason: string) => 
     /* v8 ignore next -- replayedAssistant throws only INVALID_REPLAY_STATE LlmErrors today; the
        guard keeps a future non-replay failure loud instead of silently degrading it */
     if (!(error instanceof LlmError) || error.code !== 'INVALID_REPLAY_STATE') throw error
-    onDegrade?.(error.message)
+    onDegrade?.(error.message, message)
     return foreignAssistant(message)
   }
 }

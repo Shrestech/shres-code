@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
-        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nPrecedence, resolved on every read: a selection made in this process, else the session\'s latest logged request/header, else the live default.',
+        description: 'Provide or return the session-local model selection the agent\'s model-selection hook applies, which prompt assembly snapshots. The selection is withdrawn when this service\'s fiber is disposed, so a reloaded instance provides its own.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
         parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
         returns: 'the shared mutable selection for this Agent.',
       },
@@ -292,7 +292,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'enter(agent: Agent, owner: Agent | undefined): () => void',
-        description: 'Insert an already-constructed agent without announcing it. This is the advanced ordered-lifecycle primitive used by the async agent factory: it first completes setup while the agent is unpublished, then assigns the returned detach closure into its pre-installed composite teardown before calling announce. Ordinary callers use register.',
+        description: 'Insert an already-constructed agent without announcing it. This is the advanced ordered-lifecycle primitive used by the async agent factory: it first completes setup while the agent is unpublished, then assigns the returned detach closure into its pre-installed composite teardown before calling announce. Ordinary callers use register. A root agent, one whose session header records no delegation depth, leaves with its model-selection hook installed (installModelSelection) unless setup already installed it, so every `agent/created` listener sees it.',
         parameters: [{ name: 'agent', description: 'the prepared, unpublished agent.' }, { name: 'owner', description: 'live agent whose scoped context created this agent, or undefined for a top-level runtime root. This is runtime ownership, not the resumed session\'s durable parent lineage.' }],
         returns: 'an idempotent closure that removes this exact entry and emits `agent/disposed` with listener failures contained. When called from a synchronous `agent/created` listener, removal and disposal wait until that creation dispatch unwinds.',
       },
@@ -1056,6 +1056,98 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'judgment',
+    summary: 'Abstract judgment service.',
+    description: 'Abstract judgment service. Load one implementation per context as `ctx.judgment`. A deployment loads `judgment-dispatch`, which routes each ask to a registered engine; a test can load a single-engine implementation directly. The service registers no session event, prompt, or tool of its own.\n\nThe service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle and the engine selection exist only where `ctx.judgment` does. settings reads it live.',
+    methods: [
+      {
+        signature: 'declare readonly fitting?: JudgmentFittingEngine',
+        description: 'Atomic tokenizer fitting and judgment, when supported. Declared without an emitted field so a subclass can supply it as an assignment or as an accessor defined on the instance.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly settings: () => JudgmentSettings',
+        description: 'Live read of the resolved judgment settings. Consumers call it at the decision the toggle gates and treat `enabled: false` exactly as an absent engine — never as a third behavior mode.',
+        parameters: [],
+      },
+      {
+        signature: 'fittingFor(_consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined',
+        description: 'The fitting capability that answers one consumer\'s fitted asks. A dispatcher answers with the engine it selects for `consumer`, so a consumer that names itself reads its fitting here rather than from fitting, which follows the deployment-wide selection. A single-engine implementation answers every consumer with fitting.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the fitting capability, or `undefined` when the engine answering this consumer has none.',
+      },
+      {
+        signature: 'selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined',
+        description: 'The registry id of the engine that answers one consumer\'s asks, read before an ask so a consumer can attribute its own state to an engine. A single-engine implementation selects nothing and returns `undefined`.',
+        parameters: [{ name: '_consumer', description: 'the asking consumer; omission reads the deployment-wide selection.' }],
+        returns: 'the selected registry id, or `undefined` when this service does not select engines.',
+      },
+      {
+        signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
+        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id. An implementation must honour `input.signal` at every await, settling promptly with `ABORTED` once it aborts: a consumer\'s deadline bounds the answer it uses, but bounds its wait only when the engine aborts.',
+        parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
+        returns: 'the answers with the engine and model identity and the ask\'s duration.',
+        throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), oversized serialized input (`INPUT_TOO_LARGE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
+      },
+    ],
+  },
+  {
+    key: 'judgmentEngines',
+    summary: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks.',
+    description: 'Engines a deployment composes, keyed by id, and the consumer ids that name themselves on their asks. Registration is all-or-nothing and synchronous; subscribers are notified after every engine registration, removal, and announced status change, and when a consumer id becomes declared or stops being declared, and re-read list, consumers, and each entry\'s `status()` themselves.',
+    methods: [
+      {
+        signature: 'register(id: JudgmentEngineId, entry: JudgmentEngineEntry): JudgmentEngineRegistration',
+        description: 'Register one engine. Call it inside the provider\'s `ctx.effect` so the returned disposer runs with the provider\'s fiber.',
+        parameters: [{ name: 'id', description: 'the engine\'s registry id.' }, { name: 'entry', description: 'the engine, its descriptor, and its status read.' }],
+        returns: 'the disposer, carrying the status-change announcement.',
+        throws: ['Error when the descriptor names another id, when `supportsFitting` disagrees with the engine\'s `fitting` capability, or when the id is already registered.'],
+      },
+      {
+        signature: 'list(): readonly JudgmentEngineDescriptor[]',
+        description: 'Describe every registered engine.',
+        parameters: [],
+        returns: 'the descriptors, in registration order.',
+      },
+      {
+        signature: 'entryList(): readonly JudgmentEngineEntry[]',
+        description: 'Read every registered engine with its status reader.',
+        parameters: [],
+        returns: 'the entries, in registration order.',
+      },
+      {
+        signature: 'get(id: JudgmentEngineId): JudgmentEngineEntry | undefined',
+        description: 'Look up one registered engine.',
+        parameters: [{ name: 'id', description: 'the registry id.' }],
+        returns: 'the entry, or `undefined` when no provider registered the id.',
+      },
+      {
+        signature: 'declareConsumer(id: JudgmentConsumerId): () => void',
+        description: 'Declare that a consumer names itself with `id` on its asks, so a per-consumer override for it has an effect. Call it inside the consumer\'s `ctx.effect` so the returned disposer runs with the consumer\'s fiber; declareJudgmentConsumer does that. Several live declarations of one id are allowed, and the id stays declared until every one is disposed.',
+        parameters: [{ name: 'id', description: 'the consumer id the consumer\'s asks carry.' }],
+        returns: 'the disposer ending this declaration; repeated calls do nothing.',
+      },
+      {
+        signature: 'hasConsumer(id: string): boolean',
+        description: 'Whether a consumer currently names itself with `id` on its asks.',
+        parameters: [{ name: 'id', description: 'the consumer id.' }],
+        returns: 'true while at least one declaration of the id is live.',
+      },
+      {
+        signature: 'consumers(): readonly JudgmentConsumerId[]',
+        description: 'List the declared consumer ids.',
+        parameters: [],
+        returns: 'the ids, in first-declaration order.',
+      },
+      {
+        signature: 'subscribe(listener: () => unknown): () => void',
+        description: 'Observe registrations, removals, and announced status changes.',
+        parameters: [{ name: 'listener', description: 'called after each change; what it throws or rejects with is reported and does not reach the caller that caused the change.' }],
+        returns: 'the disposer ending this subscription.',
+      },
+    ],
+  },
+  {
     key: 'ledger',
     summary: 'The abstract decision-ledger service.',
     description: 'The abstract decision-ledger service. Registered as `ctx.ledger` (one provider per context; loading a second throws cordis\' standard duplicate-service behavior). A provider subclasses this, implements the three abstract persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- persistRecord persists a resolved decision spec under its entry id.\n- queryEntries reads the provider\'s authoritative entry store.\n- hasEntry reports whether an entry id is present in the store.',
@@ -1211,6 +1303,81 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Delete one feedback item. Absence is successful regardless of the supplied version; an existing item requires an exact version match.',
         parameters: [{ name: 'request', description: 'Session, message, and observed item version.' }],
         returns: 'the stable absent postcondition, or an explicit failure.',
+      },
+    ],
+  },
+  {
+    key: 'modelRouting',
+    summary: '`ctx.modelRouting`: owns the logged routing mode, routing decisions, and the consult `installModelSelection` reaches.',
+    description: '`ctx.modelRouting`: owns the logged routing mode, routing decisions, and the consult `installModelSelection` reaches. No live mirror of the mode is kept — the log is the state — and its configuration, mode, and decision events write no prompt, tool, or model request.',
+    methods: [
+      {
+        signature: 'config(): ResolvedModelRouterConfig',
+        description: 'The resolved configuration in force, re-resolved per read and memoized by the raw snapshot\'s identity.\n\nThere is no keep-last-good recovery here on purpose: a settings write this resolver could not act on is refused by the `validate` hook below before it commits, and the settings seam keeps a namespace\'s last good value when an already-stored section fails to resolve — so a bad value reaches this method only from a caller that bypassed both, and failing loud there is the honest answer rather than masking a configuration the deployment did not write.',
+        parameters: [],
+        returns: 'the resolved configuration.',
+      },
+      {
+        signature: '@Remote(\'gate\') gateView(): ModelRoutingGateView',
+        description: 'The gate configuration in force now. Decisions do not record it, so a drill-down reads the current values.',
+        parameters: [],
+        returns: 'the thresholds, judgment deadline, difficulty band, and hold.',
+      },
+      {
+        signature: '@Remote async poolStatus(): Promise<ModelRoutingPoolStatus>',
+        description: 'The pool and `routeFrom` allowlist in force, each model with the facts its adapter declares, and the router\'s own eligibility result for every (base, pool model) pair, computed as a turn without images would compute it. Makes no model request.',
+        parameters: [],
+        returns: 'the pool status.',
+      },
+      {
+        signature: '@Remote(\'decision\') decisionDetail(agent: Agent, seq: number): ModelRoutingDecisionDetail',
+        description: 'One logged decision, verbatim, with the turn and step it was logged in and the gate configuration in force now.',
+        parameters: [{ name: 'agent', description: 'the session\'s Agent.' }, { name: 'seq', description: 'seq of a `model-routing/decision` event in that session\'s log.' }],
+        returns: 'the decision detail.',
+        throws: ['when the seq does not name a `model-routing/decision` event.'],
+      },
+      {
+        signature: '@Remote(\'stats\') async workspaceStats(request: ModelRoutingStatsRequest): Promise<ModelRoutingWorkspaceStats>',
+        description: 'Routing statistics across one workspace\'s unarchived sessions, for the Settings overview: each session\'s `modelRoutingStats` value, rolled up over the sessions whose latest decision falls in the range. An attached session\'s value is its live one and a cold session\'s is the persisted projection cache\'s; no session log is read, so a cold session without a cached value on the current unit version is counted as not summarized.',
+        parameters: [{ name: 'request', description: 'the workspace and the range.' }],
+        returns: 'the workspace statistics.',
+        throws: ['when this host composes no workspace registry or the workspace is unknown.'],
+      },
+      {
+        signature: 'get(agent: Agent): { mode: ModelRoutingMode; pending?: ModelRoutingMode }',
+        description: 'Read the logged mode and any selection awaiting the next accepted pre-step.',
+        parameters: [{ name: 'agent', description: 'the agent to read.' }],
+        returns: 'the mode in force plus a pending selection, when present.',
+      },
+      {
+        signature: 'modeOf(session: Session, end: number = session.events.length): ModelRoutingMode',
+        description: 'The mode in force on one session, derived from committed configuration and user mode events. A log with neither starts off.',
+        parameters: [{ name: 'session', description: 'the session to read.' }, { name: 'end', description: 'fold the first `end` events; defaults to the whole log.' }],
+        returns: 'the mode in force.',
+      },
+      {
+        signature: 'async onChildRoute( request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>',
+        description: 'Answer one `subagent/child-route` consult. `next()` runs first so another listener\'s answer wins and this policy records nothing.',
+        parameters: [{ name: 'request', description: 'the waterfall request, including the minted routeRequestId.' }, { name: 'next', description: 'remaining listeners.' }],
+        returns: 'the route to start the child with, or undefined to keep inherited.',
+      },
+      {
+        signature: 'set(agent: Agent, mode: ModelRoutingMode): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
+        description: 'Switch routing on, off, or to shadow. Between turns the change is appended immediately; a changed value during an open turn waits for the next accepted pre-step. An explicit choice equal to the current value records user authority immediately and prevents later settings from overriding it.',
+        parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'mode', description: 'the mode routing should run in.' }],
+        returns: 'what happened: `committed`, `queued`, `cancelled`, or `noop`.',
+      },
+      {
+        signature: 'async resolveRequest( agent: Agent, turn: number, step: number, base: ModelSelection, signal: AbortSignal, request: ModelRoutingRequest, ): Promise<ModelSelection | undefined>',
+        description: 'Resolve the route one request should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nEach new downgraded step reassesses the latest task evidence. Same-step retries reuse the judgment only while its complete candidate inputs are unchanged, and recheck manual authority, `routeFrom` and pool membership, and capabilities. A manual-model decision lasts for the turn.',
+        parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: 'step', description: 'the step number within the turn; retries share its judgment.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }, { name: 'request', description: 'frozen conversation content and the manually selected call configuration.' }],
+        returns: 'the route to run, or `undefined` to keep the manual route.',
+      },
+      {
+        signature: 'stickySelection(agent: Agent): ModelSelection | undefined',
+        description: 'Report the manual selection a held downgrade descends beneath.\n\nA held streak rewrites the consumed `request/header` to the candidate, so that header stops reporting the route the session is pointed at; a reader asking for the session\'s selection asks this first. The answer is the same fold the consult reads — no live mirror — and the effort is the one the streak was entered on, because that is what the manual route still runs at. When the streak has just ended, the last request header can still carry its candidate. In that case the decision immediately before that header retains the manual entry route until a later manual header replaces it. A decision logged after the header is ignored because it may be a crash-orphaned turn.',
+        parameters: [{ name: 'agent', description: 'the agent whose selection is being read.' }],
+        returns: 'the manual route behind an active streak or the last routed header awaiting replacement; `undefined` when the logged header is already manual.',
       },
     ],
   },
@@ -2081,6 +2248,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{@link SubagentError} under the same conditions as {@link listChildren}.'],
       },
       {
+        signature: 'childTurnOutcomes( parent: Agent, childId: SessionId, signal?: AbortSignal, ): Promise<ChildTurnOutcomesResult>',
+        description: 'Observe one direct child\'s accounting turns and the route in force for each. Live session first; otherwise one persistence inspect under the same lifecycle witness as listing. Direct children only. Observe-only: no events, no mutation. Cancellation rejects with the signal\'s reason. Data damage returns `unavailable` and never throws.',
+        parameters: [{ name: 'parent', description: 'the exact live parent whose child is read.' }, { name: 'childId', description: 'the durable child session id.' }, { name: 'signal', description: 'caller cancellation forwarded to persistence inspect.' }],
+        returns: 'accounting turns, or why they cannot be observed.',
+      },
+      {
         signature: 'registerProvider(provider: SubagentProvider): () => void',
         description: 'Register a provider under its name. Registration is effect-scoped and HMR safe; removing a provider blocks new starts but does not revoke runs that were already returned to their holders.',
         parameters: [{ name: 'provider', description: 'the trusted provider implementation.' }],
@@ -2103,6 +2276,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Establish a published child on the named provider. Capability, depth, schema, and concurrency-cap checks run before delegation. Occupancy is acquired synchronously before `provider.start()` and released on start rejection or when the holder `dispose()`s. Provider ownership lasts until its promise fulfills; a rejection therefore has no run for the caller to dispose and emits no run lifecycle events. Post-publication turn and infrastructure failures settle through the returned run.',
         parameters: [{ name: 'name', description: 'the provider to use.' }, { name: 'request', description: 'child label, prompt, parent, signal, and optional capabilities.' }],
         returns: 'the published holder-owned run.',
+      },
+      {
+        signature: 'async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>',
+        description: 'Resolve the `agentOptions` a delegation consumer starts one fresh child with, dispatching `subagent/child-route` at most once. Consumers pass the result as the start request\'s `agentOptions` and derive any reported route from the same value with `effectiveChildRoute`, so the reported route and the run route cannot diverge.\n\n`input.requested` returns unchanged, without dispatch, when it names a provider or model (explicit routes win), when the provider seeds the child with parent history (fork), when the provider does not run requested routes, when no listener answers, or when the answer equals the inherited route. A dispatch that reaches listeners mints one `routeRequestId` on the request. That id is copied onto the returned `agentOptions` only when a listener changed the route; every other path returns `requested` unchanged. A throwing listener is logged and the child keeps its inherited route: routing is an optional cost policy, and a broken policy must not fail the delegation it would only have made cheaper. An `InvariantError` raised during the dispatch is not contained: a violated invariant means the durable log is about to become inconsistent, so it rejects the delegation. A cancelled `input.signal` rejects instead of falling back. A listener route is merged over the inherited route and resolved against its registered model before return, so an unregistered route rejects before any child exists; agent creation itself does not validate a route.',
+        parameters: [{ name: 'name', description: 'the subagent provider the child will start on.' }, { name: 'input', description: 'the parent, consumer kind, requested options, task, and signal.' }],
+        returns: 'the options to start the child with, or `undefined` when none apply.',
+        throws: ['{SubagentError} `NO_PROVIDER` for an unregistered subagent provider, or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not resolve to a registered model.', '{InvariantError} when a registered invariant fails during the dispatch.'],
       },
     ],
   },
@@ -2168,7 +2348,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async assemble(context: AssembleContext = {}): Promise<PromptAssembly>',
-        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
+        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section. Rejects more than one effective complete section and, while none is active, an effective conditional section that is not ordered after every static section.',
         parameters: [{ name: 'context', description: 'the optional scope and plugin-defined assembly fields.' }],
         returns: 'the post-waterfall assembly with any complete prompt enforced.',
       },
@@ -2871,9 +3051,9 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'agent/request',
     mode: 'waterfall',
-    signature: '\'agent/request\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>',
+    signature: '\'agent/request\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; content: AgentRequestContent; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>',
     summary: 'Replace the frozen call configuration.',
-    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. Model-visible content must use logged channels; this waterfall cannot mutate messages.',
+    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. `payload.content` is the detached, deep-frozen content assembled for this request and is read-only; only the returned config may change. Model-visible content still uses the request header logged by the loop.',
     parameters: [{ name: 'payload', description: '.signal - the current turn\'s explicit abort signal. Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
@@ -3021,6 +3201,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.change - fresh current projection or clear tombstone.' }],
   },
   {
+    name: 'judgment/engines-updated',
+    mode: 'emit',
+    signature: '\'judgment/engines-updated\'(): void',
+    summary: 'The judgment engine view changed: an engine registered, unregistered, or announced a status change, a consumer id became declared or stopped being declared, or the `judgment` settings selection committed a new value.',
+    description: 'The judgment engine view changed: an engine registered, unregistered, or announced a status change, a consumer id became declared or stopped being declared, or the `judgment` settings selection committed a new value. This payload-free notification comes from the service mounted as `ctx.judgment`; listeners re-read the engine list and selection.',
+    parameters: [],
+  },
+  {
     name: 'llm/adapters-updated',
     mode: 'emit',
     signature: '\'llm/adapters-updated\'(): void',
@@ -3123,6 +3311,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A skill provider, runtime contribution, or provider-backed catalog may have changed.',
     description: 'A skill provider, runtime contribution, or provider-backed catalog may have changed. This is an unfiltered invalidation notification; consumers refetch the catalog for their own lookup options. Listener failures are contained and cannot veto the registry mutation.',
     parameters: [],
+  },
+  {
+    name: 'subagent/child-route',
+    mode: 'waterfall',
+    signature: '\'subagent/child-route\'( this: Scoped<SubagentRuntime>, request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>',
+    summary: 'Choose the provider/model route of one fresh child before its delegation consumer starts it.',
+    description: 'Choose the provider/model route of one fresh child before its delegation consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this at most once per child, and only when the request names neither a provider nor a model, the subagent provider runs requested routes, and the provider does not seed the child with parent history: a fork child keeps its parent\'s warm cached prefix and is never routed. Team seats always name their route, so no seat reaches a listener. The returned route is merged over `request.inherited`; `undefined` keeps it.\n\nThe waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child\'s creation. A throwing listener is logged and the child keeps its inherited route, except that an `InvariantError` raised during the dispatch propagates; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent\'s context answers only its delegations.',
+    parameters: [{ name: 'request', description: 'the fresh child\'s route question.' }],
   },
   {
     name: 'subagent/end',
@@ -3301,6 +3497,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AgentPreset {\n    readonly id: string;\n    readonly trust: PresetTrust;\n    readonly path: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly order?: number;\n    readonly broken?: string;\n}',
   },
   {
+    name: 'AgentRequestContent',
+    declaration: 'export interface AgentRequestContent {\n    readonly messages: readonly Message[];\n    readonly system: string;\n    readonly tools: readonly ToolSchema[];\n}',
+  },
+  {
     name: 'AgentSetup',
     declaration: 'export type AgentSetup = (agentCtx: Context) => AgentSetupCommit | Promise<AgentSetupCommit | void> | void;',
   },
@@ -3423,6 +3623,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CheckpointJspaceInput',
     declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
+  },
+  {
+    name: 'ChildTurnOutcome',
+    declaration: 'export interface ChildTurnOutcome {\n    readonly turn: number;\n    readonly reason: TurnEndReason;\n    readonly route?: {\n        readonly provider: string;\n        readonly model: string;\n    };\n}',
+  },
+  {
+    name: 'ChildTurnOutcomes',
+    declaration: 'export interface ChildTurnOutcomes {\n    readonly routeRequestId?: SubagentRouteRequestId;\n    readonly turns: readonly ChildTurnOutcome[];\n}',
+  },
+  {
+    name: 'ChildTurnOutcomesResult',
+    declaration: 'export type ChildTurnOutcomesResult = ChildTurnOutcomes | {\n    readonly unavailable: ChildTurnOutcomesUnavailable;\n};',
+  },
+  {
+    name: 'ChildTurnOutcomesUnavailable',
+    declaration: 'export type ChildTurnOutcomesUnavailable = \'missing\' | \'corrupt\' | \'no-persistence\' | \'not-a-child\';',
   },
   {
     name: 'ClaudeSessionManager',
@@ -4041,6 +4257,142 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface JspaceStatus {\n    readonly active: boolean;\n    readonly reason: \'active\' | \'disabled\';\n}',
   },
   {
+    name: 'JudgmentAnswer',
+    declaration: 'export type JudgmentAnswer = JudgmentBinaryAnswer | JudgmentChoiceAnswer | JudgmentScoreAnswer;',
+  },
+  {
+    name: 'JudgmentBinaryAnswer',
+    declaration: 'export interface JudgmentBinaryAnswer {\n    kind: \'binary\';\n    id: JudgmentQuestionId;\n    probability: number;\n}',
+  },
+  {
+    name: 'JudgmentBinaryCriteria',
+    declaration: 'export interface JudgmentBinaryCriteria {\n    yes?: string;\n    no?: string;\n}',
+  },
+  {
+    name: 'JudgmentBinaryQuestion',
+    declaration: 'export interface JudgmentBinaryQuestion {\n    kind: \'binary\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    criteria?: JudgmentBinaryCriteria;\n}',
+  },
+  {
+    name: 'JudgmentChoiceAnswer',
+    declaration: 'export interface JudgmentChoiceAnswer {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    option: string;\n    probabilities: Readonly<Record<string, number>>;\n    confidence: number;\n}',
+  },
+  {
+    name: 'JudgmentChoiceOption',
+    declaration: 'export interface JudgmentChoiceOption {\n    option: string;\n    description?: string;\n}',
+  },
+  {
+    name: 'JudgmentChoiceQuestion',
+    declaration: 'export interface JudgmentChoiceQuestion {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    options: JudgmentChoiceOption[];\n}',
+  },
+  {
+    name: 'JudgmentConsumerId',
+    declaration: 'export type JudgmentConsumerId = Branded<\'JudgmentConsumerId\'>;',
+  },
+  {
+    name: 'JudgmentCorrelation',
+    declaration: 'export interface JudgmentCorrelation {\n    sessionId: SessionId;\n    consultKey: string;\n}',
+  },
+  {
+    name: 'JudgmentEngine',
+    declaration: 'export interface JudgmentEngine {\n    readonly fitting?: JudgmentFittingEngine;\n    ask(input: JudgmentInput): Promise<JudgmentResult>;\n}',
+  },
+  {
+    name: 'JudgmentEngineCalibration',
+    declaration: 'export type JudgmentEngineCalibration = \'calibrated\' | \'logprob\' | \'verbalized\';',
+  },
+  {
+    name: 'JudgmentEngineDescriptor',
+    declaration: 'export interface JudgmentEngineDescriptor {\n    readonly id: JudgmentEngineId;\n    readonly label: string;\n    readonly egress: JudgmentEngineEgress;\n    readonly calibration: JudgmentEngineCalibration;\n    readonly supportsFitting: boolean;\n    readonly host?: JudgmentEngineHost;\n    readonly terms?: string;\n    readonly models?: Readonly<Record<JudgmentTier, string>>;\n    readonly destination?: string;\n}',
+  },
+  {
+    name: 'JudgmentEngineEgress',
+    declaration: 'export type JudgmentEngineEgress = \'none\' | \'local\' | \'remote\';',
+  },
+  {
+    name: 'JudgmentEngineEntry',
+    declaration: 'export interface JudgmentEngineEntry {\n    readonly engine: JudgmentEngine;\n    readonly descriptor: JudgmentEngineDescriptor;\n    status(): JudgmentEngineStatus;\n}',
+  },
+  {
+    name: 'JudgmentEngineHost',
+    declaration: 'export type JudgmentEngineHost = \'darwin-arm64\' | \'any\';',
+  },
+  {
+    name: 'JudgmentEngineId',
+    declaration: 'export type JudgmentEngineId = Branded<\'JudgmentEngineId\'>;',
+  },
+  {
+    name: 'JudgmentEngineRegistration',
+    declaration: 'export interface JudgmentEngineRegistration {\n    (): void;\n    statusChanged(): void;\n}',
+  },
+  {
+    name: 'JudgmentEngineState',
+    declaration: 'export type JudgmentEngineState = \'ready\' | \'starting\' | \'unavailable\' | \'unconfigured\' | \'not-installed\' | \'unsupported-host\';',
+  },
+  {
+    name: 'JudgmentEngineStatus',
+    declaration: 'export interface JudgmentEngineStatus {\n    readonly state: JudgmentEngineState;\n    readonly detail?: string;\n}',
+  },
+  {
+    name: 'JudgmentErrorCode',
+    declaration: 'export type JudgmentErrorCode = \'UNCONFIGURED\' | \'UNAVAILABLE\' | \'INPUT_TOO_LARGE\' | \'INVALID_ANSWER\' | \'ABORTED\';',
+  },
+  {
+    name: 'JudgmentFittingEngine',
+    declaration: 'export interface JudgmentFittingEngine {\n    ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>;\n}',
+  },
+  {
+    name: 'JudgmentFittingInput',
+    declaration: 'export interface JudgmentFittingInput extends Omit<JudgmentInput, \'state\'> {\n    states: readonly string[];\n}',
+  },
+  {
+    name: 'JudgmentFittingResult',
+    declaration: 'export type JudgmentFittingResult = {\n    kind: \'answered\';\n    fit: JudgmentTokenFit;\n    result: JudgmentResult;\n} | {\n    kind: \'unfit\';\n    engine: string;\n    model: string;\n    limits: JudgmentTokenLimits;\n    reason: JudgmentTokenLimitReason;\n    engineId?: JudgmentEngineId;\n};',
+  },
+  {
+    name: 'JudgmentInput',
+    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n    consumer?: JudgmentConsumerId;\n    correlation?: JudgmentCorrelation;\n}',
+  },
+  {
+    name: 'JudgmentQuestion',
+    declaration: 'export type JudgmentQuestion = JudgmentBinaryQuestion | JudgmentChoiceQuestion | JudgmentScoreQuestion;',
+  },
+  {
+    name: 'JudgmentQuestionId',
+    declaration: 'export type JudgmentQuestionId = Branded<\'JudgmentQuestionId\'>;',
+  },
+  {
+    name: 'JudgmentResult',
+    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n    engineId?: JudgmentEngineId;\n    usage?: TokenUsage;\n}',
+  },
+  {
+    name: 'JudgmentScoreAnswer',
+    declaration: 'export interface JudgmentScoreAnswer {\n    kind: \'score\';\n    id: JudgmentQuestionId;\n    score: number;\n    probabilities: Readonly<Record<string, number>>;\n    confidence: number;\n}',
+  },
+  {
+    name: 'JudgmentScoreQuestion',
+    declaration: 'export interface JudgmentScoreQuestion {\n    kind: \'score\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    levels: string[];\n}',
+  },
+  {
+    name: 'JudgmentSettings',
+    declaration: 'export interface JudgmentSettings {\n    enabled: boolean;\n    engine?: string;\n    overrides?: Readonly<Record<string, string>> | null;\n}',
+  },
+  {
+    name: 'JudgmentTier',
+    declaration: 'export type JudgmentTier = \'fast\' | \'accurate\';',
+  },
+  {
+    name: 'JudgmentTokenFit',
+    declaration: 'export interface JudgmentTokenFit {\n    selectedIndex: number;\n    state: string;\n    stateTokens: number;\n    sequenceTokens: readonly number[];\n    paddedTokens: number;\n    limits: JudgmentTokenLimits;\n}',
+  },
+  {
+    name: 'JudgmentTokenLimitReason',
+    declaration: 'export type JudgmentTokenLimitReason = \'state\' | \'head\' | \'option\' | \'batch\';',
+  },
+  {
+    name: 'JudgmentTokenLimits',
+    declaration: 'export interface JudgmentTokenLimits {\n    maxSequenceTokens: number;\n    maxHeadTokens: number;\n    maxBatchTokens: number;\n    manifestSha256: string;\n}',
+  },
+  {
     name: 'KnobState',
     declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
   },
@@ -4097,6 +4449,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
+    name: 'LlmCacheUsage',
+    declaration: 'export type LlmCacheUsage = \'reported\' | \'unreported\';',
+  },
+  {
     name: 'LlmCallConfig',
     declaration: 'export interface LlmCallConfig {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n}',
   },
@@ -4126,7 +4482,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n    promptCacheTtlMs?: number;\n    thinkingMode?: LlmThinkingMode;\n    cacheUsage?: LlmCacheUsage;\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -4142,11 +4498,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmResolvedModelInfo',
-    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n}',
+    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n    acceptsTemperature?: boolean;\n}',
   },
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+  },
+  {
+    name: 'LlmThinkingMode',
+    declaration: 'export type LlmThinkingMode = \'adaptive\' | \'budget\' | \'none\';',
   },
   {
     name: 'LocalOllamaStatus',
@@ -4321,6 +4681,186 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
   },
   {
+    name: 'ModelRoutingActiveStickyView',
+    declaration: 'export interface ModelRoutingActiveStickyView {\n    active: true;\n    stepsElapsed: number;\n    enteredTurn?: number;\n    enteredStep?: number;\n    entryBase?: ModelRoutingEntryBaseView;\n    routeErrorLimit: number;\n}',
+  },
+  {
+    name: 'ModelRoutingBreakReason',
+    declaration: 'export type ModelRoutingBreakReason = \'gate-failed\' | \'current-preferred\' | \'unknown-candidate\' | \'candidate-ineligible\' | \'escalated\' | \'manual-deviation\' | \'mode-off\' | \'route-errors\' | \'route-failed\' | \'hold-cap\' | \'base-unlisted\' | \'cold-point-return\';',
+  },
+  {
+    name: 'ModelRoutingCacheTtlView',
+    declaration: 'export interface ModelRoutingCacheTtlView {\n    readonly provider: string;\n    readonly model: string;\n    readonly ttlMs: number;\n    readonly source: \'adapter\' | \'fallback\';\n}',
+  },
+  {
+    name: 'ModelRoutingCalibration',
+    declaration: 'export type ModelRoutingCalibration = {\n    kind: \'refused\';\n} | {\n    kind: \'calibrated\';\n    by: string;\n} | {\n    kind: \'point\';\n} | {\n    kind: \'global\';\n};',
+  },
+  {
+    name: 'ModelRoutingCandidate',
+    declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description: string;\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateAssessment',
+    declaration: 'export interface ModelRoutingCandidateAssessment {\n    readonly id: string;\n    readonly provider: string;\n    readonly model: string;\n    readonly reasoningEffort?: string;\n    readonly difficultyReasoningEffort?: string;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly effectiveMaxTokens?: number;\n    readonly promptCacheTtlMs?: number;\n    readonly reason: ModelRoutingCandidateEligibilityReason;\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateEligibility',
+    declaration: 'export interface ModelRoutingCandidateEligibility {\n    readonly requirements: ModelRoutingCandidateRequirements;\n    readonly candidates: readonly ModelRoutingCandidate[];\n    readonly eligibleCandidates: readonly ModelRoutingCandidate[];\n    readonly assessments: readonly ModelRoutingCandidateAssessment[];\n}',
+  },
+  {
+    name: 'ModelRoutingCandidateEligibilityReason',
+    declaration: 'export type ModelRoutingCandidateEligibilityReason = \'eligible\' | \'base-unavailable\' | \'base-context-unknown\' | \'equals-base\' | \'candidate-unavailable\' | \'candidate-invalid\' | \'difficulty-effort-invalid\' | \'image-capability-unknown\' | \'image-incompatible\' | \'context-unknown\' | \'context-too-small\' | \'max-tokens-exceeds-context\' | \'hosted-tools-incompatible\' | \'thinking-mode-incompatible\';',
+  },
+  {
+    name: 'ModelRoutingCandidateRequirements',
+    declaration: 'export interface ModelRoutingCandidateRequirements {\n    readonly requiresImage: boolean;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly contextWindow?: number;\n    readonly hostedTools?: readonly HostedTool[];\n    readonly thinkingMode?: LlmThinkingMode;\n    readonly promptCacheTtlMs?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingChildPolicy',
+    declaration: 'export interface ModelRoutingChildPolicy {\n    readonly match: {\n        readonly kind?: \'subagent\' | \'workflow\';\n        readonly agentType?: string;\n    };\n    readonly candidate: string;\n    readonly judge: boolean;\n}',
+  },
+  {
+    name: 'ModelRoutingColdPoint',
+    declaration: 'export interface ModelRoutingColdPoint {\n    kind: ModelRoutingColdPointKind;\n    ttlMs: number;\n    ttlSource: \'adapter\' | \'fallback\';\n    idleMs?: number;\n    lastBaseSeq?: number;\n    compactionSeq?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingColdPointKind',
+    declaration: 'export type ModelRoutingColdPointKind = \'session-start\' | \'post-compaction\' | \'manual-switch\' | \'no-cache\' | \'idle\';',
+  },
+  {
+    name: 'ModelRoutingDecision',
+    declaration: 'export interface ModelRoutingDecision {\n    outcome: ModelRoutingOutcome;\n    reason: ModelRoutingReason;\n    stateHash: string;\n    stateSeqs: number[];\n    stateProjection?: {\n        renderer: \'conversation-v1\';\n        contextTurns: number;\n        maxChars: number;\n        omittedSeqs: number[];\n    };\n    candidateEligibility?: ModelRoutingCandidateEligibility;\n    judgmentQuestions?: readonly JudgmentQuestion[];\n    judgmentInput?: JudgmentTokenFit;\n    judgmentRejection?: {\n        limits: JudgmentTokenLimits;\n        reason: JudgmentTokenLimitReason;\n    };\n    selection?: ModelRoutingSelection;\n    route?: ModelRoutingRouteAnswer;\n    difficulty?: ModelRoutingDifficultyAnswer;\n    hint?: \'consider-stronger\';\n    sticky: ModelRoutingStickyView;\n    engine?: string;\n    model?: string;\n    latencyMs?: number;\n    engineId?: string;\n    judgeUsage?: TokenUsage;\n    eligibilityMs?: number;\n    inputChars?: number;\n    failure?: ModelRoutingFailure;\n    failedChunkSeq?: number;\n    engineFailure?: ModelRoutingEngineFailure;\n    objective?: ModelRoutingObjective;\n    thresholds?: ModelRoutingThresholds;\n    coldPoint?: ModelRoutingColdPoint | null;\n    shadow?: true;\n    cache?: ModelRoutingDecisionCache;\n}',
+  },
+  {
+    name: 'ModelRoutingDecisionCache',
+    declaration: 'export interface ModelRoutingDecisionCache {\n    readonly base: ModelRoutingCacheTtlView;\n    readonly candidates?: readonly {\n        readonly id: string;\n        readonly ttlMs: number;\n        readonly source: \'adapter\' | \'fallback\';\n    }[];\n}',
+  },
+  {
+    name: 'ModelRoutingDecisionDetail',
+    declaration: 'export interface ModelRoutingDecisionDetail {\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n    decision: ModelRoutingDecision;\n    gate: ModelRoutingGateView;\n}',
+  },
+  {
+    name: 'ModelRoutingDifficultyAnswer',
+    declaration: 'export interface ModelRoutingDifficultyAnswer {\n    score: number;\n    confidence: number;\n}',
+  },
+  {
+    name: 'ModelRoutingEngineFailure',
+    declaration: 'export interface ModelRoutingEngineFailure {\n    code: JudgmentErrorCode | \'DEADLINE\';\n    engineState?: \'starting\' | \'not-installed\';\n    refusedBeforeDispatch?: true;\n}',
+  },
+  {
+    name: 'ModelRoutingEntryBaseView',
+    declaration: 'export interface ModelRoutingEntryBaseView {\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n}',
+  },
+  {
+    name: 'ModelRoutingFailure',
+    declaration: 'export interface ModelRoutingFailure {\n    code: string;\n    provider: string;\n    model: string;\n}',
+  },
+  {
+    name: 'ModelRoutingGateView',
+    declaration: 'export interface ModelRoutingGateView {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    operatingPoints: ModelRoutingOperatingPoint[];\n    engines: {\n        engine: string;\n        calibration: ModelRoutingCalibration;\n    }[];\n    judgmentDeadlineMs: number;\n    entryScoreCeiling: number;\n    escalateBackScoreThreshold: number;\n    difficultyLevels: string[];\n    hold: {\n        minSteps: number;\n        maxSteps: number;\n    };\n    stateMaxChars: number;\n}',
+  },
+  {
+    name: 'ModelRoutingInactiveStickyView',
+    declaration: 'export interface ModelRoutingInactiveStickyView {\n    active: false;\n    stepsElapsed: number;\n    brokenBy?: ModelRoutingBreakReason;\n    entryBase?: ModelRoutingEntryBaseView;\n}',
+  },
+  {
+    name: 'ModelRoutingInitialMode',
+    declaration: 'export type ModelRoutingInitialMode = ModelRoutingMode;',
+  },
+  {
+    name: 'ModelRoutingInTurnFallback',
+    declaration: 'export type ModelRoutingInTurnFallback = \'manual\' | \'off\';',
+  },
+  {
+    name: 'ModelRoutingMode',
+    declaration: 'export type ModelRoutingMode = \'off\' | \'on\' | \'shadow\';',
+  },
+  {
+    name: 'ModelRoutingObjective',
+    declaration: 'export type ModelRoutingObjective = \'quota\' | \'dollars\' | \'latency\';',
+  },
+  {
+    name: 'ModelRoutingOperatingPoint',
+    declaration: 'export interface ModelRoutingOperatingPoint {\n    readonly engine: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly calibratedBy?: string;\n    readonly acceptVerbalized: boolean;\n}',
+  },
+  {
+    name: 'ModelRoutingOutcome',
+    declaration: 'export type ModelRoutingOutcome = \'downgraded\' | \'kept-strong\' | \'skipped\' | \'error\';',
+  },
+  {
+    name: 'ModelRoutingPoolBase',
+    declaration: 'export interface ModelRoutingPoolBase {\n    provider: string;\n    model: string;\n    objective: ModelRoutingObjective;\n    allowEveryTurn: boolean;\n    registered: boolean;\n    contextWindow?: number;\n}',
+  },
+  {
+    name: 'ModelRoutingPoolCandidate',
+    declaration: 'export interface ModelRoutingPoolCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n    description: string;\n    registered: boolean;\n    contextWindow?: number;\n    inputModalities?: string[];\n    efforts?: string[];\n    cacheUsage?: \'reported\' | \'unreported\';\n    alsoRouteFrom: boolean;\n    eligibility: ModelRoutingPoolEligibility[];\n}',
+  },
+  {
+    name: 'ModelRoutingPoolEligibility',
+    declaration: 'export interface ModelRoutingPoolEligibility {\n    provider: string;\n    model: string;\n    reason: ModelRoutingCandidateEligibilityReason;\n}',
+  },
+  {
+    name: 'ModelRoutingPoolStatus',
+    declaration: 'export interface ModelRoutingPoolStatus {\n    routeFrom: ModelRoutingPoolBase[];\n    candidates: ModelRoutingPoolCandidate[];\n}',
+  },
+  {
+    name: 'ModelRoutingReason',
+    declaration: 'export type ModelRoutingReason = \'gate-passed\' | \'sticky-hold\' | \'engine-absent\' | \'engine-disabled\' | \'engine-unavailable\' | \'judgment-failure-held\' | \'breaker-open\' | \'invalid-answer\' | \'no-candidates\' | \'base-unlisted\' | \'model-unavailable\' | \'candidate-ineligible\' | \'state-too-large\' | \'judgment-input-too-large\' | \'unknown-candidate\' | \'low-confidence\' | \'thin-margin\' | \'candidate-equals-base\' | \'engine-uncalibrated\' | \'thinking-mode-incompatible\' | \'current-preferred\' | \'difficulty-too-high\' | \'gate-failed\' | \'hold-cap\' | \'reentry-cooldown\' | \'escalated\' | \'manual-deviation\' | \'route-errors\' | \'route-failed\' | \'mode-off\' | \'judgment-error\' | \'warm-prefix\' | \'cold-point-return\';',
+  },
+  {
+    name: 'ModelRoutingReasonGroup',
+    declaration: 'export type ModelRoutingReasonGroup = \'switched\' | \'judge-no\' | \'fail-closed\' | \'engine\';',
+  },
+  {
+    name: 'ModelRoutingRequest',
+    declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
+  },
+  {
+    name: 'ModelRoutingRouteAnswer',
+    declaration: 'export interface ModelRoutingRouteAnswer {\n    choice: string;\n    confidence: number;\n    probabilities: Record<string, number>;\n}',
+  },
+  {
+    name: 'ModelRoutingRouteFrom',
+    declaration: 'export interface ModelRoutingRouteFrom {\n    readonly provider: string;\n    readonly model: string;\n    readonly objective: ModelRoutingObjective;\n    readonly allowEveryTurn: boolean;\n}',
+  },
+  {
+    name: 'ModelRoutingSelection',
+    declaration: 'export interface ModelRoutingSelection {\n    candidateId: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n}',
+  },
+  {
+    name: 'ModelRoutingStatsRange',
+    declaration: 'export type ModelRoutingStatsRange = \'24h\' | \'7d\' | \'all\';',
+  },
+  {
+    name: 'ModelRoutingStatsRequest',
+    declaration: 'export interface ModelRoutingStatsRequest {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n}',
+  },
+  {
+    name: 'ModelRoutingStatsSnapshot',
+    declaration: 'export interface ModelRoutingStatsSnapshot {\n    counts: {\n        decisions: number;\n        consults: number;\n        downgradedSteps: number;\n        steps: number;\n        streaks: number;\n        keptStrong: number;\n        routeFailed: number;\n        judgeFailed: number;\n        deadlineHits: number;\n        warmUps: number;\n        turnsWithDecisions: number;\n        warmSkipped: number;\n        childRouted: number;\n        childFailures: number;\n        childSuccesses: number;\n        childNeutral: number;\n    };\n    children: {\n        decided: number;\n        routed: number;\n        kept: number;\n        byReason: {\n            reason: string;\n            count: number;\n        }[];\n        byModel: {\n            candidateId: string;\n            count: number;\n        }[];\n        failures: number;\n    };\n    recentChildren: {\n        seq: number;\n        t: number;\n        outcome: \'routed\' | \'kept\';\n        reason: string;\n        candidateId: string | null;\n        agentType: string | null;\n        shadow: boolean;\n        latencyMs: number | null;\n    }[];\n    reasons: {\n        reason: string;\n        group: ModelRoutingReasonGroup;\n        count: number;\n    }[];\n    keptReasons: {\n        reason: string;\n        count: number;\n    }[];\n    exits: {\n        brokenBy: string;\n        count: number;\n    }[];\n    streakLengths: {\n        median: number | null;\n        max: number | null;\n    };\n    confidence: {\n        values: number[];\n        margins: number[ /* …truncated — full shape in source */',
+  },
+  {
+    name: 'ModelRoutingStickyView',
+    declaration: 'export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView;',
+  },
+  {
+    name: 'ModelRoutingThresholds',
+    declaration: 'export interface ModelRoutingThresholds {\n    downgradeThreshold: number;\n    downgradeMargin: number;\n    entryScoreCeiling?: number;\n    escalateBackScoreThreshold?: number;\n    source: \'operating-point\' | \'global\';\n    calibratedBy?: string;\n}',
+  },
+  {
+    name: 'ModelRoutingUnavailablePolicy',
+    declaration: 'export type ModelRoutingUnavailablePolicy = \'fallback\' | \'error\';',
+  },
+  {
+    name: 'ModelRoutingWorkspaceSession',
+    declaration: 'export interface ModelRoutingWorkspaceSession {\n    sessionId: string;\n    lastDecisionAt: number;\n    decisions: number;\n    steps: number;\n    downgradedSteps: number;\n}',
+  },
+  {
+    name: 'ModelRoutingWorkspaceStats',
+    declaration: 'export interface ModelRoutingWorkspaceStats {\n    workspaceId: string;\n    range: ModelRoutingStatsRange;\n    computedAt: number;\n    sessions: {\n        members: number;\n        summarized: number;\n        inRange: number;\n        included: number;\n        capped: boolean;\n    };\n    counts: ModelRoutingStatsSnapshot[\'counts\'];\n    reasons: ModelRoutingStatsSnapshot[\'reasons\'];\n    routedSwitches: {\n        count: number;\n        tokens: number;\n    };\n    rows: ModelRoutingWorkspaceSession[];\n}',
+  },
+  {
     name: 'NoteJspaceInput',
     declaration: 'export interface NoteJspaceInput {\n    readonly goal?: string;\n    readonly departing?: string;\n    readonly core?: string;\n    readonly open?: readonly JspaceOpenLine[];\n    readonly next?: string;\n}',
   },
@@ -4410,7 +4950,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptSection',
-    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n}',
+    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n    readonly stability?: \'static\' | \'conditional\';\n}',
   },
   {
     name: 'ProviderRequestId',
@@ -4479,6 +5019,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResolvedCredential',
     declaration: 'export interface ResolvedCredential {\n    value: string;\n    source: string;\n}',
+  },
+  {
+    name: 'ResolvedModelRouterConfig',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly routeFrom: readonly ModelRoutingRouteFrom[];\n    readonly childPolicies: readonly ModelRoutingChildPolicy[];\n    readonly childRouteErrors: number;\n    readonly childRouteInstructions?: string;\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly operatingPoints: readonly ModelRoutingOperatingPoint[];\n    readonly hold: {\n        readonly minSteps: number;\n        readonly maxSteps: number;\n    };\n    readonly entryScoreCeiling: number;\n    readonly reentryCooldownTurns: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly judgmentDeadlineMs: number;\n    readonly judgmentFailures: {\n        readonly holdTolerance: number;\n        readonly breakerThreshold: number;\n        readonly breakerOpenTurns: number;\n    };\n    readonly coldPoints: {\n        readonly unknownTtlMs: number;\n    };\n    readonly inTurnFallback: ModelRoutingInTurnFallback;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    reado /* …truncated — full shape in source */',
   },
   {
     name: 'ResolvedNormalRetryPolicy',
@@ -4882,11 +5426,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T, cause: SettingsValidationCause) => void;\n}',
   },
   {
     name: 'SettingsUpdateSource',
     declaration: 'export type SettingsUpdateSource = \'update\' | \'provider\';',
+  },
+  {
+    name: 'SettingsValidationCause',
+    declaration: 'export type SettingsValidationCause = \'register\' | \'write\' | \'reload\';',
   },
   {
     name: 'ShellExecRequest',
@@ -5145,6 +5693,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SubagentCapabilities {\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n    readonly cwd?: boolean;\n}',
   },
   {
+    name: 'SubagentChildRoute',
+    declaration: 'export interface SubagentChildRoute {\n    readonly provider?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SubagentChildRouteInput',
+    declaration: 'export interface SubagentChildRouteInput {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly requested?: AgentOptions;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
+    name: 'SubagentChildRouteKind',
+    declaration: 'export type SubagentChildRouteKind = \'subagent\' | \'workflow\';',
+  },
+  {
+    name: 'SubagentChildRouteRequest',
+    declaration: 'export interface SubagentChildRouteRequest {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly subagentProvider: string;\n    readonly inherited: SubagentChildRoute;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n    readonly routeRequestId: SubagentRouteRequestId;\n}',
+  },
+  {
     name: 'SubagentDescendantListEntry',
     declaration: 'export type SubagentDescendantListEntry = SubagentListEntry & {\n    readonly parentId: SessionId;\n    readonly depth: number;\n};',
   },
@@ -5162,7 +5726,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentProvider',
-    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
+    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    readonly runsRequestedModel?: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
   },
   {
     name: 'SubagentReportDelivery',
@@ -5177,12 +5741,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SubagentResult {\n    readonly output: ContentBlock[];\n    readonly structured?: unknown;\n    readonly stopReason: SubagentStopReason;\n}',
   },
   {
+    name: 'SubagentRouteRequestId',
+    declaration: 'export type SubagentRouteRequestId = Branded<\'SubagentRouteRequestId\'>;',
+  },
+  {
     name: 'SubagentRun',
     declaration: 'export interface SubagentRun {\n    readonly id: SessionId;\n    readonly localAgent: Agent | undefined;\n    readonly result: Promise<SubagentResult>;\n    dispose(): Promise<void>;\n}',
   },
   {
     name: 'SubagentRunEndInfo',
-    declaration: 'export interface SubagentRunEndInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly stopReason: SubagentResult[\'stopReason\'];\n    readonly lastAssistantMessage?: ContentBlock[];\n}',
+    declaration: 'export interface SubagentRunEndInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly subagentRouteRequestId?: SubagentRouteRequestId;\n    readonly stopReason: SubagentResult[\'stopReason\'];\n    readonly lastAssistantMessage?: ContentBlock[];\n}',
   },
   {
     name: 'SubagentRunId',
@@ -5190,11 +5758,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRunInfo',
-    declaration: 'export interface SubagentRunInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n}',
+    declaration: 'export interface SubagentRunInfo {\n    readonly runId: SubagentRunId;\n    readonly provider: string;\n    readonly id: SessionId;\n    readonly local: boolean;\n    readonly subagentRouteRequestId?: SubagentRouteRequestId;\n}',
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
+    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    childTurnOutcomes(parent: Agent, childId: SessionId, signal?: AbortSignal): Promise<ChildTurnOutcomesResult>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n    async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>;\n}',
   },
   {
     name: 'SubagentStartRequest',

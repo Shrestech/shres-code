@@ -748,6 +748,40 @@ describe('shres-workflow-worker-thread', () => {
       await handle.dispose()
     })
 
+    it('a child whose route resolution outlives the host cancel is refused before its provider starts', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SubagentRuntime)
+      const provider = new StubProvider('routable', () => text('routed reply'))
+      Object.assign(provider, { runsRequestedModel: true })
+      ctx.subagents.registerProvider(provider)
+      await ctx.plugin(WorkerThreadWorkflowEngine, { provider: 'routable', maxConcurrentAgents: 1 })
+      // The route question reads the parent's effective route.
+      const parent = {
+        id: SessionId('workflow-parent'),
+        options: { provider: 'mock', model: 'strong' },
+        ctx: { get: () => undefined },
+        session: { header: {}, events: [], requestHeader: () => undefined },
+      } as unknown as Agent
+      const asked = Promise.withResolvers<{ kind: string; signal: AbortSignal }>()
+      const release = Promise.withResolvers<undefined>()
+      ctx.on('subagent/child-route', async (request) => {
+        asked.resolve(request)
+        return release.promise
+      })
+
+      const handle = ctx.workflowEngine.start({ ...scripted("return await agent('routed child')"), parent })
+      const request = await asked.promise
+      expect(request.kind).toBe('workflow')
+      handle.cancel('cancelled during route resolution')
+      release.resolve(undefined)
+
+      const result = await handle.result
+      expect(result.stopReason).toBe('cancelled')
+      expect(request.signal.aborted).toBe(true)
+      expect(provider.runs).toHaveLength(0)
+      await handle.dispose()
+    })
+
     it('post-cancel narration is suppressed host-side, and completion racing a cancel reports cancelled', async () => {
       const { ctx, parent } = await setup()
       const narration: string[] = []

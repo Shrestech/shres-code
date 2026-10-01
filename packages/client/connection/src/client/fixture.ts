@@ -12,6 +12,7 @@ import {
   isTokenDelta,
 } from '@shres-code/shres-code-llm/message'
 import { CallId } from '@shres-code/shres-code-llm/brand'
+import { cacheCount, promptTokens } from '@shres-code/shres-code-llm/usage'
 import type {
   AssistantMessage,
   ContentBlock,
@@ -815,8 +816,10 @@ function permissionSelectOf(
   }
 }
 
-interface FixtureTokenUsageProjection {
+/** The fixture's `tokenUsage` projection value, bucketed as token-meter buckets it. */
+export interface FixtureTokenUsageProjection {
   uncachedInputTokens: number
+  unreportedInputTokens: number
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
@@ -849,10 +852,18 @@ function usageSampleOf(event: SessionEvent): FixtureUsageSample | undefined {
     : { turn: item.data.turn, step: item.data.step, usage }
 }
 
-/** Fixture parallel of token-meter's last-sample-replacing usage projection. */
-function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
+/**
+ * Fixture parallel of token-meter's last-sample-replacing usage projection. The
+ * read count decides whether a call is reported, so an unreported call's whole
+ * prompt, including a write count carried without a read count, is unreported
+ * input.
+ * @param log - the session's durable events.
+ * @returns the projection value token-meter would serve for the same log.
+ */
+export function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
   const totals: FixtureTokenUsageProjection = {
     uncachedInputTokens: 0,
+    unreportedInputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
@@ -865,16 +876,20 @@ function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection
   for (const event of log) {
     const sample = usageSampleOf(event)
     if (sample === undefined) continue
+    const read = cacheCount(sample.usage, 'read')
+    const write = cacheCount(sample.usage, 'write')
     const buckets: FixtureTokenUsageProjection = {
-      uncachedInputTokens: sample.usage.inputTokens,
+      uncachedInputTokens: read === undefined ? 0 : sample.usage.inputTokens,
+      unreportedInputTokens: read === undefined ? promptTokens(sample.usage) : 0,
       outputTokens: sample.usage.outputTokens,
-      cacheReadTokens: sample.usage.cacheReadTokens ?? 0,
-      cacheWriteTokens: sample.usage.cacheWriteTokens ?? 0,
+      cacheReadTokens: read === undefined ? 0 : read,
+      cacheWriteTokens: write === undefined ? 0 : write,
     }
     const previous = last?.turn === sample.turn && last.step === sample.step
       ? last.buckets
       : undefined
     totals.uncachedInputTokens += buckets.uncachedInputTokens - (previous?.uncachedInputTokens ?? 0)
+    totals.unreportedInputTokens += buckets.unreportedInputTokens - (previous?.unreportedInputTokens ?? 0)
     totals.outputTokens += buckets.outputTokens - (previous?.outputTokens ?? 0)
     totals.cacheReadTokens += buckets.cacheReadTokens - (previous?.cacheReadTokens ?? 0)
     totals.cacheWriteTokens += buckets.cacheWriteTokens - (previous?.cacheWriteTokens ?? 0)
@@ -1040,9 +1055,7 @@ function contextPressureOf(
   for (const event of log) {
     const sample = usageSampleOf(event)
     if (sample === undefined) continue
-    pressureTokens = sample.usage.inputTokens
-      + (sample.usage.cacheReadTokens ?? 0)
-      + (sample.usage.cacheWriteTokens ?? 0)
+    pressureTokens = promptTokens(sample.usage)
   }
   const contextWindow = lastRequestContext(log)?.contextWindow
   return {

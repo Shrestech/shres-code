@@ -53,6 +53,8 @@ export const apply = ctx => globalThis.__headlessStartupApply(ctx)
     `  inject: [${HEADLESS_STARTUP_SERVICE}]`,
     '  config:',
     '    task: !!js ctx.headlessStartup.task',
+    '    sessionId: !!js ctx.headlessStartup.sessionId',
+    '    resume: !!js ctx.headlessStartup.resume',
     '- id: headless-startup',
     `  name: ${pathToFileURL(join(dir, 'startup.mjs')).href}`,
     '',
@@ -96,9 +98,41 @@ describe('headless command-line provider', () => {
     expect(observed.exits).toEqual([1])
   })
 
+  it('publishes an explicit fresh-session id next to the task', async () => {
+    const { task, observed } = await bootStartup(['--session-id', 'bench-id', 'run', 'the', 'tests'])
+    expect(task).toEqual({ task: 'run the tests', sessionId: 'bench-id' })
+    expect(observed.runnerConfig).toMatchObject({ task: 'run the tests', sessionId: 'bench-id' })
+    expect(observed.exits).toEqual([])
+  })
+
+  it('publishes a resume id next to the task', async () => {
+    const { task, observed } = await bootStartup(['--resume', 'bench-id', 'keep', 'going'])
+    expect(task).toEqual({ task: 'keep going', resume: 'bench-id' })
+    expect(observed.runnerConfig).toMatchObject({ task: 'keep going', resume: 'bench-id' })
+    expect(observed.exits).toEqual([])
+  })
+
+  it('rejects an invocation that names both session flags', async () => {
+    const { task, observed } = await bootStartup(['--session-id', 'a', '--resume', 'b', 'run'])
+    expect(observed.out).toContain('--session-id and --resume are mutually exclusive')
+    expect(task).toBeUndefined()
+    expect(observed.runnerConfig).toBeUndefined()
+    expect(observed.exits).toEqual([1])
+  })
+
+  it.each([{ args: ['--session-id', 'a'] }, { args: ['--resume', 'b'] }])('still requires the task positional alongside $args', async ({ args }) => {
+    const { task, observed } = await bootStartup(args)
+    expect(observed.out).toContain('a task is required')
+    expect(task).toBeUndefined()
+    expect(observed.runnerConfig).toBeUndefined()
+    expect(observed.exits).toEqual([1])
+  })
+
   it('prints its own help and leaves the runner pending', async () => {
     const { task, observed } = await bootStartup(['--help'])
     expect(observed.out).toContain('shres --profile headless')
+    expect(observed.out).toContain('--session-id')
+    expect(observed.out).toContain('--resume')
     expect(task).toBeUndefined()
     expect(observed.runnerConfig).toBeUndefined()
     expect(observed.exits).toEqual([0])

@@ -266,16 +266,33 @@ interface AppIdentity {
 
 ## `TokenUsage`
 
-Per-call token accounting. Counts are **disjoint**: `inputTokens` is uncached input only; cached input is reported separately, and billed input is the sum of the three. Adapters whose providers fold cache hits into a single prompt total (DeepSeek's `prompt_tokens`) subtract them back out. `reasoningTokens`, when present, is informational detail already included in `outputTokens`; totals must not add it again.
+Per-call token accounting. Counts are **disjoint**: `inputTokens` excludes every cache count the provider reported, and billed input is `inputTokens` plus those counts. Adapters whose providers fold cache hits into a single prompt total (DeepSeek's `prompt_tokens`) subtract them back out. `reasoningTokens`, when present, is informational detail already included in `outputTokens`; totals must not add it again.
+
+`cacheReadTokens` decides whether a call's cache counts are reported. Present (including 0): the provider reported cache use for this call. Absent: it did not, and `inputTokens` may then include cached input. `cacheWriteTokens` is reported only alongside a read count; a provider that reports cache hits but has no write concept omits it. Adapters MUST emit a reported zero, MUST NOT emit an unreported count, and MUST NOT emit `cacheWriteTokens` without `cacheReadTokens`. The LLM stream invariant rejects a present count that is not a non-negative safe integer, and a write count without a read count.
+
+Consumers read the fields through the dependency-minimal `@shres-code/shres-code-llm/usage` entry, which the package root re-exports. `cacheCount(usage, 'read' | 'write')` returns the reported count, or `undefined` when the provider did not report it; a write count arriving without a read count is returned as unreported, and no consumer reads absence as 0. `promptTokens(usage)` returns `inputTokens` plus every cache count the usage carries, which is the whole prompt whether or not the counts were reported. `addTokenUsage(total, next)` sums two usages under the same contract: a cache count stays present only when both operands reported it, and otherwise the sum folds every value of that count the operands carry into `inputTokens`, so an aggregate never presents a partial count as a total and its prompt total is the operands' combined prompt total.
+
+Time to first token is derived from the log rather than recorded in `TokenUsage`: it is the `time` of a step's first token-bearing `assistant/chunk` minus the `time` of that step's `step/start`. `request/header` cannot anchor the measurement, because the loop logs a header only when the header changes.
 
 ```ts type-equiv
 /**
- * Token accounting for one model call (cache fields are optional).
+ * Token accounting for one model call.
  *
- * Counts are DISJOINT: `inputTokens` is uncached input only; cached input is
- * reported separately as `cacheReadTokens`/`cacheWriteTokens` (billed input =
- * sum of the three). Adapters whose providers fold cache hits into a total
- * prompt count (DeepSeek's `prompt_tokens`) subtract them out.
+ * Counts are DISJOINT: `inputTokens` excludes every cache count the provider
+ * reported, so billed input is `inputTokens` plus the reported cache counts.
+ * Adapters whose providers fold cache hits into a total prompt count
+ * (DeepSeek's `prompt_tokens`) subtract them out.
+ *
+ * `cacheReadTokens` decides whether a call's cache counts are reported.
+ * Present (including 0): the provider reported cache use for this call.
+ * Absent: it did not, and `inputTokens` may then include cached input.
+ * `cacheWriteTokens` is reported only alongside a read count; a provider that
+ * reports cache hits but has no write concept omits it. Adapters MUST emit a
+ * reported zero, MUST NOT emit an unreported count, and MUST NOT emit
+ * `cacheWriteTokens` without `cacheReadTokens`. The LLM stream invariant
+ * rejects that shape, and every consumer reads a usage carrying it as
+ * unreported, with its write counted as unreported input. Consumers read the
+ * counts through `cacheCount` and `promptTokens`.
  */
 interface TokenUsage {
   inputTokens: number
@@ -459,7 +476,37 @@ interface LlmModelInfo {
    * absent declares none, so the local tool catalog applies unchanged.
    */
   hostedTools?: readonly HostedTool[]
+  /**
+   * Prompt-cache lifetime this route requests, in milliseconds: how long a
+   * cached prefix stays readable after the start of the request that wrote or
+   * last read it, generation time included. `0` declares that the route writes
+   * no prompt cache. The value states what the adapter asks for; an upstream
+   * may retain a prefix for less. Absent means the adapter does not know.
+   */
+  promptCacheTtlMs?: number
+  /**
+   * How this route reasons when a request enables reasoning. Absent means the
+   * adapter does not declare it.
+   */
+  thinkingMode?: LlmThinkingMode
+  /**
+   * Whether this route's usage reports prompt-cache counts: `reported` calls
+   * carry `cacheReadTokens` (a miss as 0), and `unreported` calls carry none,
+   * so their input may include cached tokens. Absent means the adapter does
+   * not declare it.
+   */
+  cacheUsage?: LlmCacheUsage
 }
+```
+
+```ts type-equiv
+/**
+ * How a model reasons when a request enables reasoning: `adaptive` lets the
+ * provider decide how much to think within the requested effort, `budget`
+ * spends a fixed thinking-token budget the adapter derives from the effort, and
+ * `none` does not reason.
+ */
+type LlmThinkingMode = 'adaptive' | 'budget' | 'none'
 ```
 
 Correctness-sensitive metadata is resolved separately from the advisory catalog and is owned by the adapter serving the exact route. Context capacity, adapter call defaults, and reasoning choices share one exact-model result so consumers do not repeat authoritative model resolution.
@@ -513,6 +560,13 @@ interface LlmResolvedModelInfo extends LlmModelInfo {
   defaultMaxTokens?: number
   /** Adapter-owned selectable reasoning levels when exposed. */
   reasoning?: LlmModelReasoningInfo
+  /**
+   * `false` when this route rejects or discards a stated
+   * {@link GenerateOptions.temperature} for this model. Absent when the adapter
+   * makes no claim, so a caller that must not have its temperature dropped
+   * treats only `false` as refusal.
+   */
+  acceptsTemperature?: boolean
 }
 ```
 
@@ -923,7 +977,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:287`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:324`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -972,5 +1026,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:67`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:70`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

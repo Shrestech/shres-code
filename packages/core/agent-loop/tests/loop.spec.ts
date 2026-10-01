@@ -4,7 +4,7 @@ import LlmRuntime, { createUserMessage, CallId, LlmError, StreamChunk  } from '@
 import SessionStore, { SessionId, TurnEndReason } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@shres-code/shres-code-tools'
-import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import AgentRegistry, { type Agent, type AgentRequestContent } from '@shres-code/shres-code-agent'
 
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from './mock-adapter.ts'
@@ -412,6 +412,42 @@ describe('agent loop', () => {
     expect(adapter.requests).toHaveLength(1)
     expect(adapter.requests[0]!.model).toBe('mock')
     expect(adapter.requests[0]!.system).toBe('You are an AI agent powered by Shres Code.\n\nYou run on mock.')
+  })
+
+  it('passes detached deep-frozen assembled content to the request waterfall', async () => {
+    const adapter = new MockAdapter([textResponse('ok')])
+    const ctx = await harness(adapter, 'A routed request.')
+    ctx.tools.register(defineContentToolFixture({
+      name: 'noop',
+      description: 'does nothing',
+      parameters: {},
+      async execute() {
+        return []
+      },
+    }))
+    let observed: AgentRequestContent | undefined
+    ctx.on('agent/request', async ({ content }, next) => {
+      observed = content
+      expect(Object.isFrozen(content)).toBe(true)
+      expect(Object.isFrozen(content.messages)).toBe(true)
+      expect(Object.isFrozen(content.tools)).toBe(true)
+      expect(() => {
+        (content.tools as unknown as { push: (value: unknown) => void }).push({})
+      }).toThrow(TypeError)
+      return next()
+    })
+    const agent = ctx.agentLoop.create(SessionId('request-content'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'inspect the assembled request')
+    await waitForIdle(ctx, agent)
+
+    expect(observed).toMatchObject({
+      system: 'You are an AI agent powered by Shres Code.\n\nA routed request.',
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'inspect the assembled request' }] }],
+      tools: [{ name: 'noop', description: 'does nothing', parameters: {} }],
+    })
+    expect(observed?.messages).not.toBe(adapter.requests[0]?.messages)
+    expect(observed?.tools).not.toBe(adapter.requests[0]?.tools)
   })
 
   it('omits the system field when system-prompt/assemble short-circuits with an empty assembly', async () => {

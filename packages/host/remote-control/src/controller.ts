@@ -47,17 +47,11 @@ export interface SshRunner {
 }
 
 /**
- * Probe the remote daemon over one ssh exec.
- * @param runner - process seam.
- * @param target - validated connect target.
- * @param remotePort - remote daemon loopback port.
- * @returns the daemon version, or null when the probe found nothing to parse.
- */
-/**
  * Whether the remote carries any shres install (CLI on PATH or a shres home
  * directory); one ssh exec, reused by inspect's pre-confirm observation.
  * @param runner - process seam.
  * @param target - validated connect target.
+ * @param controlPath - optional ControlMaster socket path, reused when the alias's master is already open.
  * @returns true when an install marker was found.
  */
 export async function probeRemoteInstalled(runner: SshRunner, target: string, controlPath?: string): Promise<boolean> {
@@ -66,6 +60,14 @@ export async function probeRemoteInstalled(runner: SshRunner, target: string, co
   return result.stdout.trim() === 'installed'
 }
 
+/**
+ * Probe the remote daemon over one ssh exec.
+ * @param runner - process seam.
+ * @param target - validated connect target.
+ * @param remotePort - remote daemon loopback port.
+ * @param controlPath - optional ControlMaster socket path, reused when the alias's master is already open.
+ * @returns the daemon version, or null when the probe found nothing to parse.
+ */
 export async function probeDaemonVersion(
   runner: SshRunner,
   target: string,
@@ -82,6 +84,7 @@ export async function probeDaemonVersion(
  * null (first connect or missing file).
  * @param runner - process seam.
  * @param target - validated connect target.
+ * @param controlPath - optional ControlMaster socket path, reused when the alias's master is already open.
  * @returns the installation id or null.
  */
 export async function readInstallationId(runner: SshRunner, target: string, controlPath?: string): Promise<string | null> {

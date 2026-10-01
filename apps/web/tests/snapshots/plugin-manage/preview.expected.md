@@ -1,26 +1,24 @@
-- region "Customize":
+- region "Plugins":
   - complementary:
-    - heading "Customize" [level=2]
+    - heading "Plugins" [level=2]
     - button "Close":
       - img
       - text: Close
     - img
     - searchbox "Search settings…"
     - text: ⌘ K
-    - navigation "Customize":
+    - navigation "Plugins":
       - button "Plugins":
         - img
         - text: Plugins
-      - button "Agent presets":
-        - img
-        - text: Agent presets
-  - text: Customize
+  - text: Plugins
   - heading "Plugins" [level=1]
-  - paragraph: Shape your agent with presets and plugins.
+  - paragraph: Choose installed bundles and configure their features.
   - paragraph: Configure and inspect the plugins installed in this deployment.
   - tablist "Plugin views":
-    - tab "Plugin configuration"
+    - tab "Bundles"
     - tab "Plugin list"
+    - tab "Plugin configuration"
     - tab "Manage" [selected]
   - tabpanel "Manage":
     - heading "Review install" [level=3]

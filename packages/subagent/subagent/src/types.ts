@@ -29,6 +29,22 @@ export function SubagentRunId(id: string): SubagentRunId {
 }
 
 /**
+ * Identifies one `subagent/child-route` dispatch. Minted by
+ * {@link SubagentRuntime.resolveChildRoute} for every waterfall that reaches
+ * listeners, and carried to the child only when a listener changed the route.
+ */
+export type SubagentRouteRequestId = Branded<'SubagentRouteRequestId'>
+
+/**
+ * Brand a string as a {@link SubagentRouteRequestId}.
+ * @param id - the raw route-request id.
+ * @returns the same string, branded.
+ */
+export function SubagentRouteRequestId(id: string): SubagentRouteRequestId {
+  return id as SubagentRouteRequestId
+}
+
+/**
  * Observe-only identifying detail for a published subagent run, carried by
  * `subagent/start`. One-shot runs and continuable Activation epochs share this
  * payload, so an observer sees the same vocabulary for both.
@@ -47,6 +63,12 @@ export interface SubagentRunInfo {
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */
   readonly local: boolean
+  /**
+   * The child-route dispatch that changed this child's route, when the start
+   * request or durable descriptor carried one. Absent for inherited, explicit,
+   * and fork routes, which never dispatch or never carry the id.
+   */
+  readonly subagentRouteRequestId?: SubagentRouteRequestId
 }
 
 /**
@@ -62,6 +84,11 @@ export interface SubagentRunEndInfo {
   readonly id: SessionId
   /** Snapshot of whether `SubagentRun.localAgent` was present when start fulfilled. */
   readonly local: boolean
+  /**
+   * The same child-route dispatch id the paired start event carried, when any.
+   * The subagent invariant requires start and end to agree.
+   */
+  readonly subagentRouteRequestId?: SubagentRouteRequestId
   /** The terminal stop reason. */
   readonly stopReason: SubagentResult['stopReason']
   /**
@@ -309,6 +336,16 @@ export interface SubagentProvider {
    */
   readonly inheritsParentContext: boolean
   /**
+   * Whether the child runs the provider/model route named by the start
+   * request's `agentOptions`. In-process providers set it; an out-of-process
+   * provider runs its own configured model and omits it. Descriptive, like
+   * {@link inheritsParentContext}: start does not reject `agentOptions`
+   * without it, but `SubagentRuntime.resolveChildRoute` consults
+   * `subagent/child-route` only for providers that set it, so a routed model
+   * is never reported for a child that would not run it.
+   */
+  readonly runsRequestedModel?: boolean
+  /**
    * Establish a ONE-SHOT child and return its handle after publication.
    * The service has already validated that every requested start-time
    * capability is supported and resolved `request.descriptor`, so a
@@ -336,4 +373,73 @@ export interface SubagentProvider {
    * data belonging only to `request.sessionId`.
    */
   prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>
+}
+
+/** A child's provider/model route. */
+export interface SubagentChildRoute {
+  /** Provider route the child runs, when known. */
+  readonly provider?: string
+  /** Model id the child runs, when known. */
+  readonly model?: string
+}
+
+/** The delegation consumer starting a routable child. */
+export type SubagentChildRouteKind = 'subagent' | 'workflow'
+
+/**
+ * What a delegation consumer passes to `SubagentRuntime.resolveChildRoute`
+ * for one fresh child, before starting it.
+ */
+export interface SubagentChildRouteInput {
+  /** The delegating parent agent. */
+  readonly parent: Agent
+  /** The delegation consumer starting the child. */
+  readonly kind: SubagentChildRouteKind
+  /**
+   * The consumer's per-child options. Naming a provider or a model makes the
+   * route explicit, and an explicit route is never consulted.
+   */
+  readonly requested?: AgentOptions
+  /**
+   * The delegating tool's model-facing name, which distinguishes differently
+   * configured delegation tools. Consumers without a tool omit it.
+   */
+  readonly agentType?: string
+  /** The child's task text. */
+  readonly prompt: string
+  /** Cancellation of the delegating call; a cancelled resolution rejects. */
+  readonly signal: AbortSignal
+}
+
+/**
+ * The route question one `subagent/child-route` dispatch asks about a fresh
+ * child. The child does not exist yet.
+ */
+export interface SubagentChildRouteRequest {
+  /**
+   * The delegating parent. A listener that records its choice appends to
+   * `parent.session` before returning, which precedes the child's creation.
+   */
+  readonly parent: Agent
+  /** The delegation consumer starting the child. */
+  readonly kind: SubagentChildRouteKind
+  /** The subagent provider the child starts on. */
+  readonly subagentProvider: string
+  /**
+   * The route the child runs when no listener answers: the parent's manual
+   * selection, never a candidate a composed router serves the parent.
+   */
+  readonly inherited: SubagentChildRoute
+  /** The delegating tool's model-facing name, when a tool delegates. */
+  readonly agentType?: string
+  /** The child's task text. */
+  readonly prompt: string
+  /** Cancellation of the delegating call. */
+  readonly signal: AbortSignal
+  /**
+   * Identity of this waterfall dispatch. Minted once per consult that reaches
+   * listeners so a kept or routed decision can record it. It is not an
+   * instruction to change the child's route.
+   */
+  readonly routeRequestId: SubagentRouteRequestId
 }

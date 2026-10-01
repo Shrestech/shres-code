@@ -182,6 +182,8 @@ export const en = {
   teamMemberPersonaToggle: 'Show persona',
   teamAddMember: 'Add member',
   teamRemoveMember: 'Remove',
+  routingLinkLead: 'Routing and classifier:',
+  routingLinkTarget: 'Model routing',
   sttBadge: 'STT',
   ttsBadge: 'TTS',
   sttBadgeHint: 'Audio input: this model can transcribe speech (speech-to-text).',

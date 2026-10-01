@@ -22,6 +22,8 @@ function stubAgent(id: string, delegationDepth = 0): Agent {
   const agentId = id as Agent['id']
   return {
     id: agentId,
+    // A registered root agent needs a scoped context for its model-selection hook.
+    ctx: new Context(),
     session: { id: agentId, header: { delegationDepth } },
   } as unknown as Agent
 }

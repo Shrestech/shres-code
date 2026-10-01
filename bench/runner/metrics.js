@@ -28,6 +28,33 @@
  *   is counted from descendant-session headers in `descendants.js`, not from tool names,
  *   because the delegation tool name is configurable.
  *
+ * Jev routing/compaction metrics (added for the WP-jev experiment surface) read the
+ * model-router and compaction-jev log-only events, so they are null for arms that
+ * compose neither (all-null is the honest reading of "never judged", which is why
+ * every one of them is nullable rather than zero):
+ * - cacheHitShare: root session only. Cache reads over the prompt tokens (input
+ *   plus cache reads and writes) of the `assistant/message` usage records that
+ *   report a cache-read count, by the `TokenUsage` presence contract: a record
+ *   without one is unreported and excluded, never read as a miss. Null when no
+ *   record reports one or the reported prompt is zero. The closure-wide,
+ *   per-call figure is `accounting.cacheHitShare` (`accounting.js`); both use
+ *   `cacheShares`.
+ * - cacheUnreportedShare: root session only. The share of prompt tokens carried
+ *   by usage records without a reported cache-read count, so the root share never
+ *   hides unreported input. Null when the root session reported no prompt tokens.
+ * - modelTransitions: consecutive `request/header` events whose provider/model differ.
+ *   Null when the log carries no readable header.
+ * - downgradedStreaks: run lengths of consecutive `model-routing/decision` events with
+ *   outcome `downgraded`; null when the log carries no decision.
+ * - downgradedShare / keptStrongShare: those outcomes over every decision; null when the
+ *   log carries no decision. `skipped` and `error` decisions stay in the denominator.
+ * - routingHintCount: decisions carrying the advisory `hint` the router logs while the
+ *   manual route stands; null when the log carries no decision.
+ * - jevCompactionAcceptedBelowThreshold: `compaction/verification` verdict counts.
+ * - jevSelectionDegraded: `compaction/selection` events with `degraded: true`.
+ *   Both are null when the log carries no event of that type, which is every backend
+ *   other than compaction-jev.
+ *
  * Researcher integrity metrics (added for the WP-research experiment surface) are all
  * log-derived — never model self-reports — and null for arms that do not mount the
  * researcher surface:
@@ -46,8 +73,10 @@
  * @module bench/runner/metrics
  */
 
+import { canonicalize } from '../canonical-json.js'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { cacheShares } from './accounting.js'
 
 /**
  * @typedef {import('../schema/trial.js').TrialMetrics} TrialMetrics
@@ -101,6 +130,12 @@ const VERIFY_SATISFIED_MARKER = 'Decision rule satisfied'
 
 /** thinDebates token floor: a debate pair under it is a minimal (thin) debate. */
 export const THIN_DEBATES_FLOOR = 200
+
+/**
+ * Verification verdict meaning the better draft was kept below the pass threshold:
+ * the draft failed its battery and no escalation remained.
+ */
+const VERDICT_ACCEPTED_BELOW_THRESHOLD = 'accepted-below-threshold'
 
 /**
  * Flatten tool/result text from the durable `message` payload or the older
@@ -166,23 +201,6 @@ function resultCallId(data) {
     }
   }
   return typeof data.callId === 'string' ? data.callId : ''
-}
-
-/**
- * Stable string form for retry comparison: object keys sort recursively so
- * semantically identical arguments compare equal regardless of key order.
- * @param {unknown} value - a parsed JSON value.
- * @returns {string} canonical JSON text.
- */
-function canonicalize(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
-  if (typeof value === 'object' && value !== null) {
-    const entries = Object.keys(value)
-      .sort()
-      .map(key => `${JSON.stringify(key)}:${canonicalize(value[key])}`)
-    return `{${entries.join(',')}}`
-  }
-  return JSON.stringify(value)
 }
 
 /**
@@ -254,6 +272,15 @@ export function foldSessionLog(text, armFlags) {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    cacheHitShare: null,
+    cacheUnreportedShare: null,
+    modelTransitions: null,
+    downgradedStreaks: null,
+    downgradedShare: null,
+    keptStrongShare: null,
+    routingHintCount: null,
+    jevCompactionAcceptedBelowThreshold: null,
+    jevSelectionDegraded: null,
   }
   /** @type {Map<string, number>} */
   const callCounts = new Map()
@@ -286,6 +313,27 @@ export function foldSessionLog(text, armFlags) {
   const pendingDebate = new Map()
   /** @type {Map<number, { aegis: number, ward: number }>} */
   const debateByEpoch = new Map()
+
+  // Jev routing/compaction state.
+  /** @type {{ provider: string, model: string } | null} */
+  let lastHeaderRoute = null
+  // Root-session prompt tokens split by cache-read presence.
+  let reportedPrompt = 0
+  let reportedCacheRead = 0
+  let unreportedPrompt = 0
+  let headerEvents = 0
+  let modelTransitions = 0
+  let routingDecisions = 0
+  let routingDowngraded = 0
+  let routingKeptStrong = 0
+  let routingHints = 0
+  let openDowngradedRun = 0
+  /** @type {number[]} */
+  const downgradedRuns = []
+  let verificationEvents = 0
+  let acceptedBelowThreshold = 0
+  let selectionEvents = 0
+  let selectionDegraded = 0
 
   const lines = text.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
@@ -393,13 +441,61 @@ export function foldSessionLog(text, armFlags) {
         break
       }
       case 'assistant/message': {
-        const usage = /** @type {Record<string, unknown>} */ (data.usage ?? {})
+        const rawUsage = data.usage
+        if (typeof rawUsage !== 'object' || rawUsage === null) break
+        const usage = /** @type {Record<string, unknown>} */ (rawUsage)
         if (typeof usage.inputTokens === 'number' && Number.isFinite(usage.inputTokens)) {
           metrics.inputTokens += usage.inputTokens
         }
         if (typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)) {
           metrics.outputTokens += usage.outputTokens
         }
+        const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
+        const prompt = (count(usage.inputTokens) ? usage.inputTokens : 0) + (count(usage.cacheWriteTokens) ? usage.cacheWriteTokens : 0)
+        if (count(usage.cacheReadTokens)) {
+          reportedPrompt += prompt + usage.cacheReadTokens
+          reportedCacheRead += usage.cacheReadTokens
+        } else {
+          unreportedPrompt += prompt
+        }
+        break
+      }
+      case 'model-routing/decision': {
+        // One decision per judged turn. Any outcome other than a downgrade ends
+        // the open run, so a run is a maximal span of consecutive downgrades.
+        routingDecisions += 1
+        const outcome = data.outcome
+        if (outcome === 'downgraded') {
+          routingDowngraded += 1
+          openDowngradedRun += 1
+        } else {
+          if (openDowngradedRun > 0) downgradedRuns.push(openDowngradedRun)
+          openDowngradedRun = 0
+          if (outcome === 'kept-strong') routingKeptStrong += 1
+        }
+        // The advisory hint the router logs while the manual route stands.
+        if (typeof data.hint === 'string' && data.hint.length > 0) routingHints += 1
+        break
+      }
+      case 'compaction/verification':
+        verificationEvents += 1
+        if (data.verdict === VERDICT_ACCEPTED_BELOW_THRESHOLD) acceptedBelowThreshold += 1
+        break
+      case 'compaction/selection':
+        selectionEvents += 1
+        if (data.degraded === true) selectionDegraded += 1
+        break
+      case 'request/header': {
+        const header = /** @type {Record<string, unknown>} */ (data.header ?? {})
+        const config = /** @type {Record<string, unknown>} */ (header.config ?? {})
+        const provider = config.provider
+        const model = config.model
+        if (typeof provider !== 'string' || typeof model !== 'string') break
+        headerEvents += 1
+        if (lastHeaderRoute !== null && (lastHeaderRoute.provider !== provider || lastHeaderRoute.model !== model)) {
+          modelTransitions += 1
+        }
+        lastHeaderRoute = { provider, model }
         break
       }
       case 'jspace/card':
@@ -460,6 +556,22 @@ export function foldSessionLog(text, armFlags) {
     metrics.verifiedCheckpointShare = verifiedCheckpoints / totalCheckpoints
   }
   metrics.pressureFired = metrics.compactionCount > 0
+
+  // Jev routing/compaction fold. Every field stays null when its events are
+  // absent: a never-judged trial must not read as "judged, never downgraded".
+  const shares = cacheShares({ reportedPrompt, cacheRead: reportedCacheRead, unreportedPrompt })
+  metrics.cacheHitShare = shares.cacheHitShare
+  metrics.cacheUnreportedShare = shares.unreportedShare
+  if (headerEvents > 0) metrics.modelTransitions = modelTransitions
+  if (routingDecisions > 0) {
+    if (openDowngradedRun > 0) downgradedRuns.push(openDowngradedRun)
+    metrics.downgradedStreaks = downgradedRuns
+    metrics.downgradedShare = routingDowngraded / routingDecisions
+    metrics.keptStrongShare = routingKeptStrong / routingDecisions
+    metrics.routingHintCount = routingHints
+  }
+  if (verificationEvents > 0) metrics.jevCompactionAcceptedBelowThreshold = acceptedBelowThreshold
+  if (selectionEvents > 0) metrics.jevSelectionDegraded = selectionDegraded
 
   if (hasResearcher) {
     let debateCalls = 0
@@ -522,6 +634,15 @@ export function emptyMetrics() {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
+    cacheHitShare: null,
+    cacheUnreportedShare: null,
+    modelTransitions: null,
+    downgradedStreaks: null,
+    downgradedShare: null,
+    keptStrongShare: null,
+    routingHintCount: null,
+    jevCompactionAcceptedBelowThreshold: null,
+    jevSelectionDegraded: null,
   }
 }
 

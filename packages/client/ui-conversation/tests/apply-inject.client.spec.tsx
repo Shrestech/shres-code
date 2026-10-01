@@ -392,6 +392,103 @@ describe('conversation slot inject API', () => {
     unsub()
     await b.runtime.dispose()
   })
+
+  it('reveal writes the request, selects its view, and closes Activity in the shared session store', async () => {
+    const b = await bench()
+    const { instance, injected } = b.conversationApi(ROOT)
+    instance.actions.setActivityOpen(true)
+    const request = { view: 'routing', target: { kind: 'event', seq: 6 } } as const
+    injected.reveal(request)
+    expect(instance.store.getSnapshot()).toMatchObject({ inspect: request, view: 'routing', activityOpen: false })
+    await b.runtime.dispose()
+  })
+
+  it('the composer bar reveals through the session registration that owns the chat store', async () => {
+    const b = await bench()
+    // Before the session registration mounts, the composer's reveal has no
+    // store to write and does nothing; without a session there is none.
+    expect(() => { b.composerApi(ROOT).reveal?.({ view: 'routing', target: { kind: 'none' } }) }).not.toThrow()
+    expect(b.composerApi(undefined).reveal).toBeUndefined()
+    const { instance } = b.conversationApi(ROOT)
+    instance.actions.setActivityOpen(true)
+    b.composerApi(ROOT).reveal?.({ view: 'routing', target: { kind: 'none' } })
+    expect(instance.store.getSnapshot()).toMatchObject({ inspect: null, view: 'routing', activityOpen: false })
+    await b.runtime.dispose()
+  })
+
+  it('drops a session\'s reveal with its scope', async () => {
+    const b = await bench()
+    const { instance } = b.conversationApi(ROOT)
+    const reveal = b.composerApi(ROOT).reveal!
+    // A later mount of the same session re-records its reveal on the one scope.
+    b.conversationApi(ROOT)
+    await b.runtime.sessions.remove(ROOT)
+    instance.actions.setView('chat')
+    reveal({ view: 'routing', target: { kind: 'none' } })
+    expect(instance.store.getSnapshot().view).toBe('chat')
+    await b.runtime.dispose()
+  })
+
+  it('the service reveals in a mounted session at once, and in an unmounted one when it mounts', async () => {
+    const b = await bench()
+    const conversation = b.runtime.ctx.get('conversation')!
+    const offView = b.slots.register({ name: 'conversation.view', id: 'routing', order: 20, label: 'Routing' } as never, (() => null) as never)
+    // Not mounted yet: the latest request waits for the session's body.
+    conversation.reveal(ROOT, { view: 'chat', target: { kind: 'none' } })
+    conversation.reveal(ROOT, { view: 'routing', target: { kind: 'event', seq: 4 } })
+    const { instance } = b.conversationApi(ROOT)
+    instance.actions.setActivityOpen(true)
+    expect(instance.store.getSnapshot().view).not.toBe('routing')
+    await Promise.resolve()
+    expect(instance.store.getSnapshot()).toMatchObject({
+      view: 'routing', inspect: { view: 'routing', target: { kind: 'event', seq: 4 } }, activityOpen: false,
+    })
+    // Mounted: at once, and nothing waits any more.
+    conversation.reveal(ROOT, { view: 'chat', target: { kind: 'none' } })
+    expect(instance.store.getSnapshot()).toMatchObject({ view: 'chat', inspect: null })
+    b.conversationApi(ROOT)
+    await Promise.resolve()
+    expect(instance.store.getSnapshot().view).toBe('chat')
+    offView()
+    await b.runtime.dispose()
+  })
+
+  it('the service refuses a view no entry registers, and writes nothing', async () => {
+    const b = await bench()
+    const conversation = b.runtime.ctx.get('conversation')!
+    expect(() => { conversation.reveal(ROOT, { view: 'routing', target: { kind: 'none' } }) })
+      .toThrow('ui-conversation: no conversation view "routing" to reveal')
+    const { instance } = b.conversationApi(ROOT)
+    await Promise.resolve()
+    expect(instance.store.getSnapshot().view).toBeNull()
+    await b.runtime.dispose()
+  })
+
+  it('inspectCall (chat view face) reveals the call in the Trajectory view', async () => {
+    const b = await bench()
+    const { instance, injected } = b.chatViewApi(ROOT)
+    instance.actions.setActivityOpen(true)
+    injected.inspectCall('c1')
+    expect(instance.store.getSnapshot()).toMatchObject({
+      inspect: { view: 'trajectory', target: { kind: 'call', callId: 'c1' } },
+      view: 'trajectory',
+      activityOpen: false,
+    })
+    await b.runtime.dispose()
+  })
+
+  it('canReveal answers from the live view ledger', async () => {
+    const b = await bench()
+    const { injected } = b.conversationApi(ROOT)
+    expect(injected.canReveal('chat')).toBe(true)
+    expect(injected.canReveal('routing')).toBe(false)
+    const off = b.slots.register(
+      { name: 'conversation.view', id: 'routing', order: 20, label: 'Routing' } as never, (() => null) as never)
+    expect(injected.canReveal('routing')).toBe(true)
+    off()
+    expect(injected.canReveal('routing')).toBe(false)
+    await b.runtime.dispose()
+  })
 })
 
 describe('details inject API', () => {

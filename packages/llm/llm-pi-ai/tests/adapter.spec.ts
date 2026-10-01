@@ -11,8 +11,11 @@ import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, 
 import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
+import type { Api, Model } from '@earendil-works/pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { resolveProfiles } from '../src/config.ts'
+import { PROMPT_CACHE_KEY_FIELDS } from '../src/provider.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, responsesTextEvents, textEvents } from './mock-server.ts'
 
@@ -104,10 +107,14 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.requests[0]).toMatchObject({
       model: 'deepseek-v4-flash',
       temperature: 0.2,
-      max_tokens: 77,
       thinking: { type: 'enabled' },
       reasoning_effort: 'max',
     })
+    // pi-ai owns the output-cap field name — a DeepSeek route resolves to
+    // `max_completion_tokens`, a chutes/Moonshot route to `max_tokens` — so
+    // assert the requested cap reaches the provider without pinning that choice.
+    const body = server.requests[0] as { max_tokens?: number; max_completion_tokens?: number }
+    expect(body.max_tokens ?? body.max_completion_tokens).toBe(77)
   })
 
   it('uses a dynamic request effort and reports unsupported efforts before network I/O', async () => {
@@ -428,13 +435,16 @@ describe('provider profile lifecycle', () => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmPiAi, { providers: { openai: {} } })
     const models = await ctx.llm.listModels('openai')
+    // gpt-4.1 speaks the OpenAI Responses protocol, whose usage reports cache counts.
     expect(models.find(model => model.id === 'gpt-4.1')).toEqual({
       provider: 'openai', id: 'gpt-4.1', name: 'GPT-4.1',
       inputModalities: ['text', 'image'],
+      cacheUsage: 'reported',
     })
     expect(models.every(model => model.provider === 'openai')).toBe(true)
     const info = await ctx.llm.resolveModelInfo('openai', 'gpt-4.1')
     expect(typeof info.context?.contextWindow).toBe('number')
+    expect(info.cacheUsage).toBe('reported')
   })
 
   it('exposes pi-ai model thinking levels verbatim without inventing a provider default', async () => {
@@ -444,26 +454,23 @@ describe('provider profile lifecycle', () => {
       providers: { deepseek: {}, openai: {} },
     })
 
-    await expect(ctx.llm.resolveModelInfo('deepseek', 'deepseek-v4-flash'))
-      .resolves.toMatchObject({
-        reasoning: {
-          efforts: [
-            { id: ReasoningEffortId('off'), name: 'Off' },
-            { id: ReasoningEffortId('low'), name: 'Low' },
-            { id: ReasoningEffortId('high'), name: 'High' },
-            { id: ReasoningEffortId('max'), name: 'Max' },
-          ],
-        },
-      })
-    const extended = await ctx.llm.resolveModelInfo('openai', 'gpt-5.6-sol')
-    expect(extended.reasoning?.efforts.map(effort => effort.id)).toEqual([
-      ReasoningEffortId('off'),
-      ReasoningEffortId('low'),
-      ReasoningEffortId('medium'),
-      ReasoningEffortId('high'),
-      ReasoningEffortId('xhigh'),
-      ReasoningEffortId('max'),
-    ])
+    // The installed catalog owns the level lists — they track the dependency, not
+    // this package. The contract under test is that the adapter reports exactly
+    // the catalog's levels, with a label and no invented provider default.
+    const [catalogModel] = getBuiltinModels('deepseek')
+    if (catalogModel === undefined) throw new Error('the installed catalog ships no deepseek model')
+    const deepseekLevels = getSupportedThinkingLevels(catalogModel as Model<Api>)
+    const info = await ctx.llm.resolveModelInfo('deepseek', catalogModel.id)
+    expect(info.reasoning?.efforts.map(effort => effort.id))
+      .toEqual(deepseekLevels.map(level => ReasoningEffortId(level)))
+    for (const effort of info.reasoning?.efforts ?? []) expect(effort.name.length).toBeGreaterThan(0)
+    expect(info.reasoning?.defaultEffort).toBeUndefined()
+
+    const extendedModel = getBuiltinModels('openai').find(model => model.id === 'gpt-5.6-sol')
+    if (extendedModel === undefined) throw new Error('the installed catalog ships no gpt-5.6-sol')
+    const extended = await ctx.llm.resolveModelInfo('openai', extendedModel.id)
+    expect(extended.reasoning?.efforts.map(effort => effort.id))
+      .toEqual(getSupportedThinkingLevels(extendedModel as Model<Api>).map(level => ReasoningEffortId(level)))
     // A catalog model without reasoning is the same case as a hand-declared
     // one: pi-ai reports the single level `off`, which translates to omitting
     // the reasoning option — exactly what naming no effort already does. The
@@ -792,6 +799,58 @@ describe('provider profile lifecycle', () => {
     expect(new LlmError('x', 'X')).toBeInstanceOf(Error)
   })
 
+  it('declares the owner-supplied prompt-cache lifetime on listed and resolved models', async () => {
+    const asked: Array<[string, string]> = []
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({ deepseek: {} }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      promptCacheTtlMs: (provider, model) => {
+        asked.push([provider, model])
+        return model === 'deepseek-v4-flash' ? 300_000 : undefined
+      },
+    })
+    const listed = await adapter.listModels('deepseek')
+    expect(listed.find(model => model.id === 'deepseek-v4-flash')?.promptCacheTtlMs).toBe(300_000)
+    // An undefined answer declares nothing rather than a placeholder value.
+    expect(listed.find(model => model.id === 'deepseek-v4-pro')).not.toHaveProperty('promptCacheTtlMs')
+    await expect(adapter.resolveModel('deepseek', 'deepseek-v4-flash'))
+      .resolves.toMatchObject({ promptCacheTtlMs: 300_000 })
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-pro')).not.toHaveProperty('promptCacheTtlMs')
+    expect(asked).toContainEqual(['deepseek', 'deepseek-v4-flash'])
+  })
+
+  it('declares the thinking mode of Anthropic Messages models and none for other protocols', async () => {
+    const adapter = adapterOf({
+      anthropic: {
+        models: [
+          { id: 'claude-opus-5' },
+          { id: 'claude-sonnet-5' },
+          { id: 'claude-haiku-4-5' },
+          { id: 'plain-anthropic', name: 'Plain', contextWindow: 100_000, maxTokens: 8_000 },
+        ],
+      },
+      deepseek: {},
+    })
+    const listed = await adapter.listModels('anthropic')
+    // The catalog's adaptive models run adaptive thinking.
+    expect(listed.find(model => model.id === 'claude-opus-5')?.thinkingMode).toBe('adaptive')
+    // A reasoning model without forced adaptive thinking runs a fixed budget.
+    expect(listed.find(model => model.id === 'claude-haiku-4-5')?.thinkingMode).toBe('budget')
+    await expect(adapter.resolveModel('anthropic', 'claude-haiku-4-5')).resolves.toMatchObject({ thinkingMode: 'budget' })
+    await expect(adapter.resolveModel('anthropic', 'claude-sonnet-5')).resolves.toMatchObject({ thinkingMode: 'adaptive' })
+    await expect(adapter.resolveModel('anthropic', 'plain-anthropic')).resolves.toMatchObject({ thinkingMode: 'none' })
+    // Other protocols declare nothing.
+    for (const model of await adapter.listModels('deepseek')) expect(model).not.toHaveProperty('thinkingMode')
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-flash')).not.toHaveProperty('thinkingMode')
+  })
+
+  it('declares no prompt-cache lifetime when the owner supplies no hook', async () => {
+    const adapter = adapterOf({ deepseek: { cacheRetention: 'long' } })
+    // The profile's retention alone does not name the upstream's lifetime.
+    for (const model of await adapter.listModels('deepseek')) expect(model).not.toHaveProperty('promptCacheTtlMs')
+    expect(await adapter.resolveModel('deepseek', 'deepseek-v4-flash')).not.toHaveProperty('promptCacheTtlMs')
+  })
+
   it('rejects unsupported or unresolved image input before provider I/O', async () => {
     const adapter = adapterOf({ openai: {}, deepseek: {} })
     const drain = async (options: Parameters<PiAiAdapter['stream']>[0]): Promise<void> => {
@@ -1038,5 +1097,240 @@ describe('hosted tools and route onPayload composition', () => {
     expect(hostedTypes(0)).toEqual(['function:web_search', 'x_search'])
     expect(hostedTypes(1)).toEqual(['function:web_search'])
     expect(hostedTypes(2)).toEqual(['web_search', 'x_search'])
+  })
+})
+
+describe('route prompt cache key', () => {
+  /**
+   * A registered hand-declared route over the mock server, with an optional
+   * deployment payload hook. The route declares its own protocol, so a test can
+   * ask for one whose wire format has a vendor cache-key field and one whose
+   * does not without depending on the installed catalog.
+   */
+  async function routeContext(
+    serverUrl: string,
+    profile: Record<string, unknown>,
+    onPayload?: (payload: unknown, request: LlmPiAi.PiAiPayloadRequest) => unknown,
+  ): Promise<Context> {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'acme-gateway': {
+          api: 'openai-completions',
+          baseURL: serverUrl,
+          models: [{ id: 'acme-large' }],
+          ...profile,
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      ...onPayload === undefined ? {} : { onPayload },
+    })
+    ctx.llm.registerAdapter(['acme-gateway'], adapter)
+    return ctx
+  }
+
+  it('declares a vendor cache-key field only for the protocols that have one', () => {
+    // The protocol fact behind the emit decision. A protocol absent from the
+    // table sends nothing — anthropic-messages marks prefix boundaries with
+    // cache_control blocks, and no other protocol here spells a key at all.
+    expect(PROMPT_CACHE_KEY_FIELDS).toEqual({ 'openai-completions': 'prompt_cache_key' })
+  })
+
+  it('sends the session id as the vendor cache key on a protocol that declares one', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, { promptCacheKey: 'session' })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-1' as never,
+    })
+    expect(server.requests[0]).toMatchObject({ prompt_cache_key: 'session-cache-1' })
+  })
+
+  it('sends nothing when the profile leaves the policy off', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, {})
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-2' as never,
+    })
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('sends nothing for a request that names no session', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, { promptCacheKey: 'session' })
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [] })
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('sends nothing on a model whose protocol declares no vendor field', async () => {
+    // The other side of the protocol fact: no pi-ai OpenAI-compatible
+    // implementation keys an anthropic-messages request, so this route proves
+    // the emit decision reads the exact model's protocol rather than the route.
+    // The scripted failure is deliberate — the assertion is on the request body
+    // the endpoint received, and the response framing is not part of it.
+    const server = await mockServer([{ status: 500, body: '{}' }])
+    const ctx = await routeContext(server.url, { api: 'anthropic-messages', promptCacheKey: 'session' })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-3' as never,
+    })
+    expect(server.requests).toHaveLength(1)
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('splices the cache key before the deployment hook and keeps both effects on one body', async () => {
+    const seen: Record<string, unknown>[] = []
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(
+      server.url,
+      { promptCacheKey: 'session', hostedTools: { webSearch: true } },
+      (payload) => {
+        seen.push(payload as Record<string, unknown>)
+        if (payload !== null && typeof payload === 'object') {
+          ;(payload as Record<string, unknown>).service_tier = 'priority'
+        }
+      },
+    )
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-4' as never,
+      tools: [{ name: 'web_search', description: 'local', parameters: { type: 'object', properties: {} } }],
+    })
+    // The deployment hook runs last, so it already observes the hosted splice
+    // and the cache key on the body it is handed...
+    expect(seen[0]).toMatchObject({ prompt_cache_key: 'session-cache-4' })
+    const body = server.requests[0] as Record<string, unknown>
+    // ...and its own in-place mutation still reaches the wire beside both.
+    expect(body['prompt_cache_key']).toBe('session-cache-4')
+    expect(body['service_tier']).toBe('priority')
+    const tools = body['tools'] as Record<string, unknown>[]
+    expect(tools.some(tool => tool['type'] === 'web_search')).toBe(true)
+    expect(tools.some(tool => tool['name'] === 'web_search')).toBe(false)
+  })
+
+  it('hands the deployment hook the provider, the exact model, and the session the request names', async () => {
+    const requests: LlmPiAi.PiAiPayloadRequest[] = []
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const ctx = await routeContext(server.url, {}, (_payload, request) => { requests.push(request) })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-hook' as never,
+    })
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [] })
+    expect(requests).toEqual([
+      { provider: 'acme-gateway', model: 'acme-large', sessionId: 'session-hook' },
+      { provider: 'acme-gateway', model: 'acme-large' },
+    ])
+  })
+})
+
+describe('temperature refusal fact', () => {
+  /** Register one hand-declared route and resolve its single model. */
+  async function resolveOn(profile: Record<string, unknown>, serverUrl = 'http://127.0.0.1:9') {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['acme-gateway'], new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'acme-gateway': { baseURL: serverUrl, models: [{ id: 'acme-large' }], ...profile },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+    }))
+    return { ctx, info: await ctx.llm.resolveModelInfo('acme-gateway', 'acme-large') }
+  }
+
+  it('declares refusal for an Anthropic model whose compat drops a stated temperature', async () => {
+    const server = await mockServer([{ status: 500, body: '{}' }])
+    const { ctx, info } = await resolveOn({
+      api: 'anthropic-messages',
+      models: [{ id: 'acme-large', compat: { supportsTemperature: false } }],
+    }, server.url)
+    expect(info.acceptsTemperature).toBe(false)
+    // The declared fact matches what pi-ai sends: the stated temperature never reaches the wire.
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [], temperature: 0.2 })
+    expect(server.requests[0]).not.toHaveProperty('temperature')
+  })
+
+  it.each([
+    ['an Anthropic model without the switch', { api: 'anthropic-messages' }],
+    ['an Anthropic model that accepts temperature', { api: 'anthropic-messages', models: [{ id: 'acme-large', compat: { supportsTemperature: true } }] }],
+    ['another protocol', { api: 'openai-completions' }],
+  ])('makes no claim for %s', async (_case, profile) => {
+    const { info } = await resolveOn(profile)
+    expect(info).not.toHaveProperty('acceptsTemperature')
+  })
+})
+
+describe('cache-count reporting', () => {
+  /** A chat-completions turn whose wire reports 2 of 5 prompt tokens as cached. */
+  const cachedTextEvents = [
+    textEvents[0]!,
+    textEvents[1]!,
+    '{"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":2}}}',
+    '[DONE]',
+  ]
+
+  /** Mount one openai-responses route over the mock server. */
+  async function responsesRoute(baseURL: string, overrides: Record<string, unknown> = {}): Promise<Context> {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'responses-mock': {
+          apiKeyEnv: 'PI_TEST_KEY',
+          api: 'openai-responses',
+          baseURL,
+          models: [{ id: 'responses-mock-model' }],
+          ...overrides,
+        },
+      },
+    })
+    return ctx
+  }
+
+  it('emits a reported zero on a route whose protocol reports cache counts', async () => {
+    const server = await mockServer([{ events: responsesTextEvents({ input: 5, output: 1 }) }])
+    const ctx = await responsesRoute(server.url)
+    const result = await assemble(ctx, { provider: 'responses-mock', model: 'responses-mock-model', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })
+  })
+
+  it('omits both counts and keeps the whole prompt on an undeclared chat-completions route', async () => {
+    const server = await mockServer([{ events: cachedTextEvents }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1 })
+  })
+
+  it('reports the parsed counts when a chat-completions route declares reported', async () => {
+    const server = await mockServer([{ events: cachedTextEvents }])
+    const ctx = await harness(server.url, { cacheUsage: 'reported' })
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, cacheReadTokens: 2, cacheWriteTokens: 0 })
+  })
+
+  it('emits cacheReadTokens 0 for a miss on a reported route', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await harness(server.url, { cacheUsage: 'reported' })
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })
+  })
+
+  it('omits both counts when a route declares unreported over a reporting protocol', async () => {
+    const server = await mockServer([{ events: responsesTextEvents({ input: 5, output: 1 }) }])
+    const ctx = await responsesRoute(server.url, { cacheUsage: 'unreported' })
+    const result = await assemble(ctx, { provider: 'responses-mock', model: 'responses-mock-model', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 1 })
   })
 })

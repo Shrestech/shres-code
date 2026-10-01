@@ -1,9 +1,9 @@
 /**
  * Package-owned invariant companion for the default Agent model selection.
  *
- * The service owns no independent event relationship: settings registration
- * already validates every mutable value before `currentSelection()` can observe it.
- * The empty installer keeps that absence explicit in composed invariant sets.
+ * Defaults come from validated settings and session selections are read from
+ * the event log. The service owns no independent projection to compare with
+ * either source.
  *
  * @module @shres-code/shres-code-agent-default-model/invariant
  */
@@ -18,7 +18,7 @@ export const name = 'agent-default-model-invariant'
 /** Services required before the companion can register. */
 export const inject = ['invariants']
 
-/** No runtime invariant: settings validation owns the only mutable-value relationship. */
+/** No runtime invariant: selections derive directly from validated settings or the session log. */
 const install: InvariantInstaller = () => {}
 
 /**

@@ -15,6 +15,7 @@ import { registerTrajectoryAssistantDefinition } from './trajectory-assistant-de
 import { registerTrajectoryCompactionDefinitions } from './trajectory-compaction-definition.ts'
 import { registerTrajectoryMessageDefinitions } from './trajectory-message-definitions.ts'
 import { registerTrajectoryRequestHeaderDefinition } from './trajectory-request-header-definition.ts'
+import { registerTrajectoryRoutingDefinition } from './trajectory-routing-definition.ts'
 import { registerTrajectoryShieldDefinition } from './trajectory-shield-definition.ts'
 import { registerTrajectoryJSpaceDefinition } from './trajectory-jspace-definition.ts'
 import { registerTrajectoryConversationView } from './trajectory-snapshot-builder.ts'
@@ -42,6 +43,7 @@ export function apply(ctx: Context): void {
   registerTrajectoryToolDefinition(ctx)
   registerTrajectoryShieldDefinition(ctx)
   registerTrajectoryJSpaceDefinition(ctx)
+  registerTrajectoryRoutingDefinition(ctx)
   registerTrajectoryCompactionDefinitions(ctx)
   registerTrajectoryConversationView(ctx)
   ctx.slots.inject('conversation.view', () => ctx.slots.register({

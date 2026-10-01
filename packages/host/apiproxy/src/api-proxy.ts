@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, open, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Context } from '@shres-code/cordis'
-import { installModelSelection } from '@shres-code/shres-code-agent'
+import { provideModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-agent-presets/types'
 import { AttachmentError } from '@shres-code/shres-code-attachment'
@@ -82,7 +82,8 @@ import type {} from '@shres-code/shres-code-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.
-import { SettingsConflictError, settingsNamespace } from '@shres-code/shres-code-settings'
+import z from '@shres-code/schemastery'
+import { SettingsConflictError, SettingsFieldError, settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@shres-code/shres-code-settings'
 import { credentialRef } from '@shres-code/shres-code-credentials'
 // Value edge: the rename impl narrows the title service's validation failure; the import also resolves `ctx.get('sessionTitle')`.
@@ -265,9 +266,12 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * page's project-wiki seat (enable switch and librarian route binding).
  * `jspace-advisor` is that page's Advisor toggle and reviewer route. `speech`
  * is General Settings voice/language/auto-submit plus the composer mic's Talk
- * mode flag.
+ * mode flag. `model-router` is the deployment's model routing section — the
+ * downgrade allowlist, the two gate thresholds, and the judgment question
+ * texts — which an operator changes through a settings surface rather than by
+ * editing the composition.
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'jspace-advisor', 'speech', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'jspace-advisor', 'speech', 'model-router', 'judgment', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
@@ -711,9 +715,9 @@ export interface ApiProxyDefaults {
    * Record a selection as the new default. Either absent, or a closure that
    * may itself decline — the gateway plugin always passes one, and it no-ops
    * when the deployment mounts no settings provider or when the write races
-   * service teardown. A switch then stays process-local. A rejection is
-   * reported and swallowed: the switch already applies to its own session,
-   * and undoing it because storage failed would be the worse outcome.
+   * service teardown. The session selection remains recorded in its own log.
+   * A settings-write rejection is reported and swallowed without undoing that
+   * session selection.
    */
   saveDefaultModelSelection?: (selection: ModelSelection) => Promise<void>
   /** Default project directory for new sessions whose create request carries no cwd. */
@@ -1185,6 +1189,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
   type WebModelSelectionRef = ModelSelectionRef & { current: ModelSelection }
   const selections = new WeakMap<Agent, WebModelSelectionRef>()
+  /** Early withdrawal of each selection this proxy provided, run when its agent is disposed. */
+  const selectionReleases = new WeakMap<Agent, () => void>()
+  // A disposed agent needs no selection: release its withdrawal effect now
+  // instead of holding it until this proxy's fiber unloads.
+  ctx.on('agent/disposed', ({ agent }) => { selectionReleases.get(agent)?.() }, { global: true })
   /**
    * Serializes `agentPreset.select` per session. Two concurrent selects both
    * pass the blank check, and the second `unmountPresetFor` then finds nothing
@@ -1210,44 +1219,50 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /**
-   * Install or return the session-local model selection that prompt assembly snapshots.
+   * Provide or return the session-local model selection the agent's
+   * model-selection hook applies, which prompt assembly snapshots. With
+   * `agentDefaultModel` composed the proxy delegates to it, first withdrawing a
+   * selection it provided itself before that service was mounted. A selection
+   * this proxy provides is withdrawn when its fiber is disposed.
    *
-   * Precedence, resolved on EVERY read rather than seeded once: a selection
-   * made in this process, else the session's own latest logged request/header,
-   * else the live Agent default. Re-reading keeps the two tiers exact in both
-   * directions: a session with a recorded request derives its selection from
-   * its log, while a blank session (New Session reuses one rather than minting
-   * another) reads any default saved after it was created. There is no create-time
-   * per-session override tier on this wire — if one returns (a create-options
-   * contribution), it must fold in between the selection and the log.
+   * Explicit selections are durable even when no subsequent request runs.
+   * Otherwise the session's manual route precedes the live default, which a
+   * blank unselected session re-reads on every access. A composed router
+   * reports the base beneath its routed header.
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
     const owned = ctx.get('agentDefaultModel')
-    if (owned !== undefined) return owned.selectionFor(agent)
+    if (owned !== undefined) {
+      // agent-default-model mounted after this proxy provided a selection:
+      // withdraw ours so it becomes the agent's one provider.
+      selectionReleases.get(agent)?.()
+      return owned.selectionFor(agent)
+    }
     const installed = selections.get(agent)
     if (installed !== undefined) return installed
-    let picked: ModelSelection | undefined
     const selection: WebModelSelectionRef = {
       get current(): ModelSelection {
-        if (picked !== undefined) return picked
-        // Incrementally folded by the session, so a per-step read costs
-        // O(new events) rather than a rescan.
-        const logged = agent.session.requestHeader()?.config
-        if (logged === undefined) return defaults.defaultModelSelection()
-        return {
-          provider: logged.provider,
-          model: logged.model,
-          ...logged.reasoningEffort === undefined
-            ? {}
-            : { reasoningEffort: logged.reasoningEffort },
-        }
+        return selectionInForce(agent) ?? defaults.defaultModelSelection()
       },
       set current(next: ModelSelection) {
-        picked = next
+        agent.session.append('agent/model-selection', {
+          provider: next.provider,
+          model: next.model,
+          ...next.reasoningEffort === undefined ? {} : { reasoningEffort: next.reasoningEffort },
+        })
       },
       assembled: undefined,
     }
-    installModelSelection(agent.ctx, selection)
+    const withdraw = provideModelSelection(agent, selection)
+    // The selection belongs to this proxy's fiber: a reload withdraws it, and
+    // the replacement proxy provides its own.
+    const release = ctx.effect(() => withdraw, 'apiProxy.selectionFor()')
+    selectionReleases.set(agent, () => {
+      selectionReleases.delete(agent)
+      selections.delete(agent)
+      // The withdrawal is synchronous; the disposer's promise settles with it.
+      void release()
+    })
     selections.set(agent, selection)
     return selection
   }
@@ -2111,7 +2126,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * the namespace's new redacted view. A namespace outside the configuration
    * boundary is refused before the seam is touched; every seam refusal —
    * unknown or invalid namespace, read-only provider, schema validation,
-   * storage — becomes one `settings-rejected` carrying the seam's own message.
+   * owner validation, storage — becomes one `settings-rejected` carrying the
+   * seam's own message, plus the field path an owner's `SettingsFieldError`
+   * or the schema's validation failure names.
    */
   async function settingsWrite(
     request: RpcRequest<unknown>,
@@ -2132,10 +2149,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           details: { ns, expected: error.expected, actual: error.actual },
         })
       }
+      const path = fieldPathOf(error)
       return err(request, {
         code: 'settings-rejected',
         message: error instanceof Error ? error.message : String(error),
-        details: { ns },
+        details: path === undefined ? { ns } : { ns, path },
       })
     }
     let branded: SettingsNamespace
@@ -3925,4 +3943,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return Promise.resolve({ accepted: true })
     },
   }
+}
+
+/**
+ * The field a settings refusal names: an owner's `SettingsFieldError` path,
+ * or the path a schema validation failure reached, keys and array indices from
+ * the section root. A refusal of the whole section names none.
+ * @param error - the seam's refusal.
+ * @returns the path, or undefined when the refusal names no field.
+ */
+function fieldPathOf(error: unknown): (string | number)[] | undefined {
+  if (error instanceof SettingsFieldError) return [...error.path]
+  if (!z.ValidationError.is(error)) return undefined
+  const path = (error.options.path ?? []).filter((segment): segment is string | number => typeof segment !== 'symbol')
+  return path.length === 0 ? undefined : path
 }

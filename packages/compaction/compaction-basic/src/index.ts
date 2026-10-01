@@ -10,7 +10,7 @@ import { CompactionEngine, ManualCompactionError } from '@shres-code/shres-code-
 import type { CompactionFailureFacts, CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
 import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session } from '@shres-code/shres-code-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever, errorChain } from '@shres-code/shres-code-llm'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever, errorChain, promptTokens } from '@shres-code/shres-code-llm'
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
@@ -45,6 +45,12 @@ export type {
   ResolvedRetention,
   ResolvedTargetPolicy,
 } from './types.ts'
+// The summarizer entry points are exported because a subclass that must
+// summarize on an explicit target (rather than the conversation's) reaches them
+// through the same machinery this engine uses; the README documents
+// `summarize()`'s contract in these terms.
+export { frameSummary, summarizationFailureFacts, summarizeWithLlm } from './summarizer.ts'
+export type { SummarizationInput, SummaryResult } from './summarizer.ts'
 
 /** The region transaction's view of this service's dynamically dispatched summarizer. */
 type RegionSummarize = (input: SummarizationInput, agent: Agent, signal?: AbortSignal) => Promise<SummaryResult>
@@ -185,7 +191,7 @@ function summarizationOverflowExhausted(
   const target = facts === undefined ? 'an unreported target' : `${facts.provider}/${facts.model}`
   const usage = facts?.usage === undefined
     ? 'no usage'
-    : `${facts.usage.inputTokens + (facts.usage.cacheReadTokens ?? 0) + (facts.usage.cacheWriteTokens ?? 0)} prompt tokens`
+    : `${promptTokens(facts.usage)} prompt tokens`
   const message = `compaction could not summarize a ${overflowed.regionTokens}-token region after ${attempts} `
     + `${attempts === 1 ? 'attempt' : 'attempts'} (summarizer ${target}; last attempt reported ${usage}: `
     + `${errorChain(overflowed.error)}); reduce the retained history, point summarization at `
@@ -212,6 +218,7 @@ const retainRatioSchema = z.number()
 const retainTokensSchema = z.number().step(1).min(0)
 const summarizationProviderSchema = z.string()
 const summarizationModelSchema = z.string()
+const summarizationRouteSchema = z.union(['manual', 'request'])
 const maxTokensSchema = z.number().step(1).min(1)
 const compactionRetriesSchema = z.number().step(1).min(0)
 const maxOverflowRetriesSchema = z.number().step(1).min(0)
@@ -227,6 +234,7 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   retainTokens: retainTokensSchema,
   summarizationProvider: summarizationProviderSchema,
   summarizationModel: summarizationModelSchema,
+  summarizationRoute: summarizationRouteSchema,
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
@@ -250,6 +258,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     retainTokens: retainTokensSchema,
     summarizationProvider: summarizationProviderSchema,
     summarizationModel: summarizationModelSchema,
+    summarizationRoute: summarizationRouteSchema,
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
@@ -368,10 +377,35 @@ export class BasicCompactionEngine extends CompactionEngine {
   }
 
   /**
+   * Select the next head-anchored range to compact. The default body is the
+   * shipped selection: price the recent tail from the meter's unified
+   * measurement, round head-ward to a balanced tool-call/result boundary, and
+   * leave the route's pinned seqs unshadowed. A subclass may shape the span —
+   * for example to compact semantic segments rather than one contiguous range —
+   * and returning `null` declines the attempt, so a subclass that finds
+   * nothing worth compacting costs no summarization call. The hook is async
+   * because a judgment-backed override must await an engine before it can
+   * decide; the default body resolves immediately.
+   * @param session - session supplying authoritative current surface positions.
+   * @param measurement - unified pressure and surface measurement for this attempt.
+   * @param retainTokens - minimum recent tail budget retained verbatim.
+   * @param pinSeqs - surface seqs that must remain unshadowed.
+   * @returns the inclusive positional seq range to compact, or `null`.
+   */
+  protected selectRange(
+    session: Session,
+    measurement: TokenMeasurement,
+    retainTokens: number,
+    pinSeqs: readonly number[],
+  ): Promise<{ start: number; end: number } | null> {
+    return Promise.resolve(selectCompactableRange(session, measurement, retainTokens, pinSeqs))
+  }
+
+  /**
    * Summarize the replayed conversation region through a direct one-shot
    * `ctx.llm.stream()` call whose prefix reuses the conversation's own system
    * prompt, tools, and messages so the provider's KV cache is not invalidated.
-   * Override this sole hook for a template or remote summarizer.
+   * Override this hook for a template or remote summarizer.
    * @param input - replayed conversation prefix (system, tools, and leading messages) to condense.
    * @param agent - supplies routed-model history, fallback model, and session id.
    * @param signal - optional cancellation forwarded to the adapter.
@@ -522,7 +556,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     let attempt = firstAttempt
     let overflowed: { error: unknown; regionTokens: number } | undefined
     for (;;) {
-      const range = selectCompactableRange(agent.session, measurement, retainTokens, this.config.pinSeqs)
+      const range = await this.selectRange(agent.session, measurement, retainTokens, this.config.pinSeqs)
       if (range === null) {
         if (overflowed === undefined) return null
         throw summarizationOverflowExhausted(overflowed, attempt - firstAttempt)

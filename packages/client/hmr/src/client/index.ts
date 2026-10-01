@@ -52,18 +52,20 @@
  * per runtime, so `registry.delete` never collaterally disposes siblings.
  *
  * Self-reload: this plugin is itself a graph entry, so a rebuilt frame may
- * name it. The in-flight reload keeps running in the old bundle's closure
- * (its EventSource closes with the old fiber's effects); the new bundle's
- * apply opens a fresh channel. Frames arriving during the gap are lost —
- * acceptable for the dev channel, the next rebuild renotifies.
+ * name it. The old fiber's disposer closes its EventSource, but the reload
+ * continuation is allowed to drain that fiber and refresh the same Loader
+ * entry while the owning Loader tree remains active. The new bundle's apply
+ * opens a fresh channel. Frames arriving during the gap are lost — acceptable
+ * for the dev channel, since the next graph or rebuild frame resynchronizes it.
  *
  * Failure policy: no rollback. An import failure leaves the entry
  * fiberless (the next rebuilt frame retries from scratch); an apply failure
  * leaves a FAILED fiber for the shell's status projection. Both log loudly.
  */
-import type { Context } from '@shres-code/cordis'
+import type { Context, FiberState } from '@shres-code/cordis'
 import type { Entry, Loader } from '@shres-code/cordis-plugin-loader'
-import type { PluginsEventFrame } from '../events.ts'
+import type { BootManifest, WebBootGraph } from '@shres-code/shres-code-client-modules/client'
+import { parseBootManifest, type PluginsEventFrame } from '../events.ts'
 import { EVENTS_ENDPOINT } from '../events.ts'
 
 export type { PluginsEventFrame } from '../events.ts'
@@ -74,6 +76,16 @@ export const name = 'client-hmr'
 
 /** Required services: the vendored Loader (entry governance) and the client module system (boot provide, service name `modules`). */
 export const inject = ['loader', 'modules']
+
+const SELF_ID = '@shres-code/shres-code-client-hmr'
+
+// Cordis erases its const enum at build time; client bundles cannot import a
+// runtime enum object. Keep these values aligned with the pinned definition.
+const FIBER_STATE = {
+  ACTIVE: 2 as FiberState.ACTIVE,
+  FAILED: 3 as FiberState.FAILED,
+  DISPOSED: 4 as FiberState.DISPOSED,
+} as const
 
 /** Find the loader entry whose module specifier is `id` (entry tree ids are random; the package name lives in `options.name`). */
 function findEntry(loader: Loader, id: string): Entry | undefined {
@@ -90,6 +102,38 @@ function removeOwnedStyles(id: string): void {
   }
 }
 
+function graphFromManifest(manifest: BootManifest): WebBootGraph {
+  return {
+    rev: manifest.rev,
+    entries: manifest.modules.map((module, index) => {
+      const plugin = manifest.plugins[index]
+      return {
+        ...module,
+        ...(plugin?.inject.length ? { inject: plugin.inject } : {}),
+        ...(plugin?.immediately ? { immediately: true } : {}),
+      }
+    }),
+  }
+}
+
+function parseFrame(value: unknown): PluginsEventFrame | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const frame = value as Record<string, unknown>
+  if (frame.type === 'graph') {
+    try {
+      return { type: 'graph', graph: graphFromManifest(parseBootManifest(frame.graph)) }
+    } catch {
+      // The SSE channel is an untrusted wire input; malformed graph frames are
+      // dropped before they can alter module rows or Loader entries.
+      return undefined
+    }
+  }
+  if (frame.type === 'rebuilt' && typeof frame.id === 'string' && typeof frame.rev === 'string') {
+    return { type: 'rebuilt', id: frame.id, rev: frame.rev }
+  }
+  return undefined
+}
+
 /**
  * Mount the HMR driver: subscribe to the system SSE channel and hot-swap
  * rebuilt entries.
@@ -100,8 +144,154 @@ export function apply(ctx: Context): void {
   // client module loader package, `loader` from the vendored Loader).
   const modLoader = ctx.modules
   const loader: Loader = ctx.loader
+  const loaderOwner = ctx.fiber.parent.fiber
+  let disposed = false
+  let selfReloading = false
+  // Keep every graph id observed during this page lifetime. If an earlier
+  // transition stopped after removing a Loader entry, the next identical host
+  // graph still has enough ownership information to recreate or withdraw it.
+  const managedGraphIds = new Set(modLoader.graphRows().map(row => row.id))
+  const pendingReloadIds = new Set<string>()
+
+  const ownerIsLive = (): boolean => !disposed && ctx.fiber.state === FIBER_STATE.ACTIVE
+
+  const loaderTreeIsLive = (): boolean => loaderOwner.state === FIBER_STATE.ACTIVE
+
+  const transitionIsLive = (id: string): boolean =>
+    ownerIsLive() || (id === SELF_ID && selfReloading && loaderTreeIsLive())
+
+  const assertCreatedEntriesSettled = (ids: readonly string[]): void => {
+    for (const id of ids) {
+      const entry = loader.resolve(id)
+      // Loader.await() settles a fiber that is PENDING on a missing service;
+      // only an absent, FAILED, or DISPOSED fiber needs graph repair here.
+      if (entry.fiber === undefined || entry.fiber.state === FIBER_STATE.FAILED || entry.fiber.state === FIBER_STATE.DISPOSED) {
+        throw new Error(`client-hmr: graph entry "${entry.options.name}" failed to activate`)
+      }
+    }
+  }
+
+  async function applyGraph(graph: WebBootGraph): Promise<void> {
+    if (!ownerIsLive()) return
+    const manifest = parseBootManifest(graph)
+    const update = modLoader.applyGraph(manifest.modules)
+    // Preserve revision work across a failed arrival: the module graph has
+    // already accepted the new rows, so a repeated identical frame reports no
+    // second `changed` diff.
+    for (const change of update.changed) pendingReloadIds.add(change.after.id)
+    for (const row of manifest.modules) managedGraphIds.add(row.id)
+    const desired = new Set(manifest.modules.map(row => row.id))
+    const actual = new Map([...loader.entries()].map(entry => [entry.options.name, entry]))
+    const additions = new Map(update.added.map(row => [row.id, row]))
+    for (const row of manifest.modules) {
+      const entry = actual.get(row.id)
+      // A failed import can leave a fiberless or FAILED entry in the Loader
+      // tree. Repeated identical graph frames must repair that entry rather
+      // than treating its name as already present.
+      if (
+        entry === undefined
+        || entry.fiber === undefined
+        || entry.fiber.state === FIBER_STATE.FAILED
+        || entry.fiber.state === FIBER_STATE.DISPOSED
+        || entry.disabled
+      ) {
+        additions.set(row.id, row)
+      }
+    }
+    // A failed old fiber can be recreated as part of a changed graph row.
+    // Drop its cached factory before prefetch so the new revision is loaded;
+    // unchanged retries keep their cached factory and can retry activation.
+    for (const change of update.changed) {
+      if (additions.has(change.after.id)) modLoader.invalidate(change.after.id)
+    }
+    const removals = new Set(update.removed.map(row => row.id))
+    for (const id of managedGraphIds) {
+      if (!desired.has(id)) removals.add(id)
+    }
+    const selfRemoval = removals.delete(SELF_ID)
+
+    // Register new factories before creating entries. This preserves the
+    // boot barrier for synchronous cross-bundle require edges.
+    await Promise.all(manifest.plugins
+      .filter(row => additions.has(row.id) && row.immediately)
+      .map(row => modLoader.prefetch(row.id)))
+    if (!ownerIsLive()) return
+
+    // Dispose old fibers before dropping their factories and styles. Loader
+    // owns effect teardown; withdraw only removes module-owned resources.
+    for (const id of removals) {
+      const entry = findEntry(loader, id)
+      if (entry !== undefined) await loader.remove(entry.id)
+      if (!ownerIsLive()) return
+      modLoader.withdraw(id)
+      managedGraphIds.delete(id)
+      pendingReloadIds.delete(id)
+    }
+    await loader.await()
+    if (!ownerIsLive()) return
+
+    // Remove obsolete entries before creating additions: two versions of a
+    // provider cannot coexist while Cordis checks service ownership.
+    const created: string[] = []
+    for (const row of additions.values()) {
+      const existing = findEntry(loader, row.id)
+      if (existing !== undefined) {
+        if (
+          existing.fiber !== undefined
+          && existing.fiber.state !== FIBER_STATE.FAILED
+          && existing.fiber.state !== FIBER_STATE.DISPOSED
+          && !existing.disabled
+        ) continue
+        await loader.remove(existing.id)
+        if (!ownerIsLive()) return
+      }
+      created.push(await loader.create({ name: row.id }))
+    }
+    await loader.await()
+    if (!ownerIsLive()) return
+    assertCreatedEntriesSettled(created)
+    for (const row of additions.values()) pendingReloadIds.delete(row.id)
+
+    // A graph rev can replace a bundle without a separate rebuilt frame.
+    // Reuse the existing invalidate/prefetch/refresh path for those rows. The
+    // HMR row goes last: disposing it closes this queue's EventSource and
+    // marks this owner disposed, while a fresh HMR instance sees the graph
+    // rows already accepted and cannot infer unfinished reloads.
+    const reloadIds = [...pendingReloadIds]
+    const selfIndex = reloadIds.indexOf(SELF_ID)
+    if (selfIndex >= 0) {
+      reloadIds.splice(selfIndex, 1)
+      reloadIds.push(SELF_ID)
+    }
+    for (const id of reloadIds) {
+      if (!desired.has(id)) {
+        pendingReloadIds.delete(id)
+        continue
+      }
+      const change = update.changed.find(item => item.after.id === id)
+      if (change !== undefined && additions.has(change.after.id)) continue
+      await reload(id)
+      pendingReloadIds.delete(id)
+    }
+
+    // Removing this entry disposes the owner of the current queue. Schedule
+    // its Loader teardown only after every unrelated graph row has settled;
+    // awaiting our own removal would strand the queue in its disposer.
+    if (selfRemoval) {
+      const entry = findEntry(loader, SELF_ID)
+      managedGraphIds.delete(SELF_ID)
+      pendingReloadIds.delete(SELF_ID)
+      if (entry !== undefined) {
+        void loader.remove(entry.id).then(
+          () => { modLoader.withdraw(SELF_ID) },
+          (error: unknown) => { ctx.logger.error('client-hmr: self-removal failed'); ctx.logger.error(error) },
+        )
+      }
+    }
+  }
 
   async function reload(id: string): Promise<void> {
+    if (!ownerIsLive()) return
     const entry = findEntry(loader, id)
     if (entry === undefined) {
       ctx.logger.warn(`client-hmr: rebuilt frame for unknown entry "${id}" (not in the loader tree)`)
@@ -114,29 +304,41 @@ export function apply(ctx: Context): void {
     // at materialization, not execution).
     modLoader.invalidate(id)
     await modLoader.prefetch(id)
+    if (!ownerIsLive()) return
 
     const oldFiber = entry.fiber
-    if (oldFiber !== undefined) {
-      // Registry-first teardown (see module comment): the runtime record must
-      // be gone before the fiber's disposer emits internal/plugin, or the
-      // Loader flags the entry disabled.
-      const runtime = oldFiber.runtime
-      if (runtime !== null) entry.ctx.registry.delete(runtime.callback)
-      // Drain the unload: effect disposers (slots, subscriptions) must finish
-      // before the new bundle executes and the new apply re-registers.
-      while (oldFiber.inertia !== undefined) await oldFiber.inertia
-      delete entry.fiber
+    const self = id === SELF_ID && oldFiber !== undefined
+    if (self) selfReloading = true
+    try {
+      if (oldFiber !== undefined) {
+        // Registry-first teardown (see module comment): the runtime record
+        // must be gone before the fiber's disposer emits internal/plugin, or
+        // the Loader flags the entry disabled.
+        const runtime = oldFiber.runtime
+        if (runtime !== null) entry.ctx.registry.delete(runtime.callback)
+        // Drain the unload: effect disposers (slots, subscriptions) must
+        // finish before the new bundle executes and the new apply re-registers.
+        while (oldFiber.inertia !== undefined) {
+          await oldFiber.inertia
+          if (!transitionIsLive(id)) return
+        }
+        delete entry.fiber
+      }
+      // Old owned styles go before materialization re-injects them (the CSS
+      // idempotency guard keys on stable tag ids).
+      removeOwnedStyles(id)
+      // Re-init through the entry: fiber cleared above, so refresh() re-imports
+      // — materializing the prefetched factory (CSS injects here) — and
+      // re-plugins under the entry context. Import failures are logged by
+      // Entry._init and leave the entry fiberless (retryable).
+      await entry.refresh()
+      if (!transitionIsLive(id)) return
+      // Surface apply failures loudly (no rollback, FAILED state stays).
+      if (entry.fiber === undefined) throw new Error(`client-hmr: rebuilt entry "${id}" did not activate`)
+      await entry.fiber.await()
+    } finally {
+      if (self) selfReloading = false
     }
-    // Old owned styles go before materialization re-injects them (the CSS
-    // idempotency guard keys on stable tag ids).
-    removeOwnedStyles(id)
-    // Re-init through the entry: fiber cleared above, so refresh() re-imports
-    // — materializing the prefetched factory (CSS injects here) — and
-    // re-plugins under the entry context. Import failures are logged by
-    // Entry._init and leave the entry fiberless (retryable).
-    await entry.refresh()
-    // Surface apply failures loudly (no rollback, FAILED state stays).
-    await entry.fiber?.await()
   }
 
   // Serialize reloads: frames can arrive faster than a swap completes, and
@@ -145,16 +347,20 @@ export function apply(ctx: Context): void {
   const handle = (frame: PluginsEventFrame): void => {
     switch (frame.type) {
       case 'rebuilt':
-        queue = queue.then(() => reload(frame.id)).catch((error: unknown) => {
+        pendingReloadIds.add(frame.id)
+        queue = queue.then(async () => {
+          await reload(frame.id)
+          pendingReloadIds.delete(frame.id)
+        }).catch((error: unknown) => {
           ctx.logger.error(`client-hmr: reload of "${frame.id}" failed`)
           ctx.logger.error(error)
         })
         break
       case 'graph':
-        // Connect-time snapshot, unused. The loader's cached graph rev
-        // goes stale after rebuilds — harmless, since prefetch hits the
-        // network anyway (host serves bundles no-cache); graph rev refresh
-        // lands with the reconnect-handshake mechanism.
+        queue = queue.then(() => applyGraph(frame.graph)).catch((error: unknown) => {
+          ctx.logger.error('client-hmr: graph transition failed')
+          ctx.logger.error(error)
+        })
         break
       default:
         // Merge-extensible frame union: unknown frame types from newer hosts
@@ -166,16 +372,24 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const source = new EventSource(EVENTS_ENDPOINT)
     source.addEventListener('message', (event: MessageEvent<string>) => {
-      let frame: PluginsEventFrame
+      let raw: unknown
       try {
-        frame = JSON.parse(event.data) as PluginsEventFrame
+        raw = JSON.parse(event.data) as unknown
       } catch {
         // Wire boundary: a malformed dev-channel frame is dropped loudly.
         ctx.logger.warn(`client-hmr: unparseable event frame: ${event.data}`)
         return
       }
+      const frame = parseFrame(raw)
+      if (frame === undefined) {
+        ctx.logger.warn(`client-hmr: invalid event frame: ${event.data}`)
+        return
+      }
       handle(frame)
     })
-    return () => { source.close() }
+    return () => {
+      disposed = true
+      source.close()
+    }
   }, 'client-hmr: event source')
 }

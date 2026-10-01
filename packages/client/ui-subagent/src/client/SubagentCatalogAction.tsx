@@ -71,13 +71,13 @@ function formatTokens(value: number): string {
   return `${scaled(value / 1_000_000)}M`
 }
 
-/** Sum the four disjoint durable provider-usage buckets. */
+/** Sum the five disjoint durable provider-usage buckets. */
 function tokenTotal(
   usage: SessionProjectionMap['tokenUsage'] | undefined,
 ): number | undefined {
   return usage === undefined
     ? undefined
-    : usage.uncachedInputTokens + usage.outputTokens
+    : usage.uncachedInputTokens + usage.unreportedInputTokens + usage.outputTokens
       + usage.cacheReadTokens + usage.cacheWriteTokens
 }
 

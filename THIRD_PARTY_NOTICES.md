@@ -7,7 +7,7 @@ Shres Code is licensed under [MIT](LICENSE). It depends on the third-party softw
 
 This file lists **direct** dependencies declared by the workspace and the explicitly disclosed official Claude platform payload closure. It is generated from the workspace manifests by `scripts/gen-third-party-notices.ts`: a pre-commit hook regenerates it whenever a staged file changes one of its inputs, and `scripts/gen-third-party-notices.spec.ts` asserts in the test lane that the committed bytes match. Deleting a manifest runs no hook, so that case is caught by the assertion instead. Run `pnpm run verify-third-party-notices` for the standalone check.
 
-The complete npm transitive closure, including the Landlock launcher workspace, is recorded with exact pinned versions in [`pnpm-lock.yaml`](pnpm-lock.yaml) — inspect it with `pnpm licenses list`. The Python closure is recorded separately in [`python/sdk/uv.lock`](python/sdk/uv.lock).
+The complete npm transitive closure, including the Landlock launcher workspace, is recorded with exact pinned versions in [`pnpm-lock.yaml`](pnpm-lock.yaml) — inspect it with `pnpm licenses list`. The Python closures are recorded separately in [`python/sdk/uv.lock`](python/sdk/uv.lock) and [`python/laya-gateway/uv.lock`](python/laya-gateway/uv.lock).
 
 ## Vendored source (`vendor/`)
 
@@ -180,16 +180,47 @@ External packages **directly declared** only by repository tooling, test infrast
 
 `eslint-plugin-sonarjs` (LGPL-3.0-only) and `lightningcss` (MPL-2.0) run only as development tooling; their code is not linked into or distributed with any Shres Code artifact.
 
-## Python SDK dependencies (`python/`)
+## Python dependencies (`python/`)
 
 Direct dependencies of the `pyproject.toml` manifests, plus `uv` as the development workflow tool.
 
 | Package | License | Role |
 | --- | --- | --- |
 | [`hatchling`](https://github.com/pypa/hatch) | MIT | build backend |
+| [`huggingface-hub`](https://github.com/huggingface/huggingface_hub) | Apache-2.0 | runtime dependency of `shres-laya-gateway`; downloads the pinned checkpoint during `/laya install` only |
+| [`laya-mlx`](https://github.com/mizorewww/laya-mlx) | Apache-2.0 | runtime dependency of `shres-laya-gateway` on Apple silicon; installed by `/laya install`, not redistributed |
 | [`pydantic`](https://github.com/pydantic/pydantic) | MIT | runtime dependency of `shres-code-sdk` |
 | [`pytest`](https://github.com/pytest-dev/pytest) | MIT | test-only |
 | [`uv`](https://github.com/astral-sh/uv) | MIT / Apache-2.0 | development workflow tool |
+
+## Local Laya judgment runtime (`python/laya-gateway`)
+
+The `/laya install` action installs the gateway's locked Python closure and downloads the pinned checkpoint into the user's runtime directory. Shres Code does not redistribute these components; they are listed because the gateway loads them.
+
+| Component | License | Role |
+| --- | --- | --- |
+| [`mlx`](https://github.com/ml-explore/mlx) | MIT | array runtime of `laya-mlx`, locked in `python/laya-gateway/uv.lock` |
+| [`Laya`](https://github.com/NandhaKishorM/laya) | Apache-2.0 | model architecture, question rendering, and confidence calculation that `laya-mlx` reimplements (see the notice below) |
+| [`convaiinnovations/laya-typed-decisions`](https://huggingface.co/convaiinnovations/laya-typed-decisions/tree/f9ab0b228f0fc0f14d873dbc99038f135c2da1b2) | Apache-2.0 | weights downloaded by `/laya install` at the pinned revision and verified file by file; not redistributed |
+
+`laya-mlx` carries the following NOTICE, reproduced verbatim:
+
+```text
+laya-mlx
+Copyright 2026 laya-mlx contributors
+
+This product includes software derived from Laya:
+https://github.com/NandhaKishorM/laya
+Copyright Convai Innovations and Laya contributors. Licensed under Apache-2.0.
+Upstream source revision: 573e5b62696ba441230cd6be71d593331b5d23af
+
+The token sequence construction, question rendering, confidence calculation,
+presets, email utilities and language router are adapted from Laya.
+The neural network is reimplemented using Apple's MLX, following Laya's
+DecisionModel and the ModernBERT architecture in Hugging Face Transformers.
+Model weights are downloaded separately from Convai Innovations on Hugging Face;
+they are not included in this repository.
+```
 
 ## Fetched at build time
 

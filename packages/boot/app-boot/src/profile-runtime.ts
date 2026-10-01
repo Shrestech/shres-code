@@ -8,11 +8,15 @@
  */
 
 import type { Context } from '@shres-code/cordis'
+import type {
+  ProfileActivationOutcome,
+  ProfileBundleState,
+} from './profile-plugin-types.ts'
 
 /**
  * The boot-time profile facts an app provides before any tree entry mounts.
- * The values are frozen snapshots: later manifest edits apply after a
- * restart, which is exactly the readiness model the plugin states report.
+ * Boot facts are frozen; optional controls own the current applied composition.
+ * Hosts without controls save supported changes for their next restart.
  */
 export interface ProfileRuntime {
   /** Absolute directory of the booted profile (its manifest's owner). */
@@ -25,6 +29,46 @@ export interface ProfileRuntime {
    * it serves status and refuses mutations with its own message.
    */
   readonly pluginMutations: 'enabled' | 'unsupported'
+  /** Package anchor used to resolve installed profile bundles. */
+  readonly installAnchor?: string
+  /** Required and optional bundles available from the running installation. */
+  readonly shippedBundles?: readonly string[]
+  /** Live profile controls exposed by a launcher that supports reconciliation. */
+  readonly control?: ProfileRuntimeControl
+}
+
+/**
+ * Coordinates profile mutations with the running loader.
+ *
+ * Implementations must persist desired state before returning `saved`; a
+ * restart-required result leaves the current loader active until the next
+ * process start.
+ */
+export interface ProfileRuntimeControl {
+  /** Read available bundles and the current applied membership.
+   * @returns current bundle metadata and membership.
+   */
+  listBundles(): Promise<ProfileBundleState[]>
+  /** Persist bundle selection and reconcile the running composition.
+   * @param name - installed or shipped package identity.
+   * @param enabled - desired selection.
+   * @param signal - operation cancellation from the caller.
+   * @returns saved application state or expected refusal.
+   */
+  setBundleEnabled(
+    name: string,
+    enabled: boolean,
+    signal: AbortSignal,
+  ): Promise<ProfileActivationOutcome>
+  /** Persist a row override and reconcile the running composition.
+   * @param request - patch id, module identity, and desired enablement.
+   * @param signal - operation cancellation from the caller.
+   * @returns saved application state or expected refusal.
+   */
+  setPluginEnabled(
+    request: { id: string; moduleName: string; enabled: boolean },
+    signal: AbortSignal,
+  ): Promise<ProfileActivationOutcome>
 }
 
 /** The context key {@link provideProfileRuntime} provides under. */
@@ -50,5 +94,8 @@ export function provideProfileRuntime(ctx: Context, value: ProfileRuntime): void
     profileDir: value.profileDir,
     bootBundles: Object.freeze([...value.bootBundles]),
     pluginMutations: value.pluginMutations,
+    ...value.installAnchor === undefined ? {} : { installAnchor: value.installAnchor },
+    ...value.shippedBundles === undefined ? {} : { shippedBundles: Object.freeze([...value.shippedBundles]) },
+    ...value.control === undefined ? {} : { control: value.control },
   }))
 }

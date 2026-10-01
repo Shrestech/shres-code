@@ -7,14 +7,27 @@ import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
 import pluginAdminRemote from '@shres-code/shres-code-host-plugin-admin/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
+import judgmentEnginesRemote from '@shres-code/shres-code-judgment-dispatch/remote'
+import layaRemote from '@shres-code/shres-code-judgment-laya/remote'
 import remoteControlRemote from '@shres-code/shres-code-host-remote-control/remote'
 import messageFeedbackRemote from '@shres-code/shres-code-message-feedback/remote'
+import modelRoutingRemote from '@shres-code/shres-code-model-router/remote'
 import speechRemote from '@shres-code/shres-code-speech/remote'
 import shieldRemote from '@shres-code/shres-code-shield/remote'
 import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
 
 export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
+export type {
+  JudgmentEngineModelsView, JudgmentEngineView, JudgmentEnginesSnapshot, JudgmentSelectionView,
+} from '@shres-code/shres-code-judgment-dispatch/types'
+export type {
+  JudgmentConsumerId, JudgmentEngineCalibration, JudgmentEngineEgress, JudgmentEngineHost, JudgmentEngineId,
+  JudgmentEngineState,
+} from '@shres-code/shres-code-judgment/types'
+export type {
+  LayaGatewayExitView, LayaGatewayState, LayaGatewayView, LayaInstallResult,
+} from '@shres-code/shres-code-judgment-laya/types'
 export type {
   BrowserSkillConsent, BrowserSkillConsentDownload, BrowserSkillOperation, BrowserSkillOperationId,
   BrowserSkillRefusal, BrowserSkillState, BrowserSkillStatus, BrowserSkillToken,
@@ -23,6 +36,7 @@ export type {
 // Client contribution names what it sends and receives through this
 // assembly, never through a Host package import.
 export type {
+  ManagedBundle, ManagedPlugin, PluginActivationOutcome,
   InstalledSkillView, ParkedTransactionView, PluginAdminConfirmOutcome, PluginAdminGestureVerb,
   PluginAdminInstallOutcome, PluginAdminRemoveOutcome, PluginAdminStatusResult, PluginConfirmToken,
   PluginGestureToken, PluginMutations, PluginTransactionId, SkillInstallOutcome, SkillRemoveOutcome,
@@ -37,6 +51,8 @@ export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
 export type {} from '@shres-code/shres-code-host-plugin-admin/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
+export type {} from '@shres-code/shres-code-judgment-dispatch/remote'
+export type {} from '@shres-code/shres-code-judgment-laya/remote'
 export type {} from '@shres-code/shres-code-host-remote-control/remote'
 // The remote namespaces' payload vocabulary rides the same rule as the shield
 // block above: a Client contribution names what it sends and receives through
@@ -46,6 +62,7 @@ export type {
   RemoteRegistrySnapshot, RemoteTarget, RemoveOutcome, TunnelStateView,
 } from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-message-feedback/remote'
+export type {} from '@shres-code/shres-code-model-router/remote'
 export type {} from '@shres-code/shres-code-speech/remote'
 export type {} from '@shres-code/shres-code-shield/remote'
 // The forwarded-event allowlist's selection seat: without it in the consumer's
@@ -57,6 +74,7 @@ export type { ApiRemoteForwardedEvent } from '../types.ts'
 export type {} from '@shres-code/shres-code-commands/types'
 export type {} from '@shres-code/shres-code-cordis-host-runner/types'
 export type {} from '@shres-code/shres-code-credentials/types'
+export type {} from '@shres-code/shres-code-judgment/types'
 export type {} from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-llm/types'
 export type {} from '@shres-code/shres-code-agent-presets/types'
@@ -142,8 +160,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      browserSkillRemote, commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote, remoteControlRemote,
-      messageFeedbackRemote, speechRemote, shieldRemote,
+      browserSkillRemote, commandsRemote, goalsRemote, dynamicRemote, pluginAdminRemote, pluginInventoryRemote,
+      remoteControlRemote, messageFeedbackRemote, modelRoutingRemote, speechRemote, shieldRemote, judgmentEnginesRemote,
+      layaRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

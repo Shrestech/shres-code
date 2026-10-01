@@ -14,7 +14,7 @@ The seed transfers conversation history only. The child still receives a fresh f
 
 `start(request)` passes the completed-turn seed to [`startInProcessRun`](../subagent-in-process-driver/README.md) and awaits child publication. The shared driver owns cancellation, depth, customization, result reading, and disposal.
 
-Fork advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true, cwd: true }`, identical to spawn.
+Fork advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true, cwd: true }`, identical to spawn, and sets `runsRequestedModel`. Because it seeds the child with parent history, `resolveChildRoute` never consults `subagent/child-route` for it: a routed fork child would lose the warm cached prefix it inherits.
 
 ## Config
 

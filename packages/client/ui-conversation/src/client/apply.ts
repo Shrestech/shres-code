@@ -10,13 +10,14 @@ import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import type {} from '@shres-code/shres-code-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@shres-code/shres-code-client-locale/client'
-import type { ViewTab } from './contract/views.ts'
+import type { InspectRequest, ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
   DetailsInjected,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
+import { createReveal, SessionReveals, TRAJECTORY_VIEW_ID } from './inspect.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
@@ -172,6 +173,29 @@ export function apply(ctx: Context): void {
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
   }
+  const canReveal = (view: string): boolean => viewTabs().some(tab => tab.id === view)
+  // Each session's reveal, recorded by the strict session registration that
+  // owns that session's chat-store instance. The composer bar is
+  // session-maybe scoped, and one store handle mounts under one scope, so the
+  // bar reads a session's reveal from here instead of mounting the store; the
+  // service face reveals in a session that has not mounted yet through it.
+  const reveals = new SessionReveals(canReveal)
+
+  /**
+   * Build one session's reveal over its chat-store actions and record it for
+   * the composer bar's routing seat.
+   * @param sessionId - the session the actions belong to.
+   * @param actions - that session's bound chat-store actions.
+   * @returns the session's reveal.
+   */
+  const sessionReveal = (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ((request: InspectRequest) => void) => {
+    const reveal = createReveal(actions)
+    // The entry leaves with the session's scope, so a closed session keeps none.
+    if (reveals.record(sessionId, reveal)) {
+      sessions.binding(sessionId)?.ctx.effect(() => () => { reveals.forget(sessionId) }, 'ui-conversation: session reveal')
+    }
+    return reveal
+  }
 
   // The per-session input machine registry (SessionInputResolver face; published as
   // ctx.conversation.input by the service below sharing this one instance).
@@ -259,12 +283,14 @@ export function apply(ctx: Context): void {
       'conversation.view': { kind: 'list', scope: 'session' },
     },
     store: chatStore,
-    inject: (sessionId: SessionId, _actions: BoundActions<typeof chatStore>): ConversationSessionInjected => {
+    inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ConversationSessionInjected => {
       const conversation = concreteConversation(ctx)
       return {
         views,
         releaseSessionImages: (id) => { conversation.releaseSessionImages(id) },
         bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+        reveal: sessionReveal(sessionId, actions),
+        canReveal,
       }
     },
   }, ConversationSession)
@@ -296,14 +322,20 @@ export function apply(ctx: Context): void {
   slots.register({
     name: 'conversation.composer.bar',
     locale: NS,
-    // The two named control seats in the bar's tool row (plan beside the
-    // access control, model right); empty until their owning plugins
-    // register.
+    // The named control seats in the bar's tool row (plan beside the
+    // access control, routing and model right); empty until their owning
+    // plugins register.
     children: {
       'conversation.input.plan': { kind: 'single', scope: 'session' },
+      'conversation.input.modelRouting': { kind: 'single', scope: 'session' },
       'conversation.input.model': { kind: 'single', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
+      // The session registration records the reveal when its chat store
+      // mounts, which precedes any gesture in this session's composer.
+      const reveal = sessionId === undefined
+        ? undefined
+        : (request: InspectRequest) => { reveals.get(sessionId)?.(request) }
       if (sessionId === undefined) {
         return {
           keyboard: undefined,
@@ -315,6 +347,7 @@ export function apply(ctx: Context): void {
           toggleCommandMenu: undefined,
           stop: undefined,
           command: undefined,
+          reveal,
           hooks: { notices: ABSENT_NOTICES, lexicon: ABSENT_LEXICON, menuLauncher: ABSENT_MENU_LAUNCHER },
         }
       }
@@ -323,6 +356,7 @@ export function apply(ctx: Context): void {
       const inputTriggers = inputHub.inputTriggers(sessionId)
       return {
         keyboard: shell,
+        reveal,
         addImages: (files) => {
           // A definite no-image declaration refuses at intake with the
           // composer's own copy, before any file is read; the gate precedes
@@ -408,6 +442,7 @@ export function apply(ctx: Context): void {
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {
       const conversation = concreteConversation(ctx)
       const scoped = scopedConversation(sessions, sessionId)
+      const reveal = createReveal(actions)
       return {
         openDetails: (target) => {
           actions.select(target)
@@ -431,10 +466,9 @@ export function apply(ctx: Context): void {
         loadOlder: () => { void scoped.loadOlder() },
         loadImage: attachment => conversation.resolveImage(sessionId, attachment),
         // Unregistered 'trajectory' id is safe: the tab ring falls back to
-        // the first view, and the untouched inspect target stays inert.
+        // Chat, and the request waits until a Trajectory view registers.
         inspectCall: (callId) => {
-          actions.setInspect({ callId })
-          actions.setView('trajectory')
+          reveal({ view: TRAJECTORY_VIEW_ID, target: { kind: 'call', callId } })
         },
         chatScroll: {
           save: (position) => {
@@ -461,7 +495,7 @@ export function apply(ctx: Context): void {
   // registers itself as `conversation` and lives on its own child fiber.
   // Presentation registrants depend directly on their slot declarations;
   // this service remains only where conversation actions are required.
-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, imageInput: composerImageInput })
+  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, imageInput: composerImageInput, reveals })
 
   // The plan strip rides the input dock above the queue rows (same posture).
   ctx.plugin(todoDockEntry)

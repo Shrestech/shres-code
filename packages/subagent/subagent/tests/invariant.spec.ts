@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { scopeTarget } from '@shres-code/shres-code-scope'
 import { SessionId } from '@shres-code/shres-code-session'
-import SubagentRuntime, { SubagentRunId } from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentRunId, SubagentRouteRequestId } from '@shres-code/shres-code-subagent'
 import type {
   SubagentProvider,
   SubagentRunEndInfo,
@@ -78,6 +78,14 @@ describe('subagent invariants', () => {
       .toThrow(/no matching subagent\/start/)
     expect(() => { emitRun(ctx, 'subagent/end', end({ id: SessionId('other') })) })
       .toThrow(/identity diverges/)
+  })
+
+  it('rejects a start/end pair whose route-request ids differ', async () => {
+    const ctx = await setup()
+    emitRun(ctx, 'subagent/start', start({ subagentRouteRequestId: SubagentRouteRequestId('route-a') }))
+    expect(() => {
+      emitRun(ctx, 'subagent/end', end({ subagentRouteRequestId: SubagentRouteRequestId('route-b') }))
+    }).toThrow(/route-request id diverges/)
   })
 
   it('accepts the recorded provider name after registration ends', async () => {

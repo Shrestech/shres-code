@@ -59,7 +59,8 @@
     "@shres-code/shres-code-invariants": "workspace:^",
     "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "typescript": "^6.0.3"
   },
   "files": [
     "lib/index.js",

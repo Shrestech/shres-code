@@ -1,0 +1,144 @@
+/* Generic profile-bundle inventory and feature configuration. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.intro,
+.status,
+.failure p,
+.notice,
+.alert,
+.readOnly,
+.version {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.intro,
+.status,
+.version,
+.readOnly {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.failure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.failure button,
+.toggle {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.detailsToggle {
+  border: 0;
+  padding: 5px 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.detailsToggle:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.toggle {
+  flex: none;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.toggle:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.notice {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.alert {
+  color: var(--dsw-alias-state-error-primary);
+  overflow-wrap: anywhere;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+}
+
+.card[data-active='true'] {
+  border-color: var(--dsw-alias-border-l1);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 14px 10px;
+}
+
+.headText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.name {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.description {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.state {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.feature {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  padding: 8px 14px 13px;
+}

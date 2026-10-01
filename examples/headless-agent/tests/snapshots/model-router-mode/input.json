@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "op": "prompt", "text": "Reply with exactly: ROUTED_OK (mode turn 1)" },
+    { "op": "prompt", "text": "Reply with exactly: ROUTED_OK (mode turn 2)" },
+    { "op": "prompt", "text": "Reply with exactly: ROUTED_OK (mode turn 3)" },
+    { "op": "prompt", "text": "Reply with exactly: ROUTED_OK (mode turn 4)" }
+  ]
+}

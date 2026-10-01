@@ -50,6 +50,7 @@ import {
 import type { DelegatedPolicyOverrides } from './child-agent.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
 import { seedDescriptorTurn } from './descriptor-seed.ts'
+import { SubagentRouteRequestId } from './types.ts'
 import type { ContinuableCreateRequest, ContinuableCreateSpec, SubagentResult, SubagentStartRequest } from './types.ts'
 import type { ActivationObserver, ActivationTerminal } from './lifecycle.ts'
 import { SubagentError } from './error.ts'
@@ -210,7 +211,12 @@ interface ContinuationHost {
    * @param parent - the exact live direct parent for scoped dispatch.
    * @returns the observer whose edges this epoch publishes.
    */
-  observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
+  observeActivation(
+    provider: string,
+    childId: SessionId,
+    parent: Agent,
+    subagentRouteRequestId?: AgentOptions['subagentRouteRequestId'],
+  ): ActivationObserver
   /**
    * Reserve one concurrent-spawn slot or throw `CONCURRENCY_CAP`. The returned
    * releaser is idempotent; call it when this start's Activation settles or
@@ -473,6 +479,9 @@ export class SubagentContinuationManager {
       ...agentModel !== undefined ? { agentModel } : {},
       ...request.persona !== undefined ? { persona: request.persona } : {},
       ...request.toolFilter !== undefined ? { toolFilter: request.toolFilter } : {},
+      ...agentOptions.subagentRouteRequestId !== undefined
+        ? { agentRouteRequestId: agentOptions.subagentRouteRequestId }
+        : {},
     })
     // Capture before the first await: a later parent switch belongs to the
     // parent's future, not to this child.
@@ -1023,6 +1032,9 @@ export class SubagentContinuationManager {
         agentOptions: {
           ...descriptor.agentProvider !== undefined ? { provider: descriptor.agentProvider } : {},
           ...descriptor.agentModel !== undefined ? { model: descriptor.agentModel } : {},
+          ...descriptor.agentRouteRequestId !== undefined
+            ? { subagentRouteRequestId: SubagentRouteRequestId(descriptor.agentRouteRequestId) }
+            : {},
         },
         composition: { persona: descriptor.persona, toolFilter: descriptor.toolFilter },
         signal: options.signal,
@@ -1108,7 +1120,12 @@ export class SubagentContinuationManager {
       applyChildComposition(childCtx, parent, inputs.composition)
       return this.setupRegistry.apply(childCtx)
     }
-    const observer = this.host.observeActivation(provider, childId, parent)
+    const observer = this.host.observeActivation(
+      provider,
+      childId,
+      parent,
+      inputs.agentOptions.subagentRouteRequestId,
+    )
     // Agent creation owns rollback before handle transfer. A rejection leaves
     // no resident Activation and therefore publishes no lifecycle edge.
     const handle: AgentHandle = create === undefined

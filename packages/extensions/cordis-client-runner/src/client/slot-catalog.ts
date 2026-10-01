@@ -657,7 +657,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named model-select seat at the right end of the composer tool row,\nleft of the send button — one occupant, so taking it means rendering the\nwhole model affordance yourself. Same `locked`-only owner share and same\nrenders-nothing-while-empty contract as the plan seat. Note the composer\ndeliberately keeps this seat LIVE while it refuses text for a\nmodel-related block: every such block is one the user clears by picking\na model here.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -679,6 +679,41 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.model\', () => ctx.slots.register(\n      { name: \'conversation.input.model\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-conversation/src/client/contract/slots.ts:232',
+  },
+  {
+    key: 'conversation.input.modelRouting',
+    kind: 'single',
+    scope: 'session',
+    summary: 'The named model-routing seat immediately left of the model-select seat — one occupant, so taking it means rendering the whole routing affordance yourself.',
+    doc: 'The named model-routing seat immediately left of the model-select seat —\none occupant, so taking it means rendering the whole routing affordance\nyourself. The owner share adds the session\'s `reveal` to `locked` (see\nRoutingControlOwnerProps), so the control can open a conversation\nview such as the Routing view. Same renders-nothing-while-empty contract as\nthe plan seat: a host composing no router registers no routing projection,\nand the seat then draws nothing.',
+    registerOptions: [],
+    ownerProps: [
+      '/** Owner share of the routing control seat: the shared lock plus the session\'s reveal. */\nexport interface RoutingControlOwnerProps extends InputControlOwnerProps {\n  /**\n   * The same reveal the views receive ({@link ConvViewOwnerProps.reveal}): write\n   * the request, select the addressed view, and close the Activity popover.\n   * `{ kind: \'none\' }` opens the view with nothing to show. Absent while the\n   * composer has no session.\n   */\n  reveal?: ((request: InspectRequest) => void) | undefined\n}',
+    ],
+    ownerPropsReferences: [
+      'ConvViewOwnerProps',
+      'InputControlOwnerProps',
+      'InspectRequest',
+    ],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'useSession: SnapshotSelectorHook<ConversationSnapshot>',
+      'sessionId: SessionId',
+      'useProjection: UseProjection',
+      'useInput: SnapshotSelectorHook<InputState>',
+      'inputActions: InputActions',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'conversation.composer.bar\' (client-ui-conversation), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-model-routing RoutingChip',
+    ],
+    replaceRisk: 'shadows-shipped-ui',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.modelRouting\', () => ctx.slots.register(\n      { name: \'conversation.input.modelRouting\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:242',
   },
   {
     key: 'conversation.input.overlay',
@@ -737,7 +772,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named plan-status seat in the composer tool row, immediately right\nof the access-mode control — one occupant, so taking it means rendering\nthe plan affordance yourself. The owner passes only `locked` (see\nInputControlOwnerProps): honour it by refusing interaction, and\ntake everything else from the framework session kit or your own inject.\nUnoccupied, the seat renders nothing at all — the bar paints no\nplaceholder, so an absent plan plugin costs no layout.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1050,9 +1085,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /** One-shot inspect request from another view (chat\'s Inspect button); null when idle. */\n  inspect?: { callId: CallId } | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n}',
+      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /**\n   * The pending inspect request addressed to this view; null when idle or when\n   * the request addresses another view, which keeps it until that view is the\n   * active one.\n   */\n  inspect?: InspectRequest | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n  /**\n   * Hand a target to a view: write the request, select that view, and close\n   * the Activity popover. A request to an unregistered view selects nothing\n   * visible (the tab ring falls back to Chat) and waits until the view registers.\n   */\n  reveal?: (request: InspectRequest) => void\n  /**\n   * Whether a \'conversation.view\' entry with this id is registered, so a reveal\n   * to it lands. Read it at render: the answer follows the view ledger.\n   */\n  canReveal?: (view: string) => boolean\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'InspectRequest',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
@@ -1068,6 +1105,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'conversation.session\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-conversation ChatView id \'chat\'',
+      'client-ui-model-routing RoutingView id \'routing\'',
       'client-ui-trajectory TrajectoryView id \'trajectory\'',
     ],
     replaceRisk: 'none',
@@ -1221,7 +1259,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.audio.item\', () => ctx.slots.register(\n      { name: \'settings.audio.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:76',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:89',
   },
   {
     key: 'settings.close',
@@ -1296,7 +1334,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.general.item\', () => ctx.slots.register(\n      { name: \'settings.general.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:74',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:87',
   },
   {
     key: 'settings.header',
@@ -1368,7 +1406,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.onboarding\', () => ctx.slots.register(\n      { name: \'settings.onboarding\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings/src/client/contract/slots.ts:59',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:72',
   },
   {
     key: 'settings.plugin.item',
@@ -1418,6 +1456,41 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     source: 'packages/client/ui-settings-plugins/src/client/slot-contract.ts:16',
   },
   {
+    key: 'settings.plugins.bundle',
+    kind: 'keyed',
+    scope: 'root',
+    summary: 'Feature-owned configuration for one selected and active plugin bundle.',
+    doc: 'Feature-owned configuration for one selected and active plugin bundle.\nThe Plugins manager dispatches by the exact bundle package name and\nsupplies the generic bundle state; inactive bundles never reach this\nslot, so a feature cannot accidentally offer controls for a disabled\nruntime.',
+    registerOptions: [
+      {
+        name: 'key',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key: the entry renders where the owner dispatches this exact key. Registering an already-occupied key replaces that occupant.',
+      },
+    ],
+    ownerProps: [
+      '/** Owner share for a keyed feature configuration slot. */\nexport interface SettingsPluginsBundleOwnerProps {\n  /** Bundle metadata supplied by the generic Plugins manager. */\n  bundle: SettingsPluginsBundle\n}',
+    ],
+    ownerPropsReferences: [
+      'SettingsPluginsBundle',
+    ],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+    ],
+    keyDomain: 'fixed by the owner\'s key table { [bundleName: string]: SettingsPluginsBundleOwnerProps }, none are taken yet',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'settings.plugins.tab\' (client-ui-settings-plugins), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-browserskill BrowserSkillSettingsSection',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.plugins.bundle\', () => ctx.slots.register(\n      { name: \'settings.plugins.bundle\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-settings/src/client/contract/slots.ts:56',
+  },
+  {
     key: 'settings.plugins.tab',
     kind: 'list',
     scope: 'root',
@@ -1458,6 +1531,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-settings-plugin-inventory PluginInventorySettingsTab id \'all\'',
       'client-ui-settings-plugin-inventory PluginManageSettingsTab id \'manage\'',
+      'client-ui-settings-plugins BundleManagerTab id \'bundles\'',
       'client-ui-settings-plugins ConfigurablePluginsTab id \'configurable\'',
     ],
     replaceRisk: 'none',
@@ -1491,7 +1565,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` is the one shell affordance a section receives, for flows\n * that leave settings altogether (starting a session from a section) — the\n * onboarding coordinator\'s `openSection`/`complete` precedent, inverted.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
+      '/**\n * Owner share of a settings section entry. The shell owns page visibility\n * and navigation; a section\'s data arrives through its own inject faces and\n * stores. `close` is the one shell affordance a section receives, for flows\n * that leave settings altogether (starting a session from a section); a link\n * to another section goes through `ctx.settingsPages`, delivered as a callback\n * in the section\'s inject face.\n */\nexport interface SettingsSectionOwnerProps {\n  /** Return to the workspace. */\n  close: () => void\n  /** Optional preference id for a focused view of a contributed item. */\n  item?: string\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1504,9 +1578,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'shell.navigation\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
-      'client-ui-browserskill BrowserSkillSettingsSection id \'browserSkill\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-jspace JSpaceSection id \'jspace\'',
+      'client-ui-settings-model-routing ModelRoutingSection id \'model-routing\'',
       'client-ui-settings-models ModelsSection id \'models\'',
       'client-ui-settings-models TeamSection id \'teams\'',
       'client-ui-settings-models AudioSection id \'audio\'',

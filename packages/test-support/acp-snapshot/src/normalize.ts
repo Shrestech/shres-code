@@ -283,7 +283,9 @@ export function normalizeStdout(
 /**
  * Normalize a session JSONL log into a stable expected output: the header line's
  * volatile fields (`createdAt`, `id`, `cwd`) and every event's `time` are
- * zeroed/scrubbed, all volatile strings scrubbed, and `seq` is LEFT INTACT
+ * zeroed/scrubbed, as are the wall-clock durations a `hook/result`
+ * (`durationMs`) and a `model-routing/*` record (`eligibilityMs`,
+ * `latencyMs`) carry, all volatile strings scrubbed, and `seq` is LEFT INTACT
  * (deterministic by contract). A packed chunk row's timing (`time0`, the `dt`
  * gaps) zeroes just like an event `time`; its `seq0` stays, like `seq`.
  * Output is JSONL in the same shape as the input — one compact record per
@@ -322,6 +324,14 @@ export function normalizeSessionLog(
       if (record.type === 'hook/result' && record.data !== null && typeof record.data === 'object') {
         const data = record.data as Record<string, unknown>
         if ('durationMs' in data) data.durationMs = 0
+      }
+      // A routing record's capability assessment and judgment call are timed on
+      // the wall clock, by the router or by the engine.
+      if (typeof record.type === 'string' && record.type.startsWith('model-routing/')
+        && record.data !== null && typeof record.data === 'object') {
+        const data = record.data as Record<string, unknown>
+        if ('eligibilityMs' in data) data.eligibilityMs = 0
+        if ('latencyMs' in data) data.latencyMs = 0
       }
     }
     return scrubValue(record, ctx, cwdPathMode) as Record<string, unknown>

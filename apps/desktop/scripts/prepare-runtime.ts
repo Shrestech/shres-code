@@ -88,7 +88,7 @@ function pnpmPackageRoot(): string {
   return root
 }
 
-function preparePnpm(): { version: string, entry: string } {
+function preparePnpm(): { version: string; entry: string } {
   const source = pnpmPackageRoot()
   const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')) as { version: string }
   const destination = join(RUNTIME_ROOT, 'pnpm')

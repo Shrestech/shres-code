@@ -36,6 +36,9 @@
       "path": "../../feedback/message-feedback"
     },
     {
+      "path": "../../llm/model-router"
+    },
+    {
       "path": "../../speech/speech"
     },
     {
@@ -61,6 +64,15 @@
     },
     {
       "path": "../../settings/settings"
+    },
+    {
+      "path": "../../llm/judgment"
+    },
+    {
+      "path": "../../llm/judgment-dispatch"
+    },
+    {
+      "path": "../../llm/judgment-laya"
     },
     {
       "path": "../../typert/protocol"

@@ -23,7 +23,7 @@ describe('BrowserSkill guidance', () => {
       for (const tool of ['browser_session', 'browser_navigate', 'browser_observe', 'browser_act']) {
         expect(skill?.content).toContain(tool)
       }
-      expect(skill?.content).toContain('Settings → BrowserSkill')
+      expect(skill?.content).toContain('Plugins → BrowserSkill')
       expect(skill?.content).toContain('Each conversation, including each subagent, owns its own sessions.')
       expect(skill?.content).toContain('An interrupted command may already have changed the page')
       expect(skill?.content).not.toContain('bsk session start')

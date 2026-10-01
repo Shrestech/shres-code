@@ -11,7 +11,9 @@ import { EMPTY_CONVERSATION_VIEWS } from '@shres-code/shres-code-client-runtime/
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
-import { StatsLine, contextOccupancy, deriveStats, formatDuration, formatTokens, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
+import {
+  StatsLine, billedInputTokens, cacheHitPercent, contextOccupancy, deriveStats, formatDuration, formatTokens, type StatsLineProps,
+} from '../src/client/chat/StatsLine.tsx'
 import { en } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -167,8 +169,21 @@ describe('formatters', () => {
   })
 })
 
+describe('cache accounting', () => {
+  it('classifies a call whose write arrived without a read count as unreported input', () => {
+    // The projection token-meter folds for { inputTokens: 100, outputTokens: 5, cacheWriteTokens: 10 }.
+    const unreported = { uncachedInputTokens: 0, unreportedInputTokens: 110, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 }
+    expect(cacheHitPercent(unreported)).toBeNull()
+    expect(billedInputTokens(unreported)).toBe(110)
+    // A reported call beside it keeps its own hit share; the unreported one never dilutes it.
+    const mixed = { ...unreported, uncachedInputTokens: 20, cacheReadTokens: 60, cacheWriteTokens: 20 }
+    expect(cacheHitPercent(mixed)).toBe('60')
+    expect(billedInputTokens(mixed)).toBe(210)
+  })
+})
+
 describe('StatsLine', () => {
-  const USAGE = { uncachedInputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 }
+  const USAGE = { uncachedInputTokens: 10, unreportedInputTokens: 0, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 }
 
   /** A whole-log sessionStats value: zeros plus overrides. */
   function sessionStats(overrides: Record<string, number>): Record<string, number> {
@@ -198,14 +213,14 @@ describe('StatsLine', () => {
     expect(view.container.textContent).toBe('1 turns · 1 steps| Cache hit 90%| Input 100 tok · Output 5 tok')
     const empty = makeSource()
     const emptyView = render(<StatsLine {...props(empty.source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      tokenUsage: { uncachedInputTokens: 0, unreportedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       contextPressure: {},
     })} />)
     expect(emptyView.container.textContent).toBe('')
   })
 
   function tokenUsage(cacheReadTokens: number, uncachedInputTokens: number) {
-    return { uncachedInputTokens, outputTokens: 1, cacheReadTokens, cacheWriteTokens: 0 }
+    return { uncachedInputTokens, unreportedInputTokens: 0, outputTokens: 1, cacheReadTokens, cacheWriteTokens: 0 }
   }
 
   it.each([
@@ -334,7 +349,7 @@ describe('StatsLine', () => {
     // closed step in the whole log, so nothing renders on a brand-new session.
     const empty = makeSource()
     const view = render(<StatsLine {...props(empty.source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      tokenUsage: { uncachedInputTokens: 0, unreportedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({}),
     })} />)
     expect(view.container.textContent).toBe('')
@@ -345,7 +360,7 @@ describe('StatsLine', () => {
     // the counts group renders alone, not an uninformative zero-token group.
     const { source } = makeSource()
     const view = render(<StatsLine {...props(source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      tokenUsage: { uncachedInputTokens: 0, unreportedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({ turns: 1, steps: 1 }),
     })} />)
     expect(view.container.textContent).toBe('1 turns · 1 steps')
@@ -383,9 +398,41 @@ describe('StatsLine', () => {
   it('omits cache hit when nothing was billed on the input side', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      tokenUsage: { uncachedInputTokens: 0, unreportedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
     })} />)
     expect(view.container.textContent).toBe('1 turns · 1 steps| Input 0 tok · Output 7 tok')
+  })
+
+  it('says the cache was not reported when no call reported cache reads', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsLine {...props(source, {
+      tokenUsage: {
+        uncachedInputTokens: 0,
+        unreportedInputTokens: 300,
+        outputTokens: 7,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      },
+    })} />)
+    expect(view.container.textContent)
+      .toBe('1 turns · 1 steps| Cache not reported| Input 300 tok · Output 7 tok')
+  })
+
+  it('computes the cache hit over reported calls only and bills every input', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsLine {...props(source, {
+      tokenUsage: {
+        uncachedInputTokens: 10,
+        unreportedInputTokens: 900,
+        outputTokens: 7,
+        cacheReadTokens: 90,
+        cacheWriteTokens: 0,
+      },
+    })} />)
+    // The 900 unreported tokens may hold hits nobody counted, so they stay out
+    // of the 90% share and still count as billed input.
+    expect(view.container.textContent)
+      .toBe('1 turns · 1 steps| Cache hit 90%| Input 1K tok · Output 7 tok')
   })
 
   it('includes cache writes in billed input and the cache-hit denominator', () => {
@@ -393,6 +440,7 @@ describe('StatsLine', () => {
     const view = render(<StatsLine {...props(source, {
       tokenUsage: {
         uncachedInputTokens: 10,
+        unreportedInputTokens: 0,
         outputTokens: 7,
         cacheReadTokens: 90,
         cacheWriteTokens: 100,

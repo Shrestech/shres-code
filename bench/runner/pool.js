@@ -14,6 +14,9 @@
  * `signal` aborts, no further items start; in-flight workers are left to
  * settle (they watch the same signal and kill their children). A worker
  * rejection stops launching and is rethrown after in-flight work settles.
+ * `admit`, when given, is asked before every launch with the in-flight count;
+ * the first `false` stops launching for good, and in-flight workers settle
+ * normally (unlike an abort, nothing is killed).
  *
  * Concurrency 1 is sequential: item i+1 starts only after item i's worker
  * fulfills, so completion order matches the list.
@@ -22,10 +25,10 @@
  * @param {T[]} items - work list; not copied, not reordered.
  * @param {number} concurrency - max in-flight workers; integer >= 1.
  * @param {(item: T) => Promise<void> | void} worker - per-item work.
- * @param {{ signal?: AbortSignal }} [options]
+ * @param {{ signal?: AbortSignal, admit?: (inFlight: number) => boolean }} [options]
  * @returns {Promise<void>}
  */
-export async function mapPool(items, concurrency, worker, { signal } = {}) {
+export async function mapPool(items, concurrency, worker, { signal, admit } = {}) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) {
     throw new RangeError(`concurrency must be an integer >= 1; got ${concurrency}`)
   }
@@ -40,6 +43,7 @@ export async function mapPool(items, concurrency, worker, { signal } = {}) {
       await Promise.race(pending)
       continue
     }
+    if (admit !== undefined && !admit(pending.size)) break
     const item = items[next]
     next += 1
     const run = (async () => {

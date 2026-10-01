@@ -1,0 +1,12 @@
+# Test-only strong-route substitution. All static child-policy fields stay T’s.
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
+- id: llm-deepseek
+  config:
+    baseURL: !!js process.env.BENCH_STUB_BASE_URL
+    apiKeyEnv: BENCH_STUB_KEY
+# The scripted three-request scenario excludes title generation.
+- id: session-title-llm
+  disabled: true

@@ -7,6 +7,7 @@
  * @module @shres-code/shres-code-host-plugin-admin/types
  */
 
+import type { PluginInventoryEntry, PluginEntryId } from '@shres-code/shres-code-host-plugin-inventory/types'
 import type { Branded } from '@shres-code/shres-code-brand'
 import type {
   InstallCommitted,
@@ -22,6 +23,7 @@ export type { InstallCommitted, InstallPreview, InstallRefusal, PluginStateEntry
 
 /** The mutations a pluginAdmin user gesture can authorize. */
 export type PluginAdminGestureVerb = 'install' | 'remove' | 'skill-add' | 'skill-remove'
+  | 'bundle-enable' | 'bundle-disable' | 'plugin-enable' | 'plugin-disable'
 
 /** Opaque single-use grant from `pluginAdmin/begin`; the wire form is a 32-character hex string. */
 export type PluginGestureToken = Branded<'PluginGestureToken'>
@@ -171,3 +173,32 @@ export type SkillInstallOutcome =
 export type SkillRemoveOutcome =
   | { kind: 'removed' }
   | { kind: 'refused'; code: 'not-installed' | 'not-managed' }
+
+/** Bundle and activation data are owned by the shared profile core. */
+export type { ProfileBundleState as ManagedBundle, ProfileActivationOutcome as PluginActivationOutcome } from '@shres-code/shres-code-app-boot/plugin-types'
+
+/** Current Loader entry with its management restriction, when one applies. */
+export interface ManagedPlugin extends PluginInventoryEntry {
+  /** Why the manager refuses activation changes for this entry. */
+  readOnlyReason?: string
+}
+
+/** Gesture-authorized selection of one installed bundle. */
+export interface PluginAdminBundleEnabledRequest {
+  /** Grant for the matching bundle-enable or bundle-disable verb and package name. */
+  token: PluginGestureToken
+  /** Exact bundle package name. */
+  name: string
+  /** Whether its patch layer belongs in the profile. */
+  enabled: boolean
+}
+
+/** Gesture-authorized activation of one addressable Loader entry. */
+export interface PluginAdminPluginEnabledRequest {
+  /** Grant for the matching plugin-enable or plugin-disable verb and entry identity. */
+  token: PluginGestureToken
+  /** Identity returned by listPlugins. */
+  entryId: PluginEntryId
+  /** Desired entry enablement, persisted in the profile patch. */
+  enabled: boolean
+}

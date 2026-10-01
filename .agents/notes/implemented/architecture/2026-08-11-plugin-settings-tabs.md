@@ -8,7 +8,7 @@ Plugin configuration and the read-only Loader inventory each registered a top-le
 
 ## Decision
 
-`@shres-code/shres-code-client-ui-settings-plugins` owns the single `settings.section` contribution with id `plugins`. It renders the shared title and compact tab chrome, declares the root-scoped list slot `settings.plugins.tab`, and projects that ledger's id, order, and locale-following label into its tabs. The slot's canonical type lives in `ui-settings`, so a tab contributor depends on the Settings domain contract rather than on another feature plugin.
+`@shres-code/shres-code-client-ui-settings-plugins` owns the single `settings.section` contribution with id `plugins`. The [shared plugin activation decision](2026-09-27-shared-plugin-activation.md) owns its Plugins destination and bundle controls. This package renders the shared title and compact tab chrome, declares the root-scoped list slot `settings.plugins.tab`, and projects that ledger's id, order, and locale-following label into its tabs. The slot's canonical type lives in `ui-settings`, so a tab contributor depends on the Settings domain contract rather than on another feature plugin.
 
 The section owner contributes a `configurable` tab that declares the existing nested `settings.plugin.item` list. Configuration cards keep their namespace bindings, draft state, validation, and writes unchanged. `@shres-code/shres-code-client-ui-settings-plugin-inventory` contributes an `all` tab to `settings.plugins.tab`; its Host Loader observer, generated Remote namespace, DTO, and search semantics remain unchanged. Disabled inventory entries omit the redundant unmounted runtime state from summaries and details, while enabled entries continue to expose their Cordis phase.
 
@@ -28,7 +28,7 @@ Both registrations use `ctx.slots.inject()`. If the section declarer unloads, th
 
 ## Consequences
 
-Settings has one Plugins navigation row, ordered before Agent Presets, with **Plugin configuration** and **Plugin list** tabs. Agent Presets remains an independent section because it edits per-session agent compositions rather than the live Host Loader tree.
+The Plugins destination has one feature-owned page with configuration, inventory, and management contributions. Agent Presets remains an independent section because it edits per-session agent compositions rather than the live Host Loader tree.
 
 Feature ownership remains explicit: `ui-settings-plugins` owns the Plugins page and editable cards, `ui-settings-plugin-inventory` owns the read-only inventory view, and the Host/RPC path does not change. A new Plugins view can join by registering one `settings.plugins.tab` contribution.
 

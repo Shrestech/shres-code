@@ -15,6 +15,11 @@ export default PluginAdminGateway
 export { PluginAdminError } from './errors.ts'
 export type { PluginAdminErrorCode } from './errors.ts'
 export type {
+  ManagedBundle,
+  ManagedPlugin,
+  PluginActivationOutcome,
+  PluginAdminBundleEnabledRequest,
+  PluginAdminPluginEnabledRequest,
   InstalledSkillView,
   ParkedTransactionView,
   PluginAdminBeginRequest,

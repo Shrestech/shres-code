@@ -6,7 +6,7 @@ import { expect, it } from 'vitest'
 import { launchWebScaffold, watchConsole } from './scaffold.ts'
 import { connectFreshWorkspace } from './support.ts'
 
-it('preserves a draft through Settings, Teams, and Customize and fits a narrow viewport', async () => {
+it('preserves a draft through Settings, Teams, Plugins, and Customize and fits a narrow viewport', async () => {
   const scaffold = await launchWebScaffold({})
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1487, height: 1058 }, locale: 'en-US' })
@@ -41,6 +41,9 @@ it('preserves a draft through Settings, Teams, and Customize and fits a narrow v
     await teams.getByRole('heading', { name: 'Team members', exact: true }).waitFor()
     await teams.getByLabel('Aegis Provider').waitFor()
     await capture('implementation-teams')
+    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    await page.getByRole('region', { name: 'Plugins', exact: true }).waitFor()
+    await capture('implementation-plugins')
     await page.getByRole('button', { name: 'Customize', exact: true }).click()
     await page.getByRole('region', { name: 'Customize', exact: true }).waitFor()
     await capture('implementation-customize')
@@ -61,7 +64,7 @@ it('preserves a draft through Settings, Teams, and Customize and fits a narrow v
     await settings.getByRole('button', { name: 'Appearance', exact: true }).click()
     await settings.getByRole('button', { name: 'System', exact: true }).scrollIntoViewIfNeeded()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-    for (const name of ['Workspace', 'Teams', 'Customize', 'Settings']) {
+    for (const name of ['Workspace', 'Teams', 'Plugins', 'Customize', 'Settings']) {
       const box = await page.getByRole('button', { name, exact: true }).boundingBox()
       expect(box).not.toBeNull()
       expect(box!.x).toBeGreaterThanOrEqual(0)

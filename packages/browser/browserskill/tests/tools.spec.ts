@@ -164,7 +164,7 @@ describe('native BrowserSkill tools', () => {
       h.runtime.startSession.mockResolvedValue({ ok: false, reason: 'not-ready', detail: 'platform-dependent diagnostic' })
       expect(await h.call('browser_session', { action: 'start' })).toMatchObject({ isError: false, value: {
         ok: false, reason: 'not-ready',
-        detail: 'The browser is not ready. Ask the user to open Settings → BrowserSkill.',
+        detail: 'The browser is not ready. Ask the user to open Plugins → BrowserSkill.',
       } })
     } finally { await h.dispose() }
   })

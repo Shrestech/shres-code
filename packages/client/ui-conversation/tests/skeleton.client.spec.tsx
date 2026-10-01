@@ -18,6 +18,7 @@ import type { ClientContext } from '@shres-code/shres-code-client-runtime/client
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { Modal } from '@shres-code/shres-code-client-ui-primitives'
+import { createReveal } from '../src/client/inspect.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en } from '../src/client/locales.ts'
@@ -27,9 +28,9 @@ import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
-  ComposerBarOwnerProps,
+  ComposerBarOwnerProps, ConvViewOwnerProps,
 } from '../src/client/contract/slots.ts'
-import type { ViewTab } from '../src/client/contract/views.ts'
+import type { ChatStoreState, ViewTab } from '../src/client/contract/views.ts'
 
 /** Machine-backed wiring over a sink spy. */
 function fakeWiring() {
@@ -175,6 +176,8 @@ function mount(
   }
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
+  /** Owner share handed to the rendered view, per render, keyed by view id. */
+  const viewOwners: { view: string; owner: ConvViewOwnerProps }[] = []
   let pickerOwner: unknown
   const renderSlot = ((key: string, owner: object, opts?: { only?: string }) => {
     slotCalls.push(key)
@@ -225,6 +228,8 @@ function mount(
           views={views}
           releaseSessionImages={vi.fn()}
           bindDraftMirror={write => wiring.bindMirror(write)}
+          reveal={createReveal(chat.actions)}
+          canReveal={view => viewTabs.some(tab => tab.id === view)}
         />
       )
     }
@@ -264,6 +269,9 @@ function mount(
         />
       )
     }
+    if (key === 'conversation.view' && opts?.only !== undefined) {
+      viewOwners.push({ view: opts.only, owner })
+    }
     return <div data-testid={`view-${opts?.only ?? key}`} />
   }) as ConversationRootProps['renderSlot']
   let chainOwner: unknown
@@ -301,6 +309,12 @@ function mount(
     view, chat, sink, retargetWorkspace, session, sessions, slotCalls, seatOwners, open,
     pickerOwner: () => pickerOwner,
     chainOwner: () => chainOwner,
+    /** The owner share the given view received on its latest render. */
+    lastViewOwner: (id: string): ConvViewOwnerProps => {
+      const latest = viewOwners.findLast(entry => entry.view === id)
+      if (latest === undefined) throw new Error(`view ${id} never rendered`)
+      return latest.owner
+    },
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
 }
@@ -495,6 +509,27 @@ describe('ConversationRoot resident composer', () => {
     act(() => { b.chat.actions.setView('trajectory') })
     expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
+  })
+
+  it('shows Chat for an unlisted selected view without writing the store, and the view again when it returns', () => {
+    const viewTabs: ViewTab[] = [
+      { id: 'chat', label: 'Chat' },
+      { id: 'trajectory', label: 'Trajectory' },
+      { id: 'routing', label: 'Routing' },
+    ]
+    const b = mount(conversationSnapshot(), undefined, undefined, { viewTabs })
+    act(() => { b.chat.actions.setView('routing') })
+    expect(b.view.getByTestId('view-routing')).toBeTruthy()
+
+    // The view's owner unlisted it (its host capability went away).
+    viewTabs.pop()
+    b.rerender()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.chat.store.getSnapshot().view).toBe('routing')
+
+    viewTabs.push({ id: 'routing', label: 'Routing' })
+    b.rerender()
+    expect(b.view.getByTestId('view-routing')).toBeTruthy()
   })
 
   it('keeps the Chat fallback selected by id when a view is inserted before it', async () => {
@@ -700,5 +735,182 @@ describe('Activity trigger running-subagent count', () => {
 
     expect(b.view.queryByText(/subagent running/)).toBeNull()
     expect(b.view.getByRole('button', { name: 'Activity' }).getAttribute('aria-describedby')).toBeNull()
+  })
+})
+
+describe('cross-view inspect handoff', () => {
+  const CHAT_KEY = 'shres.conversation.chat'
+
+  it('delivers a pending request only to the view it addresses, and the ack clears it', () => {
+    const b = mount(conversationSnapshot())
+    const request = { view: 'trajectory', target: { kind: 'call', callId: 'c1' } } as const
+    act(() => { b.chat.actions.setInspect(request) })
+    // Chat is active: it receives nothing, and the request waits in the store.
+    expect(b.lastViewOwner('chat').inspect).toBeNull()
+    expect(b.chat.store.getSnapshot().inspect).toEqual(request)
+
+    act(() => { b.chat.actions.setView('trajectory') })
+    const owner = b.lastViewOwner('trajectory')
+    expect(owner.inspect).toEqual(request)
+    act(() => { owner.onInspectDone?.() })
+    expect(b.chat.store.getSnapshot().inspect).toBeNull()
+    expect(b.lastViewOwner('trajectory').inspect).toBeNull()
+  })
+
+  it('hands views reveal and canReveal; reveal selects the addressed view and closes Activity', () => {
+    const b = mount(conversationSnapshot())
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    expect(b.view.getByRole('dialog', { name: 'Inspect this session' })).toBeTruthy()
+    const chatOwner = b.lastViewOwner('chat')
+    expect(chatOwner.canReveal?.('trajectory')).toBe(true)
+    expect(chatOwner.canReveal?.('routing')).toBe(false)
+
+    const request = { view: 'trajectory', target: { kind: 'event', seq: 4 } } as const
+    act(() => { chatOwner.reveal?.(request) })
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
+    expect(b.lastViewOwner('trajectory').inspect).toEqual(request)
+  })
+
+  it('reads a persisted legacy { callId } request as a Trajectory call target', () => {
+    localStorage.setItem(CHAT_KEY, JSON.stringify({
+      selection: null, draft: '', view: 'trajectory', inspect: { callId: 'c1' },
+    }))
+    const b = mount(conversationSnapshot())
+    expect(b.lastViewOwner('trajectory').inspect).toEqual({
+      view: 'trajectory', target: { kind: 'call', callId: 'c1' },
+    })
+  })
+
+  it('reads a malformed persisted request as none', () => {
+    localStorage.setItem(CHAT_KEY, JSON.stringify({
+      selection: null, draft: '', view: 'trajectory', inspect: { view: 'trajectory', target: { kind: 'call' } },
+    }))
+    const b = mount(conversationSnapshot())
+    expect(b.lastViewOwner('trajectory').inspect).toBeNull()
+  })
+
+  it('moves no focus into Activity after a reload, while a user open still does', () => {
+    // A snapshot a build before the transient field wrote, with the popover open.
+    localStorage.setItem(CHAT_KEY, JSON.stringify({
+      selection: null, draft: '', view: null, inspect: null, activityOpen: true,
+    }))
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+    const b = mount(conversationSnapshot())
+    expect(b.chat.store.getSnapshot().activityOpen).toBe(false)
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    // Composer focus may land afterwards, so assert on every focus call, not the final element.
+    const panel = b.view.container.querySelector('#shres-session-activity')
+    expect(focus.mock.contexts.some(element => panel?.contains(element as Node) === true)).toBe(false)
+    focus.mockRestore()
+
+    // A user open still moves focus into the panel.
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    expect(panel?.contains(document.activeElement)).toBe(true)
+  })
+
+  it('keeps Activity open on a pointer press inside it and closes it on one outside', () => {
+    const b = mount(conversationSnapshot())
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    expect(b.chat.store.getSnapshot().activityOpen).toBe(true)
+    fireEvent.pointerDown(b.view.getByRole('dialog', { name: 'Inspect this session' }))
+    expect(b.chat.store.getSnapshot().activityOpen).toBe(true)
+    fireEvent.pointerDown(document.body)
+    expect(b.chat.store.getSnapshot().activityOpen).toBe(false)
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+  })
+})
+
+describe('Activity open state across a reload and a session switch', () => {
+  const CHAT_KEY = 'shres.conversation.chat'
+  type ChatInstance = ReturnType<ReturnType<typeof createChatStore>['create']>
+
+  /**
+   * The header alone, keyed by session as the runtime's session-scoped slots
+   * remount it, recording the chat store's open state each render reads.
+   */
+  function header(sessionId: SessionId, chat: ChatInstance, reads: boolean[] = []) {
+    const session = createSnapshotStore<ConversationSnapshot>(conversationSnapshot({ sessionId }))
+    const sessions = createSnapshotStore<SessionListState>({
+      ids: [sessionId], byId: { [sessionId]: row(sessionId) }, current: sessionId,
+      phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    })
+    const workspaces = createSnapshotStore<WorkspaceListState>(workspaceState([workspace('one')]))
+    const { wiring } = fakeWiring()
+    const selectChat = bindSnapshotSelector(chat)
+    const useStore = (<U,>(select: (state: ChatStoreState) => U): U => {
+      reads.push(chat.getSnapshot().activityOpen)
+      return selectChat(select)
+    }) as typeof selectChat
+    return (
+      <ConversationSessionHeader
+        key={sessionId}
+        sessionId={sessionId}
+        SessionProvider={({ children }) => children(sessionId)}
+        useSession={bindSnapshotSelector(session)}
+        useSessions={bindSnapshotSelector(sessions)}
+        useWorkspaces={bindSnapshotSelector(workspaces)}
+        useProjection={(() => undefined)}
+        useInput={bindSnapshotSelector(wiring.state)}
+        inputActions={wiring.actions}
+        useStore={useStore}
+        actions={chat.actions}
+        renderSlot={(() => null) as never}
+        views={{ list: () => [{ id: 'chat', label: 'Chat' }], subscribe: () => () => {}, version: () => 1 }}
+        open={vi.fn()}
+        t={t}
+      />
+    )
+  }
+
+  it('renders a reloaded session\'s header closed on its first render, with nothing closing it at mount', () => {
+    // What an open popover left in storage before the field was transient.
+    localStorage.setItem(`${CHAT_KEY}.s-reload`, JSON.stringify({
+      selection: null, draft: 'kept', view: null, inspect: null, activityOpen: true,
+    }))
+    const chat = createChatStore().create('s-reload')
+    const setActivityOpen = vi.spyOn(chat.actions, 'setActivityOpen')
+    const reads: boolean[] = []
+    const view = render(header(sid('s-reload'), chat, reads))
+    expect(reads[0]).toBe(false)
+    expect(reads.every(open => !open)).toBe(true)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('#shres-session-activity')?.hasAttribute('hidden')).toBe(true)
+    expect(setActivityOpen).not.toHaveBeenCalled()
+    // The rest of the stored snapshot is restored.
+    expect(chat.getSnapshot().draft).toBe('kept')
+  })
+
+  it('closes Activity on a session switch, so returning to the session shows it closed', () => {
+    const first = createChatStore().create('s-first')
+    const second = createChatStore().create('s-second')
+    const view = render(header(sid('s-first'), first))
+    fireEvent.click(view.getByRole('button', { name: 'Activity' }))
+    expect(first.getSnapshot().activityOpen).toBe(true)
+
+    view.rerender(header(sid('s-second'), second))
+    expect(first.getSnapshot().activityOpen).toBe(false)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
+
+    const reads: boolean[] = []
+    view.rerender(header(sid('s-first'), first, reads))
+    expect(reads[0]).toBe(false)
+    expect(view.getByRole('button', { name: 'Activity' }).getAttribute('aria-expanded')).toBe('false')
+  })
+})
+
+describe('Session breadcrumbs', () => {
+  it('names the session by id while the list has no row for it', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, { omitSummaryRow: true })
+    expect(b.view.getByRole('navigation', { name: t('session.hierarchy') }).textContent).toBe('s1')
+  })
+
+  it('stops the lineage walk at a subagent cycle', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      summaryOrigin: 'subagent',
+      descendants: [row('root', { displayTitle: 'Root', origin: 'subagent', parentId: SID })],
+    })
+    const crumbs = within(b.view.getByRole('navigation', { name: t('session.hierarchy') }))
+    expect(crumbs.getAllByRole('button').map(button => button.textContent)).toEqual(['Root', 'Child'])
   })
 })

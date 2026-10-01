@@ -1,0 +1,22 @@
+# Settings › Model routing's workspace overview needs the judgment dispatcher
+# (the page registers while its engines Remote is served), the model router
+# (modelRouting.stats), and the workspace registry the shipped web bundle
+# already composes. Keyless: TypeSafe names a credential reference nothing
+# stores, and the router starts off, so no turn consults.
+- insert:
+    - id: judgment-dispatch
+      name: '@shres-code/shres-code-judgment-dispatch'
+      config:
+        defaultEngine: typesafe
+    - id: judgment-typesafe
+      name: '@shres-code/shres-code-judgment-typesafe'
+      config:
+        apiKeyRef: SHRES_E2E_ABSENT_TYPESAFE_KEY
+    - id: model-router
+      name: '@shres-code/shres-code-model-router'
+      config:
+        initialMode: 'off'
+        downgradeThreshold: 0.8
+        downgradeMargin: 0.1
+        routeInstructions: Pick the cheapest route that can finish this turn.
+        difficultyInstructions: Rate how much reasoning this turn needs.

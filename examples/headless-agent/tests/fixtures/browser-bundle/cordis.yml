@@ -1,0 +1,6 @@
+# Browser bundle selection fixture: the base profile stays live while the
+# optional BrowserSkill rows are reconciled by the plugin manager.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ../../../cordis.yml

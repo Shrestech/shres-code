@@ -287,8 +287,11 @@
   min-width: 0;
 }
 
-/* Keep mode and action controls visually separate without pill containers. */
+/* Keep mode and action controls visually separate without pill containers.
+   The leading group keeps its width, so a long trailing item can never slide
+   under the access and plan controls. */
 .tools {
+  flex: none;
   gap: 10px;
 }
 
@@ -296,8 +299,11 @@
   gap: 8px;
 }
 
+/* The trailing group gives up width when the row runs short: text items with
+   min-width 0 (the routing chip's idle and error text first, then the model
+   label) truncate with an ellipsis while fixed controls keep their size. */
 .trailing {
-  flex: none;
+  flex: 0 1 auto;
   gap: 8px;
 }
 

@@ -34,7 +34,7 @@ Writers pass `{ ignorable: true }`. A build without this plugin may skip the eve
 
 ## Roster model binding
 
-A teammate's `active` `team/member` snapshot records `agentProvider` / `agentModel`, the LLM route returned by `ctx.subagents.startContinuable()` and persisted in the child's subagent descriptor; recovery of a leftover provisioning row copies the same fields from that descriptor. `provider` on the snapshot and on roster rows is the subagent spawn provider, such as `spawn`. `listMembers()` reports each row's own route as `agentProvider` / `model`: a loaded Lead reads its latest logged request header, else the live default-model selection, else its creation options; a loaded teammate reads its latest logged request header, else its creation options; an unloaded teammate reads its snapshot; an `unstarted` name reads the current template binding. A started teammate never adopts a later template change, and a row without a known route omits the model instead of showing the Lead's. A `/model` switch appears after that Agent's next request.
+A teammate's `active` `team/member` snapshot records `agentProvider` / `agentModel`, the LLM route returned by `ctx.subagents.startContinuable()` and persisted in the child's subagent descriptor; recovery of a leftover provisioning row copies the same fields from that descriptor. `provider` on the snapshot and on roster rows is the subagent spawn provider, such as `spawn`. `listMembers()` reports each row's own route as `agentProvider` / `model`: a loaded Lead reads its manual selection (its explicit `/model` selection, else the manual base a composed router reports beneath a routed request header, else its latest logged request header), else the live default-model selection, else its creation options, so a held downgrade never reads as the Lead's model; a loaded teammate reads its latest logged request header, else its creation options; an unloaded teammate reads its snapshot; an `unstarted` name reads the current template binding. A started teammate never adopts a later template change, and a row without a known route omits the model instead of showing the Lead's. A teammate's `/model` switch appears after its next request.
 
 ## Durability
 
@@ -51,6 +51,10 @@ A delivered peer message is an ordinary `user/message` in the TARGET session. It
 `{ kind: 'team-message', form: 'relay', teamId, messageId, senderSessionId, senderName }`
 
 Mailbox bookkeeping reconstructs from the Lead log; model-visible content reconstructs from the target's own `user/message`. This package declares the source; it does not write target messages.
+
+## Cache discipline
+
+Seats share one provider key, so they share its prompt cache too: batched review rounds — one round of findings per teammate — reuse the prefix the previous round warmed, while sub-minute Lead-teammate alternation pays a fresh prefill for nearly every exchange. Long-lived seat sessions are the other half of the discipline, because a session that keeps growing stops reusing its cached prefix; compacting a seat that has run for hours keeps that prefix stable. Where a seat's route declares a vendor prompt cache key, its provider profile pins that seat's affinity (`promptCacheKey: session` on the seat's `llm-pi-ai` route profile), so one seat's turns stay in one cache domain.
 
 ## Model Experience
 

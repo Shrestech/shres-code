@@ -157,6 +157,9 @@ const INSTALLATION_OWNED_PROFILE_TUPLES: Record<string, readonly string[]> = {
 /** The bundle list a `shres plugin` init uses for a name with no shipped template. */
 export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@shres-code/shres-code-base']
 
+/** Installation-owned bundles offered for explicit selection, outside every default template. */
+export const OPTIONAL_BUNDLES: readonly string[] = ['@shres-code/shres-code-browser-bundle']
+
 const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this shres profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; \`!!js\` expressions allowed).

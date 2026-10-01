@@ -12,6 +12,7 @@ import type {
   TypertRemoteNamespace,
 } from '@shres-code/shres-code-typert-protocol'
 import TypertRegistry from '@shres-code/shres-code-typert-registry'
+import { TYPERT_RESERVED_REMOTE_METHODS } from '@shres-code/shres-code-typert-protocol'
 import type { ClientRemote } from '../src/client/index.ts'
 import { apply, inject } from '../src/client/index.ts'
 
@@ -337,6 +338,25 @@ describe('Client Typert API', () => {
       descriptors: [{ ...directDescriptor(), namespace: '$mount' }],
     })).rejects.toThrow('conflicts with the Remote service')
     expect(ctx.typert.remotes.list()).toEqual([])
+  })
+
+  it('refuses exactly the method names typert-protocol reserves for the namespace service', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const named = (method: string): InvocationDescriptor => ({ ...maybeDescriptor(), id: `@fixture/probe#probe/${method}`, method })
+    await ctx.remote.$mount({ package: '@fixture/member', descriptors: [named('maybe')] })
+    const service = ctx.get('remote.probe') as object
+    const members = new Set(Object.getOwnPropertyNames(service))
+    let prototype = Object.getPrototypeOf(service) as object | null
+    while (prototype !== null) {
+      for (const name of Object.getOwnPropertyNames(prototype)) members.add(name)
+      prototype = Object.getPrototypeOf(prototype) as object | null
+    }
+    members.delete('maybe')
+    expect([...members].sort()).toEqual([...TYPERT_RESERVED_REMOTE_METHODS].sort())
+    for (const method of TYPERT_RESERVED_REMOTE_METHODS) {
+      await expect(ctx.remote.$mount({ package: `@fixture/reserved-${method}`, descriptors: [named(method)] }), method)
+        .rejects.toThrow('conflicts with its namespace service')
+    }
   })
 
   it('rejects duplicate, live, scoped-service, and Context namespace collisions', async () => {

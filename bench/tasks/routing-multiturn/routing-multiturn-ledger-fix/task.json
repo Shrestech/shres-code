@@ -1,0 +1,13 @@
+{
+  "taskId": "routing-multiturn-ledger-fix",
+  "stratum": "moderate",
+  "description": "Three scripted turns: fix a balance bug, add a hold entry kind, then extend the report the tests pin.",
+  "turns": [
+    "The ledger in src/ledger.js computes running balances, but balance() dispatches on the amount's sign instead of the entry's kind, so a withdrawal of 40 increases the balance. Fix src/ledger.js to honor the entry kind, keeping a 0-amount withdrawal a no-op, and make `node --test` pass. Do not modify the test file.",
+    "Second request: users can now place a hold on funds. Add a `hold` entry kind in src/ledger.js: a hold reduces the available balance computed by `availableBalance(entries)` but is not itself a transaction. Extend test/ledger.test.js with at least two cases for holds and make the suite pass.",
+    "Third request: the CLI in src/report.js prints a summary line per account. Include the held amount in that summary as ` (held: N)` only when the held amount is non-zero. Update the report test in test/ledger.test.js to pin the new format and make the whole suite pass."
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 420000,
+  "maxTurns": 40
+}

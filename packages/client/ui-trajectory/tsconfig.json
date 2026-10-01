@@ -39,6 +39,12 @@
       "path": "../../jspace/jspace"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/model-router"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

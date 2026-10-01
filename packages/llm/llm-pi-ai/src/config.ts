@@ -80,6 +80,20 @@ export interface PiAiEndpointVariant {
   hint?: string
 }
 
+/**
+ * How one route's requests identify their prompt cache. `session` sends each
+ * request's session id as the vendor's cache key, so every turn of one session
+ * stays in one cache domain; `off` sends nothing.
+ */
+export type PiAiPromptCacheKey = 'session' | 'off'
+
+/**
+ * Whether a route's provider reports prompt-cache counts on every call.
+ * `reported`: usage carries both cache counts, zeros included. `unreported`:
+ * usage carries neither, and `inputTokens` is the whole prompt.
+ */
+export type PiAiCacheUsage = 'reported' | 'unreported'
+
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
   /** Credential reference (environment-variable name) resolved per request through `ctx.credentials`. */
@@ -153,6 +167,17 @@ export interface PiAiProviderProfile {
    * to answer instead.
    */
   defaultInput?: PiAiModality[]
+  /**
+   * Whether this route's requests carry the vendor's prompt cache key, with
+   * the request's session id as its value (default `off`).
+   *
+   * A key is sent only where the exact model's wire protocol declares such a
+   * field (`PROMPT_CACHE_KEY_FIELDS`), and only to a request the loop stamped
+   * with a session id. A profile whose protocol has no field sends nothing —
+   * not an error, because what a vendor spells as a cache key is a property of
+   * its wire format rather than of the configuration.
+   */
+  promptCacheKey?: PiAiPromptCacheKey
   /** Provider request headers; Harness attribution wins reserved names. */
   headers?: Record<string, string>
   /** Provider-neutral pi-ai reasoning level. */
@@ -161,6 +186,13 @@ export interface PiAiProviderProfile {
   thinkingBudgets?: ThinkingBudgets
   /** Prompt-cache retention preference. */
   cacheRetention?: CacheRetention
+  /**
+   * Whether this route's provider reports prompt-cache counts on every call.
+   * pi-ai reports 0 both for a cache miss and for a response that carried no
+   * cache counts, so only the route can say which a 0 means. Omission resolves
+   * per model from its protocol through {@link resolveCacheUsage}.
+   */
+  cacheUsage?: PiAiCacheUsage
   /** Streaming transport preference. */
   transport?: Transport
   /** HTTP/provider SDK timeout in milliseconds. */
@@ -180,6 +212,8 @@ export interface ResolvedPiAiProviderProfile
   extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName' | 'hostedTools'> {
   /** Harness route key and the `Models` collection key (the configuration dict key). */
   provider: string
+  /** Resolved prompt-cache-key policy; `off` unless the profile asked for `session`. */
+  promptCacheKey: PiAiPromptCacheKey
   /** Resolved display name for selectors and configuration surfaces. */
   displayName: string
   /** Validated credential reference, when one is configured. */
@@ -302,6 +336,8 @@ const profile = z.object({
   reasoning: z.union(THINKING_LEVELS),
   thinkingBudgets,
   cacheRetention: z.union(['none', 'short', 'long']),
+  promptCacheKey: z.union(['session', 'off']).default('off'),
+  cacheUsage: z.union(['reported', 'unreported']),
   transport: z.union(['sse', 'websocket', 'websocket-cached', 'auto']),
   timeoutMs: z.natural(),
   websocketConnectTimeoutMs: z.natural(),
@@ -309,6 +345,35 @@ const profile = z.object({
   retryPolicy: RetryPolicySchema,
   enabled: z.boolean().default(true),
 })
+
+/**
+ * Protocols whose responses carry cache counts on every call. Anthropic
+ * Messages reports `cache_read_input_tokens` and `cache_creation_input_tokens`
+ * in every usage block, and the OpenAI Responses family reports cached and
+ * cache-write input under `input_tokens_details`. Every other protocol a catalog
+ * model can speak (chat completions, Gemini, Vertex, Bedrock, Mistral) includes
+ * cache counts only when its provider implements them, so a route on one of
+ * those declares `reported` only when its provider does.
+ */
+const REPORTING_PROTOCOLS: ReadonlySet<string> = new Set([
+  'anthropic-messages',
+  'openai-responses',
+  'azure-openai-responses',
+  'openai-codex-responses',
+])
+
+/**
+ * Resolve one request's cache-count reporting: the route's declaration, else
+ * `reported` for a {@link REPORTING_PROTOCOLS} model and `unreported` for any
+ * other, so an unproven protocol never presents a missing count as a miss.
+ * @param declared - the route's {@link PiAiProviderProfile.cacheUsage}, if set.
+ * @param api - the requested model's resolved wire protocol.
+ * @returns the reporting the request's usage is mapped under.
+ */
+export function resolveCacheUsage(declared: PiAiCacheUsage | undefined, api: string): PiAiCacheUsage {
+  if (declared !== undefined) return declared
+  return REPORTING_PROTOCOLS.has(api) ? 'reported' : 'unreported'
+}
 
 /** Runtime schema for {@link Config}. */
 export const Config: z<Config> = z.object({
@@ -374,6 +439,9 @@ export function resolveProfiles(
     if (source.displayName !== undefined && source.displayName.length === 0) {
       throw new Error(`llm-pi-ai: provider "${provider}" has an empty displayName`)
     }
+    // Programmatic construction bypasses the schema, so this resolve step states
+    // the default itself; the schema is what refuses an unknown policy.
+    const promptCacheKey = source.promptCacheKey ?? 'off'
     const streamIdleTimeoutMs = source.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS
     if (!Number.isFinite(streamIdleTimeoutMs)
       || streamIdleTimeoutMs <= 0
@@ -407,11 +475,19 @@ export function resolveProfiles(
       defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
       defaultMaxTokens: source.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
     })
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const {
+      apiKeyEnv,
+      retryPolicy,
+      models: _models,
+      displayName: _displayName,
+      promptCacheKey: _promptCacheKey,
+      ...rest
+    } = source
     resolved.set(provider, {
       ...rest,
       provider,
       displayName,
+      promptCacheKey,
       ...apiKeyEnv === undefined ? {} : { apiKeyEnv: credentialRef(apiKeyEnv) },
       streamIdleTimeoutMs,
       retryPolicy: resolveRetryPolicy(retryPolicy, `llm-pi-ai: provider "${provider}" retryPolicy`),

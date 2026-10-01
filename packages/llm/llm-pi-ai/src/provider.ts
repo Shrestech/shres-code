@@ -68,6 +68,24 @@ export const SILENT_OVERFLOW_PROTOCOLS: ReadonlySet<string> = new Set([
 ])
 
 /**
+ * The vendor request-body field each wire protocol declares for a prompt cache
+ * key, by protocol. A protocol absent from the table has no such field and
+ * therefore sends no key: what a vendor spells as a cache key is a property of
+ * its wire format, so the honest answer where none is known is to emit nothing
+ * rather than invent a spelling. `anthropic-messages` marks reusable prefix
+ * boundaries with `cache_control` blocks instead of a key, and providers with
+ * automatic prefix caching need no client signal at all.
+ *
+ * The table stays narrow for that reason: an entry belongs here only when the
+ * vendor's own wire format confirms the field. It is a protocol fact like the
+ * table above, not a deployment tunable — what a deployment decides is whether
+ * to send its requests' session id, through the profile's `promptCacheKey`.
+ */
+export const PROMPT_CACHE_KEY_FIELDS: Readonly<Record<string, string>> = {
+  'openai-completions': 'prompt_cache_key',
+}
+
+/**
  * Every wire protocol a configured route may name, most-reached first. The
  * order is the table's and therefore stable; a configuration surface offering
  * a choice presents the first as its default, which is why the protocol a

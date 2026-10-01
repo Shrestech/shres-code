@@ -39,6 +39,21 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
+ * @property {number | null} meanCacheHitShare - mean of the root-session `metrics.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a root cache-hit share (no usage record reported a
+ *   cache-read count): the pre-registered churn screen's input.
+ * @property {number | null} meanCacheUnreportedShare - mean of the root-session `metrics.cacheUnreportedShare`, rendered
+ *   beside `meanCacheHitShare` so unreported input is never read as a miss; null when no trial carried one.
+ * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
+ * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
+ * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.
+ * @property {number | null} meanKeptStrongShare - mean of per-trial keptStrongShare; null when no trial logged a decision.
+ * @property {number | null} meanDowngradedStreakLongest - mean longest downgraded run over the trials that logged a decision; null when none did.
+ * @property {number} totalDowngradedRuns - downgraded runs summed over the group's trials.
+ * @property {number | null} totalRoutingHintCount - routing hints summed over the trials that logged a decision; null when none did.
+ * @property {number} compactionVerificationTrials - success trials logging at least one compaction verification: the verification-adoption screen's input.
+ * @property {number | null} totalJevCompactionAcceptedBelowThreshold - below-threshold acceptances summed over the trials that logged a verification; null when none did.
+ * @property {number | null} totalJevSelectionDegraded - degraded selections summed over the trials that logged a selection; null when none did.
  */
 
 /**
@@ -78,6 +93,24 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
+ * @property {number | null} meanCacheHitShare - mean of the root-session `metrics.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a root cache-hit share (no usage record reported a
+ *   cache-read count): the pre-registered churn screen's input.
+ * @property {number | null} meanCacheUnreportedShare - mean of the root-session `metrics.cacheUnreportedShare`, rendered
+ *   beside `meanCacheHitShare` so unreported input is never read as a miss; null when no trial carried one.
+ * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
+ * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
+ * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.
+ * @property {number | null} meanKeptStrongShare - mean of per-trial keptStrongShare; null when no trial logged a decision.
+ * @property {number | null} meanDowngradedStreakLongest - mean longest downgraded run over the trials that logged a decision; null when none did.
+ * @property {number} totalDowngradedRuns - downgraded runs summed over the group's trials.
+ * @property {number | null} totalRoutingHintCount - routing hints summed over the trials that logged a decision; null when none did.
+ * @property {number} compactionVerificationTrials - success trials logging at least one compaction verification: the verification-adoption screen's input.
+ * @property {number | null} totalJevCompactionAcceptedBelowThreshold - below-threshold acceptances summed over the trials that logged a verification; null when none did.
+ * @property {number | null} totalJevSelectionDegraded - degraded selections summed over the trials that logged a selection; null when none did.
+ * @property {import('../runner/accounting.js').AccountingSummary | null} accounting - pooled priced accounting over the
+ *   arm's success trials: dollars and their upper bound, quota tokens, raw tokens by class, cache-hit and unreported
+ *   shares, judge calls and latency, and TTFT percentiles; null when no trial carries accounting.
  */
 
 /**
@@ -100,9 +133,70 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {ReportArmSummary[]} arms
  * @property {ReportComparison[]} comparisons - one entry per non-`off` arm present in the experiment.
  * @property {import('./trial.js').Trial[]} [trials] - every validated trial, embedded so the report's drill-down needs no fetch.
+ * @property {import('../report/verdicts.js').ReportVerdict[]} [verdicts] - the pre-registered Jev hypotheses, each evaluable with an interval or not-evaluable with its reason; every experiment gets the whole block.
  */
 
 const GRADES = ['improvement', 'regression', 'tradeoff', 'tie']
+
+/** Verdict statuses: a rule is either evaluated or declared not-evaluable. */
+const VERDICT_STATUSES = ['evaluable', 'not-evaluable']
+
+/** Outcomes of an evaluated verdict. */
+const VERDICT_OUTCOMES = ['pass', 'fail']
+
+/**
+ * Validate one pre-registered verdict and enforce its honesty invariant: an
+ * evaluable verdict carries an outcome, an interval, and no reason; a
+ * not-evaluable verdict carries a reason and no outcome — never a default pass
+ * and never a fail-by-default. Throws on the first violation.
+ * @param {unknown} value - candidate verdict.
+ * @param {string} path - error path prefix.
+ * @returns {void}
+ */
+function validateVerdict(value, path) {
+  const v = /** @type {Record<string, unknown>} */ (value)
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new Error(`${path} must be a record`)
+  for (const field of ['id', 'rule']) {
+    if (typeof v[field] !== 'string' || /** @type {string} */ (v[field]).length === 0) {
+      throw new Error(`${path}.${field} must be a non-empty string`)
+    }
+  }
+  if (!Array.isArray(v.arms) || v.arms.length === 0 || v.arms.some(arm => typeof arm !== 'string' || arm.length === 0)) {
+    throw new Error(`${path}.arms must be a non-empty string array`)
+  }
+  if (!VERDICT_STATUSES.includes(/** @type {string} */ (v.status))) {
+    throw new Error(`${path}.status must be evaluable|not-evaluable`)
+  }
+  if (!Number.isSafeInteger(v.trials) || /** @type {number} */ (v.trials) < 0) {
+    throw new Error(`${path}.trials must be a non-negative integer`)
+  }
+  if (typeof v.facts !== 'object' || v.facts === null || Array.isArray(v.facts)) {
+    throw new Error(`${path}.facts must be a record`)
+  }
+  if (v.status === 'evaluable') {
+    if (!VERDICT_OUTCOMES.includes(/** @type {string} */ (v.outcome))) {
+      throw new Error(`${path}.outcome must be pass|fail when the verdict is evaluable`)
+    }
+    if (v.reason !== null) throw new Error(`${path}.reason must be null when the verdict is evaluable`)
+    for (const field of ['observed', 'threshold']) {
+      if (typeof v[field] !== 'number' || !Number.isFinite(/** @type {number} */ (v[field]))) {
+        throw new Error(`${path}.${field} must be a finite number when the verdict is evaluable`)
+      }
+    }
+    const ci = v.ci95
+    if (!Array.isArray(ci) || ci.length !== 2 || ci.some(edge => typeof edge !== 'number' || !Number.isFinite(edge))) {
+      throw new Error(`${path}.ci95 must be a finite two-number interval when the verdict is evaluable`)
+    }
+    return
+  }
+  if (v.outcome !== null) throw new Error(`${path}.outcome must be null when the verdict is not evaluable`)
+  if (typeof v.reason !== 'string' || v.reason.length === 0) {
+    throw new Error(`${path}.reason must state why the verdict is not evaluable`)
+  }
+  for (const field of ['observed', 'threshold', 'ci95']) {
+    if (v[field] !== null) throw new Error(`${path}.${field} must be null when the verdict is not evaluable`)
+  }
+}
 
 /**
  * Validate one comparison record. Throws on the first violation.
@@ -158,4 +252,8 @@ export function validateReportData(value) {
   /** @type {unknown[]} */ (r.comparisons).forEach((comparison, index) => {
     validateComparison(comparison, `report.comparisons[${index}]`)
   })
+  if (r.verdicts !== undefined) {
+    if (!Array.isArray(r.verdicts)) throw new Error('report.verdicts must be an array when present')
+    r.verdicts.forEach((verdict, index) => validateVerdict(verdict, `report.verdicts[${index}]`))
+  }
 }

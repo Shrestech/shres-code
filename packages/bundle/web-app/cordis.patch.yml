@@ -16,7 +16,7 @@
 - id: system-prompt
   config:
     persona: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+      You are a coding agent. Your working directory is {{cwd}}.
 
 # TODO: Re-enable shared HMR for Web after its reload lifecycle is tested.
 - id: hmr
@@ -117,10 +117,6 @@
     - id: plugin-admin
       name: '@shres-code/shres-code-host-plugin-admin'
 
-    # Runtime downloads and the owned browser start only after local UI consent.
-    - id: browserskill
-      name: '@shres-code/shres-code-browserskill'
-
     - id: cordis-host-runner
       name: '@shres-code/shres-code-cordis-host-runner'
 
@@ -214,6 +210,9 @@
     - id: ui-settings-models
       name: '@shres-code/shres-code-client-ui-settings-models'
 
+    - id: ui-settings-model-routing
+      name: '@shres-code/shres-code-client-ui-settings-model-routing'
+
     - id: ui-settings-shield
       name: '@shres-code/shres-code-client-ui-settings-shield'
 
@@ -222,9 +221,6 @@
 
     - id: ui-settings-plugin-inventory
       name: '@shres-code/shres-code-client-ui-settings-plugin-inventory'
-
-    - id: ui-browserskill
-      name: '@shres-code/shres-code-client-ui-browserskill'
 
     - id: ui-conversation
       name: '@shres-code/shres-code-client-ui-conversation'
@@ -295,6 +291,12 @@
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@shres-code/shres-code-client-ui-model-selection'
+
+    # Model routing: the composer toggle over the modelRouting projection and
+    # the /route channel. A host composing no router registers no projection,
+    # and the seat renders nothing.
+    - id: ui-model-routing
+      name: '@shres-code/shres-code-client-ui-model-routing'
 
     - id: ui-permission
       name: '@shres-code/shres-code-client-ui-permission-presets'

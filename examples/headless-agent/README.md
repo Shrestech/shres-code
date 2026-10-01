@@ -13,7 +13,7 @@ pnpm shres --profile headless "fix the failing test in this workspace"
 
 The product command is [`shres --profile headless`](../../apps/cli/README.md): it accepts one nonblank task, creates and persists a fresh session, prints the final assistant text, and exits.
 
-Snapshot suites run this directory's configuration through [`tests/fixtures/headless-driver.ts`](tests/fixtures/headless-driver.ts), an unexported test-only process that emits canonical session events as JSONL before its result record. That stream is test infrastructure, not a supported CLI output format. Child sessions surface only through parent tool events and results.
+Snapshot suites run this directory's configuration through [`tests/fixtures/headless-driver.ts`](tests/fixtures/headless-driver.ts), an unexported test-only process that emits canonical session events as JSONL before its result record. That stream is test infrastructure, not a supported CLI output format. Child-route arms also persist each child's own session log (`child.expected.jsonl`): `model-router-subagent` pins a routed spawn (`subagent/descriptor.agentRouteRequestId` plus the candidate `request/header`) and a fork that never dispatches child-route (the fork's own first `request/header` after `seedLength` is the manual base; a seeded parent header at seq 9 is not that header); `model-router-subagent-shadow` keeps the child's header on the inherited model; `model-router-subagent-judge` records `child-judged` from the scripted engine; `model-router-subagent-guard` counts two unretryable candidate `QUOTA` failures then keeps the third child with `child-route-errors` (`SERVER` also counts after retries are exhausted; this arm uses `QUOTA` so the scripted count is exact).
 
 ## E2B POC overlay
 

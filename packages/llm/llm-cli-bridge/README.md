@@ -8,7 +8,7 @@ A route with `parseMode: 'stream-json'` streams while the CLI runs: the adapter 
 
 ## Honesty gate
 
-A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: true` throws `LlmError` `UNSUPPORTED_OPTION`. The flag opts a route in to serving a conversation loop through the CLI's own tools; `CUSTOM_ROUTE_TEMPLATE` defaults it to false, so an overlay must opt in, and a deployment that wants the route only for tool-free auxiliary calls leaves it false.
+A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: true` throws `LlmError` `UNSUPPORTED_OPTION`. The flag opts a route in to serving a conversation loop through the CLI's own tools; `CUSTOM_ROUTE_TEMPLATE` defaults it to false, so an overlay must opt in, and a deployment that wants the route only for tool-free auxiliary calls leaves it false. A stated `temperature` or `stop` also throws `UNSUPPORTED_OPTION`, because no CLI takes either; `resolveModel()` declares `acceptsTemperature: false` for every model, so a caller learns of the temperature refusal before its request.
 
 ## Model and effort
 
@@ -59,7 +59,7 @@ The external CLI sees one serialized prompt (system text, then `user` / `assista
 
 #### Token effect
 
-The child CLI pays for its own context. When the CLI reports usage, the adapter emits a `usage` chunk; otherwise the stream has none.
+The child CLI pays for its own context. When the CLI reports usage, the adapter emits a `usage` chunk carrying input, output, and reasoning counts; otherwise the stream has none. The adapter never reads a CLI's cache counts, so `cacheReadTokens` and `cacheWriteTokens` are always absent and `inputTokens` is whatever prompt count the CLI reported.
 
 #### KV Cache effect
 

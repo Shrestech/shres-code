@@ -371,14 +371,16 @@ describe('Web session model selection', () => {
       model: 'private-preview',
       reasoningEffort: 'max',
     })
+    expect(agent.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([{ provider: 'deepseek-official', model: 'private-preview', reasoningEffort: 'max' }])
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 0, signal }, () => Promise.resolve(seed),
+      'agent/request', { turn: 1, step: 0, content: { messages: [], system: '', tools: [] }, signal }, () => Promise.resolve(seed),
     )).resolves.toMatchObject({ provider: 'deepseek-official', model: 'deepseek-chat' })
 
     expect((await ctx.systemPrompt.assemble()).variables)
       .toMatchObject({ provider: 'deepseek-official', model: 'private-preview' })
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 1, signal }, () => Promise.resolve(seed),
+      'agent/request', { turn: 1, step: 1, content: { messages: [], system: '', tools: [] }, signal }, () => Promise.resolve(seed),
     )).resolves.toMatchObject({
       provider: 'deepseek-official',
       model: 'private-preview',

@@ -15,7 +15,7 @@ import type { ShresWindow } from './manifest.ts'
 export { ClientModuleSystem } from './system.ts'
 export { parseBootManifest } from './manifest.ts'
 export type {
-  BootManifest, BootModuleRow, BootPluginRow, ClientModuleLoader, ClientModuleRecord,
+  BootManifest, BootModuleRow, BootPluginRow, ClientGraphUpdate, ClientModuleLoader, ClientModuleRecord,
   ClientModuleSystemOptions, ClientPluginHandoff, ShresWindow, WebBootEntry, WebBootGraph,
 } from './manifest.ts'
 

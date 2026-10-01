@@ -1,0 +1,61 @@
+{
+  "name": "@shres-code/shres-code-judgment-guardrails",
+  "description": "Judgment guardrails observer: one capped state per checked tool call, two typed questions through ctx.judgment, and one log-only guard decision — observer only, no enforcement path",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/llm/judgment-guardrails"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/config-*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@shres-code/shres-code-settings": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-settings-file": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  }
+}

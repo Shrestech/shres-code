@@ -4,6 +4,9 @@ import type {
   RequestPromptChange, RequestView, RunningToolCall, ToolCallBlock,
 } from '@shres-code/shres-code-client-runtime/client'
 import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
+// Type-only: the model-routing vocabulary and the SessionEventMap merge for
+// model-routing/decision, from the router's client namespace.
+import type { ModelRoutingDecision } from '@shres-code/shres-code-model-router/client'
 import type { TrajectoryJSpaceBadge } from './trajectory-record.ts'
 
 /** Request-header facts retained by the Trajectory target. */
@@ -56,6 +59,19 @@ export type TrajectoryContribution =
     readonly seq: number
   }
   | {
+    readonly kind: 'routing'
+    readonly decision: TrajectoryRoutingDecision
+  }
+  | {
+    readonly kind: 'routing-child'
+    readonly seq: number
+    readonly time: number
+    readonly outcome: 'routed' | 'kept'
+    readonly reason: string
+    readonly model?: string
+    readonly shadow?: true
+  }
+  | {
     readonly kind: 'jspace'
     readonly badge: TrajectoryJSpaceBadge
   }
@@ -64,6 +80,21 @@ export type TrajectoryContribution =
 export interface TrajectoryShieldDecision extends ShieldDecision {
   /** Session-event seq that produced this verdict. */
   readonly seq: number
+}
+
+/**
+ * One logged `model-routing/decision` as the Trajectory fold reads it: the
+ * decision's own fields plus the seq and Location the event landed on.
+ */
+export type TrajectoryRoutingDecision = ModelRoutingDecision & {
+  /** Session-event seq that logged the decision. */
+  readonly seq: number
+  /** Unix epoch milliseconds from the logging event. */
+  readonly time: number
+  /** Enclosing turn, when the event resolved to one. */
+  readonly turn?: number
+  /** Enclosing step, when the decision resolved inside one. */
+  readonly step?: number
 }
 
 /** Target envelope consumed by the Trajectory snapshot builder. */
@@ -85,6 +116,10 @@ export interface TrajectorySnapshot {
   readonly decisions: readonly TrajectoryShieldDecision[]
   /** Folded J-Space badges attached to existing Trajectory rows only. */
   readonly jspace: readonly TrajectoryJSpaceBadge[]
+  /** Folded routing decisions, each rendering as its own row at its seq. */
+  readonly routing: readonly TrajectoryRoutingDecision[]
+  /** Folded child-route decisions, each a CHILD-ROUTE row at its seq. */
+  readonly routingChildren: readonly Extract<TrajectoryContribution, { kind: 'routing-child' }>[]
 }
 
 declare module '@shres-code/shres-code-client-runtime/client' {

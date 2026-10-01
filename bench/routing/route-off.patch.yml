@@ -1,0 +1,22 @@
+# Pinned treatment rows for the `route-off` routing arm — the routing control.
+#
+# This file is the source of the arm's rows: `ArmEntry.pinnedOverlay` names it and
+# bench/runner/arms.js reads it and emits its content verbatim into the arm's
+# per-trial `--patch` overlay. Nothing restates these values, so the pinned
+# posture and the applied composition cannot drift. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# Both routing arms pin the manual route to the strong model in the tier-overlay
+# posture (`bench/tiers/*.patch.yml`): a `config` patch replaces the entry's whole
+# config, so `provider` and `model` are stated together. The router's
+# manual/default selection is the strong route and `candidates` is a downgrade
+# allowlist, so this pin is what makes a downgrade the only routable transition;
+# without it the profile default is already the candidate and every turn resolves
+# `candidate-equals-base`.
+#
+# This arm inserts neither the judgment engine nor the router: it is the
+# baseline `route-on` is priced against.
+- id: agent-default-model
+  config:
+    provider: "deepseek-official"
+    model: "deepseek-v4-pro"

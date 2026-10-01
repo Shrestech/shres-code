@@ -11,9 +11,11 @@ import { registerTrajectoryMessageDefinitions } from '../src/client/trajectory-m
 import { registerTrajectoryRequestHeaderDefinition } from '../src/client/trajectory-request-header-definition.ts'
 import { registerTrajectoryShieldDefinition } from '../src/client/trajectory-shield-definition.ts'
 import { registerTrajectoryJSpaceDefinition } from '../src/client/trajectory-jspace-definition.ts'
+import { registerTrajectoryRoutingDefinition } from '../src/client/trajectory-routing-definition.ts'
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
+import { trajectoryRequestRoute } from '../src/client/trajectory-routing.ts'
 
 const DEFINITIONS: ConversationNodeDefinition[] = []
 const registrationContext = {
@@ -31,6 +33,7 @@ registerTrajectoryAssistantDefinition(registrationContext)
 registerTrajectoryToolDefinition(registrationContext)
 registerTrajectoryShieldDefinition(registrationContext)
 registerTrajectoryJSpaceDefinition(registrationContext)
+registerTrajectoryRoutingDefinition(registrationContext)
 registerTrajectoryCompactionDefinitions(registrationContext)
 
 class TestEventDefinitions {
@@ -83,12 +86,36 @@ function snapshot(value: ConversationNodeAssembler): TrajectorySnapshot {
   return current
 }
 
-function assistantMessage(id: string, text: string) {
+function routingData(overrides: Record<string, unknown> = {}) {
+  return {
+    outcome: 'downgraded',
+    reason: 'gate-passed',
+    stateHash: 'd0157f83',
+    stateSeqs: [4],
+    selection: { candidateId: 'flash', provider: 'p', model: 'cheap' },
+    route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+    sticky: {
+      active: true,
+      routeErrorLimit: 2,
+      stepsElapsed: 0,
+      enteredTurn: 1,
+      entryBase: { provider: 'p', model: 'strong' },
+    },
+    ...overrides,
+  }
+}
+
+function assistantMessage(
+  id: string,
+  text: string,
+  provider = 'test',
+  model = 'test',
+) {
   return {
     id,
     role: 'assistant',
     content: [{ type: 'text', text }],
-    source: { kind: 'model', provider: 'test', model: 'test' },
+    source: { kind: 'model', provider, model },
   }
 }
 
@@ -380,6 +407,164 @@ describe('Trajectory conversation Definitions', () => {
     }).flatMap(turn => turn.groups.flatMap(group => group.cells))
     expect(cells.find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
     expect(cells.find(cell => cell.callId === 'c2')?.shield).toBeUndefined()
+  })
+
+  it('folds model-routing/decision into routing and not eventNodes', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'model-routing/decision', routingData()),
+      at(4, 'request/header', {
+        reason: 'initial',
+        header: { config: { provider: 'p', model: 'cheap' }, system: 's', tools: [] },
+      }),
+      at(5, 'step/end', { turn: 1, step: 1 }),
+    ]))
+
+    expect(current.routing).toMatchObject([{
+      seq: 3,
+      time: 1_700_000_000_003,
+      turn: 1,
+      step: 1,
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      sticky: { active: true, stepsElapsed: 0, enteredTurn: 1 },
+    }])
+    expect(current.eventNodes.map(node => node.kind)).not.toContain('routing')
+  })
+
+  it('folds model-routing/child-decision into a CHILD-ROUTE layout row', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'model-routing/child-decision', {
+        outcome: 'routed',
+        reason: 'child-policy',
+        routeRequestId: 'route-1',
+        childKind: 'subagent',
+        policyIndex: 0,
+        inherited: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        effortApplied: false,
+        promptChars: 8,
+      }),
+      at(4, 'step/end', { turn: 1, step: 1 }),
+    ]))
+    expect(current.routingChildren).toMatchObject([{
+      kind: 'routing-child',
+      seq: 3,
+      outcome: 'routed',
+      reason: 'child-policy',
+      model: 'deepseek-official/deepseek-v4-flash',
+    }])
+    const texts = deriveTrajectoryLayout({
+      nodes: current.eventNodes,
+      partial: null,
+      runningCalls: current.runningCalls,
+      routingChildren: current.routingChildren,
+    }).flatMap(turn => turn.groups.flatMap(group => group.cells.map(cell => cell.text)))
+    expect(texts).toContain('Subagent routed to deepseek-official/deepseek-v4-flash')
+
+    const definition = DEFINITIONS.find(entry => entry.kind === 'trajectory-routing')
+    expect(definition?.match({ type: 'turn/start', data: { turn: 1 } } as never)).toBeNull()
+    expect(() => definition?.start(
+      {} as never,
+      { event: { type: 'turn/start', data: { turn: 1 } } } as never,
+      {} as never,
+    )).toThrow('trajectory-routing-decision start requires model-routing/decision')
+
+    const data = { get: () => undefined }
+    const step = { turn: 2, step: 3, start: undefined, end: undefined, status: 'open' as const, data }
+    const turn = {
+      turn: 2, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+    }
+    const decisionEvent = {
+      type: 'model-routing/decision',
+      seq: 8,
+      time: 88,
+      data: routingData(),
+    }
+    expect(definition?.start(
+      {} as never,
+      { event: decisionEvent, location: { kind: 'step', turn, step } } as never,
+      {} as never,
+    )).toMatchObject({ seq: 8, time: 88, turn: 2, step: 3, outcome: 'downgraded' })
+    expect(definition?.start(
+      {} as never,
+      { event: decisionEvent, location: { kind: 'session' } } as never,
+      {} as never,
+    )).toEqual({ ...routingData(), seq: 8, time: 88 })
+    expect(definition?.update?.(
+      { state: { seq: 8 } } as never,
+      { event: decisionEvent } as never,
+    )).toEqual({ seq: 8 })
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-routing', id: '8', matches: [],
+      start: undefined, state: undefined, current: new Map(),
+    })).toBeNull()
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-routing', id: '8', matches: [],
+      start: { event: decisionEvent } as never, state: { seq: 8, time: 88 }, current: new Map(),
+    })).toMatchObject({
+      key: 'k',
+      target: 'trajectory',
+      anchorSeq: 8,
+      data: { kind: 'routing', decision: { seq: 8, time: 88 } },
+    })
+  })
+
+  it('associates routed requests from step-start anchors through the real definitions', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(3, 'step/start', { turn: 1, step: 1 }),
+      at(4, 'request/header', {
+        reason: 'initial',
+        header: { config: { provider: 'p', model: 'strong' }, system: 's', tools: [] },
+      }),
+      at(6, 'model-routing/decision', routingData()),
+      at(20, 'assistant/message', {
+        turn: 1,
+        step: 1,
+        message: assistantMessage('assistant-1', 'first', 'p', 'cheap'),
+      }),
+      at(21, 'step/end', { turn: 1, step: 1 }),
+      at(23, 'step/start', { turn: 1, step: 2 }),
+      at(25, 'model-routing/decision', routingData({
+        outcome: 'kept-strong',
+        reason: 'gate-failed',
+        sticky: { active: false, stepsElapsed: 0, brokenBy: 'gate-failed' },
+      })),
+      at(30, 'assistant/message', {
+        turn: 1,
+        step: 2,
+        message: assistantMessage('assistant-2', 'second', 'p', 'strong'),
+      }),
+      at(31, 'step/end', { turn: 1, step: 2 }),
+    ]))
+    const requests = current.requests.filter((request): request is Extract<typeof request, { purpose: 'assistant' }> =>
+      request.purpose === 'assistant')
+
+    expect(requests.map(request => request.startSeq)).toEqual([3, 23])
+    expect(current.routing.map(decision => ({ seq: decision.seq, step: decision.step })))
+      .toEqual([{ seq: 6, step: 1 }, { seq: 25, step: 2 }])
+    const first = requests[0]!
+    const second = requests[1]!
+    expect(trajectoryRequestRoute(
+      first.turn,
+      first.step,
+      first.startSeq,
+      first.provenance?.provider,
+      first.provenance?.model,
+      current.routing,
+    )).toEqual({ provider: 'p', model: 'cheap', routed: true })
+    expect(trajectoryRequestRoute(
+      second.turn,
+      second.step,
+      second.startSeq,
+      second.provenance?.provider,
+      second.provenance?.model,
+      current.routing,
+    )).toEqual({ provider: 'p', model: 'strong', routed: false })
   })
 
   it('folds jspace/card and jspace/closed into jspace and not eventNodes', () => {

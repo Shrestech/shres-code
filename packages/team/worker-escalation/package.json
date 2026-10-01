@@ -1,0 +1,80 @@
+{
+  "name": "@shres-code/shres-code-worker-escalation",
+  "description": "The Jev worker difficulty ladder: a pure trigger fold over a delegated worker's own log, a Lead-anchored worker digest, a report-blocked terminal, an observer judgment consult, and an ask-to-escalate to the human",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/team/worker-escalation"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/config-*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-progress-signals": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-user-questions": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@shres-code/shres-code-agent-team": {
+      "optional": true
+    },
+    "@shres-code/shres-code-jspace": {
+      "optional": true
+    },
+    "@shres-code/shres-code-settings": {
+      "optional": true
+    },
+    "@shres-code/shres-code-user-questions": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-judgment": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-progress-signals": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-settings-file": "workspace:^",
+    "@shres-code/shres-code-user-questions": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  }
+}

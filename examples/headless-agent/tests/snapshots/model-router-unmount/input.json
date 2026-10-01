@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Reply with exactly: ROUTED_OK"
+    },
+    {
+      "op": "prompt",
+      "text": "Continue after the router was removed."
+    }
+  ]
+}

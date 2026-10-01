@@ -22,15 +22,16 @@ import type {
   ConversationSnapshot, RequestView,
   SessionId, SessionListState, SnapshotStore, WorkspaceListState,
 } from '@shres-code/shres-code-client-runtime/client'
-import type { ConvViewProps, ViewTab } from '@shres-code/shres-code-client-ui-conversation/client'
+import type { ConvViewOwnerProps, ConvViewProps, ViewTab } from '@shres-code/shres-code-client-ui-conversation/client'
 import {
   ConversationSession, ConversationSessionHeader,
   type ConversationSessionHeaderProps, type ConversationSessionProps,
 } from '@shres-code/shres-code-client-ui-conversation/src/client/skeleton/ConversationSession.tsx'
 import { createChatStore } from '@shres-code/shres-code-client-ui-conversation/src/client/stores.ts'
+import { createReveal } from '@shres-code/shres-code-client-ui-conversation/src/client/inspect.ts'
 import { en as conversationEn } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
 import { apply as localeApply, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
-import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import type { LocaleKeysOf } from '@shres-code/shres-code-client-ui-slots'
 import { en, type TrajectoryKey } from '../src/client/locales.ts'
 import { apply, inject } from '@shres-code/shres-code-client-ui-trajectory/client'
@@ -48,6 +49,8 @@ const SID = 's1' as SessionId
 const sessionSnapshots = new WeakMap<SlotRegistry, SnapshotStore<ConversationSnapshot>>()
 const tConversation: ConversationSessionHeaderProps['t'] =
   key => (conversationEn as Record<string, string>)[key] ?? key
+
+const dictionary = makeTranslate(en)
 
 afterEach(cleanup)
 // The chat store persists under its declared key; clear so one case's active
@@ -86,6 +89,8 @@ function historySnapshot(
     runningCalls: [],
     decisions: [],
     jspace: [],
+    routing: [],
+    routingChildren: [],
     ...inspection,
   }
   return {
@@ -235,7 +240,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
   // Minimal outlet twin: resolve the ring entry by the `only` filter and
   // render it with the session standard kit (what SlotOutlet does for a
   // list-kind session slot, minus machinery).
-  const renderSlot = ((key: string, _owner: object, opts?: { only?: string }): ReactNode => {
+  const renderSlot = ((key: string, owner: object, opts?: { only?: string }): ReactNode => {
     const entry = slots.entries('conversation.view').find(e => e.options.id === opts?.only)
     if (entry === undefined) return null
     const View = entry.component as FC<ConvViewProps>
@@ -257,12 +262,13 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     return (
       <View
         {...injectedProps}
+        {...owner as ConvViewOwnerProps}
         {...({ sessionId: SID, useSession, useSessions: emptySessions(), useWorkspaces: emptyWorkspaces() } as unknown as ConvViewProps)}
         key={key}
       />
     )
   }) as unknown as ConversationSessionProps['renderSlot']
-  return render(
+  const result = render(
     <>
       <ConversationSessionHeader
         sessionId={SID}
@@ -295,9 +301,12 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useInput={useInput}
         inputActions={inputActions}
         bindDraftMirror={() => () => {}}
+        reveal={createReveal(chat.actions)}
+        canReveal={view => tabsOf(slots).some(tab => tab.id === view)}
       />
     </>,
   )
+  return Object.assign(result, { chat })
 }
 
 /** Open the session-local Activity inspector and select one registered view. */
@@ -667,6 +676,41 @@ describe('timeline projection', () => {
       expect(tooltip?.textContent).toContain('Total 2,000 ms')
       expect(tooltip?.textContent).toContain('TTFT 500 ms')
       expect(tooltip?.textContent).toContain('Decoding 1,500 ms')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('labels a routing span as ROUTING in the overview', () => {
+    vi.useFakeTimers()
+    try {
+      const view = render(
+        <TrajectoryTimeline
+          turns={[{
+            turn: 1,
+            groups: [{
+              title: 'Step 1',
+              cells: [{
+                index: 1,
+                kind: 'routing',
+                text: 'downgraded · gate-passed',
+                startedAt: 1_000,
+                timeSeconds: 0,
+              }],
+            }],
+          }]}
+          mode="sequence"
+          range={null}
+          onRangeChange={vi.fn()}
+        />,
+      )
+      const span = view.container.querySelector<HTMLElement>('[data-timeline-span="routing"]')
+
+      expect(span).toBeTruthy()
+      fireEvent.mouseEnter(span as HTMLElement)
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(view.container.querySelector<HTMLElement>('[role="tooltip"]')?.textContent)
+        .toContain('ROUTING')
     } finally {
       vi.useRealTimers()
     }
@@ -1182,6 +1226,198 @@ describe('TrajectoryView state', () => {
     expect(screen.getAllByText('Open')).toHaveLength(2)
   })
 
+  it('renders a CHILD-ROUTE row from folded child-decision contributions', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 1, time: 1_000,
+        content: [{ type: 'text', text: 'delegate' }], source: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          routingChildren: [{
+            kind: 'routing-child',
+            seq: 3,
+            time: 3_000,
+            outcome: 'routed',
+            reason: 'child-policy',
+            model: 'deepseek-official/deepseek-v4-flash',
+          }],
+        })),
+        ...standaloneDuration(),
+      },
+    ) as never)
+    expect(screen.getByText('Subagent routed to deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.queryByText(/kept strong/)).toBeNull()
+  })
+
+  it('renders the folded decision row and the routed route the request ran on', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 4, time: 4,
+        content: [{ type: 'text', text: 'ROUTED_OK' }], source: null,
+      },
+      {
+        kind: 'assistant', seq: 14, time: 14, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'ROUTED_OK' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const requests: readonly RequestView[] = [{
+      purpose: 'assistant',
+      startSeq: 3,
+      turn: 1,
+      step: 1,
+      startedAt: 3,
+      completedAt: 14,
+      status: 'complete',
+      provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    }]
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          requests,
+          routing: [{
+            seq: 6,
+            time: 6,
+            turn: 1,
+            step: 1,
+            outcome: 'downgraded',
+            reason: 'gate-passed',
+            stateHash: 'd0157f83',
+            stateSeqs: [4],
+            selection: {
+              candidateId: 'flash',
+              provider: 'deepseek-official',
+              model: 'deepseek-v4-flash',
+            },
+            route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+            sticky: {
+              active: true,
+              routeErrorLimit: 2,
+              stepsElapsed: 0,
+              enteredTurn: 1,
+              entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+            },
+          }],
+        })),
+        ...standaloneDuration(),
+        t: dictionary,
+      },
+    ) as never)
+
+    const decision = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(decision.textContent).toContain('confidence 0.90')
+    expect(decision.textContent).toContain('streak entered · turn 1')
+    const request = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    expect(request?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(request?.textContent).toContain('deepseek-official/deepseek-v4-flash')
+    expect(screen.getByText('Routed')).toBeTruthy()
+  })
+
+  it('associates same-turn requests by step while excluding a later step decision', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 1, time: 1,
+        content: [{ type: 'text', text: 'first request' }], source: null,
+      },
+      {
+        kind: 'assistant', seq: 20, time: 20, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'first answer' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+      {
+        kind: 'assistant', seq: 30, time: 30, turn: 1, step: 2,
+        blocks: [{ kind: 'text', text: 'second answer' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const requests: readonly RequestView[] = [
+      {
+        purpose: 'assistant',
+        startSeq: 3,
+        turn: 1,
+        step: 1,
+        startedAt: 3,
+        completedAt: 20,
+        status: 'complete',
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+      {
+        purpose: 'assistant',
+        startSeq: 23,
+        turn: 1,
+        step: 2,
+        startedAt: 23,
+        completedAt: 30,
+        status: 'complete',
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    ]
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          requests,
+          routing: [
+            {
+              seq: 6,
+              time: 6,
+              turn: 1,
+              step: 1,
+              outcome: 'downgraded',
+              reason: 'gate-passed',
+              stateHash: 'd0157f83',
+              stateSeqs: [1],
+              selection: {
+                candidateId: 'flash',
+                provider: 'deepseek-official',
+                model: 'deepseek-v4-flash',
+              },
+              route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+              sticky: {
+                active: true,
+                routeErrorLimit: 2,
+                stepsElapsed: 0,
+                enteredTurn: 1,
+                entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+              },
+            },
+            {
+              seq: 25,
+              time: 25,
+              turn: 1,
+              step: 2,
+              outcome: 'kept-strong',
+              reason: 'gate-failed',
+              stateHash: 'd0157f83',
+              stateSeqs: [1],
+              route: { choice: 'keep-current', confidence: 0.9, probabilities: { 'keep-current': 0.9 } },
+              sticky: {
+                active: false,
+                stepsElapsed: 0,
+                brokenBy: 'gate-failed',
+              },
+            },
+          ],
+        })),
+        ...standaloneDuration(),
+        t: dictionary,
+      },
+    ) as never)
+
+    const first = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    const second = screen.getByRole('button', { name: 'Request #2' }).closest('tr')
+    expect(first?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(second?.querySelector('[data-request-route="selection"]')).toBeTruthy()
+  })
+
   it('persists the duration preference through the runtime snapshot-store seam', () => {
     const firstDuration = createTrajectoryDurationStore()
     const commonProps = {
@@ -1251,5 +1487,86 @@ describe('TrajectoryView state', () => {
 describe('node half', () => {
   it('node apply is an intentional no-op (loader-managed lifecycle only)', () => {
     expect(() => { nodeApply() }).not.toThrow()
+  })
+})
+
+describe('cross-view inspect', () => {
+  const EXPLAIN = 'Explain this routing decision in the Routing view'
+  const ROUTED_NODES = [
+    { kind: 'user', seq: 4, time: 4, content: [{ type: 'text', text: 'ROUTED_OK' }], source: null },
+    {
+      kind: 'assistant', seq: 14, time: 14, turn: 1, step: 1,
+      blocks: [{ kind: 'text', text: 'ROUTED_OK' }],
+      provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    },
+  ] as unknown as ConversationSnapshot['nodes']
+
+  /** A session whose one routing decision (seq 6) downgraded turn 1. */
+  function routedHistory(): ConversationSnapshot {
+    return historySnapshot(ROUTED_NODES, {
+      routing: [{
+        seq: 6, time: 6, turn: 1, step: 1,
+        outcome: 'downgraded', reason: 'gate-passed', stateHash: 'd0157f83', stateSeqs: [4],
+        selection: { candidateId: 'flash', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+        sticky: {
+          active: true, routeErrorLimit: 2, stepsElapsed: 0, enteredTurn: 1,
+          entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+        },
+      }],
+    })
+  }
+
+  /** Register a routing view stub that records the owner share it renders with. */
+  function registerRoutingView(slots: SlotRegistry) {
+    const owners: ConvViewOwnerProps[] = []
+    const RoutingStub = (props: ConvViewOwnerProps) => {
+      owners.push(props)
+      return <div data-testid="routing-body" />
+    }
+    slots.register(
+      { name: 'conversation.view', id: 'routing', order: 20, label: 'Routing' } as never, RoutingStub as never)
+    return owners
+  }
+
+  it('hides Explain while no routing view is registered to receive it', async () => {
+    const b = await bench(routedHistory())
+    mount(b.slots, ROUTED_NODES)
+    openActivityView('Trajectory')
+    expect(screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: EXPLAIN })).toBeNull()
+  })
+
+  it('Explain reveals the decision in the routing view and closes Activity', async () => {
+    const b = await bench(routedHistory())
+    const owners = registerRoutingView(b.slots)
+    const view = mount(b.slots, ROUTED_NODES)
+    openActivityView('Trajectory')
+    fireEvent.click(screen.getByRole('button', { name: /^Activity$/ }))
+    expect(screen.getByRole('dialog', { name: 'Inspect this session' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: EXPLAIN }))
+
+    const request = { view: 'routing', target: { kind: 'event', seq: 6 } }
+    expect(screen.getByTestId('routing-body')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    expect(owners.at(-1)?.inspect).toEqual(request)
+    expect(view.chat.store.getSnapshot().inspect).toEqual(request)
+  })
+
+  it('an event target revealed from another view opens its Trajectory record and is acknowledged', async () => {
+    const b = await bench(routedHistory())
+    const owners = registerRoutingView(b.slots)
+    const view = mount(b.slots, ROUTED_NODES)
+    openActivityView('Routing')
+    const routingOwner = owners.at(-1)
+    expect(routingOwner?.canReveal?.('trajectory')).toBe(true)
+
+    act(() => { routingOwner?.reveal?.({ view: 'trajectory', target: { kind: 'event', seq: 6 } }) })
+
+    const decision = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(decision.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('complementary', { name: 'Event details' })).toBeTruthy()
+    expect(view.chat.store.getSnapshot().inspect).toBeNull()
   })
 })

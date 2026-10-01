@@ -1,0 +1,71 @@
+# Shared routing tier overlay for the route-off, route-on, and route-shield arms.
+#
+# This layer is applied after the arm overlay. The pi-ai row is a whole-config
+# replacement, so both provider entries are stated here with the metadata used
+# by the base bundle and the pinned ZAI tier. Credentials are references only;
+# the current runner resolves only its primary and Jev references, so a
+# controller using this tier must explicitly resolve ZAI_API_KEY and
+# OLLAMA_API_KEY into the child environment before creating isolated SHRES_HOME.
+- id: llm-pi-ai
+  config:
+    providers:
+      ollama-cloud:
+        displayName: Ollama Cloud
+        api: openai-completions
+        baseURL: https://ollama.com/v1
+        apiKeyEnv: OLLAMA_API_KEY
+        models:
+          - id: deepseek-v4-flash:cloud
+            name: DeepSeek V4 Flash (cloud)
+            contextWindow: 1048576
+            maxTokens: 32768
+          - id: deepseek-v4-pro:cloud
+            name: DeepSeek V4 Pro (cloud)
+            contextWindow: 1048576
+            maxTokens: 32768
+      zai:
+        apiKeyEnv: ZAI_API_KEY
+        hostedTools:
+          webSearch: true
+        models:
+          - id: glm-5.3
+
+- id: agent-default-model
+  config:
+    provider: zai
+    model: glm-5.3
+
+# A missing model-router row is intentionally a no-op. Thus route-off keeps its
+# control composition, while route-on and route-shield receive this policy.
+- id: model-router
+  config:
+    initialMode: "on"
+    tier: "fast"
+    candidates:
+      - id: flash
+        provider: ollama-cloud
+        model: deepseek-v4-flash:cloud
+        description: "a routine, bounded task with a known safe fit"
+    routeFrom:
+      - provider: zai
+        model: glm-5.3
+        objective: dollars
+    downgradeThreshold: 0.8
+    downgradeMargin: 0.1
+    hold:
+      minSteps: 20
+      maxSteps: 40
+    difficulty:
+      entryScoreCeiling: 2
+    reentryCooldownTurns: 2
+    escalateBack:
+      scoreThreshold: 3
+    maxRouteErrors: 2
+    onUnavailable: "fallback"
+    judgmentDeadlineMs: 1500
+    judgmentFailures:
+      holdTolerance: 2
+      breakerThreshold: 3
+      breakerOpenTurns: 5
+    routeInstructions: "Prefer the candidate for a routine, bounded task with a known safe fit; keep the current model when the work is uncertain, ambiguous, or its difficulty is not yet known."
+    difficultyInstructions: "How hard is this turn for the model handling it? Score it on the levels below."

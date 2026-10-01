@@ -1,0 +1,53 @@
+# Pinned treatment rows for the `compact-jev` compaction arm — the treatment.
+#
+# This file is the source of the arm's rows: `ArmEntry.pinnedOverlay` names it and
+# bench/runner/arms.js reads it and emits its content verbatim into the arm's
+# per-trial `--patch` overlay. Nothing restates these values, so the pinned
+# posture and the applied composition cannot drift. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# The basic provider is DISABLED, not patched away: compaction-jev registers the
+# same service key, so the two rows cannot both stand. The judgment dispatcher,
+# the judgment engine, and the jev backend are INSERTED, never patched — the base
+# headless composition mounts none of them, and a patch against a missing entry
+# no-ops silently, which would leave the arm measuring its own baseline. The
+# dispatcher's defaultEngine names the one engine the arm composes. The engine resolves
+# TYPESAFE_API_KEY through the credentials seam: only the reference name is
+# pinned here, never a key value.
+#
+# The first seven fields restate the whole inherited policy, whose one home is
+# bench/pressure/forced-compaction.patch.yml — the file the `compact-basic` arm
+# pins and the experiment-level pressure overlay. They are restated here because a
+# `config` patch replaces an entry's whole config, so an inserted backend cannot
+# inherit them; the two files must stay equal, and the values are copied verbatim.
+#
+# `tier: accurate` is the preregistration's reservation for the verification
+# cascade, where a draft already costs a summarization call and the extra latency
+# is small beside it. The battery is the three documented hazards; an unanswered
+# or failed ask degrades to the byte-identical basic path.
+- id: compaction-basic
+  disabled: true
+- insert:
+    - id: judgment-dispatch
+      name: "@shres-code/shres-code-judgment-dispatch"
+      config:
+        defaultEngine: "typesafe"
+    - id: judgment-typesafe
+      name: "@shres-code/shres-code-judgment-typesafe"
+      config:
+        apiKeyRef: "TYPESAFE_API_KEY"
+    - id: compaction-jev
+      name: "@shres-code/shres-code-compaction-jev"
+      config:
+        auto: true
+        thresholdRatio: 0.015
+        retainRatio: 0.003
+        maxTokens: 8192
+        compactionRetries: 1
+        maxOverflowRetries: 1
+        maxPointers: 0
+        tier: "accurate"
+        segmentScoreInstructions: "How much does a later turn depend on this segment? Score it on the levels below, using the segment text in the state."
+        boundaryInstructions: "Would a boundary at this point cut through work that belongs together? A high probability means the edge is unsafe."
+        verifyInstructions: "How well does this summary preserve what a later turn needs?"
+        verifyChecks: [{"name":"constraints","instructions":"Does the summary leave out a constraint the user stated?"},{"name":"errors","instructions":"Does the summary invent or misstate an error or outcome?"},{"name":"paths","instructions":"Does the summary name a file or symbol that never appeared?"}]

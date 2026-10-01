@@ -39,7 +39,8 @@
   "dependencies": {
     "js-yaml": "^4.2.0",
     "npm-package-arg": "^14.0.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "yaml": "^2.9.0"
   },
   "peerDependencies": {
     "@shres-code/cordis-plugin-group": "workspace:^",

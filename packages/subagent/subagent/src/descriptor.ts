@@ -54,6 +54,12 @@ interface SubagentDescriptorBase {
   readonly mode: 'one-shot' | 'continuable'
   /** The `ctx.subagents` provider name that established the child. */
   readonly provider: string
+  /**
+   * The child-route dispatch that changed this child's route, when one did.
+   * Optional at version 2: an older descriptor without it still folds.
+   * Present only as a nonempty string.
+   */
+  readonly agentRouteRequestId?: string
 }
 
 /** A session-backed subagent that cannot be cold-resumed after its run. */
@@ -100,6 +106,8 @@ export interface OneShotSubagentDescriptorInput extends SubagentDescriptorInputB
   readonly mode: 'one-shot'
   /** Optional initial delegation `description` used as the durable creation label. */
   readonly label?: string
+  /** Child-route dispatch that changed this child's route, when one did. */
+  readonly agentRouteRequestId?: string
 }
 
 /** Input for a continuable child's durable identity and resumable composition. */
@@ -115,6 +123,8 @@ export interface ContinuableSubagentDescriptorInput extends SubagentDescriptorIn
   readonly persona?: string
   /** Requested child tool scoping. */
   readonly toolFilter?: ToolRestriction
+  /** Child-route dispatch that changed this child's route, when one did. */
+  readonly agentRouteRequestId?: string
 }
 
 /** Inputs {@link snapshotSubagentDescriptor} validates and detaches. */
@@ -127,6 +137,7 @@ const DESCRIPTOR_BASE_KEYS = [
   'mode',
   'provider',
   'label',
+  'agentRouteRequestId',
 ] as const
 const ONE_SHOT_DESCRIPTOR_KEYS = new Set(DESCRIPTOR_BASE_KEYS)
 const CONTINUABLE_DESCRIPTOR_KEYS = new Set([
@@ -157,6 +168,16 @@ function optionalString(value: Record<string, unknown>, key: string): string | u
   const field = value[key]
   if (typeof field !== 'string') {
     throw new Error(`persisted subagent descriptor ${key} must be a string`)
+  }
+  return field
+}
+
+/** Read one optional nonempty string field from a persisted descriptor record. */
+function optionalNonemptyString(value: Record<string, unknown>, key: string): string | undefined {
+  const field = optionalString(value, key)
+  if (field === undefined) return undefined
+  if (field.length === 0) {
+    throw new Error(`persisted subagent descriptor ${key} must be a nonempty string`)
   }
   return field
 }
@@ -216,6 +237,7 @@ function parseSubagentDescriptor(value: unknown): SubagentDescriptorData | undef
   if (typeof provider !== 'string') {
     throw new Error('persisted subagent descriptor provider must be a string')
   }
+  const agentRouteRequestId = optionalNonemptyString(value, 'agentRouteRequestId')
   if (mode === 'one-shot') {
     const label = optionalString(value, 'label')
     return {
@@ -223,6 +245,7 @@ function parseSubagentDescriptor(value: unknown): SubagentDescriptorData | undef
       mode,
       provider,
       ...label !== undefined ? { label } : {},
+      ...agentRouteRequestId !== undefined ? { agentRouteRequestId } : {},
     }
   }
   const label = value['label']
@@ -244,6 +267,7 @@ function parseSubagentDescriptor(value: unknown): SubagentDescriptorData | undef
     ...agentModel !== undefined ? { agentModel } : {},
     ...persona !== undefined ? { persona } : {},
     ...toolFilter !== undefined ? { toolFilter } : {},
+    ...agentRouteRequestId !== undefined ? { agentRouteRequestId } : {},
   }
 }
 
@@ -275,6 +299,7 @@ export function snapshotSubagentDescriptor(input: SubagentDescriptorInput): Suba
       mode: input.mode,
       provider: input.provider,
       ...input.label !== undefined ? { label: input.label } : {},
+      ...input.agentRouteRequestId !== undefined ? { agentRouteRequestId: input.agentRouteRequestId } : {},
     }
     : {
       version: SUBAGENT_DESCRIPTOR_VERSION,
@@ -285,6 +310,7 @@ export function snapshotSubagentDescriptor(input: SubagentDescriptorInput): Suba
       ...input.agentModel !== undefined ? { agentModel: input.agentModel } : {},
       ...input.persona !== undefined ? { persona: input.persona } : {},
       ...input.toolFilter !== undefined ? { toolFilter: input.toolFilter } : {},
+      ...input.agentRouteRequestId !== undefined ? { agentRouteRequestId: input.agentRouteRequestId } : {},
     }
   const snapshot = snapshotJsonValue(candidate)
   if (snapshot === undefined) {

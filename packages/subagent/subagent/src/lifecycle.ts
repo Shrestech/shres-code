@@ -141,6 +141,9 @@ export function observeRun(
     provider,
     id: run.id,
     local: run.localAgent !== undefined,
+    ...run.localAgent?.options.subagentRouteRequestId !== undefined
+      ? { subagentRouteRequestId: run.localAgent.options.subagentRouteRequestId }
+      : {},
   }
   // Attach the terminal observer before dispatching start. Promise reactions
   // still run after this synchronous start emission, preserving start → end.
@@ -170,6 +173,7 @@ export function observeRun(
  * @param provider - the provider name recorded in the durable descriptor.
  * @param childId - the durable child session id.
  * @param parent - the exact live direct parent keying scoped dispatch.
+ * @param subagentRouteRequestId - the child-route dispatch that changed this child's route, when one did.
  * @returns the observer whose edges this epoch publishes.
  */
 export function createActivationObserver(
@@ -177,8 +181,15 @@ export function createActivationObserver(
   provider: string,
   childId: SessionId,
   parent: Agent,
+  subagentRouteRequestId?: SubagentRunInfo['subagentRouteRequestId'],
 ): ActivationObserver {
-  const identity = { runId: SubagentRunId(randomUUID()), provider, id: childId, local: true }
+  const identity = {
+    runId: SubagentRunId(randomUUID()),
+    provider,
+    id: childId,
+    local: true,
+    ...subagentRouteRequestId !== undefined ? { subagentRouteRequestId } : {},
+  }
   // A cold resume replays earlier turns, so this epoch's telemetry must come
   // from the suffix it actually produced — never the whole session, which
   // would report a previous epoch's answer when this one opened no turn.
@@ -259,8 +270,13 @@ function epochStopReason(events: readonly SessionEvent[]): SubagentResult['stopR
   }
 }
 
-/** Render any listener-thrown value without letting coercion escape containment. */
-function renderThrown(value: unknown): string {
+/**
+ * Render any listener-thrown value without letting coercion escape containment.
+ * @param value - the value a listener threw.
+ * @returns the error name and message, the value's string form, or a fixed
+ *   placeholder when rendering itself throws.
+ */
+export function renderThrown(value: unknown): string {
   try {
     return value instanceof Error ? `${value.name}: ${value.message}` : String(value)
   } catch {
