@@ -2,7 +2,9 @@
  * Node-compatible child lifecycle and streaming custom-protocol carrier. The
  * shell owns exactly one host child: it spawns it with byte pipes on descriptors
  * 3 and 4 plus the lifecycle IPC channel, forwards `shres-app://app` requests
- * without buffering their bodies, and tears the child down on shutdown.
+ * without buffering their bodies, and tears the child down on shutdown. A slow
+ * response is queued up to {@link DESKTOP_RESPONSE_PIPE_BUFFER_BYTES} before
+ * the shared response pipe pauses, so one unread body cannot stall the others.
  * @module @shres-code/shres-code-desktop/host-process
  */
 
@@ -29,16 +31,40 @@ import {
   type DesktopHostResponseFrame,
 } from './host-protocol.ts'
 
+/**
+ * Bytes one response body may queue in the shell before later frames for that
+ * body wait beside the pipe. One unread event chunk is far below this, so it
+ * does not stall other responses.
+ */
+export const DESKTOP_RESPONSE_STREAM_HIGH_WATER_BYTES = 256 * 1024
+
+/**
+ * Unread response bytes the shell holds across every stream before it pauses
+ * the shared response pipe. Below this cap, a slow event downlink cannot stop
+ * an unrelated API or asset response.
+ */
+export const DESKTOP_RESPONSE_PIPE_BUFFER_BYTES = 2 * 1024 * 1024
+
+/** Characters of host stderr retained for the exit diagnostic. */
+const STDERR_TAIL_CHARS = 64 * 1024
+
 /** Runtime-tree path of the host child entry inside an installed shres runtime. */
 const INSTALLED_HOST_ENTRY = ['node_modules', '@shres-code', 'shres-code-desktop-host', 'lib', 'index.js'] as const
 
 /** Host entry the workspace builds for unpackaged launches, at apps/desktop-host/lib/index.js. */
 const DEVELOPMENT_HOST_ENTRY = fileURLToPath(new URL('../../desktop-host/lib/index.js', import.meta.url))
 
+interface HeldResponse {
+  readonly chunks: Buffer[]
+  index: number
+  bytes: number
+}
+
 interface PendingResponse {
   readonly resolve: (response: Response) => void
   readonly reject: (error: Error) => void
   responseStarted: boolean
+  responseEnded: boolean
   uploadOpen: boolean
   controller?: ReadableStreamDefaultController<Uint8Array>
   requestReader?: ReadableStreamDefaultReader<Uint8Array>
@@ -115,7 +141,8 @@ export class DesktopHostProcess {
   private requestWriteTail: Promise<void> = Promise.resolve()
   private nextStreamId = 1
   private readonly pending = new Map<number, PendingResponse>()
-  private readonly blockedResponses = new Set<number>()
+  private readonly heldResponses = new Map<number, HeldResponse>()
+  private heldResponseBytes = 0
   private readyResolve!: (ready: DesktopHostReady) => void
   private readyReject!: (error: Error) => void
   private readonly readyPromise = new Promise<DesktopHostReady>((resolve, reject) => {
@@ -176,7 +203,10 @@ export class DesktopHostProcess {
     this.requestPipe = requestPipe
     this.responsePipe = responsePipe
     child.stderr?.setEncoding('utf8')
-    child.stderr?.on('data', (chunk: string) => { this.stderr += chunk })
+    child.stderr?.on('data', (chunk: string) => {
+      this.stderr += chunk
+      if (this.stderr.length > STDERR_TAIL_CHARS) this.stderr = this.stderr.slice(this.stderr.length - STDERR_TAIL_CHARS)
+    })
     child.stdout?.pipe(process.stdout)
     responsePipe.on('data', (chunk: Buffer) => { this.acceptResponseBytes(chunk) })
     responsePipe.once('end', () => {
@@ -229,6 +259,7 @@ export class DesktopHostProcess {
         resolve,
         reject,
         responseStarted: false,
+        responseEnded: false,
         uploadOpen: hasBody,
       }
       const abort = (): void => {
@@ -263,7 +294,8 @@ export class DesktopHostProcess {
   async stop(): Promise<void> {
     const child = this.child
     if (child === undefined) return
-    this.blockedResponses.clear()
+    this.heldResponses.clear()
+    this.heldResponseBytes = 0
     this.responsePipe?.resume()
     if (child.connected) this.send({ type: 'shutdown' })
     // Closing the parent-owned write end releases the host's pending Windows pipe read.
@@ -363,11 +395,11 @@ export class DesktopHostProcess {
         if (frame.hasBody) {
           body = new ReadableStream<Uint8Array>({
             start: (controller) => { pending.controller = controller },
-            pull: () => {
-              this.blockedResponses.delete(frame.streamId)
-              this.resumeResponsePipe()
-            },
+            pull: () => { this.releaseHeld(frame.streamId) },
             cancel: (reason) => { this.cancelResponse(frame.streamId, reason) },
+          }, {
+            highWaterMark: DESKTOP_RESPONSE_STREAM_HIGH_WATER_BYTES,
+            size: chunk => chunk.byteLength,
           })
         }
         pending.resolve(new Response(body, {
@@ -381,17 +413,19 @@ export class DesktopHostProcess {
         if (!pending.responseStarted || controller === undefined) {
           throw new Error(`shres desktop host sent body data before a body start for stream ${String(frame.streamId)}`)
         }
-        controller.enqueue(frame.data)
-        if ((controller.desiredSize ?? 0) <= 0) {
-          this.blockedResponses.add(frame.streamId)
-          this.responsePipe?.pause()
+        if (this.heldResponses.has(frame.streamId) || (controller.desiredSize ?? 0) <= 0) {
+          this.holdResponse(frame.streamId, frame.data)
+          return
         }
+        controller.enqueue(frame.data)
         return
       }
       case 'end':
         if (!pending.responseStarted) {
           throw new Error(`shres desktop host ended stream ${String(frame.streamId)} before its response start`)
         }
+        pending.responseEnded = true
+        if (this.heldResponses.has(frame.streamId)) return
         pending.controller?.close()
         this.finishPending(frame.streamId, true)
         return
@@ -439,12 +473,60 @@ export class DesktopHostProcess {
     }
     pending.removeAbort?.()
     this.pending.delete(streamId)
-    this.blockedResponses.delete(streamId)
+    this.dropHeld(streamId)
+    this.resumeResponsePipe()
+  }
+
+  private holdResponse(streamId: number, data: Buffer): void {
+    const copy = Buffer.from(data)
+    let held = this.heldResponses.get(streamId)
+    if (held === undefined) {
+      held = { chunks: [], index: 0, bytes: 0 }
+      this.heldResponses.set(streamId, held)
+    }
+    held.chunks.push(copy)
+    held.bytes += copy.byteLength
+    this.heldResponseBytes += copy.byteLength
+    if (this.heldResponseBytes >= DESKTOP_RESPONSE_PIPE_BUFFER_BYTES) this.responsePipe?.pause()
+  }
+
+  private dropHeld(streamId: number): void {
+    const held = this.heldResponses.get(streamId)
+    if (held === undefined) return
+    let remaining = 0
+    for (let index = held.index; index < held.chunks.length; index += 1) {
+      remaining += held.chunks[index]?.byteLength ?? 0
+    }
+    this.heldResponseBytes -= remaining
+    this.heldResponses.delete(streamId)
+  }
+
+  /** Move held frames back onto the body until its byte budget is full again. */
+  private releaseHeld(streamId: number): void {
+    const pending = this.pending.get(streamId)
+    const controller = pending?.controller
+    const held = this.heldResponses.get(streamId)
+    if (pending !== undefined && controller !== undefined && held !== undefined) {
+      while (held.index < held.chunks.length && (controller.desiredSize ?? 0) > 0) {
+        const next = held.chunks[held.index]
+        if (next === undefined) break
+        held.index += 1
+        held.bytes -= next.byteLength
+        this.heldResponseBytes -= next.byteLength
+        controller.enqueue(next)
+      }
+      if (held.index >= held.chunks.length) this.heldResponses.delete(streamId)
+      if (pending.responseEnded && !this.heldResponses.has(streamId)) {
+        controller.close()
+        this.finishPending(streamId, true)
+        return
+      }
+    }
     this.resumeResponsePipe()
   }
 
   private resumeResponsePipe(): void {
-    if (this.blockedResponses.size === 0) this.responsePipe?.resume()
+    if (this.heldResponseBytes < DESKTOP_RESPONSE_PIPE_BUFFER_BYTES) this.responsePipe?.resume()
   }
 
   private handleMessage(message: DesktopHostEvent): void {
@@ -475,7 +557,8 @@ export class DesktopHostProcess {
       pending.removeAbort?.()
     }
     this.pending.clear()
-    this.blockedResponses.clear()
+    this.heldResponses.clear()
+    this.heldResponseBytes = 0
     this.responsePipe?.resume()
   }
 }

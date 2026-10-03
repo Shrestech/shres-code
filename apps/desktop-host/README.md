@@ -31,10 +31,13 @@ The executable entrypoint calls `healProfilesModuleFallback` with the installed 
 ## Wire protocol
 
 `wire.ts` frames requests and responses (magic `0x53485233`, protocol version
-1, 64 KiB data chunks, monotonic stream ids). The process entry reads fds 3/4,
-applies backpressure by pausing the request pipe against unread body streams,
-emits `ready`/`fatal` over Node IPC, and tears down on `shutdown`, parent
-disconnect, or pipe errors.
+1, 64 KiB data chunks, monotonic stream ids). The process entry reads fds 3/4.
+An unread request body pauses the request pipe. Event downlinks coalesce a few
+milliseconds of NDJSON, or 16 KiB, into one body chunk and wait when that
+stream's own queue is full. The shell pauses the shared response pipe only
+after it is already holding 2 MiB of unread response bytes, so one event
+stream does not stall other responses. The entry emits `ready`/`fatal` over
+Node IPC and tears down on `shutdown`, parent disconnect, or pipe errors.
 
 ## Testing
 

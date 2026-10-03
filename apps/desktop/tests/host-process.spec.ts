@@ -11,7 +11,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DESKTOP_HOST_PROTOCOL_VERSION, FRAME_MAGIC } from '@shres-code/shres-code-desktop-host/wire'
-import { DesktopHostProcess } from '../src/host-process.ts'
+import {
+  DESKTOP_RESPONSE_STREAM_HIGH_WATER_BYTES,
+  DesktopHostProcess,
+} from '../src/host-process.ts'
 
 /** Bytes the large-response case streams in bounded chunks. */
 const LARGE_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -202,6 +205,39 @@ function onRequestFrame(frame) {
       expect(body).toHaveLength(LARGE_RESPONSE_BYTES)
       expect(body[0]).toBe(97)
       expect(body.at(-1)).toBe(97)
+    } finally {
+      await host.stop().catch(() => undefined)
+    }
+  })
+
+  it('serves a later response while an earlier body is past its stream budget and still unread', async () => {
+    const heldChunks = Math.ceil(DESKTOP_RESPONSE_STREAM_HIGH_WATER_BYTES / STUB_CHUNK_BYTES) + 1
+    const project = projectWithHost(`
+ready('split-pipe')
+function onRequestFrame(frame) {
+  if (frame.type !== 1) return
+  const request = JSON.parse(frame.payload)
+  responseStart(frame.streamId)
+  if (request.url.endsWith('/hold')) {
+    const payload = Buffer.alloc(${String(STUB_CHUNK_BYTES)}, 104)
+    for (let index = 0; index < ${String(heldChunks)}; index += 1) responseData(frame.streamId, payload)
+    return
+  }
+  responseData(frame.streamId, 'fast-body')
+  responseEnd(frame.streamId)
+}
+`)
+    const host = new DesktopHostProcess(process.execPath, project, project)
+    try {
+      const held = await host.fetch(new Request('shres-app://app/hold'))
+      const reader = held.body?.getReader()
+      if (reader === undefined) throw new Error('held response had no body')
+      const fast = await host.fetch(new Request('shres-app://app/fast'))
+      await expect(fast.text()).resolves.toBe('fast-body')
+      const first = await reader.read()
+      expect(first.done).toBe(false)
+      expect(first.value?.[0]).toBe(104)
+      await reader.cancel()
     } finally {
       await host.stop().catch(() => undefined)
     }

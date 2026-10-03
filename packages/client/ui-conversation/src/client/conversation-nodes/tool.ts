@@ -249,6 +249,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
     }
     return null
   },
+  publication: match => match.event.type === 'tool/code-dispatch' ? 'animation-frame' : 'immediate',
   start: (_context, match) => ({ root: rootCall(match), children: new Map(), parents: new Map() }),
   update: (context, match) => {
     if (match.event.type === 'tool/result') {

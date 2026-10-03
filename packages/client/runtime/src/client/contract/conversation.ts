@@ -254,6 +254,29 @@ export interface ConversationViewBuilder<Node extends ConversationViewNode = Con
     readonly upserts: readonly Node[]
     readonly timeline: ConversationTimelineSnapshot
   }): Snapshot
+  /**
+   * Stage a full replace without building the snapshot.
+   * Paired with {@link materialize} so an unobserved view skips the walk.
+   * @param input - complete Nodes and current timeline.
+   */
+  stageReplace?(input: {
+    readonly nodes: readonly Node[]
+    readonly timeline: ConversationTimelineSnapshot
+  }): void
+  /**
+   * Stage an incremental update without building the snapshot.
+   * @param input - changed Nodes and current timeline.
+   */
+  stageApply?(input: {
+    readonly upserts: readonly Node[]
+    readonly timeline: ConversationTimelineSnapshot
+  }): void
+  /**
+   * Build the snapshot last staged by {@link stageReplace} or {@link stageApply}.
+   * Further calls return that snapshot until the next stage.
+   * @returns the current view snapshot.
+   */
+  materialize?(): Snapshot
 }
 
 /** Registry contribution that creates one isolated view builder per Session. */

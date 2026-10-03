@@ -1,7 +1,7 @@
 import type { Context } from '@shres-code/cordis'
 import type {
   AssistantMessageNode, ConversationNode, ConversationPromptSnapshot,
-  ConversationViewBuilder, ConversationViewDefinition, RequestView,
+  ConversationTimelineSnapshot, ConversationViewBuilder, ConversationViewDefinition, RequestView,
   ToolCallBlock,
 } from '@shres-code/shres-code-client-runtime/client'
 import type {
@@ -147,22 +147,69 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
   private readonly nodes = new Map<string, TrajectoryConversationViewNode>()
   private readonly positions = new Map<string, number>()
   private contributions: TrajectoryConversationViewNode[] = []
+  private stale = false
+  private cached: TrajectorySnapshot | undefined
   readonly empty = EMPTY_TRAJECTORY_SNAPSHOT
 
   replace(input: {
     readonly nodes: readonly TrajectoryConversationViewNode[]
   }): TrajectorySnapshot {
-    this.nodes.clear()
-    for (const node of input.nodes) this.nodes.set(node.key, node)
-    this.rebuildContributions()
-    return this.snapshot()
+    this.replaceNodes(input.nodes)
+    return this.materialize()
   }
 
   apply(input: {
     readonly upserts: readonly TrajectoryConversationViewNode[]
   }): TrajectorySnapshot {
+    this.applyNodes(input.upserts)
+    return this.materialize()
+  }
+
+  /**
+   * Remember a full node set. The snapshot walk waits for {@link materialize}.
+   * @param input - complete nodes. The timeline is not part of this projection.
+   */
+  stageReplace(input: {
+    readonly nodes: readonly TrajectoryConversationViewNode[]
+    readonly timeline: ConversationTimelineSnapshot
+  }): void {
+    void input.timeline
+    this.replaceNodes(input.nodes)
+  }
+
+  /**
+   * Remember changed nodes. The snapshot walk waits for {@link materialize}.
+   * @param input - changed nodes. The timeline is not part of this projection.
+   */
+  stageApply(input: {
+    readonly upserts: readonly TrajectoryConversationViewNode[]
+    readonly timeline: ConversationTimelineSnapshot
+  }): void {
+    void input.timeline
+    this.applyNodes(input.upserts)
+  }
+
+  /**
+   * Build the staged trajectory snapshot, reusing the previous one when nothing changed.
+   * @returns the current snapshot.
+   */
+  materialize(): TrajectorySnapshot {
+    if (!this.stale && this.cached !== undefined) return this.cached
+    this.cached = this.buildSnapshot()
+    this.stale = false
+    return this.cached
+  }
+
+  private replaceNodes(nodes: readonly TrajectoryConversationViewNode[]): void {
+    this.nodes.clear()
+    for (const node of nodes) this.nodes.set(node.key, node)
+    this.rebuildContributions()
+    this.stale = true
+  }
+
+  private applyNodes(upserts: readonly TrajectoryConversationViewNode[]): void {
     let structural = false
-    for (const node of input.upserts) {
+    for (const node of upserts) {
       const previous = this.nodes.get(node.key)
       this.nodes.set(node.key, node)
       if (previous === undefined || previous.anchorSeq !== node.anchorSeq) {
@@ -174,10 +221,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
       else this.contributions[position] = node
     }
     if (structural) this.rebuildContributions()
-    return this.snapshot()
+    this.stale = true
   }
 
-  private snapshot(): TrajectorySnapshot {
+  private buildSnapshot(): TrajectorySnapshot {
     const headersByStep = new Map<string, TrajectoryRequestHeaderState>()
     for (const contribution of this.contributions) {
       if (contribution.data.kind !== 'request-header') continue

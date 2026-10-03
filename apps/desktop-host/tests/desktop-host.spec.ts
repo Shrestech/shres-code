@@ -76,39 +76,48 @@ function stageRuntime(): { root: string; runtimeDir: string } {
   return { root, runtimeDir }
 }
 
-const STUB_SERVICES = [
-  'export const name = "stub-host-services"',
-  'export const inject = []',
-  'export function apply(ctx) {',
-  '  ctx.provide("connection", {',
-  '    createSharedFetchHandler(channel, fallback) {',
-  '      return {',
-  '        async fetch(request) {',
-  '          if (new URL(request.url).pathname === "/api/hello/world") {',
-  '            return new Response(JSON.stringify({ channel, ok: true }), { headers: { "content-type": "application/json" } })',
-  '          }',
-  '          return fallback.fetch(request)',
-  '        },',
-  '      }',
-  '    },',
-  '  })',
-  '  ctx.provide("clientModules", {',
-  '    graph: () => ({ entries: [{ id: "known-plugin", url: "/plugins/known-plugin/client.js", rev: "abc" }] }),',
-  '    fetchBundle: async request => {',
-  '      const id = new URL(request.url).pathname.slice("/plugins/".length, -"/client.js".length)',
-  '      if (id !== "known-plugin") return new Response(null, { status: 404 })',
-  '      return new Response(' + JSON.stringify('export const marker = "stub client bundle"\n') + ', { headers: { "content-type": "text/javascript; charset=utf-8" } })',
-  '    },',
-  '  })',
-  '  ctx.provide("apiProxy", {',
-  '    events: {',
-  '      mux: frame => (async function* () { yield { rpcId: frame.rpcId, payload: { type: "session/frame", seq: 1 } } })(),',
-  '      host: frame => (async function* () { yield { rpcId: frame.rpcId, payload: { type: "host/frame", n: 2 } } })(),',
-  '    },',
-  '  })',
-  '}',
-  '',
-].join('\n')
+/** Mux frames the fixture downlink yields. Above 1, each payload carries padding so the burst exceeds the downlink queue. */
+function stubServices(muxEvents: number): string {
+  const muxBody = muxEvents <= 1
+    ? 'yield { rpcId: frame.rpcId, payload: { type: "session/frame", seq: 1 } }'
+    : `const pad = ${JSON.stringify('x'.repeat(180))}\n`
+      + `      for (let seq = 1; seq <= ${muxEvents}; seq += 1) {\n`
+      + '        yield { rpcId: frame.rpcId, payload: { type: "session/frame", seq, pad } }\n'
+      + '      }'
+  return [
+    'export const name = "stub-host-services"',
+    'export const inject = []',
+    'export function apply(ctx) {',
+    '  ctx.provide("connection", {',
+    '    createSharedFetchHandler(channel, fallback) {',
+    '      return {',
+    '        async fetch(request) {',
+    '          if (new URL(request.url).pathname === "/api/hello/world") {',
+    '            return new Response(JSON.stringify({ channel, ok: true }), { headers: { "content-type": "application/json" } })',
+    '          }',
+    '          return fallback.fetch(request)',
+    '        },',
+    '      }',
+    '    },',
+    '  })',
+    '  ctx.provide("clientModules", {',
+    '    graph: () => ({ entries: [{ id: "known-plugin", url: "/plugins/known-plugin/client.js", rev: "abc" }] }),',
+    '    fetchBundle: async request => {',
+    '      const id = new URL(request.url).pathname.slice("/plugins/".length, -"/client.js".length)',
+    '      if (id !== "known-plugin") return new Response(null, { status: 404 })',
+    '      return new Response(' + JSON.stringify('export const marker = "stub client bundle"\n') + ', { headers: { "content-type": "text/javascript; charset=utf-8" } })',
+    '    },',
+    '  })',
+    '  ctx.provide("apiProxy", {',
+    '    events: {',
+    `      mux: frame => (async function* () {\n        ${muxBody}\n      })(),`,
+    '      host: frame => (async function* () { yield { rpcId: frame.rpcId, payload: { type: "host/frame", n: 2 } } })(),',
+    '    },',
+    '  })',
+    '}',
+    '',
+  ].join('\n')
+}
 
 /** The picker packages the desktop patch inserts; a real profile installs them, this fixture stubs them. */
 const PICKER_PACKAGES = [
@@ -117,7 +126,7 @@ const PICKER_PACKAGES = [
 ]
 
 /** A desktop profile holding the stub host services the desktop host consumes. */
-function stageProject(root: string, bundles: readonly string[], stubServices: boolean): string {
+function stageProject(root: string, bundles: readonly string[], stubServicesEnabled: boolean, muxEvents: number): string {
   const projectDir = join(root, 'project')
   for (const packageName of PICKER_PACKAGES) {
     const dir = join(projectDir, 'node_modules', ...packageName.split('/'))
@@ -134,8 +143,8 @@ function stageProject(root: string, bundles: readonly string[], stubServices: bo
     shres: { profile: { bundles: [...bundles] } },
   })
   writeFile(join(projectDir, 'cordis.patch.yml'),
-    stubServices ? '- insert:\n    - id: stub-host-services\n      name: ./' + STUB_PLUGIN + '\n' : '[]\n')
-  writeFile(join(projectDir, STUB_PLUGIN), STUB_SERVICES)
+    stubServicesEnabled ? '- insert:\n    - id: stub-host-services\n      name: ./' + STUB_PLUGIN + '\n' : '[]\n')
+  writeFile(join(projectDir, STUB_PLUGIN), stubServices(muxEvents))
   writeFile(join(projectDir, STUB_CLIENT_BUNDLE), 'export const marker = "stub client bundle"\n')
   return projectDir
 }
@@ -146,12 +155,21 @@ interface Harness {
 }
 
 async function bootFixture(
-  options: { bundles?: readonly string[]; allowLinkedPackages?: boolean; stubServices?: boolean } = {},
+  options: {
+    bundles?: readonly string[]
+    allowLinkedPackages?: boolean
+    stubServices?: boolean
+    muxEvents?: number
+    onFrame?: (frame: Buffer) => Promise<void> | void
+  } = {},
 ): Promise<Harness> {
   const { root, runtimeDir } = stageRuntime()
-  const projectDir = stageProject(root, options.bundles ?? [], options.stubServices !== false)
+  const projectDir = stageProject(root, options.bundles ?? [], options.stubServices !== false, options.muxEvents ?? 1)
   const frames: Buffer[] = []
-  const controller = await runDesktopHost(runtimeDir, projectDir, async (frame) => { frames.push(frame) }, {
+  const controller = await runDesktopHost(runtimeDir, projectDir, async (frame) => {
+    frames.push(frame)
+    await options.onFrame?.(frame)
+  }, {
     ...(options.allowLinkedPackages === undefined ? {} : { allowLinkedPackages: options.allowLinkedPackages }),
   })
   return { controller, frames }
@@ -234,6 +252,39 @@ describe('runDesktopHost', () => {
     await controller.fetch(requestOf(3, 'shres-app://app/api/events.mux'), null)
     expect(statusOf(frames, 3)).toBe(405)
     await controller.dispose()
+  })
+
+  it('coalesces a downlink burst and resumes after the first body chunk is read', async () => {
+    const eventCount = 400
+    let releaseFirst: () => void = () => undefined
+    const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve })
+    let dataFrames = 0
+    const { controller, frames } = await bootFixture({
+      muxEvents: eventCount,
+      onFrame: async (frame) => {
+        if (frame.readUInt8(4) !== 2) return
+        dataFrames += 1
+        if (dataFrames === 1) await firstHeld
+      },
+    })
+    try {
+      const done = controller.fetch(requestOf(1, 'shres-app://app/api/events.mux', 'POST'), null)
+      await new Promise((resolve) => { setTimeout(resolve, 50) })
+      releaseFirst()
+      const stalled = new Promise<never>((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('downlink stalled after the shell resumed reading')) }, 2000)
+      })
+      await Promise.race([done, stalled])
+      const lines = textOf(frames, 1).split('\n').filter(line => line.length > 0)
+      expect(lines).toHaveLength(eventCount)
+      expect(JSON.parse(lines[0] ?? '')).toMatchObject({ type: 'server-request', payload: { seq: 1 } })
+      expect(JSON.parse(lines[eventCount - 1] ?? '')).toMatchObject({ payload: { seq: eventCount } })
+      const bodies = framesOf(frames, 1).filter(frame => frame.type === 2)
+      expect(bodies.length).toBeGreaterThan(1)
+      expect(bodies.length).toBeLessThan(lines.length)
+    } finally {
+      await controller.dispose()
+    }
   })
 
   it('fails loud when the composition provides no clientModules', async () => {

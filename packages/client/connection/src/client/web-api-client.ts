@@ -10,6 +10,9 @@ import type { ClientTransportHooks, TransportFetch } from './transport.ts'
 type SocketItem<F> = { kind: 'frame'; envelope: RpcRequest<F> } | { kind: 'end' }
 type Parser<F> = { parse(value: unknown): F }
 
+/** Lines applied from one read before the renderer is allowed to paint. */
+const STREAM_LINES_PER_TURN = 32
+
 /**
  * Browser platform subclass: unary/respond use fetch; mux/host use downlink-only
  * WebSockets. A shell transport routes every fetch through its carrier and, when
@@ -81,10 +84,13 @@ export class WebApiClient extends AbstractApiClient {
         const { done, value } = await reader.read()
         if (done) return
         buffer += decoder.decode(value, { stream: true })
-        let newline: number
-        while ((newline = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, newline)
-          buffer = buffer.slice(newline + 1)
+        let start = 0
+        let applied = 0
+        let newline = buffer.indexOf('\n', start)
+        while (newline >= 0) {
+          const line = buffer.slice(start, newline)
+          start = newline + 1
+          newline = buffer.indexOf('\n', start)
           if (line === '') continue
           let full: ServerRequest
           let frame: F
@@ -97,7 +103,13 @@ export class WebApiClient extends AbstractApiClient {
           }
           this.onEnvelope(full)
           yield { rpcId: full.rpcId, payload: frame }
+          applied += 1
+          if (applied >= STREAM_LINES_PER_TURN) {
+            applied = 0
+            await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+          }
         }
+        buffer = start === 0 ? buffer : buffer.slice(start)
       }
     } finally {
       signal.removeEventListener('abort', abort)

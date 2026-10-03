@@ -275,6 +275,25 @@ function assetHandler(ctx: Context, runtimeDir: string): DesktopFetchHandler {
   }
 }
 
+/** Bytes of event text queued in the host before the downlink waits for the shell to read. */
+const DOWNLINK_HIGH_WATER_BYTES = 64 * 1024
+
+/** Event text coalesced into one body chunk before it becomes its own pipe frame. */
+const DOWNLINK_COALESCE_BYTES = 16 * 1024
+
+/** Upper bound on how long the first line of a quiet downlink waits to be grouped. */
+const DOWNLINK_COALESCE_MS = 8
+
+function concatBytes(parts: readonly Uint8Array[], total: number): Uint8Array {
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const part of parts) {
+    merged.set(part, offset)
+    offset += part.byteLength
+  }
+  return merged
+}
+
 /** One server-request envelope for a downlinked event frame, matching the browser WebSocket carrier. */
 function serverRequest(frame: RpcRequest<MuxFrame | HostFrame>): ServerRequest {
   return {
@@ -287,8 +306,9 @@ function serverRequest(frame: RpcRequest<MuxFrame | HostFrame>): ServerRequest {
 
 /**
  * Stream one event downlink as ndjson: one server-request envelope per line,
- * body end for stream loss. The desktop transport has no WebSocket, so the
- * browser's fetch carrier reads the same frames from the response body.
+ * several lines per chunk. Production waits while this stream's queue is full.
+ * The desktop transport has no WebSocket, so the browser's fetch carrier reads
+ * the same frames from the response body.
  * @param api - the host API supplying the typed event stream.
  * @param kind - which event family this request asked for.
  * @param signal - the request's cancellation signal.
@@ -299,24 +319,87 @@ function downlinkResponse(api: ApiProxy, kind: 'mux' | 'host', signal: AbortSign
   const cancel = (): void => { abort.abort(signal.reason) }
   signal.addEventListener('abort', cancel, { once: true })
   const encoder = new TextEncoder()
+  let releaseCapacity: (() => void) | undefined
+  let flushPending: ((force: boolean) => void) | undefined
   const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        const frames = kind === 'mux'
-          ? api.events.mux({ rpcId: RpcId(randomUUID()), payload: {} }, abort.signal)
-          : api.events.host({ rpcId: RpcId(randomUUID()), payload: {} }, abort.signal)
-        for await (const frame of frames) controller.enqueue(encoder.encode(`${JSON.stringify(serverRequest(frame))}\n`))
-        controller.close()
-      } catch (error) {
-        controller.error(error)
-      } finally {
-        signal.removeEventListener('abort', cancel)
+    start(controller) {
+      const parts: Uint8Array[] = []
+      let pendingBytes = 0
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const flush = (force: boolean): void => {
+        if (timer !== undefined) {
+          clearTimeout(timer)
+          timer = undefined
+        }
+        if (pendingBytes === 0) return
+        if (!force && (controller.desiredSize ?? 1) <= 0) return
+        const body = parts.length === 1 ? parts[0] : concatBytes(parts, pendingBytes)
+        parts.length = 0
+        pendingBytes = 0
+        if (body === undefined) return
+        controller.enqueue(body)
       }
+      flushPending = flush
+      const waitForCapacity = async (): Promise<void> => {
+        if (abort.signal.aborted || (controller.desiredSize ?? 1) > 0) return
+        await new Promise<void>((resolve) => {
+          const done = (): void => {
+            releaseCapacity = undefined
+            abort.signal.removeEventListener('abort', done)
+            resolve()
+          }
+          releaseCapacity = done
+          abort.signal.addEventListener('abort', done, { once: true })
+        })
+      }
+      // ReadableStream does not call pull until start's promise settles, so this
+      // producer has to run after start returns or a full queue never resumes.
+      void (async () => {
+        try {
+          const frames = kind === 'mux'
+            ? api.events.mux({ rpcId: RpcId(randomUUID()), payload: {} }, abort.signal)
+            : api.events.host({ rpcId: RpcId(randomUUID()), payload: {} }, abort.signal)
+          for await (const frame of frames) {
+            if (abort.signal.aborted) break
+            const line = encoder.encode(`${JSON.stringify(serverRequest(frame))}\n`)
+            parts.push(line)
+            pendingBytes += line.byteLength
+            if (pendingBytes >= DOWNLINK_COALESCE_BYTES) {
+              await waitForCapacity()
+              if (abort.signal.aborted) break
+              flush(true)
+            } else if (timer === undefined) {
+              timer = setTimeout(() => {
+                timer = undefined
+                flush(false)
+              }, DOWNLINK_COALESCE_MS)
+            }
+          }
+          if (!abort.signal.aborted) {
+            flush(true)
+            controller.close()
+          }
+        } catch (error) {
+          if (timer !== undefined) clearTimeout(timer)
+          controller.error(error)
+        } finally {
+          flushPending = undefined
+          signal.removeEventListener('abort', cancel)
+        }
+      })()
+    },
+    pull() {
+      releaseCapacity?.()
+      flushPending?.(false)
     },
     cancel(reason) {
       abort.abort(reason)
+      releaseCapacity?.()
       signal.removeEventListener('abort', cancel)
     },
+  }, {
+    highWaterMark: DOWNLINK_HIGH_WATER_BYTES,
+    size: chunk => chunk.byteLength,
   })
   return new Response(stream, { headers: { 'content-type': 'application/x-ndjson' } })
 }
@@ -446,11 +529,10 @@ export async function runDesktopHost(
         }))
         if (response.body !== null) {
           for await (const chunk of response.body) {
-            const bytes = Buffer.from(chunk)
-            for (let offset = 0; offset < bytes.byteLength; offset += DESKTOP_PIPE_CHUNK_BYTES) {
+            for (let offset = 0; offset < chunk.byteLength; offset += DESKTOP_PIPE_CHUNK_BYTES) {
               await writeResponse(encodeDesktopResponseData(
                 command.streamId,
-                bytes.subarray(offset, offset + DESKTOP_PIPE_CHUNK_BYTES),
+                chunk.subarray(offset, Math.min(offset + DESKTOP_PIPE_CHUNK_BYTES, chunk.byteLength)),
               ))
             }
           }
