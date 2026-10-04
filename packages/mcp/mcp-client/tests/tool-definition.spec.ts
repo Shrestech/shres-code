@@ -8,7 +8,7 @@ import { AttachmentError, AttachmentId } from '@shres-code/shres-code-attachment
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
 import { CallId } from '@shres-code/shres-code-llm'
-import ToolRuntime, { type JsonValue, type ToolRunContext } from '@shres-code/shres-code-tools'
+import ToolRuntime, { type JsonValue, type ToolExecutionToken, type ToolRunContext } from '@shres-code/shres-code-tools'
 import { createMcpToolDefinition } from '@shres-code/shres-code-mcp-client/src/tools.ts'
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
@@ -39,10 +39,10 @@ class FakeAttachments extends Service {
   }
 }
 
-async function mountRegistry(): Promise<Context> {
+async function mountRegistry(mode?: 'code'): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime)
+  await ctx.plugin(ToolRuntime, mode === undefined ? {} : { mode })
   return ctx
 }
 
@@ -322,6 +322,74 @@ describe('createMcpToolDefinition image projection', () => {
         { type: 'image', mimeType: 'image/png', data: PNG },
         { type: 'text', text: 'after' },
       ],
+    })
+    expect(result.additionalContexts).toBeUndefined()
+  })
+
+  it('forwards an admitted image from a nested Code Mode call and keeps the raw MCP value', async () => {
+    const ctx = await mountRegistry('code')
+    const saveImages = vi.fn(async () => [imageRef])
+    new FakeLlm(ctx, vi.fn(async () => ({ inputModalities: ['image', 'text'] })))
+    new FakeAttachments(ctx, saveImages)
+    const content = [
+      { type: 'text', text: 'before' },
+      { type: 'image', mimeType: 'image/png', data: PNG },
+      { type: 'text', text: 'after' },
+    ]
+    const definition = createMcpToolDefinition(ctx, {
+      name: 'mcp__srv__img',
+      rawName: 'img',
+      description: '',
+      inputSchema: { type: 'object' },
+      call: async () => ({ content }),
+    })
+    ctx.tools.register(definition)
+    const result = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: CallId('img'),
+      name: definition.name,
+      arguments: {},
+      agent: agent({ provider: 'opt', model: 'opt-model' }),
+      parent: Symbol('run_code') as ToolExecutionToken,
+    })
+    expect(saveImages).toHaveBeenCalledOnce()
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected admitted image success')
+    expect(result.value).toEqual({ content })
+    expect(result.additionalContexts).toHaveLength(1)
+    expect(result.additionalContexts?.[0]?.source).toEqual({ kind: 'plugin', plugin: 'mcp-client' })
+    expect(result.additionalContexts?.[0]?.content).toEqual([
+      { type: 'text', text: 'before' },
+      { type: 'image', attachment: imageRef },
+      { type: 'text', text: 'after' },
+    ])
+  })
+
+  it('does not forward a refused image from a nested Code Mode call', async () => {
+    const ctx = await mountRegistry('code')
+    new FakeLlm(ctx, vi.fn(async () => ({ inputModalities: ['text'] })))
+    new FakeAttachments(ctx, vi.fn())
+    const definition = createMcpToolDefinition(ctx, {
+      name: 'mcp__srv__img',
+      rawName: 'img',
+      description: '',
+      inputSchema: { type: 'object' },
+      call: async () => ({ content: [{ type: 'image', mimeType: 'image/png', data: PNG }] }),
+    })
+    ctx.tools.register(definition)
+    const nested = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: CallId('img'),
+      name: definition.name,
+      arguments: {},
+      agent: agent({ provider: 'opt', model: 'opt-model' }),
+      parent: Symbol('run_code') as ToolExecutionToken,
+    })
+    expect(textOf(nested)).toContain('does not declare image input')
+    expect(nested.additionalContexts).toBeUndefined()
+    if (nested.isError) throw new Error('expected the raw value to remain available')
+    expect(nested.value).toEqual({
+      content: [{ type: 'image', mimeType: 'image/png', data: PNG }],
     })
   })
 })

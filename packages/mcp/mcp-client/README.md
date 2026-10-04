@@ -97,7 +97,7 @@ Prefix-stable while the discovered tool set and schemas are unchanged. A re-sync
 
 #### What the model sees
 
-The public tool name and JSON arguments remain in assistant history. Text result blocks are joined with newlines into one retained text block. An admitted image is its own image block. A refused image, audio block, or embedded resource becomes diagnostic text, and a resource link with a name and URI becomes `Resource link: <name> (<uri>)`. The execution-local canonical value keeps the raw JSON blocks and optional structured content. MCP `isError` rejects the call through the registry's error path.
+The public tool name and JSON arguments remain in assistant history. Text result blocks are joined with newlines into one retained text block. An admitted image is its own image block. Under Code Mode the program still receives the raw JSON, and that image is a plugin-sourced user message after the outer `run_code` result. A refused image, audio block, or embedded resource becomes diagnostic text, and a resource link with a name and URI becomes `Resource link: <name> (<uri>)`. The execution-local canonical value keeps the raw JSON blocks and optional structured content. MCP `isError` rejects the call through the registry's error path.
 
 #### Token effect
 

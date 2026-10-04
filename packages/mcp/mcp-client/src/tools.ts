@@ -20,8 +20,9 @@ import { z } from 'zod'
 import type { Context } from '@shres-code/cordis'
 import { isImageAdmissionError } from '@shres-code/shres-code-attachment'
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@shres-code/shres-code-attachment'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
-import type { ToolDefinition, ToolExecution } from '@shres-code/shres-code-tools'
+import type { ToolDefinition, ToolExecution, ToolRunContext } from '@shres-code/shres-code-tools'
 import { assertSupportedJsonSchema } from '@shres-code/shres-code-tools'
 import type { JsonSchemaNode, JsonValue } from '@shres-code/shres-code-tools'
 
@@ -323,7 +324,7 @@ function createExecutor(
   projections: WeakMap<ToolExecution, PreparedProjection>,
 ): ToolDefinition['execute'] {
   const { rawName, taskRequired } = options
-  return async (args: unknown, exec: ToolExecution) => {
+  return async (args: unknown, exec: ToolRunContext) => {
     if (taskRequired) {
       throw new Error(`Tool "${rawName}" requires task-based execution, which this bridge does not support`)
     }
@@ -364,6 +365,14 @@ function createExecutor(
       const fallback: ContentBlock[] = [{ type: 'text', text }]
       const projected = await prepareImageProjection(ctx, exec, content, rawName)
       projections.set(exec, { value, fallback, content: projected })
+      // Nested Code Mode history keeps the outer run_code result. Admitted
+      // images have to be deferred before that result is snapshotted.
+      if (exec.parent !== undefined && projected.some(block => block.type === 'image')) {
+        exec.deferContext(createUserMessage({
+          content: projected,
+          source: { kind: 'plugin', plugin: 'mcp-client' },
+        }))
+      }
     }
     return value
   }
