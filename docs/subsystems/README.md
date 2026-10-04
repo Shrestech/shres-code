@@ -48,6 +48,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [browser.md](browser.md) | owned browser lifecycle, consent and operation records, session identities, and native browser command results |
 | [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
 | [speech.md](speech.md) | the speech I/O seam: `SpeechSynthesizeRequest`/`Result`, `SpeechTranscribeRequest`/`Result`, provider selection, Web mic, speaker, and Talk mode |
+| [mcp.md](mcp.md) | external MCP servers: `McpResourceRequest`, `McpResourceProvider`, and `ctx.mcpResources` |
 | [spill.md](spill.md) | the spill storage seam: `SaveTextSpill`, `SpillOwner`/`SpillSource`, `SpillRef`, the branded `SpillLocator` |
 | [workflow.md](workflow.md) | the workflow seam: `WorkflowStartRequest`, `WorkflowMeta`, `WorkflowRun`/`Result`, the `workflow/*` event payloads, `WorkflowError` fatality |
 | [jobs.md](jobs.md) | the background-job runtime: branded `JobId`s, the producer contract, consumer views, and `ctx.jobs` service behavior |

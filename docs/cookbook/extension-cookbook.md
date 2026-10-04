@@ -116,7 +116,7 @@ Every product feature maps to a listener on a documented extension point — the
 | Permission system / AskUserQuestion | return `ask` from `tools/pre-execute` and answer through `ctx.approval`; register a separate model-facing ask tool for ordinary user questions |
 | Plan mode | [`@shres-code/shres-code-plan-mode`](../../packages/plan/plan-mode/README.md) — logged `plan/mode` state, the `plan:policy` guidance section, `/plan [message]` entry, `/plan off` direct exit, and the user-reviewed `exit_plan_mode` exit; enforcement stays on the independent sandbox/approval axes |
 | Sub-agent delegation | the `ctx.subagents` provider registry (`shres-subagent-spawn-in-process`/`-fork`/`-acp`/`-codex`/`-claude-code`/`-shres-sdk`) + `shres-tool-subagent` exposing one configured provider to the model |
-| MCP | one plugin per server: discover tools → `ctx.tools.register()` |
+| MCP | one opt-in `@shres-code/shres-code-mcp-client` row per server registers tools on `ctx.tools`; the base bundle's `ctx.mcpResources` adds resource tools and literal server instructions while a client is active in that scope |
 | Skills | section + tool registration; `inject()` skill content on invocation |
 | Memory | section provider + tool |
 | Scheduled tasks (cron) | a plugin registers model-callable scheduling tools; timer fires → `followup(…, {source: {kind: 'cron', …}})` when idle / `inject()` notification when busy |

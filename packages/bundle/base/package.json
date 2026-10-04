@@ -82,6 +82,7 @@
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
     "@shres-code/shres-code-llm-retry": "workspace:^",
     "@shres-code/shres-code-llm-xai-apikey": "workspace:^",
+    "@shres-code/shres-code-mcp-resources": "workspace:^",
     "@shres-code/shres-code-permission-presets": "workspace:^",
     "@shres-code/shres-code-plan-mode": "workspace:^",
     "@shres-code/shres-code-pwsh-sandbox": "workspace:^",

@@ -254,6 +254,9 @@ importers:
       '@shres-code/shres-code-mcp-client':
         specifier: workspace:^
         version: link:../../packages/mcp/mcp-client
+      '@shres-code/shres-code-mcp-resources':
+        specifier: workspace:^
+        version: link:../../packages/mcp/mcp-resources
       '@shres-code/shres-code-persona':
         specifier: workspace:^
         version: link:../../packages/preset/persona
@@ -1485,6 +1488,9 @@ importers:
       '@shres-code/shres-code-llm-xai-apikey':
         specifier: workspace:^
         version: link:../../llm/llm-xai-apikey
+      '@shres-code/shres-code-mcp-resources':
+        specifier: workspace:^
+        version: link:../../mcp/mcp-resources
       '@shres-code/shres-code-permission-presets':
         specifier: workspace:^
         version: link:../../interaction/permission-presets
@@ -7768,18 +7774,51 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
+      '@shres-code/shres-code-mcp-resources':
+        specifier: workspace:^
+        version: link:../mcp-resources
+      '@shres-code/shres-code-scope':
+        specifier: workspace:^
+        version: link:../../core/scope
       '@shres-code/shres-code-subprocess':
         specifier: workspace:^
         version: link:../../subprocess/subprocess
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
       '@shres-code/shres-code-timeout':
         specifier: workspace:^
         version: link:../../util/timeout
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
+  packages/mcp/mcp-resources:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-scope':
+        specifier: workspace:^
+        version: link:../../core/scope
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools

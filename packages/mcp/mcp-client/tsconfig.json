@@ -19,7 +19,19 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../attachment/attachment"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../mcp-resources"
     },
     {
       "path": "../../subprocess/subprocess"

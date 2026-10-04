@@ -122,6 +122,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Add model-facing context | call `agent.inject()`; it lands in the next admitted request |
 | Add UI or editor integration | drive `ctx.agents` and render from `session/event` |
 | Add speech I/O (mic, read-aloud, Talk mode) | register on `ctx.speech` (local Kokoro TTS, Whisper STT); the Web client records and plays; Talk mode confirms by voice before `session.prompt`; do not add audio content blocks |
+| Connect an external MCP server | add an `@shres-code/shres-code-mcp-client` row; its tools register on `ctx.tools`, and `ctx.mcpResources` exposes resource tools and literal server instructions while a client is active in that scope |
 | Add a Web Client Chat node | register a `ConversationNodeDefinition` + keyed renderer |
 | Add project long-term memory | register on `ctx.wiki`; tools are the only model-visible path |
 | Add durable session state | extend `SessionEventMap`; render and replay from the log |

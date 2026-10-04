@@ -789,6 +789,15 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/mcp/mcp-resources": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/mcp/mcp-client": {
       "entry": [
         "tests/**/*.spec.ts",

@@ -49,6 +49,11 @@ function sleep(ms: number): Promise<void> {
   return gate.promise
 }
 
+/** Join every text block, failing the test when one is not text. */
+function textOfAll(content: readonly unknown[]): string {
+  return content.map(textOf).join('\n')
+}
+
 /** Narrow a result content block to its text, failing the test on any other shape. */
 function textOf(block: unknown): string {
   if (block && typeof block === 'object' && 'text' in block && typeof block.text === 'string') {
@@ -147,9 +152,9 @@ describe('fixture server — controlled scenarios', () => {
       callId: nextCallId(), name: 'mcp__fixture__image', arguments: {},
     })
     expect(result.isError).toBe(false)
-    const text = textOf(result.content[0])
+    const text = textOfAll(result.content)
     expect(text).toContain('Here is an image:')
-    expect(text).toContain('[image: image/png, content discarded]')
+    expect(text).toContain('[image unavailable: image/png; no attachment store is mounted; raw image data remains available to programmatic callers]')
     expect(text).toContain('End of image.')
   })
 })
@@ -340,7 +345,7 @@ describe('server-everything — official test server', () => {
       callId: nextCallId(), name: 'mcp__everything__get-tiny-image', arguments: {},
     })
     expect(result.isError).toBe(false)
-    expect(textOf(result.content[0])).toContain('[image: image/png, content discarded]')
+    expect(textOfAll(result.content)).toContain('[image unavailable: image/png; no attachment store is mounted; raw image data remains available to programmatic callers]')
   })
 })
 

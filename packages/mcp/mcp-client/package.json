@@ -32,12 +32,21 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@shres-code/shres-code-attachment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-mcp-resources": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
     "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-timeout": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/cordis": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@shres-code/shres-code-system-prompt": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -45,9 +54,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@shres-code/shres-code-attachment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-mcp-resources": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
     "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-timeout": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@modelcontextprotocol/server-everything": "^2026.7.4",

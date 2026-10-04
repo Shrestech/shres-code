@@ -2914,6 +2914,16 @@
       "doc": "docs/subsystems/profiles.md",
       "symbol": "ProfileActivationOutcome",
       "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpResourceRequest",
+      "source": "packages/mcp/mcp-resources/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpResourceProvider",
+      "source": "packages/mcp/mcp-resources/src/index.ts"
     }
   ]
 }

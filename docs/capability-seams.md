@@ -254,6 +254,9 @@ flowchart LR
   pkg_wiki_embed_onnx["wiki-embed-onnx"]
   pkg_tool_wiki["tool-wiki"]
   pkg_wiki_librarian["wiki-librarian"]
+  pkg_mcp_resources["mcp-resources"]
+  svc_mcpResources["ctx.mcpResources<br/>MCP resource registry"]
+  pkg_mcp_client["mcp-client"]
   pkg_acp --> svc_approval
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -311,6 +314,8 @@ flowchart LR
   pkg_llm_replay --> svc_llm
   pkg_lsp --> svc_lsp
   pkg_lsp_local --> svc_lsp
+  pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_resources --> svc_mcpResources
   pkg_message_feedback --> svc_messageFeedback
   pkg_model_router --> svc_modelRouting
   pkg_modules --> svc_clientModules
@@ -608,5 +613,6 @@ flowchart LR
 | `ctx.tracker` | `seam` | [`tracker`](../packages/tracker/tracker) | [`tracker-shrestech`](../packages/tracker/tracker-shrestech) | [`tool-tracker`](../packages/tracker/tool-tracker) | - | Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session. |
 | `ctx.ledger` | `seam` | [`ledger`](../packages/ledger/ledger) | - | [`tool-ledger`](../packages/ledger/tool-ledger) | - | Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event. |
 | `ctx.wiki` | `seam` | [`wiki`](../packages/wiki/wiki) | [`wiki-filesystem`](../packages/wiki/wiki-filesystem), [`wiki-embed-onnx`](../packages/wiki/wiki-embed-onnx) | [`tool-wiki`](../packages/wiki/tool-wiki), [`wiki-librarian`](../packages/wiki/wiki-librarian), `ui-settings-jspace` | - | Long-term markdown memory with temperature/demotion/lint folds; the filesystem provider persists under .shres/wiki, embeddings are optional, and the librarian seat stays dormant until a cheap model is bound. |
+| `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | - | - | Each mcp-client row registers one server provider; the first provider in a scope exposes the shared resource tools and the server-name prompt section, and removing the last provider drops those local registrations. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.
