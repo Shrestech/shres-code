@@ -485,6 +485,22 @@ describe('SystemPrompt', () => {
       expect(renderPrompt(await ctx.systemPrompt.assemble())).toBe(`${IDENTITY}\n\nYou run on deepseek-v4 in /work.`)
     })
 
+    it('keeps braces literal when a section sets interpolate false', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt, { persona: 'You run on {{model}}.' })
+      ctx.systemPrompt.variable('model', () => 'deepseek-v4')
+      ctx.systemPrompt.section({
+        name: 'literal',
+        order: 10,
+        interpolate: false,
+        text: 'server says {{model}}',
+      })
+
+      expect(renderPrompt(await ctx.systemPrompt.assemble())).toBe(
+        `${IDENTITY}\n\nYou run on deepseek-v4.\n\nserver says {{model}}`,
+      )
+    })
+
     it('lets a waterfall listener add or override variables before render', async () => {
       const ctx = new Context()
       await ctx.plugin(SystemPrompt)

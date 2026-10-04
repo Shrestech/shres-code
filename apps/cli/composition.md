@@ -204,6 +204,8 @@ flowchart LR
   cfg --> plugin_shres_base_tools
   plugin_shres_base_system_prompt["system-prompt<br/>@shres-code/shres-code-system-prompt"]
   cfg --> plugin_shres_base_system_prompt
+  plugin_shres_base_mcp_resources["mcp-resources<br/>@shres-code/shres-code-mcp-resources"]
+  cfg --> plugin_shres_base_mcp_resources
   plugin_shres_base_agent_loop["agent-loop<br/>@shres-code/shres-code-agent-loop"]
   cfg --> plugin_shres_base_agent_loop
   plugin_shres_base_fs_sandbox["fs-sandbox<br/>@shres-code/shres-code-fs-sandbox"]
@@ -334,6 +336,7 @@ flowchart LR
 | `speech-whisper` | `@shres-code/shres-code-speech-whisper` |
 | `tools` | `@shres-code/shres-code-tools` |
 | `system-prompt` | `@shres-code/shres-code-system-prompt` |
+| `mcp-resources` | `@shres-code/shres-code-mcp-resources` |
 | `agent-loop` | `@shres-code/shres-code-agent-loop` |
 | `fs-sandbox` | `@shres-code/shres-code-fs-sandbox` |
 | `llm-cli-bridge` | `@shres-code/shres-code-llm-cli-bridge` |

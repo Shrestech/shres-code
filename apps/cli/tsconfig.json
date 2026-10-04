@@ -111,6 +111,9 @@
       "path": "../../packages/mcp/mcp-client"
     },
     {
+      "path": "../../packages/mcp/mcp-resources"
+    },
+    {
       "path": "../../packages/test-support/loader-smoke"
     },
     {

@@ -18,10 +18,12 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import type { Context } from '@shres-code/cordis'
+import type { JsonValue } from '@shres-code/shres-code-tools'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { createTransport } from './transport.ts'
 import { syncTools } from './tools.ts'
 import type { ToolBridgeOptions, ToolDisposers } from './tools.ts'
+import type { ServerContext } from './server-context.ts'
 import type { Config } from './index.ts'
 
 /** Automatic reconnect policy for one MCP server connection. */
@@ -35,6 +37,9 @@ export interface ReconnectConfig {
   /** Consecutive failed attempts per outage before giving up for good (default 10). */
   maxAttempts?: number
 }
+
+/** Default UTF-8 budget for one server's attributed instructions. */
+export const DEFAULT_MAX_INSTRUCTION_BYTES = 32_768
 
 /** Defaults shared by the Config schema and {@link resolveReconnectPolicy}. */
 export const RECONNECT_DEFAULTS: Required<ReconnectConfig> = Object.freeze({
@@ -96,7 +101,7 @@ export interface ConnectionOutcome {
 }
 
 /** Handle for one plugin instance's supervised connection. */
-export interface ConnectionHandle {
+export interface ConnectionHandle extends ServerContext {
   /**
    * Settles when the first connection attempt completes (success or failure).
    * The supervisor enters its reconnect loop regardless; the caller decides
@@ -135,6 +140,8 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     : opts
 
   let disposed = false
+  const maxInstructionBytes = config.maxInstructionBytes ?? DEFAULT_MAX_INSTRUCTION_BYTES
+  let serverInstructions = ''
   /** Current generation: the connecting or connected client; undefined during backoff waits and after final failure. */
   let client: Client | undefined
   /** Close signal paired with {@link client}; captured by dispose before current ownership is cleared. */
@@ -209,6 +216,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       syncChain = syncChain.then(() => {
         for (const dispose of disposers.values()) dispose()
         disposers = new Map()
+        serverInstructions = ''
       })
       ctx.logger.error(`${label}: giving up after ${policy.maxAttempts} consecutive failed reconnect attempts — tools unregistered; reload the plugin or restart the Host to reconnect`)
       return
@@ -268,12 +276,18 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         }
       },
     )
+    let instructions = ''
     try {
       await generation.connect(createTransport(config))
       if (hasClosed()) {
         attemptSettled = true
         generationDown(generation)
         return
+      }
+      const serverText = generation.getInstructions()?.trimEnd() ?? ''
+      instructions = serverText ? `### MCP server: ${config.serverName}\n\n${serverText}` : ''
+      if (Buffer.byteLength(instructions) > maxInstructionBytes) {
+        throw new Error(`${label}: server instructions exceed maxInstructionBytes (${maxInstructionBytes})`)
       }
       await enqueueSync(generation, startup ? startupOpts : opts)
     } catch (error) {
@@ -300,6 +314,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       return
     }
     if (!isCurrent(generation)) return
+    serverInstructions = instructions
     connectedAt = Date.now()
     if (failedAttempts > 0) ctx.logger.info(`${label}: reconnected and re-synced tools (attempt ${failedAttempts}/${policy.maxAttempts})`)
   }
@@ -324,8 +339,34 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
 
   return {
     ready,
+    instructions: () => serverInstructions,
+    resources: {
+      async request(request, exec): Promise<JsonValue> {
+        const generation = client
+        if (!generation || connectedAt === undefined) throw new Error(`${label}: server is disconnected`)
+        const options = { signal: exec.signal, timeout: config.toolCallTimeoutMs }
+        switch (request.method) {
+          case 'resources/list':
+            return await generation.listResources(
+              request.cursor === undefined ? undefined : { cursor: request.cursor }, options,
+            ) as unknown as JsonValue
+          case 'resources/templates/list':
+            return await generation.listResourceTemplates(
+              request.cursor === undefined ? undefined : { cursor: request.cursor }, options,
+            ) as unknown as JsonValue
+          case 'resources/read':
+            return await generation.readResource({ uri: request.uri }, options) as unknown as JsonValue
+          /* v8 ignore next 3 -- resource requests are the closed, typed tool operation union */
+          default: {
+            const unexpected: never = request
+            throw new Error(`${label}: unsupported MCP resource method`, { cause: unexpected })
+          }
+        }
+      },
+    },
     async dispose(): Promise<void> {
       disposed = true
+      serverInstructions = ''
       if (reconnectTimer !== undefined) {
         clearTimeout(reconnectTimer)
         reconnectTimer = undefined

@@ -79,6 +79,7 @@ const GROUP_ORDER = [
   'tasks',
   'workflow',
   'web',
+  'mcp',
   'spill',
   'todo',
   'plan',
@@ -696,6 +697,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['wiki-filesystem', 'wiki-embed-onnx'],
     consumers: ['tool-wiki', 'wiki-librarian', 'ui-settings-jspace'],
     note: 'Long-term markdown memory with temperature/demotion/lint folds; the filesystem provider persists under .shres/wiki, embeddings are optional, and the librarian seat stays dormant until a cheap model is bound.',
+  },
+  {
+    key: 'mcpResources',
+    pkg: 'mcp-resources',
+    title: 'MCP resource registry',
+    mode: 'seam',
+    implementations: ['mcp-client'],
+    note: 'Each mcp-client row registers one server provider; the first provider in a scope exposes the shared resource tools and the server-name prompt section, and removing the last provider drops those local registrations.',
   },
 ]
 

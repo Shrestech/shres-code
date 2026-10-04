@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import McpResourceRuntime from '@shres-code/shres-code-mcp-resources'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import type { Config } from '@shres-code/shres-code-mcp-client'
@@ -12,7 +13,10 @@ import type { Config } from '@shres-code/shres-code-mcp-client'
 
 // vi.mock factories are hoisted above every import/const, so the mock fns and
 // class must be created inside vi.hoisted to exist when the factories run.
-const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient } = vi.hoisted(() => {
+const {
+  mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, mockGetInstructions,
+  mockListResources, mockListResourceTemplates, mockReadResource, MockClient,
+} = vi.hoisted(() => {
   const mockConnect = vi.fn<() => Promise<void>>()
   const mockClose = vi.fn<() => Promise<void>>()
   const mockListTools = vi.fn<(_params?: Record<string, unknown>) => Promise<unknown>>()
@@ -20,6 +24,10 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
     _params?: Record<string, unknown>, _compatibilitySchema?: unknown, _options?: unknown,
   ) => Promise<unknown>>()
   const mockSetNotificationHandler = vi.fn()
+  const mockGetInstructions = vi.fn<() => string | undefined>(() => undefined)
+  const mockListResources = vi.fn<() => Promise<unknown>>()
+  const mockListResourceTemplates = vi.fn<() => Promise<unknown>>()
+  const mockReadResource = vi.fn<() => Promise<unknown>>()
   const mockRequest = vi.fn(async (
     request: { method: string; params?: Record<string, unknown> },
     _schema: unknown,
@@ -36,8 +44,15 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
     callTool = mockCallTool
     request = mockRequest
     setNotificationHandler = mockSetNotificationHandler
+    getInstructions = mockGetInstructions
+    listResources = mockListResources
+    listResourceTemplates = mockListResourceTemplates
+    readResource = mockReadResource
   }
-  return { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient }
+  return {
+    mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, mockGetInstructions,
+    mockListResources, mockListResourceTemplates, mockReadResource, MockClient,
+  }
 })
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -54,7 +69,11 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
+import { createScope } from '@shres-code/shres-code-scope'
+import { renderPrompt } from '@shres-code/shres-code-system-prompt'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
 import { apply, name, inject, Config as ConfigSchema } from '@shres-code/shres-code-mcp-client/src/index.ts'
+import { resolveReconnectPolicy, startConnection } from '@shres-code/shres-code-mcp-client/src/connection.ts'
 
 // ---- Helpers ----
 
@@ -132,6 +151,13 @@ describe('mcp-client plugin module exports', () => {
       command: 'echo',
     } as never)
     expect(omitted.reconnect).toEqual({ enabled: true, initialDelayMs: 500, maxDelayMs: 30_000, maxAttempts: 10 })
+    expect(omitted.maxInstructionBytes).toBe(32_768)
+    const http = ConfigSchema({
+      transport: 'streamable-http',
+      serverName: 'srv',
+      url: 'http://127.0.0.1/mcp',
+    } as never)
+    expect(http.maxInstructionBytes).toBe(32_768)
 
     const partial = ConfigSchema({
       transport: 'stdio',
@@ -150,6 +176,12 @@ describe('mcp-client plugin module exports', () => {
       command: 'echo',
       reconnect: { maxAttempts: 0 },
     } as never)).toThrow()
+    expect(() => ConfigSchema({
+      transport: 'stdio',
+      serverName: 'srv',
+      command: 'echo',
+      maxInstructionBytes: 0,
+    } as never)).toThrow()
   })
 })
 
@@ -158,6 +190,8 @@ describe('apply (plugin lifecycle)', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockGetInstructions.mockReset()
+    mockGetInstructions.mockImplementation(() => undefined)
     mockConnect.mockResolvedValue(undefined)
     mockClose.mockImplementation(function (this: { onclose?: () => void }) {
       this.onclose?.()
@@ -169,6 +203,15 @@ describe('apply (plugin lifecycle)', () => {
     })
     mockCallTool.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] })
     ctx = await mountRegistry()
+  })
+
+  it('publishes the server on the shared resource runtime when that runtime is mounted', async () => {
+    await ctx.plugin(McpResourceRuntime)
+    await apply(ctx, stdioConfig)
+    expect(ctx.tools.get('list_mcp_resources')).toBeDefined()
+    expect(ctx.tools.get('list_mcp_resource_templates')).toBeDefined()
+    expect(ctx.tools.get('read_mcp_resource')).toBeDefined()
+    expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
   })
 
   it('connects, syncs tools under the namespace, and registers a notification handler', async () => {
@@ -399,5 +442,93 @@ describe('apply (plugin lifecycle)', () => {
 
     expect(mockConnect).toHaveBeenCalled()
     expect(ctx.tools.get('mcp__web__remote')).toBeDefined()
+  })
+
+  it('reuses one serverName in separate registration scopes and rejects a duplicate inside one scope', async () => {
+    const scopeA = createScope(ctx, {})
+    const scopeB = createScope(ctx, {})
+    await apply(scopeA.ctx, stdioConfig)
+    await expect(apply(scopeB.ctx, stdioConfig)).resolves.toBeUndefined()
+    await expect(apply(scopeA.ctx, stdioConfig)).rejects.toThrow(/already in use in this registration scope/)
+  })
+
+  it('ignores plugin events for other fibers and for a fiber that is still live', async () => {
+    await apply(ctx, stdioConfig)
+    const child = ctx.plugin({ name: 'child', apply() {} })
+    await child
+    await child.dispose()
+    ctx.emit('internal/plugin', ctx.fiber)
+    await sleep(0)
+    expect(mockClose).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+    expect(mockClose).toHaveBeenCalled()
+  })
+
+  it('publishes trimmed server instructions literally and clears them on dispose', async () => {
+    mockGetInstructions.mockReturnValue('server says {{model}}\n')
+    ctx.systemPrompt.variable('model', () => 'deepseek-v4')
+    await apply(ctx, stdioConfig)
+
+    const assembly = await ctx.systemPrompt.assemble()
+    const section = assembly.sections.find(item => item.name === 'mcp:srv')
+    expect(section).toMatchObject({
+      interpolate: false,
+      text: '### MCP server: srv\n\nserver says {{model}}',
+    })
+    expect(renderPrompt(assembly)).toContain('server says {{model}}')
+  })
+
+  it('keeps an empty instruction section when the server omits instructions or sends only trailing space', async () => {
+    await apply(ctx, stdioConfig)
+    expect((await ctx.systemPrompt.assemble()).sections.find(item => item.name === 'mcp:srv')?.text).toBe('')
+
+    await ctx.fiber.dispose()
+    mockGetInstructions.mockReturnValue('\n')
+    const second = await mountRegistry()
+    await apply(second, stdioConfig)
+    expect((await second.systemPrompt.assemble()).sections.find(item => item.name === 'mcp:srv')?.text).toBe('')
+  })
+
+  it('rejects instructions that exceed the configured byte budget', async () => {
+    mockGetInstructions.mockReturnValue('hello')
+    const handle = startConnection(
+      ctx,
+      { ...stdioConfig, maxInstructionBytes: 8, reconnect: { enabled: false } },
+      resolveReconnectPolicy({ enabled: false }, 'reconnect'),
+    )
+    const outcome = await handle.ready
+    expect(outcome.error).toBeInstanceOf(Error)
+    expect((outcome.error as Error).message).toContain('maxInstructionBytes (8)')
+    expect(handle.instructions()).toBe('')
+  })
+
+  it('refuses resource requests until the server is connected, then forwards each method', async () => {
+    const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+    mockConnect.mockImplementation(() => gate.promise)
+    const handle = startConnection(ctx, stdioConfig, resolveReconnectPolicy(undefined, 'reconnect'))
+    const exec = { signal: new AbortController().signal } as ToolExecution
+    await vi.waitFor(() => { expect(mockConnect).toHaveBeenCalled() })
+    await expect(handle.resources.request({ method: 'resources/list' }, exec)).rejects.toThrow(/server is disconnected/)
+
+    mockListResources.mockResolvedValue({ resources: [{ uri: 'file://a' }] })
+    mockListResourceTemplates.mockResolvedValue({ resourceTemplates: [] })
+    mockReadResource.mockResolvedValue({ contents: [] })
+    gate.resolve()
+    await handle.ready
+
+    await expect(handle.resources.request({ method: 'resources/list' }, exec)).resolves.toEqual({ resources: [{ uri: 'file://a' }] })
+    expect(mockListResources).toHaveBeenCalledWith(undefined, expect.objectContaining({ timeout: 60_000, signal: exec.signal }))
+    await handle.resources.request({ method: 'resources/list', cursor: 'page-2' }, exec)
+    expect(mockListResources).toHaveBeenLastCalledWith({ cursor: 'page-2' }, expect.objectContaining({ signal: exec.signal }))
+    await handle.resources.request({ method: 'resources/templates/list' }, exec)
+    expect(mockListResourceTemplates).toHaveBeenCalledWith(undefined, expect.anything())
+    await handle.resources.request({ method: 'resources/templates/list', cursor: 'tpl' }, exec)
+    expect(mockListResourceTemplates).toHaveBeenLastCalledWith({ cursor: 'tpl' }, expect.anything())
+    await handle.resources.request({ method: 'resources/read', uri: 'file://a' }, exec)
+    expect(mockReadResource).toHaveBeenCalledWith({ uri: 'file://a' }, expect.objectContaining({ timeout: 60_000 }))
+
+    await handle.dispose()
+    await expect(handle.resources.request({ method: 'resources/read', uri: 'file://a' }, exec)).rejects.toThrow(/server is disconnected/)
+    expect(handle.instructions()).toBe('')
   })
 })

@@ -15,7 +15,9 @@ import type { Config } from '@shres-code/shres-code-mcp-client'
 
 // vi.mock factories are hoisted above every import/const, so the mock fns and
 // class must be created inside vi.hoisted to exist when the factories run.
-const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient, instances } = vi.hoisted(() => {
+const {
+  mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, mockGetInstructions, MockClient, instances,
+} = vi.hoisted(() => {
   const mockConnect = vi.fn<() => Promise<void>>()
   const mockClose = vi.fn<() => Promise<void>>()
   const mockListTools = vi.fn<(_params?: Record<string, unknown>) => Promise<unknown>>()
@@ -23,6 +25,7 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
     _params?: Record<string, unknown>, _compatibilitySchema?: unknown, _options?: unknown,
   ) => Promise<unknown>>()
   const mockSetNotificationHandler = vi.fn()
+  const mockGetInstructions = vi.fn<() => string | undefined>(() => undefined)
   const mockRequest = vi.fn(async (
     request: { method: string; params?: Record<string, unknown> },
     _schema: unknown,
@@ -38,10 +41,11 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
     close = mockClose
     request = mockRequest
     setNotificationHandler = mockSetNotificationHandler
+    getInstructions = mockGetInstructions
     constructor() { instances.push(this) }
   }
   const instances: MockClient[] = []
-  return { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient, instances }
+  return { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, mockGetInstructions, MockClient, instances }
 })
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -126,6 +130,8 @@ describe('reconnect supervisor', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockGetInstructions.mockReset()
+    mockGetInstructions.mockImplementation(() => undefined)
     instances.length = 0
     mockConnect.mockResolvedValue(undefined)
     mockClose.mockImplementation(function (this: { onclose?: () => void }) {
@@ -172,7 +178,10 @@ describe('reconnect supervisor', () => {
 
   it('stops at the failure cap, unregisters the tools, and reports final failure', async () => {
     const { warns, errors } = captureLogs(ctx)
+    mockGetInstructions.mockReturnValue('Use the remote tools.')
     await apply(ctx, stdioConfig({ initialDelayMs: 2, maxDelayMs: 8, maxAttempts: 2 }))
+    expect((await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'mcp:srv')?.text)
+      .toBe('### MCP server: srv\n\nUse the remote tools.')
     await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
 
     mockConnect.mockRejectedValue(new Error('server gone'))
@@ -186,8 +195,9 @@ describe('reconnect supervisor', () => {
     await vi.waitFor(() => {
       expect(errors.some(line => line.includes('giving up after 2 consecutive failed reconnect attempts'))).toBe(true)
     })
-    // Stale tools do not leak past final failure.
+    // Stale tools do not leak past final failure, and the instruction snapshot is cleared with them.
     expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined()
+    expect((await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'mcp:srv')?.text).toBe('')
     // Initial connect + exactly maxAttempts reconnect attempts.
     expect(mockConnect).toHaveBeenCalledTimes(3)
     expect(warns.some(line => line.includes('connection attempt failed: Error: server gone'))).toBe(true)
@@ -324,6 +334,7 @@ describe('reconnect supervisor', () => {
 
   it('reconnect disabled keeps the registered tools and reports manual recovery', async () => {
     const { errors } = captureLogs(ctx)
+    mockGetInstructions.mockReturnValue('Stay available.')
     await apply(ctx, stdioConfig({ enabled: false }))
     await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
 
@@ -332,6 +343,8 @@ describe('reconnect supervisor', () => {
     expect(mockConnect).toHaveBeenCalledTimes(1)
     // Pre-reconnect contract: the generation stays registered until disposal.
     expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
+    expect((await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'mcp:srv')?.text)
+      .toBe('### MCP server: srv\n\nStay available.')
     expect(errors.some(line => line.includes('connection lost and reconnect is disabled'))).toBe(true)
   })
   it('reconnect disabled after a failed initial connect reports no registered tools', async () => {

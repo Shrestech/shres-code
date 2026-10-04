@@ -20,7 +20,7 @@ Use the official [`@modelcontextprotocol/sdk`](https://github.com/modelcontextpr
 
 ### Scope
 
-MCP Client only (no server side — ACP already covers the "expose harness as an agent" role). Bridge **Tools** only — Resources and Prompts are deferred (they require harness-side consumption mechanisms that don't exist yet, and design space is large).
+MCP Client only (no server side — ACP already covers the "expose harness as an agent" role). This note's bridge is tools. Resource discovery, server instructions, and admitted images are owned by the [resources and instructions note](2026-10-04-mcp-resources-and-instructions.md). MCP prompts stay deferred.
 
 ### Plugin shape
 
@@ -52,7 +52,7 @@ interface StreamableHttpConfig {
 type Config = StdioConfig | StreamableHttpConfig
 ```
 
-`serverName` is the stable local identity that namespaces this server's tools in the model-facing name (below). It is deliberately user configuration, NOT the remote `serverInfo.name`: the remote name is untrusted input, is not unique across deployments (prod and staging instances of one server report the same name), and may change on server upgrade — none of which may silently rename model-facing tools. A duplicate `serverName` across live instances is a configuration error: the later instance fails at load with an actionable message, never silent shadowing or skipping. A short `serverName` (`gh`) is also the knob for shortening public names.
+`serverName` is the stable local identity that namespaces this server's tools in the model-facing name (below). It is deliberately user configuration, NOT the remote `serverInfo.name`: the remote name is untrusted input, is not unique across deployments (prod and staging instances of one server report the same name), and may change on server upgrade — none of which may silently rename model-facing tools. A duplicate `serverName` inside one registration scope is a configuration error: the later instance fails at load with an actionable message, never silent shadowing or skipping. Separate Agent scopes may reuse a name ([resources and instructions](2026-10-04-mcp-resources-and-instructions.md)). A short `serverName` (`gh`) is also the knob for shortening public names.
 
 Example `cordis.yml` usage:
 
@@ -120,7 +120,7 @@ MCP guarantees tool-name uniqueness only [within one server](https://modelcontex
 
 - Two servers publishing `search` coexist as `mcp__github__search` and `mcp__web__search`.
 - A native harness tool named `search` is unaffected.
-- Duplicate `serverName` config fails the later instance at load (see Configuration).
+- Duplicate `serverName` config inside one registration scope fails the later instance at load (see Configuration). Separate Agent scopes may reuse a name.
 - A server listing the same tool name twice is an invalid tool list: the sync throws and the previous generation stays registered.
 - A registry conflict during the swap can only mean a foreign tool squats on this server's `mcp__<serverName>__` namespace: the partial generation is rolled back (zero tools from this server) and the error is logged loudly.
 
@@ -141,7 +141,7 @@ A unified `execute` handler for all tools from one MCP server:
 1. Resolve `rawName` (the executor closes over it) and call `client.callTool({ name: rawName, arguments }, { signal: exec.signal })` with the configured timeout — the public name is never sent to the server.
 2. Map the result:
    - Multiple `text` content blocks → join with `'\n'` into a single `TextBlock` (required: `flattenText` uses `join('')` without separator, so multiple blocks would lose inter-block boundaries).
-   - `image` content blocks → discard with a `ctx.logger.warn` (the harness has no image content block type; [drop-image Agent Note](../simplification/2026-07-04-drop-image-content-block.md)).
+   - `image` content blocks are admitted through the attachment service when the current model declares image input; otherwise they become diagnostic text. The canonical value keeps the raw MCP JSON. The [resources and instructions note](2026-10-04-mcp-resources-and-instructions.md) owns that projection.
    - `isError: true` → map to the harness `isError` result path (`{ content: [...], isError: true }`).
 3. Cancellation: `exec.signal` (from the agent loop's cancel) is passed through to the MCP SDK's `callTool`, which sends `$/cancelRequest` to the server.
 
@@ -169,7 +169,7 @@ Rejected for v1: it added a partial-availability state (tools registered but tem
 
 ### Bridge Resources and Prompts
 
-Deferred. Resources need a harness-side mechanism to decide WHEN to inject content (system prompt? on demand? model-triggered?). Prompts need a "prompt template" concept the harness lacks. Both require their own design; Tools are the high-value, low-risk starting point.
+MCP prompts stay deferred: the harness has no prompt-template consumer. Resource discovery and server instructions ship as on-demand tools and a literal conditional section ([resources and instructions](2026-10-04-mcp-resources-and-instructions.md)).
 
 ### Raw model-facing tool names with an optional `toolPrefix`
 
@@ -185,15 +185,15 @@ Rejected. The remote name is untrusted, non-unique across deployments, and chang
 
 ### Preserve multiple TextBlocks in tool result
 
-Rejected. `flattenText()` in the DeepSeek serializer uses `join('')` (no separator) when flattening `ContentBlock[]` to wire format. Multiple text blocks would silently lose inter-block boundaries — a correctness bug. All existing tools return a single TextBlock; the MCP bridge follows suit.
+Rejected for text blocks. `flattenText()` in the DeepSeek serializer uses `join('')` (no separator) when flattening `ContentBlock[]` to wire format. Multiple text blocks would silently lose inter-block boundaries. Text from one MCP result is joined with newlines into one text block. An admitted image is a separate image content block; the [resources and instructions note](2026-10-04-mcp-resources-and-instructions.md) owns that projection.
 
 ## Testing
 
 Coverage is named per tier; each behavior lives at the cheapest tier that can express it.
 
-- **Unit** (`tests/mcp-client.spec.ts`, `tests/apply.spec.ts`, mocked MCP SDK): the `publicToolName` algorithm (clean, normalize, truncate-and-hash, determinism, distinct-identity separation), raw-vs-public wire discipline, cross-server and native-tool coexistence, duplicate-`serverName` load failure and reservation release, invalid-tool-list rejection, generation swap/rollback, failed-re-sync retention, result mapping, cancellation, config schema validation. 100% per-file coverage gates the package.
+- **Unit** (`tests/mcp-client.spec.ts`, `tests/apply.spec.ts`, `tests/tool-definition.spec.ts`, `tests/reconnect.spec.ts`, mocked MCP SDK): the `publicToolName` algorithm (clean, normalize, truncate-and-hash, determinism, distinct-identity separation), raw-vs-public wire discipline, cross-server and native-tool coexistence, duplicate-`serverName` load failure inside one registration scope and reservation release, invalid-tool-list rejection, generation swap/rollback, failed-re-sync retention, result mapping, image admission, server instructions, resource requests, cancellation, config schema validation. 100% per-file coverage gates the package. Shared resource tools are pinned in `packages/mcp/mcp-resources/tests/resources.spec.ts`.
 - **E2E** (`tests/mcp-client.e2e.ts`, keyless): the real MCP protocol against the in-repo fixture server, `@modelcontextprotocol/server-everything`, and `@modelcontextprotocol/server-filesystem` over stdio, and against an in-process `StreamableHTTPServerTransport` server over Streamable HTTP — discovery under the namespace, dotted-name normalization end to end, execution round-trips, duplicate-`serverName` rejection, disposal.
-- **Snapshot**: deliberately none. MCP tools introduce no new presentation shape — they register as raw `ToolDefinition`s and UI consumers use the generic-card fallback already pinned by their presentation suites. Adding an MCP server to a runnable snapshot composition would mutate its pinned system-prompt fixture and make every replay depend on spawning an external MCP server process for no new behavior. If a later change gives MCP tools their own render intent, that change names its snapshot coverage then.
+- **Snapshot**: deliberately none for shipped compositions. Those compositions do not enable an MCP server, so their prompts stay unchanged. Instruction text, resource results, and image projection are pinned by the unit tests above. Adding an MCP server to a runnable snapshot composition would mutate its pinned prompt fixture and make every replay depend on spawning an external MCP server process.
 
 ## Consequences
 

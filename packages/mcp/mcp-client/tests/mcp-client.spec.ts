@@ -376,7 +376,13 @@ describe('tool execution', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__img', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: 'before\n[image: image/png, content discarded]' })
+    expect(result.content).toEqual([
+      { type: 'text', text: 'before' },
+      {
+        type: 'text',
+        text: '[image unavailable: image/png; the image data is not canonical base64; raw image data remains available to programmatic callers]',
+      },
+    ])
     if (result.isError) throw new Error('expected MCP success')
     expect(result.value).toEqual({ content: blocks })
   })
@@ -396,7 +402,7 @@ describe('tool execution', () => {
 
     expect(result.content[0]).toEqual({
       type: 'text',
-      text: '[unsupported content type: unknown]\n[unsupported content type: unknown]\n[unsupported content type: unknown]',
+      text: '[unsupported MCP content block: expected an object]\n[unsupported MCP content block: expected an object]\n[unsupported MCP content block: expected an object]',
     })
     if (result.isError) throw new Error('expected primitive MCP blocks to remain a successful JSON value')
     expect(result.value).toEqual({ content: blocks })
@@ -556,7 +562,10 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__audio_tool', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[audio: audio/mp3, content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: '[audio result unsupported: audio/mp3; raw audio data remains available to programmatic callers]',
+    })
   })
 
   it('handles resource content with placeholder', async () => {
@@ -568,7 +577,10 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__res_tool', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[resource: content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: '[embedded resource unsupported; raw resource data remains available to programmatic callers]',
+    })
   })
 
   it('handles resource_link content with placeholder', async () => {
@@ -580,7 +592,22 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__link_tool', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[resource: content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: '[resource link unavailable: the MCP block is missing its name or URI]',
+    })
+  })
+
+  it('renders a resource link that names its target', async () => {
+    const client = createMockClient(
+      [{ name: 'link_named', inputSchema: { type: 'object' } }],
+      { content: [{ type: 'resource_link', name: 'Guide', uri: 'file://guide.md' }] },
+    )
+
+    await syncTools(client as never, ctx, defaultOpts, new Map())
+    const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__link_named', arguments: {} })
+
+    expect(result.content[0]).toEqual({ type: 'text', text: 'Resource link: Guide (file://guide.md)' })
   })
 
   it('handles unknown content types', async () => {
@@ -592,7 +619,7 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__unknown_tool', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[unsupported content type: video]' })
+    expect(result.content[0]).toEqual({ type: 'text', text: '[unsupported MCP content type: video]' })
   })
 
   it('handles image with missing mimeType (buggy server)', async () => {
@@ -604,7 +631,10 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__img2', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[image: unknown, content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: '[image unavailable: unknown media type; the declared media type is not PNG, JPEG, WebP, or GIF; raw image data remains available to programmatic callers]',
+    })
   })
 
   it('handles audio with missing mimeType (buggy server)', async () => {
@@ -616,7 +646,10 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__audio_no_mime', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '[audio: unknown, content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: '[audio result unsupported: unknown media type; raw audio data remains available to programmatic callers]',
+    })
   })
 
   it('handles text block with missing text (buggy server)', async () => {
@@ -628,7 +661,7 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__notext', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '(notext returned no text content)' })
+    expect(result.content[0]).toEqual({ type: 'text', text: '(notext returned no model-visible content)' })
   })
 
   it('handles empty content array', async () => {
@@ -640,7 +673,7 @@ describe('tool execution edge cases', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__empty_tool', arguments: {} })
 
-    expect(result.content[0]).toEqual({ type: 'text', text: '(empty_tool returned no text content)' })
+    expect(result.content[0]).toEqual({ type: 'text', text: '(empty_tool returned no model-visible content)' })
   })
 
 
@@ -678,7 +711,10 @@ describe('tool execution edge cases', () => {
     const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'mcp__srv__err_notext', arguments: {} })
 
     expect(result.isError).toBe(true)
-    expect(result.content[0]).toEqual({ type: 'text', text: 'Error: [image: image/png, content discarded]' })
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: 'Error: [image unavailable: image/png; this result was not admitted to durable model context; raw image data remains available to programmatic callers]',
+    })
   })
 
 

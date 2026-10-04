@@ -601,6 +601,11 @@
       config:
         persona: ''
 
+    # Shared MCP resource tools. They register only while an mcp-client row is
+    # active in the same scope; no server is enabled here.
+    - id: mcp-resources
+      name: '@shres-code/shres-code-mcp-resources'
+
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.
     - id: agent-loop

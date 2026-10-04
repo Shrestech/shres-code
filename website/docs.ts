@@ -271,6 +271,7 @@ const subsystemGroups = [
     ['web.md', 'Web access'],
     ['browser.md', 'Browser automation'],
     ['speech.md', 'Speech I/O'],
+    ['mcp.md', 'MCP'],
     ['skills.md', 'Skills'],
     ['profiles.md', 'Profiles and installation'],
     ['workflow.md', 'Workflows'],
