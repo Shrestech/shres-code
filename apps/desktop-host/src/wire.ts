@@ -61,7 +61,7 @@ function assertStreamId(streamId: number): void {
   }
 }
 
-function encodeFrame(type: ResponseFrameType, streamId: number, payload: Buffer): Buffer {
+function encodeFrame(type: ResponseFrameType, streamId: number, payload: Uint8Array): Buffer {
   assertStreamId(streamId)
   const limit = type === RESPONSE_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : MAX_CONTROL_PAYLOAD_BYTES
   if (payload.byteLength > limit) {
@@ -72,7 +72,7 @@ function encodeFrame(type: ResponseFrameType, streamId: number, payload: Buffer)
   frame.writeUInt8(type, 4)
   frame.writeUInt32BE(streamId, 5)
   frame.writeUInt32BE(payload.byteLength, 9)
-  payload.copy(frame, FRAME_HEADER_BYTES)
+  frame.set(payload, FRAME_HEADER_BYTES)
   return frame
 }
 
@@ -104,7 +104,7 @@ export function encodeDesktopResponseStart(
  * @returns the encoded data frame.
  */
 export function encodeDesktopResponseData(streamId: number, data: Uint8Array): Buffer {
-  return encodeFrame(RESPONSE_FRAME_DATA, streamId, Buffer.from(data))
+  return encodeFrame(RESPONSE_FRAME_DATA, streamId, data)
 }
 
 /**

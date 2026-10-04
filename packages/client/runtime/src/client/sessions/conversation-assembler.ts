@@ -42,6 +42,8 @@ interface ViewState {
   readonly target: string
   readonly builder: ConversationViewBuilder
   snapshot: unknown
+  /** The builder has staged nodes that `snapshot()` has not materialized. */
+  stale: boolean
 }
 
 const PUBLICATION_RANK: Record<ConversationPublication, number> = {
@@ -274,10 +276,17 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
         if (node !== null) allByTarget.get(target)?.push(node)
       }
       for (const view of this.views.values()) {
-        view.snapshot = view.builder.replace({
+        const input = {
           nodes: allByTarget.get(view.target) ?? [],
           timeline: this.locationIndex.snapshot(),
-        })
+        }
+        if (view.builder.stageReplace !== undefined && view.builder.materialize !== undefined) {
+          view.builder.stageReplace(input)
+          view.stale = true
+        } else {
+          view.snapshot = view.builder.replace(input)
+          view.stale = false
+        }
       }
       this.replacePending = false
       this.dirty.clear()
@@ -307,10 +316,17 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     for (const view of this.views.values()) {
       const upserts = upsertsByTarget.get(view.target) ?? []
       if (upserts.length === 0 && !timelineDirty) continue
-      view.snapshot = view.builder.apply({
+      const input = {
         upserts,
         timeline: this.locationIndex.snapshot(),
-      })
+      }
+      if (view.builder.stageApply !== undefined && view.builder.materialize !== undefined) {
+        view.builder.stageApply(input)
+        view.stale = true
+      } else {
+        view.snapshot = view.builder.apply(input)
+        view.stale = false
+      }
     }
     return true
   }
@@ -321,7 +337,13 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
    * @returns target snapshot, or undefined when no builder is registered.
    */
   snapshot(target: string): unknown {
-    return this.views.get(target)?.snapshot
+    const view = this.views.get(target)
+    if (view === undefined) return undefined
+    if (view.stale && view.builder.materialize !== undefined) {
+      view.snapshot = view.builder.materialize()
+      view.stale = false
+    }
+    return view.snapshot
   }
 
   get<Target extends Extract<keyof ConversationViewSnapshotMap, string>>(
@@ -780,6 +802,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
         target: definition.target,
         builder,
         snapshot: builder.empty,
+        stale: false,
       })
     }
     this.replacePending = true

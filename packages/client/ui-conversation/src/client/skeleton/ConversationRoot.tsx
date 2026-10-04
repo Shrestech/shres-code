@@ -4,13 +4,53 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import type { WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
+import type { ConversationSnapshot, WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
+
+function sameSubagent(
+  left: ConversationSnapshot['subagent'],
+  right: ConversationSnapshot['subagent'],
+): boolean {
+  if (left === right) return true
+  if (left === null || right === null) return false
+  return left.parentAvailable === right.parentAvailable
+    && left.address.mode === right.address.mode
+    && left.address.parentSessionId === right.address.parentSessionId
+    && left.address.childSessionId === right.address.childSessionId
+}
+
+/**
+ * Fields the composer shell and its takeover selectors read. Token text and
+ * the trajectory projection notify their own subscribers.
+ * @param left - previous snapshot.
+ * @param right - next snapshot.
+ * @returns whether the shell can keep its current render.
+ */
+function sameComposerShell(
+  left: ConversationSnapshot | undefined,
+  right: ConversationSnapshot | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right
+  return left.sessionId === right.sessionId
+    && left.openState === right.openState
+    && left.composerPhase === right.composerPhase
+    && left.blank === right.blank
+    && left.running === right.running
+    && left.removed === right.removed
+    && left.pending === right.pending
+    && left.queue === right.queue
+    && left.hasMore === right.hasMore
+    && left.loadingOlder === right.loadingOlder
+    && left.openError === right.openError
+    && left.promptError === right.promptError
+    && left.lastAgentError === right.lastAgentError
+    && sameSubagent(left.subagent, right.subagent)
+}
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
@@ -19,7 +59,7 @@ export function ConversationRoot({
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
   const pending = useSession(s => s.pending) ?? []
-  const session = useSession(s => s)
+  const session = useSession(s => s, sameComposerShell)
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
