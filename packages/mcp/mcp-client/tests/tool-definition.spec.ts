@@ -46,11 +46,11 @@ async function mountRegistry(mode?: 'code'): Promise<Context> {
   return ctx
 }
 
-function agent(options: { provider?: string; model?: string }, header?: { provider: string; model: string }): ToolRunContext['agent'] {
+function agent(options: { provider?: string; model?: string }, header?: { provider: string; model: string }): NonNullable<ToolRunContext['agent']> {
   return {
     options,
     session: { requestHeader: () => header === undefined ? undefined : { config: header } },
-  } as unknown as ToolRunContext['agent']
+  } as unknown as NonNullable<ToolRunContext['agent']>
 }
 
 function execution(options?: { agent?: ToolRunContext['agent']; signal?: AbortSignal }): ToolRunContext {
