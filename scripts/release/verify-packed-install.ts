@@ -12,10 +12,12 @@
  *
  * What this proves is that `files` selected a complete payload and that the
  * published dependency ranges resolve. A workspace link or a stale `lib/` in the
- * checkout cannot stand in for a missing file here.
+ * checkout cannot stand in for a missing file here. The shres family also
+ * resolves the headless bundle's judgment and model-router dependencies from
+ * the installed tree.
  */
 
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,6 +67,38 @@ function packedDependencies(directories: readonly string[]): Map<string, { url: 
   return dependencies
 }
 
+/**
+ * Packages the headless bundle declares and that a published shres install
+ * must be able to load. They are not the family entry; bundle/headless pulls
+ * them in.
+ */
+const HEADLESS_CLOSURE = [
+  '@shres-code/shres-code-judgment-shield',
+  '@shres-code/shres-code-judgment-laya',
+  '@shres-code/shres-code-model-router',
+] as const
+
+/**
+ * Resolve the headless bundle's closure from the installed package, not from
+ * the throwaway consumer's own dependency list.
+ * @param consumerRoot - the throwaway consumer directory.
+ * @param environment - the child environment.
+ */
+function assertHeadlessClosure(consumerRoot: string, environment: NodeJS.ProcessEnv): void {
+  const headlessPackage = join(consumerRoot, 'node_modules', '@shres-code', 'shres-code-headless', 'package.json')
+  if (!existsSync(headlessPackage)) {
+    throw new Error(`installed tree is missing ${headlessPackage}`)
+  }
+  const script = [
+    "import { createRequire } from 'node:module'",
+    `const require = createRequire(${JSON.stringify(headlessPackage)})`,
+    `const names = ${JSON.stringify(HEADLESS_CLOSURE)}`,
+    'for (const name of names) require.resolve(name)',
+  ].join('\n')
+  capture(process.execPath, ['--input-type=module', '--eval', script], { cwd: consumerRoot, env: environment })
+  console.log(`release verify-packed-install: headless closure resolves ${HEADLESS_CLOSURE.join(', ')}`)
+}
+
 /** Install every tarball under `--from` and drive the `--family` entry. */
 function main(): void {
   const { values } = parseArgs({
@@ -112,6 +146,7 @@ function main(): void {
       throw new Error(`installed ${entry.packageName} --version reported ${JSON.stringify(version)}, expected ${expected.version}`)
     }
     console.log(`release verify-packed-install: installed ${entry.packageName} reports ${version}`)
+    if (family.id === 'shres') assertHeadlessClosure(consumerRoot, environment)
   } finally {
     rmSync(consumerRoot, { recursive: true, force: true })
   }
