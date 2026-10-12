@@ -13,11 +13,12 @@
  * What this proves is that `files` selected a complete payload and that the
  * published dependency ranges resolve. A workspace link or a stale `lib/` in the
  * checkout cannot stand in for a missing file here. The shres family also
- * resolves the headless bundle's judgment and model-router dependencies from
- * the installed tree.
+ * requires the installed headless bundle manifest to declare judgment-shield,
+ * judgment-laya, and model-router, then resolves those packages from that
+ * install.
  */
 
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -72,23 +73,44 @@ function packedDependencies(directories: readonly string[]): Map<string, { url: 
  * must be able to load. They are not the family entry; bundle/headless pulls
  * them in.
  */
-const HEADLESS_CLOSURE = [
+export const HEADLESS_CLOSURE = [
   '@shres-code/shres-code-judgment-shield',
   '@shres-code/shres-code-judgment-laya',
   '@shres-code/shres-code-model-router',
 ] as const
 
 /**
- * Resolve the headless bundle's closure from the installed package, not from
- * the throwaway consumer's own dependency list.
+ * Reject an installed headless manifest that dropped one of {@link HEADLESS_CLOSURE}.
+ * Node resolution from the consumer root is not enough: every packed tarball is
+ * a direct dependency there, so a missing edge on headless would still resolve.
+ * @param dependencies - the installed `dependencies` object.
+ */
+export function assertHeadlessClosure(dependencies: Readonly<Record<string, unknown>> | undefined): void {
+  const present = dependencies ?? {}
+  const missing = HEADLESS_CLOSURE.filter(name => !Object.hasOwn(present, name))
+  if (missing.length > 0) {
+    throw new Error(`installed @shres-code/shres-code-headless is missing dependency edges: ${missing.join(', ')}`)
+  }
+}
+
+/**
+ * Read the installed headless manifest, require its closure edges, then resolve
+ * each package from that install.
  * @param consumerRoot - the throwaway consumer directory.
  * @param environment - the child environment.
  */
-function assertHeadlessClosure(consumerRoot: string, environment: NodeJS.ProcessEnv): void {
+function assertInstalledHeadlessClosure(consumerRoot: string, environment: NodeJS.ProcessEnv): void {
   const headlessPackage = join(consumerRoot, 'node_modules', '@shres-code', 'shres-code-headless', 'package.json')
   if (!existsSync(headlessPackage)) {
     throw new Error(`installed tree is missing ${headlessPackage}`)
   }
+  const manifest = JSON.parse(readFileSync(headlessPackage, 'utf8')) as { dependencies?: unknown }
+  const dependencies = manifest.dependencies
+  assertHeadlessClosure(
+    dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)
+      ? dependencies as Record<string, unknown>
+      : undefined,
+  )
   const script = [
     "import { createRequire } from 'node:module'",
     `const require = createRequire(${JSON.stringify(headlessPackage)})`,
@@ -146,7 +168,7 @@ function main(): void {
       throw new Error(`installed ${entry.packageName} --version reported ${JSON.stringify(version)}, expected ${expected.version}`)
     }
     console.log(`release verify-packed-install: installed ${entry.packageName} reports ${version}`)
-    if (family.id === 'shres') assertHeadlessClosure(consumerRoot, environment)
+    if (family.id === 'shres') assertInstalledHeadlessClosure(consumerRoot, environment)
   } finally {
     rmSync(consumerRoot, { recursive: true, force: true })
   }
