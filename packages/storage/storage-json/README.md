@@ -1,6 +1,6 @@
 # @shres-code/shres-code-storage-json
 
-JSON backend for the [storage hub](../storage/README.md): one human-readable `<unit>.json` file (`single` layout) or one document per record under `<unit>/` (`per-record` layout) under a configured root, registered as backend `json`. Design: [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md). Version-read compatibility: [compatible-versions Agent Note](../../../.agents/notes/implemented/bug-fix/2026-09-11-storage-version-read-compat.md).
+JSON backend for the [storage hub](../storage/README.md): one human-readable `<unit>.json` file (`single` layout) or one document per record under `<unit>/` (`per-record` layout) under a configured root, registered as backend `json`. Design: domain KV storage Agent Note. Version-read compatibility: compatible-versions Agent Note.
 
 ## Model
 

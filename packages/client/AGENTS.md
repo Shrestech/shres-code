@@ -1,12 +1,12 @@
 # AGENTS.md — Web client stack
 
-Rules for `packages/client/*` (the browser side of the shres web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.md). Before touching slots, component props, stores, or plugin structure, read the [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) (the definitive composition model) and the [web client architecture note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md) (loading chain, object layer, services).
+Rules for `packages/client/*` (the browser side of the shres web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.md). Before touching slots, component props, stores, or plugin structure, read the slot system standard (the definitive composition model) and the web client architecture note (loading chain, object layer, services).
 
 Packages here are named with the directory prefix: `@shres-code/shres-code-client-<name>`.
 
 ## Slot and props discipline
 
-The [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) owns the full design; these are the rules you must not violate when writing or reviewing client code:
+The slot system standard owns the full design; these are the rules you must not violate when writing or reviewing client code:
 
 1. **One API**: a plugin composes UI only through `ctx.slots.register({ name, children?, store?, inject? }, Component)`. There is no separate slot-definition call, no whitelist face object, no face-minting helper. The shell alone renders `'root'`.
 2. **children = declaration + authorization**: the slots your component renders are exactly the keys of your register call's `children` object (spec values: `kind`/`scope`). Rendering a slot you didn't declare, or declaring one someone else declared, fails at load — do not work around it; the conflict is the design speaking. Slot names mirror the composition path: `<domain>.<entry>.<hole>` (e.g. `'tool.call.toolview'`).
@@ -41,7 +41,7 @@ The `/client` entrypoint of a UI plugin package is its public browser API, not a
 
 ## Layering red lines
 
-The stack has one-way knowledge, settled in the [web client architecture note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md):
+The stack has one-way knowledge, settled in the web client architecture note:
 
 1. **Data object layer** (`runtime`, React-free): `ConnectionController` → `SessionManager` → `Session` own all business state (event windows, streaming accumulation, reconnect machine), and the snapshot-store engine (zustand/immer, `defineStore`, `shallowEqual`) lives here too — store products are bare observable sources with no hook members. Zero React imports — grep-assertable.
 2. **Render machinery** (`web-react`, shell-only glue): all ctx-to-React integration — slot renderer/outlets, `SessionProvider`, and the uSES adapter. Every hook is composed here at the binding site from bare sources; business plugin packages carry no web-react dependency at all.
@@ -50,7 +50,7 @@ The stack has one-way knowledge, settled in the [web client architecture note](.
 Non-negotiables across the layers:
 
 - **Business data lives in the object layer, never a store.** Entry-declared stores carry shared viewing/interaction state (selection, drafts, panel widths); sessions, frames, and connections stay in the object layer.
-- **rpcId is strictly bidirectional**: the initiator mints, the responder echoes; business signatures see only `RpcRequest<P>`, minting stays in the carrier layer ([layering and RPC protocol note](../../.agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.md)).
+- **rpcId is strictly bidirectional**: the initiator mints, the responder echoes; business signatures see only `RpcRequest<P>`, minting stays in the carrier layer.
 - **Notifier publication discipline**: `notifyNow` is only the direct echo of a user gesture; structural updates use microtask-batched `markDirty`, while visible streaming chunks use cumulative `markFrameDirty`. See `runtime/src/client/sessions/notifier.ts`.
 - **The web layer is pure presentation.** Nothing that is "how to draw" (tool-card views, queue states) enters the session log; the host computes such data per frame or pushes it live, and replay recomputes it — falling back to the generic form when it can't. A new *model-visible* input still requires a session event (repo-wide rule).
 
@@ -66,11 +66,11 @@ One UI feature = one plugin package (`src/client/` browser half). A multi-domain
 
 ## Styling
 
-[docs/web-styling.md](../../docs/web-styling.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Product copy is English; code comments are English. See [docs/AGENTS.md](../../docs/AGENTS.md) and the [English-only purge Agent Note](../../.agents/notes/implemented/process/2026-08-16-english-only-purge.md).
+[docs/web-styling.md](../../docs/web-styling.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Product copy is English; code comments are English. See [docs/AGENTS.md](../../docs/AGENTS.md) and the English-only purge Agent Note.
 
 ## Testing and coverage
 
-The GUI test structure (three tiers, lane map) is settled in the [GUI testing system note](../../.agents/notes/implemented/process/2026-07-20-gui-testing-system.md); repo-wide policy in [docs/testing.md](../../docs/testing.md).
+The GUI test structure (three tiers, lane map) is settled in the GUI testing system note; repo-wide policy in [docs/testing.md](../../docs/testing.md).
 
 - Client source packages are inside the per-file 100% coverage gate (`pnpm run test:coverage`). Genuinely unreachable defensive arms take a `/* v8 ignore -- <reason> */` comment with a real reason, never a bare ignore.
 - Component specs render with realistic props or a driven fixture runtime and assert user-visible behavior, not class names, hook internals, or render counts.
@@ -83,7 +83,7 @@ Run the narrowest rung that covers what you touched; escalate only when the chan
 
 1. **Every GUI code change** — `pnpm run test:gui` (seconds; no browser, no server): the client suites plus the host-side GUI packages. This is the inner loop; run it as freely as a typecheck.
 2. **Any change that can alter the assembled browser or visible conversation/UI output** (client components or copy, `apps/web`, Vite, `shres-host-webserver`, connection/handler/SSE) — additionally `SHRES_SNAPSHOT=replay pnpm run test:web`: rebuilds the frontend dist, then runs the browser smoke pair (the real-host case self-skips without `DEEPSEEK_API_KEY`) plus the keyless replayed e2e scenarios. Linux PR CI uses the same read-only replay mode. Use `SHRES_SNAPSHOT=refresh` only after confirming an intentional output change, or `SHRES_SNAPSHOT=record` with a key to re-record fixtures.
-3. **Before a PR** — use [shres-pre-push-checks](../../.agents/skills/shres-pre-push-checks/SKILL.md) to select the narrow checks for the outgoing diff; there is no repo-wide pre-push aggregate.
+3. **Before a PR** — use shres-pre-push-checks to select the narrow checks for the outgoing diff; there is no repo-wide pre-push aggregate.
 
 If `test:gui` is red on code you did not touch, neither silently fix nor ignore it: note it in your handoff so it lands in the next PR window's sweep.
 
@@ -99,9 +99,8 @@ Bringing up a new `packages/client/<name>` plugin package (ui-workspace is a com
 
 ## New component checklist
 
-1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md). No other composition route exists.
+1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the slot system standard. No other composition route exists.
 2. Type the props as the four shares (`PropsRuntime` & `PropsRenderSlots` & `PropsStore` & inject face) — derive, don't hand-write. Shared/surviving state goes in a `createXXXStore()` factory declared at register; component-private state stays local.
 3. Component tests feed props directly (`createXXXStore().create()` for the store data; plain stubs for framework hooks) and assert behavior without render machinery.
 4. Tokens only in CSS; English product copy; English comments.
 5. `pnpm run test:gui` green; if the component changes visible assembled output, also run `SHRES_SNAPSHOT=replay pnpm run test:web`.
-6. Non-trivial change? It needs an Agent Note in the same PR (repo-wide rule) — the GUI notes above are the precedents to extend.

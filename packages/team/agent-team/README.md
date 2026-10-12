@@ -2,7 +2,7 @@
 
 Agent Teams runtime: one Lead session coordinates named peer teammates through a roster and a Lead-log mailbox. This package owns the log events, the fold, the `agentTeam` projection, `TeamJournal`, continuable provisioning, steer delivery, and the `team_send` / `team_list` tools. Task-board tools are not registered yet.
 
-The [runtime note](../../../.agents/notes/implemented/feature/2026-09-11-agent-teams-runtime-and-seats.md) owns live delivery; the [vocabulary note](../../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity and replay; the [subsystem page](../../../docs/subsystems/agent-team.md) records the durable forms.
+The runtime note owns live delivery; the vocabulary note owns identity and replay; the [subsystem page](../../../docs/subsystems/agent-team.md) records the durable forms.
 
 ## Config
 

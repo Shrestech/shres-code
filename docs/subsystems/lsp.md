@@ -1,6 +1,6 @@
 # LSP navigation
 
-The LSP seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md) exposing semantic code navigation on one `ctx.lsp` service, split across packages: Service Definition ([shres-lsp](../../packages/lsp/lsp), `ctx.lsp` + the provider registry), a generic Service Provider ([shres-lsp-stdio](../../packages/lsp/lsp-stdio), a configured stdio language-server host), and Consumer ([shres-tool-lsp](../../packages/lsp/tool-lsp), the `lsp` tool schema). LSP is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A provider swap does not change how the model asks for navigation.
+The LSP seam — a capability seam exposing semantic code navigation on one `ctx.lsp` service, split across packages: Service Definition ([shres-lsp](../../packages/lsp/lsp), `ctx.lsp` + the provider registry), a generic Service Provider ([shres-lsp-stdio](../../packages/lsp/lsp-stdio), a configured stdio language-server host), and Consumer ([shres-tool-lsp](../../packages/lsp/tool-lsp), the `lsp` tool schema). LSP is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A provider swap does not change how the model asks for navigation.
 
 Source: [`packages/lsp/lsp/src/types.ts`](../../packages/lsp/lsp/src/types.ts)
 

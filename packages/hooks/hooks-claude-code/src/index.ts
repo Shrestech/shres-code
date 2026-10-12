@@ -5,7 +5,7 @@
  * mapping; shared execution and parsing live in `shres-hook-protocol`.
  * `updatedInput` is logged and warned but not honored. Bespoke behavior should
  * use typed native plugins on the same extension points; see the
- * [hook-bridges Agent Note](../../../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.md).
+ * hook-bridges Agent Note.
  * @module @shres-code/shres-code-hooks-claude-code
  */
 

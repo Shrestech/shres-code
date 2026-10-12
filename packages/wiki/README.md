@@ -12,4 +12,4 @@ Wiki content reaches the model only through tools. The filesystem provider, tool
 | [`wiki-embed-onnx/`](wiki-embed-onnx/README.md) | Optional embeddings provider; absent search is BM25-only | — |
 | [`wiki-librarian/`](wiki-librarian/README.md) | Cheap-model consolidator; unbound = dormant | — |
 
-Design: [LLM Wiki as project long-term memory](../../.agents/notes/implemented/feature/2026-08-29-llm-wiki.md).
+Design: LLM Wiki as project long-term memory.

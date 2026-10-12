@@ -47,7 +47,7 @@ const install: InvariantInstaller = (ctx, fail) => {
   // `skill` against the empty global layer, so the model receives nothing.
   // `composedPreset()` is the roster's own answer to "did this agent join",
   // read from the live scope chain — see the [Agent
-  // Note](../../../../.agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.md)
+  // Note](
   // for why the warning beside it is advisory while this one fails.
   //
   // Two conditions, each load-bearing. `context.agent` is what makes this an

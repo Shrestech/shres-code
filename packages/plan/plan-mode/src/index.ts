@@ -18,7 +18,7 @@
  * catalog.
  *
  * Agent Note:
- * - .agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md
+ * -
  *
  * @module @shres-code/shres-code-plan-mode
  */

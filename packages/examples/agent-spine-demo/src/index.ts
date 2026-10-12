@@ -4,7 +4,7 @@
  * agent-instructions providers, and model-facing shell/skill consumers;
  * deployments still choose the LLM adapter, bash executor, and presentation.
  * The plugin intentionally exposes named exports only because Loader default
- * unwrapping would discard its `Config` schema (see docs/postmortem/0001).
+ * unwrapping would discard its `Config` schema (see
  * @module @shres-code/shres-code-agent-spine-demo
  */
 

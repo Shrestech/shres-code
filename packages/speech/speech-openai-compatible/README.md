@@ -1,6 +1,6 @@
 # @shres-code/shres-code-speech-openai-compatible
 
-OpenAI-compatible cloud speech provider for the speech capability seam (`ctx.speech`): STT and TTS over one configurable endpoint, OpenRouter by default. See the [speech I/O Agent Note](../../../.agents/notes/implemented/feature/2026-09-04-cloud-speech-openai-compatible.md) for why the provider is registered but never auto-selected.
+OpenAI-compatible cloud speech provider for the speech capability seam (`ctx.speech`): STT and TTS over one configurable endpoint, OpenRouter by default. See the speech I/O Agent Note for why the provider is registered but never auto-selected.
 
 ## Providers
 

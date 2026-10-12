@@ -17,7 +17,7 @@ import { decodeStorageRecord } from '@shres-code/shres-code-session'
  * `pnpm run test:snapshot:record` re-records model transcripts against the real
  * API; `pnpm run test:snapshot:refresh` rewrites current replay expected outputs keyless.
  * See the package README (packages/test-support/acp-snapshot) and the snapshot Agent Note,
- * .agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md.
+ *
  */
 
 // The shres-acp-demo bin (the demo:acp entry), this example's cordis.yml, and

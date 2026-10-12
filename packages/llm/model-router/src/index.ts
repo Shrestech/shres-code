@@ -28,8 +28,8 @@
  * in force for the rest of the turn.
  *
  * Agent Notes:
- * - .agents/notes/implemented/bug-fix/2026-09-22-routing-choice-and-difficulty.md
- * - .agents/notes/implemented/bug-fix/2026-09-25-router-selection-install-gap.md
+ * -
+ * -
  *
  * @module @shres-code/shres-code-model-router
  */

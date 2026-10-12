@@ -24,7 +24,7 @@ Use the split lifecycle only when teardown must be ordered with another resource
 - `enter(session)` performs the collision check, publishes without announcing, and returns an entry-bound idempotent detach. Concurrent same-id preparations are allowed, but only one entry succeeds; a stale detach cannot remove its replacement.
 - `announce(session)` emits the single creation edge and rejects repeat or reentrant announcements. Detach during that dispatch is deferred and later emits the paired disposal edge; an unannounced entry emits neither lifecycle edge.
 
-`shres-agent-loop` uses this split so final loop flush precedes session detach; see the [ownership Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-agent-lifecycle-and-ownership-contracts.md).
+`shres-agent-loop` uses this split so final loop flush precedes session detach; see the ownership Agent Note.
 
 ### Live service events
 
@@ -59,7 +59,7 @@ This package owns ordered surface projection, replacement validation, replay, an
 
 ### Request-header reconstruction (`request-header.ts`)
 
-`request/header` records a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, or `change`. Its optional `adapterDefaults` map marks effective `reasoningEffort` or `maxTokens` values materialized by exact-model resolution, allowing the next request proposal to distinguish them from explicit conversation settings. `foldRequestHeader()` selects the latest snapshot; legacy delta events and the removed `fallback` reason are rejected. See the [reconstructable-requests Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md).
+`request/header` records a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, or `change`. Its optional `adapterDefaults` map marks effective `reasoningEffort` or `maxTokens` values materialized by exact-model resolution, allowing the next request proposal to distinguish them from explicit conversation settings. `foldRequestHeader()` selects the latest snapshot; legacy delta events and the removed `fallback` reason are rejected. See the reconstructable-requests Agent Note.
 
 A `user/message` stores the complete `UserMessage` directly, including the identity created before inbox routing or step entry. It renders its `content` verbatim whether it is a direct human prompt, a synthetic injection, or an entered goal round; its typed `source` is the only channel that tells them apart and carries any domain-specific durable facts. `assistant/message` and `tool/result` likewise store complete message values. Turn execution remains enclosed by `turn/start` and `turn/end`; `agent.inject()` queues input until a later pre-step claims it and returns it in an enter decision.
 
@@ -79,7 +79,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 
 - `sourceEventSeqs?: number[]` — seq numbers of earlier events cited as sources (e.g., the `assistant/chunk` seqs behind an `assistant/message`, or the shadowed entries behind a compaction replacement entry). On `assistant/message`, a present `[]` records a known empty provider stream, while omission means a legacy or foreign event did not record the source stream; other surface events require a non-empty list when this field is present.
 - `surfaceOp?: SurfaceOp` — how this event entered the surface. Absent for non-surface events (boundaries, chunks, usage, errors).
-- `ignorable?: true` — marks an event a reader may safely skip when it does not recognize the type; absent means required, so an unknown-type event refuses session reconstruction ([mechanism](../../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md)).
+- `ignorable?: true` — marks an event a reader may safely skip when it does not recognize the type; absent means required, so an unknown-type event refuses session reconstruction.
 
 ### Metadata types (`types.ts`)
 
@@ -138,7 +138,7 @@ Logging causes no invalidation, and exact reconstruction preserves request-prefi
 ## Known Limitations and Deferred Work
 
 - **Session branching/tree** (pi-style entry tree) — deferred unless needed beyond boundary-based `fork()`.
-- **`fork()` cuts only at stable boundaries of live sessions** — the selected prefix must end outside an open turn and the source must be in the store; forking a persisted-but-unloaded session is excluded from the [fork API](../../../.agents/notes/implemented/feature/2026-06-30-session-store-fork-api.md).
+- **`fork()` cuts only at stable boundaries of live sessions** — the selected prefix must end outside an open turn and the source must be in the store; forking a persisted-but-unloaded session is excluded from the fork API.
 - **Windowed RAM requires a sync durable reader** — `inMemoryLogWindow` is persistence-backend config. Without an archive that can re-read by seq, attaching a window fails loud rather than dropping events that cannot be reconstructed. Detached `Session.create()` never windows.
-- **`SESSION_FORMAT_VERSION` stays pinned at `0`** — pre-release, no broad compatibility implied: `Session` accepts only current seed shapes, and a backend refuses any other version naming the direction (newer: "written by a newer harness — upgrade"; older: no upgrade path ships yet). Unknown event types refuse the same way unless marked `ignorable` in the envelope; the versioning mechanism is the [session-log-version-mechanism note](../../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md). Narrow storage import upgrades belong to the persistence boundary ([policy](../../../AGENTS.md), [pre-identity message recovery](../../../.agents/notes/implemented/bug-fix/2026-07-28-load-pre-identity-session-messages.md)).
+- **`SESSION_FORMAT_VERSION` stays pinned at `0`** — pre-release, no broad compatibility implied: `Session` accepts only current seed shapes, and a backend refuses any other version naming the direction (newer: "written by a newer harness — upgrade"; older: no upgrade path ships yet). Unknown event types refuse the same way unless marked `ignorable` in the envelope; the versioning mechanism is the session-log-version-mechanism note. Narrow storage import upgrades belong to the persistence boundary ([policy](../../../AGENTS.md), pre-identity message recovery).
 - **`TurnEndReasonMap` omits the ACP-named `refusal` / `max_turn_requests` variants** — producer-gated: they land when an adapter or the loop first emits them.

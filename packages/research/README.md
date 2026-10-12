@@ -6,4 +6,4 @@ Settings-toggled autonomous-research protocol. The `autoresearch` settings names
 |---|---|
 | [`protocol/`](protocol/README.md) | Function plugin: settings namespace, prompt section, gate, invariant observer | — |
 
-Design: [researcher harness proposal](../../.agents/notes/proposed/architecture/2026-08-24-researcher-harness-long-horizon-autonomous-research.md) — verdicts re-execute the run's decision rule mechanically before reviewer interpretation; this group owns the pre-compute half of that discipline.
+Design: researcher harness proposal — verdicts re-execute the run's decision rule mechanically before reviewer interpretation; this group owns the pre-compute half of that discipline.

@@ -35,7 +35,7 @@ When the composition mounts `ctx.sessionProjections` ([`@shres-code/shres-code-s
 
 `section` is required and non-empty. Unknown keys fail at load. The package does not accept arbitrary named modes, tool filters, sandbox settings, or approval policy.
 
-Design: [plan-specific collaboration state](../../../.agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md).
+Design: plan-specific collaboration state.
 
 ## Model Experience
 

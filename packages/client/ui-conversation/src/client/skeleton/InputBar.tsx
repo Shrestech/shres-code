@@ -202,7 +202,7 @@ export function InputBar({
   // keeps ordinary typing and programmatic draft updates from reading layout;
   // the helper then repairs only measured overflow before paint while
   // preserving native editing state. See
-  // .agents/notes/implemented/bug-fix/2026-08-13-safari-textarea-soft-wrap-reflow.md.
+  //
   useLayoutEffect(() => {
     const nativeShrink = safariNativeShrinkRef.current
     safariNativeShrinkRef.current = false

@@ -1,6 +1,6 @@
 # Remote connect
 
-Remote connect owns VS Code-style connect to a remote host over SSH: a durable alias registry, a hardened tunnel contract, the gesture-gated `remoteAdmin` mutation namespace, and the read-only `remoteControl` registry projection. The [package README](../../packages/host/remote-control/README.md) owns composition, config, and limitations; the [namespace and gate note](../../.agents/notes/implemented/architecture/2026-08-30-remote-admin-namespace.md) owns the trust model, and the [controller-core](../../.agents/notes/implemented/architecture/2026-08-29-remote-control-pr1.md) and [registry-namespace](../../.agents/notes/implemented/architecture/2026-08-29-remote-control-remote-face.md) notes own the underlying decisions. Source: [`packages/host/remote-control/src/types.ts`](../../packages/host/remote-control/src/types.ts).
+Remote connect owns VS Code-style connect to a remote host over SSH: a durable alias registry, a hardened tunnel contract, the gesture-gated `remoteAdmin` mutation namespace, and the read-only `remoteControl` registry projection. The [package README](../../packages/host/remote-control/README.md) owns composition, config, and limitations; the namespace and gate note owns the trust model, and the controller-core and registry-namespace notes own the underlying decisions. Source: [`packages/host/remote-control/src/types.ts`](../../packages/host/remote-control/src/types.ts).
 
 ## Durable registry records
 

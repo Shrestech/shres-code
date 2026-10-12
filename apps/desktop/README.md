@@ -33,7 +33,7 @@ Public releases require a `desktop-release` GitHub environment with these secret
 
 Restrict that environment to release tags and configure its reviewers in repository settings. Create a `shres-v<version>` tag matching the desktop manifest on a commit in `master`, then run the desktop workflow from that tag with `publish` enabled. The release job requires these credentials, signs with hardened runtime, notarizes, verifies the app, runs the smoke check, and publishes the DMG/ZIP/checksums to GitHub Releases. Prerelease versions remain marked as prereleases. Missing credentials or failed validation stop publication. PR artifact jobs receive no signing credentials.
 
-Signing configuration follows [electron-builder v26](https://www.electron.build/v26/docs/mac/); `SHRES_DESKTOP_RELEASE=1` enables the same mandatory signing and notarization checks locally. The [packaging decision](../../.agents/notes/implemented/process/2026-09-23-desktop-release-artifacts.md) records dependency and publication ownership.
+Signing configuration follows [electron-builder v26](https://www.electron.build/v26/docs/mac/); `SHRES_DESKTOP_RELEASE=1` enables the same mandatory signing and notarization checks locally. The packaging decision records dependency and publication ownership.
 
 ## Known limitations
 

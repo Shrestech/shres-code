@@ -10,7 +10,7 @@ This package owns the Service Definition role of the compaction capability, spli
 | `@shres-code/shres-code-compaction-basic` | Service Provider: `ctx.tokenMeter` pressure + token-budget retention + `llm.stream()` summarization |
 | `@shres-code/shres-code-command-compact` | Consumer: the human `/compact` command over `ctx.compaction.compactNow()` |
 
-Unlike the bash seam, this Service Definition depends on `@shres-code/shres-code-session` and `@shres-code/shres-code-llm` — the contract's verbs are defined over a `Session` and its output is the `ContentBlock` vocabulary, so they cannot be expressed without naming those packages. That deviation from the "Service Definition depends only on cordis" guidance is intentional and recorded in the [compaction capability-seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md).
+Unlike the bash seam, this Service Definition depends on `@shres-code/shres-code-session` and `@shres-code/shres-code-llm` — the contract's verbs are defined over a `Session` and its output is the `ContentBlock` vocabulary, so they cannot be expressed without naming those packages. That deviation from the "Service Definition depends only on cordis" guidance is intentional and recorded in the compaction capability-seam Agent Note.
 
 ## Service API (`ctx.compaction`)
 

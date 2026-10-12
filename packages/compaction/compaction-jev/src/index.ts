@@ -17,7 +17,7 @@
  * events.
  *
  * Agent Note:
- * - .agents/notes/proposed/feature/2026-09-17-jev-judgment-routing-and-compaction.md
+ * -
  *
  * @module @shres-code/shres-code-compaction-jev
  */

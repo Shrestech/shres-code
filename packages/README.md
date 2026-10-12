@@ -45,7 +45,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files | Product — stable API |
 | [`guard/`](guard/README.md) | Loop-hygiene guards: repeat-call reminders, tool-execute deadlines, and the Shield seat | Product — stable API |
 | [`bundle/`](bundle/README.md) | Installable `shres --profile` patch layers | Product — stable API |
-| [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written plugin mount/unmount ([design](../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md)) | Product — stable API |
+| [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written plugin mount/unmount | Product — stable API |
 | [`hooks/`](hooks/README.md) | Hook bridges + the shared Claude Code / Codex wire-protocol library | Product — stable API |
 | [`session/`](session/README.md) | Durable session data plane: persistence seam + JSONL/SQLite backends, projection seam, log-backed titles | Product — stable API |
 | [`session-query/`](session-query/README.md) | Session retrieval: bounded reads, lineage, semantic filtering, and SQLite full-text search | Product — stable API |
@@ -69,6 +69,6 @@ New packages join existing groups; new groups update their README and this table
 
 The dependency graph is generated: [docs/module-graph.md](../docs/module-graph.md) (`pnpm run gen-module-graph`, freshness-gated in CI).
 
-**Extension plugins depend on Service Definitions, never concrete providers.** `shres-agent-loop` is swappable; UI, hook, and tool plugins use `shres-agent`. Composition bundles, including `shres-agent-spine-demo`, may depend on spine plugins. Capabilities separate Service Definition / Service Provider / Consumer roles when they evolve independently; see [capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md).
+**Extension plugins depend on Service Definitions, never concrete providers.** `shres-agent-loop` is swappable; UI, hook, and tool plugins use `shres-agent`. Composition bundles, including `shres-agent-spine-demo`, may depend on spine plugins. Capabilities separate Service Definition / Service Provider / Consumer roles when they evolve independently; see capability seams.
 
 Package READMEs cover purpose, APIs, extension points, and [Model Experience](../docs/cookbook/adding-a-package.md#4-write-the-package-readme) unless on the model-agnostic [omission allowlist](../scripts/verify-package-readme-model-experience.ts). They also carry `## Known Limitations and Deferred Work` or use its [allowlist](../scripts/verify-package-readme-limitations.ts).

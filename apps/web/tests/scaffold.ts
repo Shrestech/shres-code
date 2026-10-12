@@ -1,5 +1,5 @@
 // Shared scaffold for the keyless browser e2e lane (Agent Note:
-// .agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md).
+//
 // Boots the REAL web composition — the shres-base and shres-web-app bundle
 // patches over the empty profile root through the vendored Loader (the same
 // layer stack the profile boot composes), patched the
