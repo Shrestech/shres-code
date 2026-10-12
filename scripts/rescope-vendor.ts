@@ -3,8 +3,7 @@
  * that rescope with `--reverse`. Every harness package declares `cordis` as a
  * peer dependency, so publication carries this framework layer too; publishing
  * it under the upstream names would squat them on the registry
- * ([rationale](../.agents/notes/implemented/process/2026-08-10-vendor-package-rescope.md),
- * [name mapping](../docs/rescope.md)).
+ * ([name mapping](../docs/rescope.md)).
  *
  * The generic pass rewrites ONLY delimited, complete package-name tokens:
  * `'old'` / `"old"` / `` `old` `` / `'old/subpath'`, plus a YAML `name: old`
@@ -473,9 +472,8 @@ const VENDORED_LIBRARY = /^@shres-code\\/(cosmokit|schemastery)(\\/|$)/
 /** Files the rescope must never rewrite. */
 function excluded(file: string): boolean {
   if (file === 'scripts/rescope-vendor.ts') return true // the mapping itself
-  if (file.startsWith('.agents/notes/')) return true // notes record what was true when written
   // Recorded model payloads quote documentation verbatim, so they must mirror the
-  // sources on disk — including the notes this rescope leaves alone.
+  // sources on disk.
   if (file.startsWith('scripts/snapshots/')) return true
   // The mapping documents state both names on purpose.
   if (file === 'docs/rescope.md') return true

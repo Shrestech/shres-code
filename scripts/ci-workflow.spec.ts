@@ -391,34 +391,18 @@ describe('Issue lifecycle workflow', () => {
 })
 
 describe('Git hooks', () => {
-  it('leaves frozen Agent Note sidecars to the archive verifier', () => {
+  it('does not install agent-note or translation-pairing jobs', () => {
     const lefthook = loadWorkflow('lefthook.yml')
-
-    for (const hookName of ['pre-commit', 'pre-merge-commit']) {
-      const hook = lefthook[hookName]
-      if (!isRecord(hook) || !Array.isArray(hook.jobs)) {
-        throw new TypeError(`lefthook must define ${hookName} jobs`)
-      }
-      let archived: Record<string, unknown> | undefined
-      for (const job of hook.jobs) {
-        if (isRecord(job) && job.name === 'archived agent notes') {
-          archived = job
-          break
-        }
-      }
-      if (archived === undefined) {
-        throw new TypeError(`lefthook ${hookName} must define the archived agent notes job`)
-      }
-      expect(archived.glob).toBe('.agents/notes/archived/**')
-      let pairing: unknown
-      for (const job of hook.jobs) {
-        if (isRecord(job) && String(job.name).includes('translation pairing')) {
-          pairing = job
-          break
-        }
-      }
-      expect(pairing).toBeUndefined()
+    const hook = lefthook['pre-commit']
+    if (!isRecord(hook) || !Array.isArray(hook.jobs)) {
+      throw new TypeError('lefthook must define pre-commit jobs')
     }
+    for (const job of hook.jobs) {
+      if (!isRecord(job)) continue
+      expect(job.name).not.toBe('archived agent notes')
+      expect(String(job.name)).not.toContain('translation pairing')
+    }
+    expect(lefthook['pre-merge-commit']).toBeUndefined()
   })
 })
 

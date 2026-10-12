@@ -22,11 +22,11 @@ describe('isZhArtifact', () => {
 })
 
 describe('isTranslateSkillPath', () => {
-  it('matches both current and leftover translate-docs skill trees', () => {
-    expect(isTranslateSkillPath('.agents/skills/roos-translate-docs/SKILL.md')).toBe(true)
+  it('matches leftover translate-docs skill trees under .claude', () => {
+    expect(isTranslateSkillPath('.claude/skills/roos-translate-docs/SKILL.md')).toBe(true)
     expect(isTranslateSkillPath('.claude/skills/roos-translate-docs/agents/openai.yaml')).toBe(true)
-    expect(isTranslateSkillPath('.agents/skills/dsh-translate-docs/SKILL.md')).toBe(true)
-    expect(isTranslateSkillPath('.agents/skills/roos-archive-agent-notes/SKILL.md')).toBe(false)
+    expect(isTranslateSkillPath('.claude/skills/dsh-translate-docs/SKILL.md')).toBe(true)
+    expect(isTranslateSkillPath('.claude/skills/shres-code-review/SKILL.md')).toBe(false)
   })
 })
 
@@ -34,7 +34,7 @@ describe('classifyPurgeTarget', () => {
   it('splits artifacts from skill trees and leaves everything else', () => {
     expect(classifyPurgeTarget('README.zh.md')).toBe('artifact')
     expect(classifyPurgeTarget('README.i18n.yaml')).toBe('artifact')
-    expect(classifyPurgeTarget('.agents/skills/roos-translate-docs/SKILL.md')).toBe('skill')
+    expect(classifyPurgeTarget('.claude/skills/roos-translate-docs/SKILL.md')).toBe('skill')
     expect(classifyPurgeTarget('vendor/cordis/README.zh.md')).toBeUndefined()
     expect(classifyPurgeTarget('README.md')).toBeUndefined()
   })

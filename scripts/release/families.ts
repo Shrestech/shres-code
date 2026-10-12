@@ -2,8 +2,7 @@
  * The three independent publish sequences this repository releases from
  * (`packages/` + public `apps/`, `vendor/`, and `native/`) and the two this module
  * owns: `shres` and `vendor`. Each family carries its own version baseline, tag
- * naming, and publish set, so releasing one never republishes another
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * naming, and publish set, so releasing one never republishes another.
  *
  * The family dimension lives here only. A new sequence adds a subclass and a
  * `releaseFamilies()` entry; nothing else in the release scripts branches on it.

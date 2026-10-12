@@ -8,8 +8,7 @@
  * those packages live in another release sequence, and this job must not depend
  * on the registry already carrying versions that match — one pull request may
  * bump both families before either publishes — so a shres verification passes the
- * vendored family's pack output too, while publishing only its own
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * vendored family's pack output too, while publishing only its own.
  *
  * What this proves is that `files` selected a complete payload and that the
  * published dependency ranges resolve. A workspace link or a stale `lib/` in the

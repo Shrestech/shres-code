@@ -1,8 +1,7 @@
 /**
  * Verify root-relative documentation paths in repo-authored TypeScript. The
- * textual scan covers `docs/*.md` and `.agents/notes/*.md`, requires the
- * extension, checks matching string literals too, and excludes built
- * declarations and vendored source.
+ * textual scan covers `docs/*.md`, requires the extension, checks matching
+ * string literals too, and excludes built declarations and vendored source.
  */
 
 import { existsSync } from 'node:fs'
@@ -19,7 +18,7 @@ const isExcluded = (p: string): boolean =>
   p.includes('/lib/') || p.endsWith('.d.ts') || p.startsWith('vendor/')
 
 /** Root-relative Markdown path token, excluding trailing prose. */
-const DOC_REF = /(?:\bdocs|\.agents\/notes)\/[A-Za-z0-9._/-]+\.md/g
+const DOC_REF = /\bdocs\/[A-Za-z0-9._/-]+\.md/g
 
 /** Find every broken root-relative documentation reference in one TypeScript file. */
 function findViolations(absPath: string): Violation[] {

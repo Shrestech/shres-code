@@ -29,9 +29,6 @@ export interface ZhResidue {
  */
 export const CJK_ALLOWLIST: ReadonlyArray<{ prefix: string; reason: string }> = [
   { prefix: 'vendor/', reason: 'vendored upstream source is out of scope for the English-only purge' },
-  { prefix: '.agents/notes/archived/', reason: 'frozen archive English notes keep historical switcher lines and quoted Chinese' },
-  { prefix: 'scripts/archived-agent-notes.ts', reason: 'archive header check still requires the historical switcher line' },
-  { prefix: 'scripts/archived-agent-notes.spec.ts', reason: 'archive fixtures pin the frozen historical switcher line' },
   { prefix: 'scripts/verify-no-zh-artifacts.ts', reason: 'this gate names CJK ranges and allowlist reasons' },
   { prefix: 'scripts/verify-no-zh-artifacts.spec.ts', reason: 'acceptance fixtures include a CJK sample the gate must detect' },
   { prefix: 'examples/headless-agent/tests/fixtures/e2b/', reason: 'UTF-8 split/PTY fixture output uses CJK sample text' },
@@ -65,7 +62,6 @@ export const CJK_ALLOWLIST: ReadonlyArray<{ prefix: string; reason: string }> = 
   { prefix: 'packages/core/tools/src/py-types.ts', reason: 'documents that Unicode identifiers such as CJK remain legal Python names' },
   { prefix: 'packages/core/tools/tests/py-types.spec.ts', reason: 'generated Python types keep CJK identifiers as UTF-8 fixtures' },
   { prefix: 'packages/client/ui-settings-models/tests/components.client.spec.tsx', reason: 'API-key character-class fixture includes CJK sample text' },
-  { prefix: '.agents/skills/shres-trim-cot-leakage/', reason: 'detector batteries include CJK authoring-language slips they must find' },
   { prefix: 'packages/jspace/jspace/tests/fold.spec.ts', reason: 'coverage matcher fixture proves CJK extra terms use substring includes' },
   { prefix: 'packages/jspace/jspace/tests/jspace.spec.ts', reason: 'checkpoint fixture proves extra CJK coverageTerms match at write time' },
 ]

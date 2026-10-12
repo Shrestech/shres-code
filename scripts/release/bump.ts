@@ -1,7 +1,6 @@
 /**
  * Bump one release family's version and commit it, so the published version is
- * readable from the repository rather than derived inside CI
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * readable from the repository rather than derived inside CI.
  *
  * The shres family shares one version across its published members, the
  * workspace root, and the private desktop manifests:

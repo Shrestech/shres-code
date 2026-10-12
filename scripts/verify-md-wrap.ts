@@ -10,15 +10,13 @@ import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import type { Nodes } from 'mdast'
 import { parseMarkdown, visitMarkdown } from './markdown.ts'
-import { isArchivedAgentNotePath, uniqueRepoFiles } from './repo-files.ts'
+import { uniqueRepoFiles } from './repo-files.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
 /** Files to check: doc-typecheck's scope, system-prompt expected outputs, and the AGENTS.md pair. */
 const PATTERNS = [
   'README.md',
-
-  '.agents/notes/**/*.md',
   'docs/**/*.md',
   'packages/*/*.md',
   'packages/*/*/*.md',
@@ -69,7 +67,7 @@ function findViolations(absPath: string): Violation[] {
   return out
 }
 
-const files = uniqueRepoFiles(root, PATTERNS, isArchivedAgentNotePath)
+const files = uniqueRepoFiles(root, PATTERNS)
 const all = files.flatMap(file => findViolations(file.abs))
 const checked = files.length
 

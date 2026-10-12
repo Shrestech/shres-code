@@ -1,8 +1,7 @@
 /**
  * Doc-sync gate for package README Model Experience sections. It validates
  * audited package classifications, model/token/KV-cache fields, package-owned
- * text blocks, generated-catalog links, and final-section order. See the
- * [Model Experience Agent Note](../.agents/notes/implemented/process/2026-07-12-package-model-experience-contract.md).
+ * text blocks, generated-catalog links, and final-section order.
  */
 
 import { existsSync, globSync, readFileSync } from 'node:fs'

@@ -2,8 +2,8 @@
 # Run the blocking Windows gates (workspace build, production site) with real
 # win-x64 Node.js under Wine — the same script the pull-request `windows` job
 # in ci.yml executes and the optional local gate `pnpm run check:windows-wine`
-# wraps. Owning rationale and fidelity limits:
-# .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
+# wraps. Wine runs Windows Node, not the Windows kernel, so observational
+# portability gates stay on the native Windows job.
 #
 # The working tree is never mutated: tracked plus untracked-unignored files
 # are snapshotted into a scratch directory, the Wine-specific pnpm overrides

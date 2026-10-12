@@ -1,9 +1,9 @@
 /**
  * Purge Chinese-language documentation artifacts. Deletes every tracked
- * `*.zh.md` and `*.i18n.yaml` outside `vendor/`, plus the retired
- * `roos-translate-docs` / `dsh-translate-docs` skill trees and their
- * `.claude` mirrors. Re-running `--apply` is a no-op once the tree is
- * clean.
+ * `*.zh.md` and `*.i18n.yaml` outside `vendor/`, plus leftover
+ * `.claude` mirrors of the retired `roos-translate-docs` /
+ * `dsh-translate-docs` skill trees. Re-running `--apply` is a no-op once
+ * the tree is clean.
  *
  * Usage: `pnpm run purge-zh [--apply|--check]`. Without a mode it reports
  * what would change. `--check` asserts the post-state: zero tracked zh
@@ -19,8 +19,6 @@ const root = resolve(import.meta.dirname, '..')
 
 /** Skill trees the English-only purge deletes. */
 export const TRANSLATE_SKILL_PREFIXES = [
-  '.agents/skills/roos-translate-docs/',
-  '.agents/skills/dsh-translate-docs/',
   '.claude/skills/roos-translate-docs/',
   '.claude/skills/dsh-translate-docs/',
 ] as const

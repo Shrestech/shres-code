@@ -16,11 +16,12 @@ describe('isForbiddenZhArtifact', () => {
 })
 
 describe('findCjkResidue', () => {
-  it('reports CJK code points and ignores allowlisted frozen archive paths', () => {
-    expect(findCjkResidue('docs/architecture.md', 'Agent Note 中文 leftover\n')).toEqual([
+  it('reports CJK code points outside the allowlist and ignores allowlisted paths', () => {
+    expect(findCjkResidue('docs/architecture.md', '中文 leftover\n')).toEqual([
       { file: 'docs/architecture.md', line: 1, id: 'cjk' },
     ])
-    expect(isCjkAllowlisted('.agents/notes/archived/process/example.md')).toBe(true)
-    expect(findCjkResidue('.agents/notes/archived/process/example.md', 'English | [中文](example.zh.md)\n')).toEqual([])
+    expect(isCjkAllowlisted('scripts/verify-no-zh-artifacts.spec.ts')).toBe(true)
+    expect(findCjkResidue('scripts/verify-no-zh-artifacts.spec.ts', '中文\n')).toEqual([])
+    expect(isCjkAllowlisted('docs/architecture.md')).toBe(false)
   })
 })

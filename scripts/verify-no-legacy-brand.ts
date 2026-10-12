@@ -49,10 +49,6 @@ export interface LegacyBrandReference {
 
 function keepListed(file: string): boolean {
   if (file === 'LICENSE' || file === 'NOTICE') return true
-  if (file.startsWith('.agents/notes/archived/')) return true
-  if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
-  if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
-  if (file === '.agents/notes/implemented/process/2026-09-02-purge-legacy-branding-traces.md') return true
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/rescope-vendor.ts' || file === 'scripts/rescope-vendor.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true

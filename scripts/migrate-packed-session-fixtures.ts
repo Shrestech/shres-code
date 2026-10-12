@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Temporary branch-convergence command for canonical packed session fixtures.
- *
- * @see ../.agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.md
+ * Rewrite packed session fixtures to the canonical layout. Takes no arguments
+ * and prints each path it rewrites.
  */
 
 import { writeFileSync } from 'node:fs'

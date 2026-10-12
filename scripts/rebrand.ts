@@ -10,7 +10,7 @@
  * listed in {@link EXACT_EDITS} with an exact hit count. Directory and file
  * renames live in {@link PATH_RENAMES}.
  *
- * Frozen trees (archived Agent Notes, `LICENSE`, vendored upstream README/LICENSE)
+ * Frozen trees (`LICENSE`, vendored upstream README/LICENSE)
  * and this script (which must keep old tokens as find-strings) are skipped.
  *
  * Usage: `pnpm run rebrand [--apply|--check]`. Without a mode it reports what
@@ -143,15 +143,6 @@ const PATH_RENAMES: readonly PathRename[] = [
   { id: 'python-sdk', from: 'python/sdk/src/roos_code', to: 'python/sdk/src/shres_code' },
   { id: 'python-runtime', from: 'python/sdk-runtime/src/roos_code_runtime', to: 'python/sdk-runtime/src/shres_code_runtime' },
   { id: 'python-runtime-json', from: 'python/sdk-runtime/src/shres_code_runtime/roos-code-runtime.json', to: 'python/sdk-runtime/src/shres_code_runtime/shres-code-runtime.json' },
-  { id: 'skill-archive', from: '.agents/skills/roos-archive-agent-notes', to: '.agents/skills/shres-archive-agent-notes' },
-  { id: 'skill-review', from: '.agents/skills/roos-code-review', to: '.agents/skills/shres-code-review' },
-  { id: 'skill-doc-site', from: '.agents/skills/roos-doc-site-sync', to: '.agents/skills/shres-doc-site-sync' },
-  { id: 'skill-doc-std', from: '.agents/skills/roos-doc-standards', to: '.agents/skills/shres-doc-standards' },
-  { id: 'skill-simplifications', from: '.agents/skills/roos-find-simplifications', to: '.agents/skills/shres-find-simplifications' },
-  { id: 'skill-stacks', from: '.agents/skills/roos-merging-stacked-prs', to: '.agents/skills/shres-merging-stacked-prs' },
-  { id: 'skill-pre-push', from: '.agents/skills/roos-pre-push-checks', to: '.agents/skills/shres-pre-push-checks' },
-  { id: 'skill-prose', from: '.agents/skills/roos-prose-standard', to: '.agents/skills/shres-prose-standard' },
-  { id: 'skill-cot', from: '.agents/skills/roos-trim-cot-leakage', to: '.agents/skills/shres-trim-cot-leakage' },
   { id: 'subagent-sdk', from: 'packages/subagent/subagent-roos-sdk', to: 'packages/subagent/subagent-shres-sdk' },
   { id: 'subagent-sdk-fixture', from: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk', to: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-shres-sdk' },
   { id: 'cli-badge-fixture', from: 'apps/cli/tests/fixtures/roos-badge', to: 'apps/cli/tests/fixtures/shres-badge' },
@@ -171,9 +162,6 @@ function excluded(file: string): boolean {
   if (file === 'apps/web/tests/verify-app.live.mjs') return true
   if (file === 'CLAUDE.md' || file.endsWith('/CLAUDE.md')) return true
   if (file === 'LICENSE' || file === 'NOTICE') return true
-  if (file.startsWith('.agents/notes/archived/')) return true
-  if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
-  if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
   if (file === 'pnpm-lock.yaml') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   return !EXTENSIONS.some(extension => file.endsWith(extension))

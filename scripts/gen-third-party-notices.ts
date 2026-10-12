@@ -4,8 +4,8 @@
  * manifest in `vendor/README.md`, the Python `pyproject.toml` files, and the
  * pnpm patch list. License and repository metadata come from the installed
  * store, so the tree must be installed. `--check` verifies the committed
- * artifact. Tier policy and ownership live in
- * `.agents/notes/implemented/process/2026-07-30-generated-third-party-notices.md`.
+ * artifact. Runtime dependencies and repository-tooling dependencies are
+ * separate sections in the emitted file.
  */
 
 import { existsSync, globSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
