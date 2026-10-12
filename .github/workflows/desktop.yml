@@ -1,13 +1,15 @@
 # Build and package the desktop application on GitHub's arm64 macOS image.
 # Pull requests and branch pushes produce unsigned validation artifacts. A
-# manual dispatch from a matching shres-v* tag is the only path that can use
-# release credentials or create a public GitHub release.
+# version-matched shres-v* tag push publishes the signed release, and a manual
+# dispatch from one tag with publish enabled is the fallback. Neither path
+# runs the unsigned package job.
 name: desktop
 
 on:
   pull_request:
   push:
     branches: [master, develop]
+    tags: ['shres-v*']
   workflow_dispatch:
     inputs:
       publish:
@@ -23,7 +25,7 @@ concurrency:
   group: desktop-${{ github.workflow }}-${{ github.ref }}
   # A release dispatch must finish once it has passed the environment gate;
   # stale validation runs may be replaced while they are still on a branch.
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.publish != true }}
+  cancel-in-progress: ${{ !( (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) ) }}
 
 env:
   PRIMARY_NODE_VERSION: '24'
@@ -72,7 +74,7 @@ jobs:
 
   package:
     name: Package unsigned desktop artifacts
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish != true }}
+    if: ${{ !( (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) ) }}
     needs: desktop
     runs-on: macos-14
     timeout-minutes: 90
@@ -162,7 +164,7 @@ jobs:
 
   release-validate:
     name: Validate release ref
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -180,12 +182,12 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF_TYPE" != tag || "$GITHUB_REF_NAME" != shres-v* ]]; then
-            echo 'publish must be dispatched from a shres-v* tag.' >&2
+            echo 'publish must run from a shres-v* tag.' >&2
             exit 1
           fi
           tag_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
           if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
-            echo "Tag $GITHUB_REF_NAME does not point to the dispatch commit $GITHUB_SHA." >&2
+            echo "Tag $GITHUB_REF_NAME does not point to $GITHUB_SHA." >&2
             exit 1
           fi
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
@@ -201,7 +203,7 @@ jobs:
 
   publish:
     name: Publish signed desktop release
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) }}
     needs: [desktop, release-validate]
     runs-on: macos-14
     timeout-minutes: 120

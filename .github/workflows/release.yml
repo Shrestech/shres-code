@@ -3,14 +3,16 @@
 # packages are separate sequences with their own workflows and version lines.
 #
 # Pack runs without credentials on every pull request and master push, so a
-# pull request proves the whole publish set still packs. Publication is a
-# manual dispatch from a shres-v* tag and consumes exactly the packed bytes.
+# pull request proves the whole publish set still packs. Publication runs on a
+# shres-v* tag push and on a manual dispatch from that tag, and consumes
+# exactly the packed bytes.
 name: Release (shres)
 
 on:
   pull_request:
   push:
     branches: [master]
+    tags: ['shres-v*']
   workflow_dispatch:
     inputs:
       publish:
@@ -74,7 +76,7 @@ jobs:
 
       - name: Verify release version
         env:
-          RELEASE_PUBLISH: ${{ inputs.publish }}
+          RELEASE_PUBLISH: ${{ ( (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) ) && 'true' || 'false' }}
         run: pnpm run release:verify --family shres
 
       - name: Build
@@ -111,7 +113,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    if: inputs.publish
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'shres-v')) }}
     needs: pack
     runs-on: ubuntu-24.04
     # Required reviewers and the allowed tags live on the environment; this is

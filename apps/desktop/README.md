@@ -31,7 +31,7 @@ Public releases require a `desktop-release` GitHub environment with these secret
 | `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
 | `APPLE_TEAM_ID` | Apple Developer team ID |
 
-Restrict that environment to release tags and configure its reviewers in repository settings. Create a `shres-v<version>` tag matching the desktop manifest on a commit in `master`, then run the desktop workflow from that tag with `publish` enabled. The release job requires these credentials, signs with hardened runtime, notarizes, verifies the app, runs the smoke check, and publishes the DMG/ZIP/checksums to GitHub Releases. Prerelease versions remain marked as prereleases. Missing credentials or failed validation stop publication. PR artifact jobs receive no signing credentials.
+Restrict that environment to release tags and configure its reviewers in repository settings. Pushing a `shres-v<version>` tag that matches the desktop manifest on a commit in `master` builds the signed DMG and publishes the GitHub release. Manual dispatch from that tag with `publish` enabled remains the fallback. The release job requires these credentials, signs with hardened runtime, notarizes, verifies the app, runs the smoke check, and publishes the DMG/ZIP/checksums to GitHub Releases. Prerelease versions remain marked as prereleases. Missing credentials or failed validation stop publication. Pull requests and branch pushes still produce only unsigned artifacts and receive no signing credentials.
 
 Signing configuration follows [electron-builder v26](https://www.electron.build/v26/docs/mac/); `SHRES_DESKTOP_RELEASE=1` enables the same mandatory signing and notarization checks locally. The packaging decision records dependency and publication ownership.
 
