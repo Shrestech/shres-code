@@ -153,7 +153,7 @@ flush?(): void
 abstract shutdown(): Promise<void>
 ```
 
-Source: [`packages/session/session-telemetry/src/index.ts:148`](../../packages/session/session-telemetry/src/index.ts)
+Source: [`packages/session/session-telemetry/src/index.ts:147`](../../packages/session/session-telemetry/src/index.ts)
 
 <a id="session-telemetry-events"></a>
 

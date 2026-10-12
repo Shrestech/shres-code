@@ -1058,5 +1058,5 @@ stickySelection(agent: Agent): ModelSelection | undefined
 
 Types: [Agent](core.md) · [ModelRoutingRequest](core.md) · [ModelSelection](core.md) · [Session](session.md) · [SubagentChildRoute](subagent.md) · [SubagentChildRouteRequest](subagent.md)
 
-Source: [`packages/llm/model-router/src/index.ts:520`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:516`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->
