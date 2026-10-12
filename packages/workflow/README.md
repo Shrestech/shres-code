@@ -11,4 +11,4 @@ This family runs model-authored orchestration workflows over subagents and expos
 
 Worker threads isolate workflow execution from the host event loop but are not a security boundary. See the dynamic-workflow and Ralph tool decisions.
 
-The subsystem reference — start requests, `WorkflowMeta`, results, live runs, `workflow/*` events — is [docs/subsystems/workflow.md](../../docs/subsystems/workflow.md); decisions in the dynamic-workflows and Ralph consumer Agent Notes.
+The subsystem reference — start requests, `WorkflowMeta`, results, live runs, `workflow/*` events — is [docs/subsystems/workflow.md](../../docs/subsystems/workflow.md);

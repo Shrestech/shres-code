@@ -384,7 +384,7 @@ export function presentFetchCall(args: { url: string }): GenericCallView {
  * not duplicated here. `truncated` is the effective truncation the render text
  * reflects, which a client cannot recompute (it does not know the deployment's
  * `fetchMaxOutputChars`); this is why fetch meta is carried, not derived from the
- * header line (see the web-result-card Agent Note).
+ * header line.
  */
 export interface WebFetchMeta {
   /** The final URL after allowed redirects. */
@@ -430,7 +430,7 @@ export function fetchMetaFromResult(meta: unknown): WebFetchMeta | undefined {
  * Completed-call presentation: a `web` fetch card carrying the retrieval summary
  * from `meta`. It sets no `content` copy — a UI without the `web` capability
  * falls back to the raw `tool/result` content, the already-markdown body (see the
- * web-result-card Agent Note).
+ *.
  *
  * @param args - the raw tool arguments; `url` becomes the result-state title so a
  *   window-truncated replay that dropped the call head still has one.

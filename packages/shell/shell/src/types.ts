@@ -120,7 +120,7 @@ export interface ShellRunResult {
    * short. Mutually exclusive with {@link aborted}: one fused deadline drives
    * both the timeout and the caller's cancellation, so a timeout and an abort
    * racing before process close report the single first-abort cause, not both
-   * (see the timeout-library Agent Note).
+   *.
    */
   timedOut: boolean
   /**

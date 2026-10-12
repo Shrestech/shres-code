@@ -27,10 +27,6 @@
  * recheck capabilities and manual authority. A manual-model decision remains
  * in force for the rest of the turn.
  *
- * Agent Notes:
- * -
- * -
- *
  * @module @shres-code/shres-code-model-router
  */
 

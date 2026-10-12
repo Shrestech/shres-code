@@ -42,7 +42,7 @@ Merge-extensible: plugins can declare extra fields on `PromptAssembly` and `Asse
 - Tool schema providers: `ToolRuntime` registers itself as a tool provider automatically.
 - The [`system-prompt/assemble` waterfall](#live-events): cooperatively mutate or replace the assembly per caller before any complete-section constraint is enforced.
 
-Design rationale: the prompt-variables Agent Note; section stability classes: the stable-prompt-prefix Agent Note.
+
 
 ## Model Experience
 

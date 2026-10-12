@@ -1,6 +1,6 @@
 # @shres-code/shres-code-tmux-context
 
-Opt-in durable context naming the tmux session, window, and pane this agent process runs in, plus the window's pane-tree layout. It is sampled once per turn during model-request preparation and is not part of the shipped Web/headless composition. Decision record: the tmux-context Agent Note.
+Opt-in durable context naming the tmux session, window, and pane this agent process runs in, plus the window's pane-tree layout. It is sampled once per turn during model-request preparation and is not part of the shipped Web/headless composition.
 
 ## Config
 

@@ -1,6 +1,6 @@
 # @shres-code/shres-code-tool-goal
 
-The model-facing control tools for [`ctx.goals`](../goal/README.md): `get_goal`, `create_goal`, and `update_goal`. The goal-tool Agent Note owns the authority split and Codex-shaped UX.
+The model-facing control tools for [`ctx.goals`](../goal/README.md): `get_goal`, `create_goal`, and `update_goal`.
 
 ## Tools
 

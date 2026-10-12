@@ -5,7 +5,7 @@
  * or command substitution, and no pre-tool approval or rewrite path; only
  * blocking decisions are honored. Shared execution and parsing live in
  * `shres-hook-protocol`; see the
- * hook-bridges Agent Note.
+
  * @module @shres-code/shres-code-hooks-codex
  */
 

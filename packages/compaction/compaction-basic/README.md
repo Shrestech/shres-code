@@ -2,7 +2,7 @@
 
 The **basic compaction backend**: a `BasicCompactionEngine` implementing the `@shres-code/shres-code-compaction` Service Definition with reusable `ctx.tokenMeter` pressure, token-budget retention, and summarization as a direct one-shot `ctx.llm.stream()` call that replays the conversation prefix to reuse the provider's KV cache (interceptable at `llm/stream`).
 
-This package owns the Service Provider role of the compaction capability — see the [Service Definition package](../compaction/README.md) for its contract and the capability-seam Agent Note for the design.
+This package owns the Service Provider role of the compaction capability — see the [Service Definition package](../compaction/README.md) for its contract
 
 ## What it owns
 

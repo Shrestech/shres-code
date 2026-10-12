@@ -96,7 +96,7 @@ interface ShellExecSpec {
 }
 ```
 
-`stdin` and `env` are trusted in-process plugin inputs and are not exposed by `shres-tool-bash`. The local executor scrubs ambient credentials before merging explicit caller-supplied env. See the bash-stdin-env Agent Note.
+`stdin` and `env` are trusted in-process plugin inputs and are not exposed by `shres-tool-bash`. The local executor scrubs ambient credentials before merging explicit caller-supplied env.
 
 `stdoutMaxBytes` is also trusted-plugin-only. It lets a foreground consumer request complete stdout up to a bounded parser budget without changing stderr, background jobs, or the model-facing bash tool's ordinary output cap.
 
@@ -116,7 +116,7 @@ interface ShellRunResult {
    * short. Mutually exclusive with {@link aborted}: one fused deadline drives
    * both the timeout and the caller's cancellation, so a timeout and an abort
    * racing before process close report the single first-abort cause, not both
-   * (see the timeout-library Agent Note).
+   *.
    */
   timedOut: boolean
   /**
@@ -160,7 +160,7 @@ interface ShellSandboxInfo {
 }
 ```
 
-The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) is what the `ctx.sandbox` provider throws — and the executor propagates — when a confined mode has no usable backend. A selected runner refusing its profile reaches the same fail-closed foreground error; a settled background job records `runnerFailed`. The model receives denial/runner facts in results, learns the effective mode only when a denial marker names it, and can request a one-shot strictly wider retry through `sandbox_permissions` plus `justification`; `ctx.approval` must grant that exact call before anything executes. The complete policy and switching design is the sandbox Agent Note.
+The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) is what the `ctx.sandbox` provider throws — and the executor propagates — when a confined mode has no usable backend. A selected runner refusing its profile reaches the same fail-closed foreground error; a settled background job records `runnerFailed`. The model receives denial/runner facts in results, learns the effective mode only when a denial marker names it, and can request a one-shot strictly wider retry through `sandbox_permissions` plus `justification`; `ctx.approval` must grant that exact call before anything executes.
 
 ## Background processes: `ShellProcess`
 

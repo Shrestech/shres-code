@@ -1,6 +1,6 @@
 # @shres-code/shres-code-repeat-tool-reminder
 
-A loop-breaker, not a model-facing tool: it never appears in the tool list, and adds exactly one behavior — it watches each agent's stream of tool calls, counts runs of consecutive calls to the same tool with identical canonicalized arguments, and at configured run lengths injects an escalating advisory reminder telling the model to stop repeating itself, re-read the last result, and either change approach or conclude. Reminders decide nothing: a legitimately repeated call is delayed by nothing and blocked by nothing. A deployment that wants the loop actually stopped sets the opt-in `vetoThreshold`, past which the identical call is refused instead of dispatched. Decision records: the repeat-tool-reminder Agent Note and the harness-hardening Agent Note.
+A loop-breaker, not a model-facing tool: it never appears in the tool list, and adds exactly one behavior — it watches each agent's stream of tool calls, counts runs of consecutive calls to the same tool with identical canonicalized arguments, and at configured run lengths injects an escalating advisory reminder telling the model to stop repeating itself, re-read the last result, and either change approach or conclude. Reminders decide nothing: a legitimately repeated call is delayed by nothing and blocked by nothing. A deployment that wants the loop actually stopped sets the opt-in `vetoThreshold`, past which the identical call is refused instead of dispatched. Decision records:
 
 ## Config
 

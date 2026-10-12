@@ -27,7 +27,7 @@ The registry is process memory and the only source of truth. The session log car
 
 ## Trust stance
 
-The vm sandbox isolates globals but is not a security boundary: Node globals are absent or redirect to Cordis services (`ctx.fs`, `ctx.web`, `ctx.bash`, the timer helpers), and a host half receives a façade without framework internals, yet the services it declares reach the live runtime. Host-half `activate` therefore asks the existing [`ctx.approval`](../../interaction/user-approval/README.md) seam once per Plugin id per Session before any Host code runs. Treat a dynamic package like bash access — see the self-referential toolset Agent Note and the Host-activation approval Agent Note.
+The vm sandbox isolates globals but is not a security boundary: Node globals are absent or redirect to Cordis services (`ctx.fs`, `ctx.web`, `ctx.bash`, the timer helpers), and a host half receives a façade without framework internals, yet the services it declares reach the live runtime. Host-half `activate` therefore asks the existing [`ctx.approval`](../../interaction/user-approval/README.md) seam once per Plugin id per Session before any Host code runs. Treat a dynamic package like bash access —
 
 ## Config
 

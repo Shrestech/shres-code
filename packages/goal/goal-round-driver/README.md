@@ -1,6 +1,6 @@
 # @shres-code/shres-code-goal-round-driver
 
-Same-session continuation driver for [`ctx.goals`](../goal/README.md). It turns an active, armed goal into sequential [goal rounds](../../../docs/glossary.md#goal-round) through the public `Agent` and session services; the same-session driver Agent Note owns the race and lifecycle rationale.
+Same-session continuation driver for [`ctx.goals`](../goal/README.md). It turns an active, armed goal into sequential [goal rounds](../../../docs/glossary.md#goal-round) through the public `Agent` and session services;
 
 ## Composition
 

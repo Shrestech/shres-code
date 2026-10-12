@@ -82,4 +82,4 @@ Independent model request: the ask neither reads nor extends a conversation pref
 - **Byte bound, not tokens** — `maxStateTokens` counts UTF-8 bytes, which never undercounts tokens and rejects some states a real tokenizer would admit.
 - **Tier has no effect** — one route serves both tiers, so `tier: 'fast'` and `'accurate'` send the same request.
 - **Structured output is a tool call** — the llm seam has no response-format field, so the schema rides on the `judgment_answer` tool. A route that ignores tool schemas can still return any arguments, and `readAnswers` rejects what does not match.
-- **The request is not logged by this package** — the engine appends nothing to a session. A consumer's decision event records the questions, the state's source, and the answering engine; see the Agent Note for what a log can reconstruct.
+- **The request is not logged by this package** — the engine appends nothing to a session. A consumer's decision event records the questions, the state's source, and the answering engine

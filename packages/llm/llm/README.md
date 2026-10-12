@@ -61,7 +61,7 @@ Streaming is a raw chunk protocol (`block-start`, `text-delta`, `reasoning-delta
 
 ### App attribution (`attribution.ts`)
 
-Every product adapter sends application identity on provider HTTP requests. `attributionHeaders(identity?)` builds the standard `User-Agent`, defaulting to public `APP_IDENTITY`; white-label deployments may replace but not suppress it. Adapters verify the wire header directly or through their library hook. See the attribution Agent Note.
+Every product adapter sends application identity on provider HTTP requests. `attributionHeaders(identity?)` builds the standard `User-Agent`, defaulting to public `APP_IDENTITY`; white-label deployments may replace but not suppress it. Adapters verify the wire header directly or through their library hook.
 
 ### API key validation (`api-key.ts`)
 

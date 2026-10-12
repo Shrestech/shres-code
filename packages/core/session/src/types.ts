@@ -50,7 +50,7 @@ export function SessionId(id: string): SessionId {
  * in doubt, bump: a near-identity upgrade step is almost free, a missed bump
  * makes older runtimes read new logs wrong silently. The full mechanism
  * (upgrade-step chain, in-memory view conversion, migrate-on-continue) is
- * recorded in the session-log-version-mechanism Agent Note
+
  * (`
  */
 export const SESSION_FORMAT_VERSION = 0

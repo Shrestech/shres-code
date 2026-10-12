@@ -2,7 +2,7 @@
 
 Pure progress-signal folds over a session's committed events: five stuck-trigger verdicts, the numbers-first progress facts that measure the same runs, the trailing tool window, and the identical-call chain key. Each fold reads only the log it is given, so resume, fork, compaction, and bench replay reach the same answers from the same events.
 
-It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events. [`worker-escalation`](../worker-escalation/README.md) folds a worker's log through it for the difficulty ladder, and any other consumer reads the same verdicts without depending on the Team packages. The extraction Agent Note records why the folds have their own home.
+It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events. [`worker-escalation`](../worker-escalation/README.md) folds a worker's log through it for the difficulty ladder, and any other consumer reads the same verdicts without depending on the Team packages. records why the folds have their own home.
 
 ## API
 

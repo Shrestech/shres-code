@@ -1,6 +1,6 @@
 # Session-local Schedule
 
-Schedule owns durable reminders that return to the original live Session as ordinary later conversation turns. The durable Schedule Agent Note owns the persistence and lifecycle decisions, conversational delivery owns the no-receipt boundary, the explicit time-zone boundary owns browser-local interpretation, and bounded fixed-rate Schedule owns recurrence. This page records the durable and model-facing shapes from [`packages/schedule/schedule/src/types.ts`](../../packages/schedule/schedule/src/types.ts); the [package README](../../packages/schedule/schedule/README.md) owns composition, tool behavior, and the exact reminder framing.
+Schedule owns durable reminders that return to the original live Session as ordinary later conversation turns. This page records the durable and model-facing shapes from [`packages/schedule/schedule/src/types.ts`](../../packages/schedule/schedule/src/types.ts); the [package README](../../packages/schedule/schedule/README.md) owns composition, tool behavior, and the exact reminder framing.
 
 ## Durable records
 

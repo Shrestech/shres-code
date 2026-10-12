@@ -1,12 +1,12 @@
 # Development guide
 
-The setup tutorial takes a new contributor from prerequisites to a checked checkout. The contributor reference that follows covers repository layout, daily workflow, and CI organization. Design rationale and implementation details belong to the linked Agent Notes and scripts.
+The setup tutorial takes a new contributor from prerequisites to a checked checkout. The contributor reference that follows covers repository layout, daily workflow, and CI organization.
 
 ## Setup tutorial
 
 ### Prerequisites
 
-- Node.js supports 22.19+ and 24+. CI covers 22.19, 24, and 26; see the Node engine floor Agent Note.
+- Node.js supports 22.19+ and 24+. CI covers 22.19, 24, and 26.
 - Corepack-enabled pnpm. The repo pins `pnpm@11.7.0` in `package.json`; run `corepack enable` if `pnpm --version` does not resolve through Corepack.
 - Git 2.26 or newer; hook setup enables Git's worktree-specific configuration extension.
 - Optional: a DeepSeek API key for the Web, headless, and ACP automation demos and real-API e2e tests.
@@ -19,7 +19,7 @@ Install dependencies from the repo root:
 pnpm install
 ```
 
-The install also configures worktree-local Lefthook hooks through `scripts/install-lefthook.mjs`. The worktree-local hooks Agent Note owns the hook-path safety contract.
+The install also configures worktree-local Lefthook hooks through `scripts/install-lefthook.mjs`. The installer sets worktree-local `core.hooksPath` to `<git-dir>/shres-hooks`, refuses a symlinked or unowned hooks directory, and refuses to replace a user-owned, command-scoped, or other worktree `core.hooksPath` unless `SHRES_LEFTHOOK_ALLOW_HOOKS_PATH_OVERRIDE=1` is set for an inherited path that should stay active only in other worktrees.
 
 If either integration is missing because dependencies were restored from cache or `postinstall` was skipped, install them manually:
 
@@ -27,7 +27,7 @@ If either integration is missing because dependencies were restored from cache o
 node scripts/install-lefthook.mjs
 ```
 
-If the wrapper rejects existing Git configuration or reports a stale lock, follow its diagnostic and the linked Agent Note rather than editing worktree metadata speculatively. After moving a checkout, rerun the wrapper to regenerate the owned path.
+If the wrapper rejects existing Git configuration or reports a stale lock, follow its diagnostic rather than editing worktree metadata. After moving a checkout, rerun the wrapper to regenerate the owned path.
 
 Run typecheck once after a fresh clone:
 

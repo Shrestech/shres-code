@@ -10,7 +10,7 @@ A config without `shres-sdk-jsonrpc-server` is valid and serves nothing; the bin
 
 ## Exit lifecycle
 
-stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exits 130 after the same disposal. EOF may cut off an in-flight turn as documented in the distribution Agent Note. The `jsonrpc` plugin owns response-before-exit protocol shutdown; both paths are idempotent and safe to race.
+stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exits 130 after the same disposal. The `jsonrpc` plugin owns response-before-exit protocol shutdown; both paths are idempotent and safe to race.
 
 ## stdout is the protocol
 

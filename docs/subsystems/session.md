@@ -126,7 +126,7 @@ interface SessionEventMap {
 
 ### `TodoItem` — one todo-list entry
 
-The unit of the `todo/write` event's whole-list snapshot. Deliberately minimal — a `content` line and a three-state `status` (no id, priority, or `activeForm`): the list is replaced wholesale on every write, so entries need no stable identity. See the todo_write Agent Note.
+The unit of the `todo/write` event's whole-list snapshot. Deliberately minimal — a `content` line and a three-state `status` (no id, priority, or `activeForm`): the list is replaced wholesale on every write, so entries need no stable identity.
 
 ```ts type-equiv
 /**
@@ -151,7 +151,7 @@ interface TodoItem {
 
 ### The request header event: `request/header`
 
-The request envelope — the `EpochHeader` (call config + markers for adapter-supplied defaults + rendered system prompt + assembled tool schemas) — is logged session state, so every conversation request is a pure function of the log (the reconstructability Agent Note). A full `request/header` snapshot with reason `'initial'` or `'resume'` records each loop-instance boundary; a later changed request records another full snapshot with reason `'change'`. `foldRequestHeader(events)` reconstructs the header by selecting the latest snapshot. The event is not a `SurfaceEventType`: it produces no LLM message.
+The request envelope — the `EpochHeader` (call config + markers for adapter-supplied defaults + rendered system prompt + assembled tool schemas) — is logged session state, so every conversation request is a pure function of the log. A full `request/header` snapshot with reason `'initial'` or `'resume'` records each loop-instance boundary; a later changed request records another full snapshot with reason `'change'`. `foldRequestHeader(events)` reconstructs the header by selecting the latest snapshot. The event is not a `SurfaceEventType`: it produces no LLM message.
 
 ```ts type-equiv
 /**
@@ -248,7 +248,7 @@ For `assistant/message`, a present `sourceEventSeqs: []` is a complete known-emp
 
 ## Surface types
 
-The three message-producing types (`SurfaceEventType` — `user/message`, `assistant/message`, `tool/result`) carry surface metadata declaring how they join the ordered derived surface. See the session surface Agent Note.
+The three message-producing types (`SurfaceEventType` — `user/message`, `assistant/message`, `tool/result`) carry surface metadata declaring how they join the ordered derived surface.
 
 ### `SurfaceEventType` — the message-producing subset of event types
 
@@ -626,7 +626,7 @@ A plugin may declaration-merge extra `SessionEventMap` types. These are **log-on
 
 When several events in one plugin-owned family assemble into one Web Client Conversation Node, every start, update, result, resource, or interruption event in that family carries or independently derives the same stable business id. This requirement applies to correlated Node families, not to every Session event; it lets the client group each event without guessing from adjacency or scanning history. See the [Conversation Node cookbook](../cookbook/adding-a-conversation-node.md).
 
-The hook bridges' `hook/invoked` / `hook/result` pairs (from `@shres-code/shres-code-hook-protocol`) correlate by `handlerId`. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` fire inside the loop's open turn, so their `hook/*` records are turn-enclosed by construction. `SessionStart` gets no `hook/*` record because it runs before turn 1; its context remains pending in the inbox until a waking delivery opens a turn (see the hook-bridges Agent Note).
+The hook bridges' `hook/invoked` / `hook/result` pairs (from `@shres-code/shres-code-hook-protocol`) correlate by `handlerId`. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` fire inside the loop's open turn, so their `hook/*` records are turn-enclosed by construction. `SessionStart` gets no `hook/*` record because it runs before turn 1; its context remains pending in the inbox until a waking delivery opens a turn.
 
 ## Durability contract
 

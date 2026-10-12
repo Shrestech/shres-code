@@ -1,6 +1,6 @@
 # @shres-code/shres-code-command-goal
 
-Human-facing `/goal` control over [`ctx.goals`](../goal/README.md). The plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers and executes it without a model turn. The human goal-command Agent Note owns the UX and composition decisions.
+Human-facing `/goal` control over [`ctx.goals`](../goal/README.md). The plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers and executes it without a model turn.
 
 ## Command contract
 

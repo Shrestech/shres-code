@@ -2,7 +2,7 @@
 
 The **`CodeRuntime`** (`ctx.codeRuntime`) defines WHAT a code runtime does — run one model-written program against a set of host-provided async bindings and report `{ value, logs, error? }` — without saying HOW.
 
-This package owns the Service Definition role of the capability (the bash trio is the template — see capability seams): providers subclass `CodeRuntime` and register the service; the Consumer is the tool registry's Code Mode, which generates the model-facing SDK and bridges tool dispatch — both specified in the Code Mode Agent Note, whose first provider is a Node worker-thread backend. The runtime knows nothing about tools or sessions: it is handed named async functions and a program string, and everything tool-shaped stays with the Consumer.
+This package owns the Service Definition role of the capability (the bash trio is the template — see capability seams): providers subclass `CodeRuntime` and register the service, whose first provider is a Node worker-thread backend. The runtime knows nothing about tools or sessions: it is handed named async functions and a program string, and everything tool-shaped stays with the Consumer.
 
 ## Service API (`ctx.codeRuntime`)
 

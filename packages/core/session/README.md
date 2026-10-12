@@ -24,7 +24,7 @@ Use the split lifecycle only when teardown must be ordered with another resource
 - `enter(session)` performs the collision check, publishes without announcing, and returns an entry-bound idempotent detach. Concurrent same-id preparations are allowed, but only one entry succeeds; a stale detach cannot remove its replacement.
 - `announce(session)` emits the single creation edge and rejects repeat or reentrant announcements. Detach during that dispatch is deferred and later emits the paired disposal edge; an unannounced entry emits neither lifecycle edge.
 
-`shres-agent-loop` uses this split so final loop flush precedes session detach; see the ownership Agent Note.
+`shres-agent-loop` uses this split so final loop flush precedes session detach
 
 ### Live service events
 
@@ -59,7 +59,7 @@ This package owns ordered surface projection, replacement validation, replay, an
 
 ### Request-header reconstruction (`request-header.ts`)
 
-`request/header` records a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, or `change`. Its optional `adapterDefaults` map marks effective `reasoningEffort` or `maxTokens` values materialized by exact-model resolution, allowing the next request proposal to distinguish them from explicit conversation settings. `foldRequestHeader()` selects the latest snapshot; legacy delta events and the removed `fallback` reason are rejected. See the reconstructable-requests Agent Note.
+`request/header` records a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, or `change`. Its optional `adapterDefaults` map marks effective `reasoningEffort` or `maxTokens` values materialized by exact-model resolution, allowing the next request proposal to distinguish them from explicit conversation settings. `foldRequestHeader()` selects the latest snapshot; legacy delta events and the removed `fallback` reason are rejected.
 
 A `user/message` stores the complete `UserMessage` directly, including the identity created before inbox routing or step entry. It renders its `content` verbatim whether it is a direct human prompt, a synthetic injection, or an entered goal round; its typed `source` is the only channel that tells them apart and carries any domain-specific durable facts. `assistant/message` and `tool/result` likewise store complete message values. Turn execution remains enclosed by `turn/start` and `turn/end`; `agent.inject()` queues input until a later pre-step claims it and returns it in an enter decision.
 

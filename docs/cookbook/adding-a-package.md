@@ -70,7 +70,7 @@ Use `SDK` only for the JSON-RPC client/server protocol used by the supported Pyt
 
 ## 4. Write the package README
 
-Keep package-specific service API, config, events, extension points, and design notes first. The limitations section records durable consumer gaps and non-obvious maintainer constraints owned by this package; ordinary cleanup stays in its source TODO or Agent Note. An indirect Model Experience sentence may name the consumer that surfaces this package's contribution, but it does not restate that consumer's implementation. End a package README with this canonical sequence:
+Keep package-specific service API, config, events, extension points, and design notes first. The limitations section records durable consumer gaps and non-obvious maintainer constraints owned by this package; ordinary cleanup stays in its source TODO. An indirect Model Experience sentence may name the consumer that surfaces this package's contribution, but it does not restate that consumer's implementation. End a package README with this canonical sequence:
 
 ````markdown
 ## Model Experience
@@ -102,7 +102,7 @@ Append-only, prefix-stable, replacing, or independent behavior, including the ex
 
 Fill Model Experience from the implementation. Use one H3 per direct, conditional, capped, lifetime, or auxiliary model-context entry, with the three ordered H4 fields shown above and one prose paragraph under each. Quote stable text owned by the package: system-prompt prose goes in a titled H5 plus `markdown` fence under the field that introduces it—normally `What the model sees`—other short literals stay inline with named placeholders, and other long literals use the same nested form. Summarize only data-dependent or provider-owned text. A tool-schema entry links its anchored section in the generated [tool catalog](../tool-catalog.md) and states only deltas absent there. Keep prompt and schema entries separate when scoping can hide one without the other. In `KV Cache effect`, distinguish append-only growth, a stable repeated prefix, replacement of earlier request tokens, and an independent model request, then name the package-owned changes that can invalidate reuse. “Does not invalidate” means the package preserves an already-reusable prefix; provider cache availability and eviction remain outside the package contract. The prose standard governs completeness and ownership; the verifier enforces the required section structure.
 
-A package with no context effect or one consumer-owned path uses the audited `None, as ` or `Indirectly, through ` sentence in [`SENTENCE_MODEL_EXPERIENCE`](../../scripts/verify-package-readme-model-experience.ts), followed by a `KV Cache effect` H4 and one non-empty paragraph; a model-agnostic generic package may instead join `NO_MODEL_EXPERIENCE_SECTION`. Do not expand either case into a description of another package's work. The limitations [allowlist](../../scripts/verify-package-readme-limitations.ts) is independent. The Model Experience Agent Note records the rationale.
+A package with no context effect or one consumer-owned path uses the audited `None, as ` or `Indirectly, through ` sentence in [`SENTENCE_MODEL_EXPERIENCE`](../../scripts/verify-package-readme-model-experience.ts), followed by a `KV Cache effect` H4 and one non-empty paragraph; a model-agnostic generic package may instead join `NO_MODEL_EXPERIENCE_SECTION`. Do not expand either case into a description of another package's work. The limitations [allowlist](../../scripts/verify-package-readme-limitations.ts) is independent.
 
 ## 5. Verify
 

@@ -111,7 +111,7 @@ export interface SessionTelemetrySink {
    * export timing: a backend that does implement it owns the interaction
    * between its concurrent flushes and {@link shutdown}'s drain (the OTel
    * backend leaves it unimplemented for exactly that hazard — see the
-   * revival Agent Note).
+  *.
    */
   flush?(): void
   /**

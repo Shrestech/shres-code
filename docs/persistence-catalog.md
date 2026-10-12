@@ -434,7 +434,7 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
    * The model that wrote the summary — the summarize call's envelope,
    * reported by the backend that made the call, logged so the one-shot
    * request is reconstructable from log + code and "which model wrote
-   * this summary" has a durable answer (the reconstructability Agent Note).
+   * this summary" has a durable answer.
    */
   model: string
   /** The generation cap the summarize call sent, when one applied. */
@@ -978,7 +978,7 @@ Source: [`packages/interaction/permission-presets/src/index.ts:50`](../packages/
 'plan/mode': { active: boolean }
 ```
 
-Source: [`packages/plan/plan-mode/src/index.ts:53`](../packages/plan/plan-mode/src/index.ts)
+Source: [`packages/plan/plan-mode/src/index.ts:50`](../packages/plan/plan-mode/src/index.ts)
 
 ### `request/*`
 

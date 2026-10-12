@@ -149,7 +149,6 @@ const PATH_RENAMES: readonly PathRename[] = [
   { id: 'cli-badge-snapshot', from: 'apps/cli/tests/roos-badge.snapshot.ts', to: 'apps/cli/tests/shres-badge.snapshot.ts' },
   { id: 'skill-badge-md', from: 'packages/skill/skill-badge/assets/roos-badge.md', to: 'packages/skill/skill-badge/assets/shres-badge.md' },
   { id: 'skill-badge-png', from: 'packages/skill/skill-badge/assets/roos-badge.png', to: 'packages/skill/skill-badge/assets/shres-badge.png' },
-  { id: 'cookbook-review', from: 'docs/cookbook/maintaining-roos-code-review.md', to: 'docs/cookbook/maintaining-shres-code-review.md' },
 ]
 
 /** Files the rebrand must never rewrite. */

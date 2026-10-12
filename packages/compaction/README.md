@@ -9,6 +9,6 @@ A compaction capability family (see capability seams): a Service Definition, a s
 | [`compaction-tool-result-pruner/`](compaction-tool-result-pruner/README.md) | Optional model-free tool-result pruning | `ctx.toolResultPruner` |
 | [`command-compact/`](command-compact/README.md) | Human compaction command | registers on `ctx.commands` |
 
-The backend, optional pruner, and human command compose through the seam; token measurement remains a separate LLM-family service. The compaction capability-seam Agent Note owns the dependency rationale.
+The backend, optional pruner, and human command compose through the seam; token measurement remains a separate LLM-family service.
 
-The subsystem reference — the `compaction/*` events, `CompactionResult`, the service, pruning outcomes — is [docs/subsystems/compaction.md](../../docs/subsystems/compaction.md); the seam's deliberate `shres-session`/`shres-llm` dependency is recorded in the compaction capability-seam Agent Note.
+The subsystem reference — the `compaction/*` events, `CompactionResult`, the service, pruning outcomes — is [docs/subsystems/compaction.md](../../docs/subsystems/compaction.md)

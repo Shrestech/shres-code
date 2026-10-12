@@ -17,9 +17,6 @@
  * or leaving plan mode changes only the prompt section, not the request tool
  * catalog.
  *
- * Agent Note:
- * -
- *
  * @module @shres-code/shres-code-plan-mode
  */
 

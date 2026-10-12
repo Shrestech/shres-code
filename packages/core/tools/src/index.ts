@@ -261,7 +261,7 @@ export interface ToolDefinition extends ToolSchema {
    * Opted-in executions must not mutate parent-owned state. Shared state must
    * tolerate concurrent dispatch; recorder races are permitted only when they
    * commute or fail closed. See the
-   * parallel-tool-call Agent Note
+
    * for the full contract.
    * @param args - parsed arguments; `defineTool` validates before calling.
    * @returns Whether this call may join a parallel group.

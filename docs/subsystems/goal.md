@@ -1,6 +1,6 @@
 # Same-session goals
 
-Types shared by the event-sourced goal service and its policy consumers. The goal-domain Agent Note owns the persistence and activation decisions; this page records the exact fields and variants from [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts).
+Types shared by the event-sourced goal service and its policy consumers. This page records the exact fields and variants from [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts).
 
 ## Identity and lifecycle
 

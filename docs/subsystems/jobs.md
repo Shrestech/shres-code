@@ -1,6 +1,6 @@
 # Background Task Runtime
 
-Types shared by long-running producers, `ctx.jobs`, and job controls. The runtime Agent Note owns the design; this page records the exact fields and variants from [`packages/jobs/jobs/src/types.ts`](../../packages/jobs/jobs/src/types.ts).
+Types shared by long-running producers, `ctx.jobs`, and job controls. This page records the exact fields and variants from [`packages/jobs/jobs/src/types.ts`](../../packages/jobs/jobs/src/types.ts).
 
 ## Ids and status
 

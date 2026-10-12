@@ -1,6 +1,6 @@
 # @shres-code/shres-code-command-compact
 
-Human-facing `/compact` control over [`ctx.compaction`](../compaction/README.md). The plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers and executes it without a model turn. The queued manual compaction Agent Note owns the admission, lock, and durability decisions.
+Human-facing `/compact` control over [`ctx.compaction`](../compaction/README.md). The plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers and executes it without a model turn.
 
 ## Command contract
 

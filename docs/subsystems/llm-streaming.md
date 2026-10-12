@@ -723,7 +723,7 @@ interface LlmDiscoveredModel {
 
 ### The request envelope: `LlmCallConfig` and the logged header
 
-The loop builds each request from logged state. `EpochHeader` records call config, marks the fields supplied by adapter defaults, and records the rendered prompt and authoritative returned tool order (configured by `toolOrder`, or lexicographic when unset) through full `request/header` snapshots. Together with derived history, this makes the request reconstructable from the session log. See [session.md](session.md#the-request-header-event-requestheader) and the reconstructability Agent Note.
+The loop builds each request from logged state. `EpochHeader` records call config, marks the fields supplied by adapter defaults, and records the rendered prompt and authoritative returned tool order (configured by `toolOrder`, or lexicographic when unset) through full `request/header` snapshots. Together with derived history, this makes the request reconstructable from the session log. See [session.md](session.md#the-request-header-event-requestheader)
 
 `agent/request` receives a frozen call-config seed and may return a replacement to switch provider, model, reasoning effort, or sampling. Before the waterfall, the loop removes values marked as adapter defaults so exact-model preparation materializes the selected route's current values; unmarked explicit settings remain in the proposal. After the waterfall, preparation rejects unsupported explicit effort ids without clamping and logs the effective config plus the fields supplied by adapter defaults under the turn signal. The prepared call keeps one adapter registration through dispatch. Requests reaching `llm/stream` are deep-frozen, so mutation throws, and carry a process-local loop identity so observers do not confuse separately logged frozen auxiliary calls with conversation requests.
 
@@ -1018,7 +1018,7 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
  * @param options - the full request. A LOOP-built request carries the
  *   process-local {@link markAgentLoopRequest} identity and arrives deep-frozen
  *   (mutation throws): its content is a pure function of the session log (the
- *   reconstructability Agent Note), so listeners read it, never rewrite it.
+ *, so listeners read it, never rewrite it.
  *   Hand-built calls do not carry that marker; their messages already obey
  *   the immutable creation contract.
  * @mode waterfall

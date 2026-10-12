@@ -128,7 +128,7 @@ export function presentSearchCall(args: { query: string }): GenericCallView {
  * opaquely (as `JsonValue`) on the tool result and persisted with the session
  * log, so `presentResult` reproduces the search card on replay. This projection
  * is the only faithful route to the per-source fields, which the lossy render
- * text cannot carry (the owning rationale is the web-result-card Agent Note).
+ * text cannot carry.
  */
 export interface WebSearchMeta {
   /** The faithful structured sources, in result order. */
@@ -230,7 +230,7 @@ export function searchMetaFromResult(meta: unknown): WebSearchMeta | undefined {
  * Completed-call presentation: a `web` search card carrying the faithful
  * structured sources from `meta`. It sets no `content` copy — a UI without the
  * `web` capability falls back to the raw `tool/result` content, which is the
- * same text (see the web-result-card Agent Note).
+ * same text.
  *
  * @param args - the raw tool arguments; `query` becomes the result-state title so
  *   a window-truncated replay that dropped the call head still has one.

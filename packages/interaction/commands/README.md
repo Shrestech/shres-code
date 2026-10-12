@@ -1,6 +1,6 @@
 # @shres-code/shres-code-commands
 
-Plugin-owned human-command registry consumed by interactive UI adapters. The plugin command registration Agent Note owns the boundary and dispatch contract.
+Plugin-owned human-command registry consumed by interactive UI adapters.
 
 ## Service contract
 

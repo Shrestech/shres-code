@@ -55,5 +55,3 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **No saved or nested workflows** — the seam starts caller-supplied scripts only, and a workflow script receives no `workflow()` hook for recursive orchestration.
 - **No token-budget vocabulary** — engines cap concurrency, items, and children, but neither the request nor result accounts for model tokens across children.
 - **Runs are holder-owned, not service-tracked** — unloading the engine does not discover independent live handles; every consumer must dispose the run it started.
-
-See the dynamic-workflows Agent Note for the deferred workflow API.

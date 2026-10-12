@@ -66,7 +66,7 @@ One UI feature = one plugin package (`src/client/` browser half). A multi-domain
 
 ## Styling
 
-[docs/web-styling.md](../../docs/web-styling.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Product copy is English; code comments are English. See [docs/AGENTS.md](../../docs/AGENTS.md) and the English-only purge Agent Note.
+[docs/web-styling.md](../../docs/web-styling.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Product copy is English; code comments are English. See [docs/AGENTS.md](../../docs/AGENTS.md).
 
 ## Testing and coverage
 
@@ -83,7 +83,7 @@ Run the narrowest rung that covers what you touched; escalate only when the chan
 
 1. **Every GUI code change** — `pnpm run test:gui` (seconds; no browser, no server): the client suites plus the host-side GUI packages. This is the inner loop; run it as freely as a typecheck.
 2. **Any change that can alter the assembled browser or visible conversation/UI output** (client components or copy, `apps/web`, Vite, `shres-host-webserver`, connection/handler/SSE) — additionally `SHRES_SNAPSHOT=replay pnpm run test:web`: rebuilds the frontend dist, then runs the browser smoke pair (the real-host case self-skips without `DEEPSEEK_API_KEY`) plus the keyless replayed e2e scenarios. Linux PR CI uses the same read-only replay mode. Use `SHRES_SNAPSHOT=refresh` only after confirming an intentional output change, or `SHRES_SNAPSHOT=record` with a key to re-record fixtures.
-3. **Before a PR** — use shres-pre-push-checks to select the narrow checks for the outgoing diff; there is no repo-wide pre-push aggregate.
+3. **Before a PR** — run the narrow checks that cover the outgoing diff, and again immediately after `gh stack sync` publishes rewritten branches; report only commands run. There is no repo-wide pre-push aggregate.
 
 If `test:gui` is red on code you did not touch, neither silently fix nor ignore it: note it in your handoff so it lands in the next PR window's sweep.
 

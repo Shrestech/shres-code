@@ -2,7 +2,7 @@
 
 Zero-dependency **untrusted-content frame** for model-visible text that did not come from the current user. The library owns the mechanical wrapper: a trusted label, XML-like tags, and lossless `<` → `\u003c` escaping so payload text cannot spell a framing tag.
 
-It owns **no domain semantics**. Callers choose the tag name, write the label's first sentence, and keep trusted metadata (status lines, truncation footers, citation instructions) outside the frame. This is the boundary the Agent Note draws: share the escape and wrapper, keep placement local.
+It owns **no domain semantics**. Callers choose the tag name, write the label's first sentence, and keep trusted metadata (status lines, truncation footers, citation instructions) outside the frame. draws: share the escape and wrapper, keep placement local.
 
 It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events.
 

@@ -16,9 +16,6 @@
  * compaction-basic run, with `degraded: true` and a reason on the companion
  * events.
  *
- * Agent Note:
- * -
- *
  * @module @shres-code/shres-code-compaction-jev
  */
 

@@ -1,6 +1,6 @@
 # @shres-code/shres-code-storage-sqlite
 
-SQLite backend for the [storage hub](../storage/README.md): registers as backend `sqlite`, serving the `kv` facet over one `node:sqlite` database file (or `:memory:`). Design and trade-offs: domain KV storage Agent Note.
+SQLite backend for the [storage hub](../storage/README.md): registers as backend `sqlite`, serving the `kv` facet over one `node:sqlite` database file (or `:memory:`). Design and trade-offs:
 
 ## Storage model
 
@@ -38,4 +38,4 @@ None — the backend never touches live request prefixes.
 - **`DatabaseSync` is synchronous** — each write blocks the event loop for its (single-statement) duration; acceptable at domain-data scale.
 - **No busy-wait or retry policy** — another connection holding a write transaction rejects the operation immediately; there is no multi-process write protection.
 - **Only the current `STORAGE_SQLITE_SCHEMA_VERSION` opens** — any other stamped version is rejected rather than migrated (pre-release stance).
-- **`openDatabase` duplicates the session-persistence SQLite open sequence** — extraction into a shared media layer is deferred to the planned session-backend migration (see the Agent Note's reuse audit).
+- **`openDatabase` duplicates the session-persistence SQLite open sequence** — extraction into a shared media layer is deferred to the planned session-backend migration.

@@ -25,7 +25,7 @@ import { clampTimeout, deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@shres-co
 /* jscpd:ignore-end */
 import { resolvePwshPath } from './resolve.ts'
 
-/* jscpd:ignore-start -- deliberate call-for-call mirror of shres-bash-local (Agent Note: pwsh-tool-and-executor). */
+/* jscpd:ignore-start -- deliberate call-for-call mirror of shres-bash-local. */
 /**
  * Model-friendly environment overrides for PowerShell: disable colors and
  * pagers that would garble tool output. `TERM=dumb` is a POSIX concept and is

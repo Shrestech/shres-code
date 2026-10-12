@@ -14,7 +14,7 @@ import type { ShellProcessRead, ShellSandboxInfo, CollectedOutput } from '@shres
 import type { SandboxMode } from '@shres-code/shres-code-sandbox'
 import { escalationHintMarker, sandboxDenialMarker } from '@shres-code/shres-code-sandbox'
 
-/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/render.ts (Agent Note). */
+/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/render.ts. */
 
 /** Append the truncation notice (with the full-output spill path) to a stream's text. */
 function streamText(output: CollectedOutput): string {

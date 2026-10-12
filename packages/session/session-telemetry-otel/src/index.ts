@@ -269,7 +269,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
   // concurrent flushes, whose undocumented interactions with shutdown's
   // internal drain (concurrent-flush guard, provider-level flush timeout)
   // silently drop tail records. Rationale and the revival trigger: the
-  // revival Agent Note.
+
 
   /**
    * Ask the SDK to drain and quiesce, but reject after the backend-owned

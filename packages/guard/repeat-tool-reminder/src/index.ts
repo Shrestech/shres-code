@@ -3,7 +3,7 @@
  * logged model context, and — only when a deployment opts in with
  * `vetoThreshold` — refuses the call itself past that run length.
  * Configuration and chain semantics live in the package README; rationale
- * lives in the repeat-tool-reminder Agent Note.
+
  * @module @shres-code/shres-code-repeat-tool-reminder
  */
 

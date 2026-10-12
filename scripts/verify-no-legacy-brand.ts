@@ -1,9 +1,8 @@
 /**
  * Reject tracked leftovers of retired product identities (DeepSeek Harness /
- * DSH and Roos Code) outside the keep-list (LICENSE, NOTICE, archived Agent
- * Notes, the historical rebrand notes, the rebrand/rescope/zh-purge scripts
- * that must still mention old tokens as find-strings, and vendored upstream
- * README/LICENSE). Also rejects the slash-stripped catalog slug
+ * DSH and Roos Code) outside the keep-list (LICENSE, NOTICE, the
+ * rebrand/rescope/zh-purge scripts that must still mention old tokens as
+ * find-strings, and vendored upstream README/LICENSE). Also rejects the slash-stripped catalog slug
  * `deepseek-aidsh` and leftover mermaid node ids (`pkg_*_dsh_*`, `pkg_*_roos_*`).
  * Hyphenated `roos-code` / `shres-code` is not a slash-stripped slug.
  */

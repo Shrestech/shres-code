@@ -1,6 +1,6 @@
 # Persistent PTY Sessions
 
-Types shared by PTY backends, `ctx.terminals`, and the model-facing consumer. The persistent PTY Agent Note owns the rationale; this page records the cross-package vocabulary from [`packages/terminal/terminal/src/types.ts`](../../packages/terminal/terminal/src/types.ts).
+Types shared by PTY backends, `ctx.terminals`, and the model-facing consumer. This page records the cross-package vocabulary from [`packages/terminal/terminal/src/types.ts`](../../packages/terminal/terminal/src/types.ts).
 
 ## Identity and readiness
 

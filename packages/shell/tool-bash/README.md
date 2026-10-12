@@ -40,13 +40,13 @@ The tool owns its `presentCall`/`presentResult` render intent. A foreground call
 
 ## The tool builds its request from named args only
 
-`ShellExecRequest` carries optional `stdoutMaxBytes`, `stdin`, ordinary `env`, and managed `shresEnv`, used by trusted in-process plugins and this tool's environment registry. The model-facing tool exposes none of `stdoutMaxBytes`, `stdin`, or `env`: it builds requests from named command/workdir/timeout/signal/sandbox fields plus the registry-collected `shresEnv`. Extra model keys are ignored and cannot replace managed values. Shell syntax provides equivalent command-level behavior, while the local executor scrubs ambient credentials and stale `SHRES_*` values. See the stdin/env Agent Note.
+`ShellExecRequest` carries optional `stdoutMaxBytes`, `stdin`, ordinary `env`, and managed `shresEnv`, used by trusted in-process plugins and this tool's environment registry. The model-facing tool exposes none of `stdoutMaxBytes`, `stdin`, or `env`: it builds requests from named command/workdir/timeout/signal/sandbox fields plus the registry-collected `shresEnv`. Extra model keys are ignored and cannot replace managed values. Shell syntax provides equivalent command-level behavior, while the local executor scrubs ambient credentials and stale `SHRES_*` values.
 
 ## Permissions and escalation
 
 Commands run with the executor's full authority unless a sandboxing executor ([`shres-bash-sandbox`](../bash-sandbox/)) confines them — the deny-only sandbox reports denials as result facts, rendered here as the denial marker; per-call allow/deny/ask policy is the `tools/pre-execute` waterfall (see docs/architecture.md).
 
-Escalating bash calls resolve `ctx.approval` before execution. `allowed-once` applies the requested mode only to that call; rejection, cancellation, unavailability, or missing approval context executes nothing and returns a distinct error. On a real denial, the model may retry the same command once in the same turn with the narrowest sufficient mode and justification; the approval prompt itself is the consent step. Escalation is never speculative, and a disabled or rejected approval is final. The sandbox Agent Note owns the rationale.
+Escalating bash calls resolve `ctx.approval` before execution. `allowed-once` applies the requested mode only to that call; rejection, cancellation, unavailability, or missing approval context executes nothing and returns a distinct error. On a real denial, the model may retry the same command once in the same turn with the narrowest sufficient mode and justification; the approval prompt itself is the consent step. Escalation is never speculative, and a disabled or rejected approval is final.
 
 ## Per-session mode switching
 
@@ -133,5 +133,5 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 - **Replay exit pills parse from result text** — output whose final line happens to be exactly `[exit code: N]` / `[killed by signal: …]` shows a wrong pill on session replay and loses that line from the card body, because the parse treats it as the marker it consumes; a display-only known residual.
-- **The `bash` tool opts out of `timeout-policy` budgets** — it keeps the executor-owned `BASH_TIMEOUT` path, per the tool-call timeout-policy Agent Note.
+- **The `bash` tool opts out of `timeout-policy` budgets** — it keeps the executor-owned `BASH_TIMEOUT` path,
 - **Background processes have no executor timeout** — callers must use `job_kill`, or rely on owner/service disposal, when work no longer matters.

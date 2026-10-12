@@ -1,6 +1,6 @@
 # @shres-code/shres-code-tool-cordis
 
-The self-referential Cordis toolset: five model-facing tools over the live runtime in the current Shres process. The registry, the vm sandbox, and the browser broadcast belong to [`@shres-code/shres-code-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: the toolset Agent Note.
+The self-referential Cordis toolset: five model-facing tools over the live runtime in the current Shres process. The registry, the vm sandbox, and the browser broadcast belong to [`@shres-code/shres-code-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them.
 
 ## What it does
 

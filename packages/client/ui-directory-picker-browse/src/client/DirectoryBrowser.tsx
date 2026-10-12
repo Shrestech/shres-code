@@ -115,7 +115,7 @@ function displayCrumbs(listing: DirectoryListing, homeLabel: string): DirectoryE
  * home directory whose own name contains a backslash would misread.
  * TODO: replace with a host-stamped `separator` field on the wire
  * DirectoryListing so the platform fact travels verbatim (the trade-off is
- * recorded in the directory-picker capability seam Agent Note).
+ *).
  */
 function separatorOf(listing: DirectoryListing): '\\' | '/' {
   return listing.home.includes('\\') ? '\\' : '/'

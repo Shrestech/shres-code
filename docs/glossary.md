@@ -1,6 +1,6 @@
 # Glossary
 
-Domain vocabulary for Shres Code uses one canonical term per concept. Terms link to their entries with standard Markdown anchors; implementation detail stays in package READMEs and Agent Notes.
+Domain vocabulary for Shres Code uses one canonical term per concept. Terms link to their entries with standard Markdown anchors; implementation detail stays in package READMEs.
 
 ## capability-seam
 

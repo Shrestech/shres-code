@@ -22,9 +22,9 @@ The optional `@shres-code/shres-code-scope/invariant` companion owns that runtim
 
 ## Design contract
 
-The registration context determines both visibility and ownership, preventing a registration from being visible in one scope but disposed with another. Scopes route trusted same-process plugins; they are not sandboxes or authority boundaries. See the agent-scope Agent Note for rationale and security non-goals.
+The registration context determines both visibility and ownership, preventing a registration from being visible in one scope but disposed with another. Scopes route trusted same-process plugins; they are not sandboxes or authority boundaries.
 
-Scope-aware services define a concrete `ScopeLayer` that aggregates their heterogeneous tables and domain helpers. `ScopedLayers.effect()` accepts one synchronous action returning one synchronous undo, installs that undo before optional notification, and reclaims an exact-scope layer only when the complete aggregate is empty. `notify` defaults to `true`; the supplied callback owns whether observer failures throw or are contained. `EntryValues` remains internal, the storage classes are imported from the package root rather than a `/store` subpath, and the shared storage does not define registry-specific filtering or iteration policy. See the shared scoped-layer storage Agent Note.
+Scope-aware services define a concrete `ScopeLayer` that aggregates their heterogeneous tables and domain helpers. `ScopedLayers.effect()` accepts one synchronous action returning one synchronous undo, installs that undo before optional notification, and reclaims an exact-scope layer only when the complete aggregate is empty. `notify` defaults to `true`; the supplied callback owns whether observer failures throw or are contained. `EntryValues` remains internal, the storage classes are imported from the package root rather than a `/store` subpath, and the shared storage does not define registry-specific filtering or iteration policy.
 
 Handing out a scoped context hands out the minting plugin's service-resolution API (resolution walks the minting fiber's dependency chain, not the holder's) — mint it from the plugin whose dependencies the scoped registrations need to resolve.
 
