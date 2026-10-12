@@ -9,7 +9,7 @@ Behavioral guard plugins watch the agent loop for unproductive patterns and enfo
 | [`timeout-policy/`](timeout-policy/README.md) | Arms per-call tool deadlines as deployment policy | registers a `tools/execute` listener |
 | [`shield/`](shield/README.md) | Default-on seat for the paid Shres Shield plugin | `ctx.shield` |
 
-Reminders travel as `additionalContexts` on the `tools/post-execute` decision and are appended as logged plugin-sourced `user/message` events ([tools](../../docs/subsystems/tools.md)).. Timeouts are split across `shres-timeout`, capability termination, and this policy layer.
+Reminders travel as `additionalContexts` on the `tools/post-execute` decision and are appended as logged plugin-sourced `user/message` events ([tools](../../docs/subsystems/tools.md)). Timeouts are split across `shres-timeout`, capability termination, and this policy layer.
 
 Every enforcing behavior in this family is off unless a deployment configures it: the repeat veto (`vetoThreshold`), the step budget (`maxStepsPerTurn`), and the blanket tool deadline (`defaultTimeoutMs`) all ship neutral, because each one truncates honest work when its ceiling is wrong.
 

@@ -429,7 +429,7 @@ export function fetchMetaFromResult(meta: unknown): WebFetchMeta | undefined {
 /**
  * Completed-call presentation: a `web` fetch card carrying the retrieval summary
  * from `meta`. It sets no `content` copy — a UI without the `web` capability
- * falls back to the raw `tool/result` content, the already-markdown body (see the
+ * falls back to the raw `tool/result` content, the already-markdown body.
  *
  * @param args - the raw tool arguments; `url` becomes the result-state title so a
  *   window-truncated replay that dropped the call head still has one.
