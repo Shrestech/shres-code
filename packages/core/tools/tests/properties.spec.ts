@@ -1,8 +1,7 @@
 /**
- * Property-based tests for the tool-schema DSL, including
- * the property-testing ↔ runtime-validation composition: generated args that satisfy a ParameterSchemaSpec must
- * pass validateArgs, and targeted corruptions must be rejected. This closes the
- * validator/
+ * Property-based tests for the tool-schema DSL.
+ * Generated args that satisfy a ParameterSchemaSpec must pass validateArgs, and targeted corruptions must be rejected. This closes
+ * validator and InferArgs drift.
  */
 
 import { describe, expect, it } from 'vitest'

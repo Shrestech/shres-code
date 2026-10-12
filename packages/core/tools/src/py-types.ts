@@ -85,8 +85,7 @@ const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u
  * here — and the declared `class \u{A7DC}Args` fails with `invalid
  * non-printable character U+A7DC`. Closing the exposure therefore covers all
  * four read points, not this predicate alone; it needs the target interpreter's
- * version, which the backend reporting `language: 'python'` owns; the
- * records the deferral.
+ * version, which the backend reporting `language: 'python'` owns.
  *
  * The `ts-types` sibling keeps its own ASCII rule rather than sharing this
  * one: ECMAScript identifiers are a different set (`$`) and are never

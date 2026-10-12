@@ -1061,9 +1061,9 @@ describe('the model-facing bash tool builds its request from named args only (no
    * never spread unknown tool-call keys into it. This guard's job is to catch a
    * future refactor that blindly forwards `...args` — which would silently thread
    * model input into the post-scrub `env` merge or per-run capture budget — NOT
-   * to defend a trust boundary
-   * (the credential scrub in shres-bash-local is the security control; see the
-  *. Foreground `run()` returns a canned result; `start()`
+   * to defend a trust boundary.
+   * The credential scrub in shres-bash-local is the security control.
+   * Foreground `run()` returns a canned result; `start()`
    * hands back an already-settled fake handle so the task registration completes.
    */
   class RecordingBashExecutor extends ShellExecutor {

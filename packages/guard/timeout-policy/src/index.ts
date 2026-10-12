@@ -8,7 +8,6 @@
  * FIXME: settle the intended `@shres-code/shres-code-timeout-guard` rename before the
  * first tagged release — suggestion only, aligning the name with its `guard/`
  * home; decide at resolution time
- *.
  *
  * @module @shres-code/shres-code-tool-call-timeout-policy
  */

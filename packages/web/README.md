@@ -14,4 +14,4 @@ This family provides provider-neutral web search and fetch operations plus the m
 
 The web capability decision records why search and fetch share one provider-selection service.
 
-The subsystem reference — search/fetch requests and results, availability, `WebError` — is [docs/subsystems/web.md](../../docs/subsystems/web.md); rationale (including deferred SSRF protection)
+The subsystem reference — search/fetch requests and results, availability, `WebError` — is [docs/subsystems/web.md](../../docs/subsystems/web.md); rationale (including deferred SSRF protection).

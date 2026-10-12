@@ -10,4 +10,4 @@ This family gives long-running tools one owner-isolated background-job protocol 
 
 See the background-job runtime and job-registry decisions.
 
-The subsystem reference — the id scheme, the owner-fenced contract, snapshots — is [docs/subsystems/jobs.md](../../docs/subsystems/jobs.md);
+The subsystem reference — the id scheme, the owner-fenced contract, snapshots — is [docs/subsystems/jobs.md](../../docs/subsystems/jobs.md).

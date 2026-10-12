@@ -1,6 +1,6 @@
 # Testing policy
 
-How this repo tests, tier by tier, and the rules that keep a green suite meaningful. Commands live in root [AGENTS.md](../AGENTS.md);
+How this repo tests, tier by tier, and the rules that keep a green suite meaningful. Commands live in root [AGENTS.md](../AGENTS.md).
 
 ## Tiers
 

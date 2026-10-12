@@ -120,7 +120,6 @@ function pwshDescription(backgroundEnabled: boolean, escalationModes: readonly S
   // shipped composition pairing tool-pwsh with a confining executor is
   // win32-only; a future POSIX pwsh-sandbox composition must gate both
   // sentences on the platform instead (tracked in the pwsh-tool-and-executor
-  //.
   return base + ' Under the Windows sandbox, read-only pwsh runs in PowerShell ConstrainedLanguage mode, while '
     + 'workspace-write stays in FullLanguage unless host policy says otherwise. In read-only, prefer cmdlets and core types (`[string]`, `[datetime]`, `[regex]`, `[guid]`); '
     + '.NET static calls (`[System.IO.*]::`, `[math]::`), `Add-Type`, COM objects, and reflection fail '
@@ -283,7 +282,6 @@ export function apply(ctx: Context, config: Config = {}): void {
     output: {
       // The foreground result wire shape mirrors shres-tool-bash's by contract —
       // consumers of one must accept the other (see the pwsh-tool-and-executor
-      //.
       /* jscpd:ignore-start -- deliberate result-schema symmetry with shres-tool-bash. */
       schema: {
         oneOf: [

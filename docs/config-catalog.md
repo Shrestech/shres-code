@@ -4310,7 +4310,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/guard/timeout-policy/src/index.ts:42`](../packages/guard/timeout-policy/src/index.ts)
+Source: [`packages/guard/timeout-policy/src/index.ts:41`](../packages/guard/timeout-policy/src/index.ts)
 
 <a id="shres-codeshres-code-tool-fs"></a>
 

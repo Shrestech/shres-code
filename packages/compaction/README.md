@@ -11,4 +11,4 @@ A compaction capability family (see capability seams): a Service Definition, a s
 
 The backend, optional pruner, and human command compose through the seam; token measurement remains a separate LLM-family service.
 
-The subsystem reference — the `compaction/*` events, `CompactionResult`, the service, pruning outcomes — is [docs/subsystems/compaction.md](../../docs/subsystems/compaction.md)
+The subsystem reference — the `compaction/*` events, `CompactionResult`, the service, pruning outcomes — is [docs/subsystems/compaction.md](../../docs/subsystems/compaction.md).. The seam deliberately depends on `shres-session` and `shres-llm`.

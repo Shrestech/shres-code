@@ -11,4 +11,4 @@ This family provides provider-neutral text-to-speech and speech-to-text plus the
 
 The Web consumer lives in [`client/ui-speech`](../client/ui-speech/README.md). Transcripts enter the model as ordinary `session.prompt` text. Playback consumes ordinary assistant text. The family does not add audio content blocks and does not call a paid speech API.
 
-The speech I/ records why TTS and STT share one seam, why audio is not a model content type, and why the shipped engines are local Kokoro and Whisper rather than a billed Voice API or browser `speechSynthesis`. records how an OpenAI-compatible cloud endpoint joined as an opt-in user-layer pin while local stayed the composition default.
+TTS and STT share one seam. Audio is not a model content type. The shipped engines are local Kokoro and Whisper rather than a billed Voice API or browser `speechSynthesis`. An OpenAI-compatible cloud endpoint is an opt-in user-layer pin; local stays the composition default.

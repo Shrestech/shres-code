@@ -1,6 +1,6 @@
 # @shres-code/shres-code-session-projection-cache
 
-The persisted projection cache (`ctx.sessionProjectionCache`): durable checkpoints of every registered projection unit's state, one record per session on the domain data form (`session_projcache` domain — the shipped json backend lands the per-record tree at `<root>/session_projcache/` beside `workspace.json`). Design authority: the session-projection RFC (persisted projection cache section). Version-read compatibility:
+The persisted projection cache (`ctx.sessionProjectionCache`): durable checkpoints of every registered projection unit's state, one record per session on the domain data form (`session_projcache` domain — the shipped json backend lands the per-record tree at `<root>/session_projcache/` beside `workspace.json`). Design authority: the session-projection RFC (persisted projection cache section). Version-read compatibility.
 
 A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority: possibly stale (`seq` says exactly how stale) but never wrong. Consequences the implementation commits to:
 

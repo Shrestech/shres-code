@@ -10,4 +10,4 @@ This family persists oversized tool output and replaces the inline result with a
 
 See the tool-output spill decision for the boundary between storage, retention, and tool-owned output handling.
 
-The subsystem reference — `SaveTextSpill`, owners/sources, the branded locator — is [docs/subsystems/spill.md](../../docs/subsystems/spill.md);
+The subsystem reference — `SaveTextSpill`, owners/sources, the branded locator — is [docs/subsystems/spill.md](../../docs/subsystems/spill.md).

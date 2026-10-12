@@ -10,4 +10,4 @@ This family applies per-session confinement policy to process execution. It cove
 
 See the sandbox decision for the capability boundary and the filesystem integration decision for cross-family policy use.
 
-The subsystem reference — modes and enforcement, per-call policy, wrapped-argv dialects, fail-closed errors — is [docs/subsystems/sandbox.md](../../docs/subsystems/sandbox.md)
+The subsystem reference — modes and enforcement, per-call policy, wrapped-argv dialects, fail-closed errors — is [docs/subsystems/sandbox.md](../../docs/subsystems/sandbox.md).

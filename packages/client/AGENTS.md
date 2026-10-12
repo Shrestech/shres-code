@@ -1,12 +1,12 @@
 # AGENTS.md — Web client stack
 
-Rules for `packages/client/*` (the browser side of the shres web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.md). Before touching slots, component props, stores, or plugin structure, read the slot system standard (the definitive composition model) and the web client architecture note (loading chain, object layer, services).
+Rules for `packages/client/*` (the browser side of the shres web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.md). Before touching slots, component props, stores, or plugin structure, read the slot and props rules and the layering rules in this file.
 
 Packages here are named with the directory prefix: `@shres-code/shres-code-client-<name>`.
 
 ## Slot and props discipline
 
-The slot system standard owns the full design; these are the rules you must not violate when writing or reviewing client code:
+These are the rules you must not violate when writing or reviewing client code:
 
 1. **One API**: a plugin composes UI only through `ctx.slots.register({ name, children?, store?, inject? }, Component)`. There is no separate slot-definition call, no whitelist face object, no face-minting helper. The shell alone renders `'root'`.
 2. **children = declaration + authorization**: the slots your component renders are exactly the keys of your register call's `children` object (spec values: `kind`/`scope`). Rendering a slot you didn't declare, or declaring one someone else declared, fails at load — do not work around it; the conflict is the design speaking. Slot names mirror the composition path: `<domain>.<entry>.<hole>` (e.g. `'tool.call.toolview'`).
@@ -41,7 +41,7 @@ The `/client` entrypoint of a UI plugin package is its public browser API, not a
 
 ## Layering red lines
 
-The stack has one-way knowledge, settled in the web client architecture note:
+The stack has one-way knowledge:
 
 1. **Data object layer** (`runtime`, React-free): `ConnectionController` → `SessionManager` → `Session` own all business state (event windows, streaming accumulation, reconnect machine), and the snapshot-store engine (zustand/immer, `defineStore`, `shallowEqual`) lives here too — store products are bare observable sources with no hook members. Zero React imports — grep-assertable.
 2. **Render machinery** (`web-react`, shell-only glue): all ctx-to-React integration — slot renderer/outlets, `SessionProvider`, and the uSES adapter. Every hook is composed here at the binding site from bare sources; business plugin packages carry no web-react dependency at all.
@@ -70,7 +70,7 @@ One UI feature = one plugin package (`src/client/` browser half). A multi-domain
 
 ## Testing and coverage
 
-The GUI test structure (three tiers, lane map) is settled in the GUI testing system note; repo-wide policy in [docs/testing.md](../../docs/testing.md).
+Repo-wide test policy is [docs/testing.md](../../docs/testing.md). This section states the GUI tiers.
 
 - Client source packages are inside the per-file 100% coverage gate (`pnpm run test:coverage`). Genuinely unreachable defensive arms take a `/* v8 ignore -- <reason> */` comment with a real reason, never a bare ignore.
 - Component specs render with realistic props or a driven fixture runtime and assert user-visible behavior, not class names, hook internals, or render counts.
@@ -99,7 +99,7 @@ Bringing up a new `packages/client/<name>` plugin package (ui-workspace is a com
 
 ## New component checklist
 
-1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the slot system standard. No other composition route exists.
+1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component with `ctx.slots.register`. No other composition route exists.
 2. Type the props as the four shares (`PropsRuntime` & `PropsRenderSlots` & `PropsStore` & inject face) — derive, don't hand-write. Shared/surviving state goes in a `createXXXStore()` factory declared at register; component-private state stays local.
 3. Component tests feed props directly (`createXXXStore().create()` for the store data; plain stubs for framework hooks) and assert behavior without render machinery.
 4. Tokens only in CSS; English product copy; English comments.

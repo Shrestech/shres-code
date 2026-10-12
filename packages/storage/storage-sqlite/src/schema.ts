@@ -31,8 +31,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 /* jscpd:ignore-start -- deliberately mirrors the session-persistence-sqlite /
    session-query-sqlite open sequence; this group is the third user, and the
    shared medium helper is deferred to the log-facet migration so the session
-   packages stay untouched this phase (
-   reuse audit). */
+   packages stay untouched this phase. */
 /**
  * Exclusively create a missing database file with owner-only permissions.
  * Existing files retain their modes, and errors other than `EEXIST` propagate.

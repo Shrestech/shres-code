@@ -9,4 +9,4 @@ The shared process substrate for one execution world: executable lookup, fully-s
 
 The service owns process lifetime across consumer reloads; consumers own what a process means (a bash command, a future non-shell runner) and every default that shapes one.
 
-The subsystem reference — spawn specs, output readers, outcomes, the `SHRES_*` environment — is [docs/subsystems/subprocess.md](../../docs/subsystems/subprocess.md)
+The subsystem reference — spawn specs, output readers, outcomes, the `SHRES_*` environment — is [docs/subsystems/subprocess.md](../../docs/subsystems/subprocess.md).

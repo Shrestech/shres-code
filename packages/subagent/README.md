@@ -21,4 +21,4 @@ This family lets an agent delegate work to child agents. Multiple named provider
 
 See the decisions for the capability family, continuable children, and control tools.
 
-The subsystem reference — start requests, results, live runs, the provider contract, continuable background children — is [docs/subsystems/subagent.md](../../docs/subsystems/subagent.md); design rationale in the subagent capability seam, continuable background subagents,
+The subsystem reference — start requests, results, live runs, the provider contract, continuable background children — is [docs/subsystems/subagent.md](../../docs/subsystems/subagent.md); design rationale in the subagent capability seam, continuable background subagents.

@@ -1,7 +1,7 @@
 /**
  * Showcase integration: the real `web_fetch` tool + the real spill stack
  * (`shres-spill-local` backend + `shres-spill-policy`), exercised through
- * `ctx.tools.execute()`.— a large
+ * `ctx.tools.execute()`. A large
  * formatted fetch result is automatically retained and spilled with NO
  * tool-specific spill code, and the model-facing text changes ONLY by the
  * deliberate spill notice (the full formatted result lands in the spill file).

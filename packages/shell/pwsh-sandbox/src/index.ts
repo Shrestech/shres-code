@@ -42,8 +42,8 @@ export type Config = LocalConfig
 /**
  * Registers as `ctx.shell` in place of the local pwsh executor and requires a
  * `ctx.sandbox` provider plus `ctx.sandboxPolicy`; the tool layer carries the
- * sandbox denial rendering and escalation surface (see the
- *. Tool calls pass the calling session's
+ * sandbox denial rendering and escalation surface.
+ * Tool calls pass the calling session's
  * resolved policy; direct calls fall back to deployment policy.
  * `result.sandbox` reports the mode, enforcement, and denial facts the tool
  * renders.

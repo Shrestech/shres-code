@@ -18,4 +18,4 @@ The Service Definition lives at `fs/fs/`. A sandboxed, remote, or project-scoped
 
 `read`/`write`/`edit` take **no** `timeoutMs` and the provider contract arms no deadline: file IO here runs untimed because a deadline would kill work the OS will still finish — see [the filesystem subsystem page](../../docs/subsystems/filesystem.md). Cancellation still propagates through the tool-execution signal for best-effort abort at syscall boundaries.
 
-The subsystem reference — targets, outcomes, guards, policy events, the error taxonomy, and why file IO takes no timeout — is [docs/subsystems/filesystem.md](../../docs/subsystems/filesystem.md)
+The subsystem reference — targets, outcomes, guards, policy events, the error taxonomy, and why file IO takes no timeout — is [docs/subsystems/filesystem.md](../../docs/subsystems/filesystem.md).

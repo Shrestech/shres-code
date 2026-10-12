@@ -130,7 +130,7 @@ export interface HookOutput {
   systemMessage?: string
   /**
    * A tool-input rewrite a hook requested (CC `updatedInput`). PARSED but NOT
-   * honored — input rewrite is deferred; a
+   * honored — input rewrite is deferred. A
    * bridge logs + warns when this is present.
    */
   updatedInput?: Record<string, unknown>
