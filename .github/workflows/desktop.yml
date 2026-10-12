@@ -28,6 +28,10 @@ concurrency:
 env:
   PRIMARY_NODE_VERSION: '24'
   SHRES_TELEMETRY_DISABLED: '1'
+  # The full-workspace build (tsdown + typert generation across ~300 packages) exceeds
+  # Node's memory-sized default heap on the 7 GB macOS runner; the same build passes
+  # on larger hosts. Raise the per-process cap for every job in this workflow.
+  NODE_OPTIONS: '--max-old-space-size=5120'
 
 jobs:
   desktop:
