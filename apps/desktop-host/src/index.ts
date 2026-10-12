@@ -15,7 +15,7 @@ import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Context } from '@shres-code/cordis'
+import { FiberState, type Context } from '@shres-code/cordis'
 import type { PatchOptions } from '@shres-code/cordis-plugin-include'
 import {
   boot,
@@ -25,6 +25,7 @@ import {
   loadOverlayPatches,
   loadProfileDirectory,
   provideProfileRuntime,
+  watchUserPatches,
   type Profile,
 } from '@shres-code/shres-code-app-boot'
 import { provideCmdline } from '@shres-code/shres-code-cmdline'
@@ -183,6 +184,12 @@ interface DesktopComposition {
   readonly installAnchor: string
   readonly profile: Profile
   readonly patches: PatchOptions[]
+  /** Bundle layers below the profile patch. A live reload reuses this copy. */
+  readonly bundlePatches: PatchOptions[]
+  /** Shipped desktop overlay above the profile patch. A live reload reuses this copy. */
+  readonly desktopPatches: PatchOptions[]
+  /** System agent-preset root, when that row is composed. It stays above the profile patch. */
+  readonly presetOverlay: PatchOptions[]
 }
 
 /**
@@ -207,23 +214,63 @@ function desktopComposition(
       throw new Error(`${NAME}: profile bundle ${JSON.stringify(layer.packageName)} resolved outside the desktop runtime and profile`)
     }
   }
-  const layers = [
-    ...profile.layers.map(layer => layer.patches),
-    profile.patches,
-    loadOverlayPatches(NAME, DESKTOP_PATCH),
-  ]
+  const bundlePatches = profile.layers.flatMap(layer => layer.patches)
+  const desktopPatches = loadOverlayPatches(NAME, DESKTOP_PATCH)
+  const layers = [bundlePatches, profile.patches, desktopPatches]
   const rows = new Map(composeEntries(layers).flatMap(row => typeof row.id === 'string' ? [[row.id, row] as const] : []))
   const agentPresets = rows.get('agent-presets')
-  if (agentPresets !== undefined) {
-    layers.push([{
-      id: 'agent-presets',
-      config: {
-        ...(agentPresets.config ?? {}) as Record<string, unknown>,
-        roots: [{ path: join(appRoot, 'config', 'agent-presets'), trust: 'system' }],
-      },
-    }])
+  const presetOverlay: PatchOptions[] = agentPresets === undefined ? [] : [{
+    id: 'agent-presets',
+    config: {
+      ...(agentPresets.config ?? {}) as Record<string, unknown>,
+      roots: [{ path: join(appRoot, 'config', 'agent-presets'), trust: 'system' }],
+    },
+  }]
+  return {
+    installAnchor,
+    profile,
+    bundlePatches,
+    desktopPatches,
+    presetOverlay,
+    patches: [...bundlePatches, ...profile.patches, ...desktopPatches, ...presetOverlay],
   }
-  return { installAnchor, profile, patches: layers.flat() }
+}
+
+/**
+ * Watch the desktop profile's `cordis.patch.yml` and reapply it between the
+ * bundle layers and the shipped desktop overlay.
+ * The web bundle disables the shared module-reload `hmr` row, so a missing
+ * service is replaced with a watch-only instance. Bundle install stays
+ * restart-required; this watch does not read `package.json`.
+ * @param ctx - settled desktop host context.
+ * @param composition - boot layers the reload must keep in place.
+ */
+async function watchDesktopProfilePatch(ctx: Context, composition: DesktopComposition): Promise<void> {
+  if (ctx.fiber.state !== FiberState.ACTIVE || ctx.get('loader') === undefined) return
+  if (ctx.get('hmr') === undefined) {
+    if (ctx.get('timer') === undefined) {
+      await ctx.loader.create({ name: '@shres-code/cordis-plugin-timer' })
+    }
+    // Polling matches the config-watch tests. A worker thread does not receive
+    // native file events, and an empty module root does not walk the tree.
+    await ctx.loader.create({
+      name: '@shres-code/cordis-plugin-hmr',
+      config: { root: [], ignored: [], debounce: 0, usePolling: true },
+    })
+  }
+  const bundlePatches = structuredClone(composition.bundlePatches)
+  const desktopPatches = structuredClone(composition.desktopPatches)
+  const presetOverlay = structuredClone(composition.presetOverlay)
+  await watchUserPatches(ctx, {
+    binName: NAME,
+    filename: composition.profile.patchPath,
+    compose: profilePatches => structuredClone([
+      ...bundlePatches,
+      ...profilePatches,
+      ...desktopPatches,
+      ...presetOverlay,
+    ]),
+  })
 }
 
 function appVersionOf(runtimeDir: string): string {
@@ -476,6 +523,12 @@ export async function runDesktopHost(
   if (clientModules === undefined) {
     await ctx.fiber.dispose()
     throw new Error(`${NAME}: composition did not provide clientModules`)
+  }
+  try {
+    await watchDesktopProfilePatch(ctx, composition)
+  } catch (error) {
+    await ctx.fiber.dispose()
+    throw error
   }
   // The desktop patch disables the Connection web route (its node half is
   // webserver-bound and never activates without one), so this host owns the

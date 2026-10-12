@@ -4,9 +4,10 @@
  * response frames, the fail-loud composition checks, and teardown.
  */
 
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { runDesktopHost } from '../src/index.ts'
 
@@ -73,6 +74,16 @@ function stageRuntime(): { root: string; runtimeDir: string } {
   }
   noopPlugin('@shres-code/shres-code-host-directory-picker-native')
   noopPlugin('@shres-code/shres-code-client-ui-directory-picker-native')
+  // The host mounts these by package name after boot. The fixture profile is
+  // outside the workspace, so the parent walk needs the real packages.
+  const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
+  const linkPackage = (name: string, target: string): void => {
+    const link = join(root, 'node_modules', ...name.split('/'))
+    mkdirSync(dirname(link), { recursive: true })
+    symlinkSync(target, link, 'dir')
+  }
+  linkPackage('@shres-code/cordis-plugin-timer', join(repoRoot, 'vendor', 'timer'))
+  linkPackage('@shres-code/cordis-plugin-hmr', join(repoRoot, 'vendor', 'hmr'))
   return { root, runtimeDir }
 }
 
@@ -126,15 +137,28 @@ const PICKER_PACKAGES = [
 ]
 
 /** A desktop profile holding the stub host services the desktop host consumes. */
-function stageProject(root: string, bundles: readonly string[], stubServicesEnabled: boolean, muxEvents: number): string {
+function stageProject(
+  root: string,
+  bundles: readonly string[],
+  stubServicesEnabled: boolean,
+  muxEvents: number,
+  markerPath?: string,
+): string {
   const projectDir = join(root, 'project')
   for (const packageName of PICKER_PACKAGES) {
     const dir = join(projectDir, 'node_modules', ...packageName.split('/'))
     writeJson(join(dir, 'package.json'), { name: packageName, version: '1.0.0', type: 'module', main: 'index.js' })
+    const recordsStamp = packageName.endsWith('host-directory-picker-native')
     writeFile(join(dir, 'index.js'),
-      'export const name = ' + JSON.stringify(packageName)
+      (recordsStamp ? 'import { writeFileSync } from "node:fs"\n' : '')
+      + 'export const name = ' + JSON.stringify(packageName)
       + '\nexport const inject = []'
-      + '\nexport function apply() {}\n')
+      + '\nexport function apply() {\n'
+      + (recordsStamp
+        ? '  const stamp = process.env.DESKTOP_PICKER_STAMP\n'
+          + '  if (typeof stamp === "string" && stamp.length > 0) writeFileSync(stamp, "applied\\n")\n'
+        : '')
+      + '}\n')
   }
   writeJson(join(projectDir, 'package.json'), {
     name: 'shres-desktop-fixture-profile',
@@ -142,9 +166,26 @@ function stageProject(root: string, bundles: readonly string[], stubServicesEnab
     type: 'module',
     shres: { profile: { bundles: [...bundles] } },
   })
+  const markerRow = markerPath === undefined ? '' : [
+    '    - id: reload-marker',
+    '      name: ./reload-marker.js',
+    '      config:',
+    '        path: ' + JSON.stringify(markerPath),
+    '        generation: 1',
+  ].join('\n') + '\n'
   writeFile(join(projectDir, 'cordis.patch.yml'),
-    stubServicesEnabled ? '- insert:\n    - id: stub-host-services\n      name: ./' + STUB_PLUGIN + '\n' : '[]\n')
+    stubServicesEnabled
+      ? '- insert:\n    - id: stub-host-services\n      name: ./' + STUB_PLUGIN + '\n' + markerRow
+      : '[]\n')
   writeFile(join(projectDir, STUB_PLUGIN), stubServices(muxEvents))
+  writeFile(join(projectDir, 'reload-marker.js'), [
+    'import { writeFileSync } from "node:fs"',
+    'export const name = "reload-marker"',
+    'export function apply(_ctx, config) {',
+    '  writeFileSync(config.path, String(config.generation))',
+    '}',
+    '',
+  ].join('\n'))
   writeFile(join(projectDir, STUB_CLIENT_BUNDLE), 'export const marker = "stub client bundle"\n')
   return projectDir
 }
@@ -160,11 +201,18 @@ async function bootFixture(
     allowLinkedPackages?: boolean
     stubServices?: boolean
     muxEvents?: number
+    markerPath?: string
     onFrame?: (frame: Buffer) => Promise<void> | void
   } = {},
-): Promise<Harness> {
+): Promise<Harness & { readonly projectDir: string }> {
   const { root, runtimeDir } = stageRuntime()
-  const projectDir = stageProject(root, options.bundles ?? [], options.stubServices !== false, options.muxEvents ?? 1)
+  const projectDir = stageProject(
+    root,
+    options.bundles ?? [],
+    options.stubServices !== false,
+    options.muxEvents ?? 1,
+    options.markerPath,
+  )
   const frames: Buffer[] = []
   const controller = await runDesktopHost(runtimeDir, projectDir, async (frame) => {
     frames.push(frame)
@@ -172,7 +220,15 @@ async function bootFixture(
   }, {
     ...(options.allowLinkedPackages === undefined ? {} : { allowLinkedPackages: options.allowLinkedPackages }),
   })
-  return { controller, frames }
+  return { controller, frames, projectDir }
+}
+
+async function eventually(test: () => boolean, message: string): Promise<void> {
+  const deadline = Date.now() + 20_000
+  while (!test()) {
+    if (Date.now() >= deadline) throw new Error(message)
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
 }
 
 function framesOf(frames: readonly Buffer[], streamId: number): DecodedFrame[] {
@@ -283,6 +339,46 @@ describe('runDesktopHost', () => {
       expect(bodies.length).toBeGreaterThan(1)
       expect(bodies.length).toBeLessThan(lines.length)
     } finally {
+      await controller.dispose()
+    }
+  })
+
+  it('reapplies the profile patch without dropping the shipped desktop overlay', { timeout: 20_000 }, async () => {
+    const markerPath = join(mkdtempSync(join(tmpdir(), 'shres-desktop-marker-')), 'generation')
+    const stampPath = join(mkdtempSync(join(tmpdir(), 'shres-desktop-stamp-')), 'picker')
+    process.env.DESKTOP_PICKER_STAMP = stampPath
+    const { controller, frames, projectDir } = await bootFixture({ markerPath })
+    try {
+      await eventually(() => {
+        try {
+          return readFileSync(markerPath, 'utf8') === '1'
+        } catch {
+          return false
+        }
+      }, 'the profile patch marker was not applied at boot')
+      rmSync(stampPath, { force: true })
+      writeFileSync(join(projectDir, 'cordis.patch.yml'), [
+        '- insert:',
+        '    - id: stub-host-services',
+        '      name: ./' + STUB_PLUGIN,
+        '    - id: reload-marker',
+        '      name: ./reload-marker.js',
+        '      config:',
+        '        path: ' + JSON.stringify(markerPath),
+        '        generation: 2',
+        '',
+      ].join('\n'))
+      await eventually(() => {
+        try {
+          return readFileSync(markerPath, 'utf8') === '2' && readFileSync(stampPath, 'utf8') === 'applied\n'
+        } catch {
+          return false
+        }
+      }, 'the profile patch edit did not reapply the marker and the desktop picker')
+      await controller.fetch(requestOf(1, 'shres-app://app/api/hello/world'), null)
+      expect(statusOf(frames, 1)).toBe(200)
+    } finally {
+      delete process.env.DESKTOP_PICKER_STAMP
       await controller.dispose()
     }
   })
