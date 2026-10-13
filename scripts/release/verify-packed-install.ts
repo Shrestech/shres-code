@@ -145,12 +145,30 @@ function main(): void {
 
   const consumerRoot = mkdtempSync(join(tmpdir(), `shres-packed-${family.id}-`))
   try {
+    // Koffi's native prebuild ships as koffi's own optionalDependency, which the
+    // install below omits alongside the Landlock musl packages; without the
+    // prebuild present, koffi's install script compiles C++ from source for
+    // whatever version the published ranges resolve to. Declaring the prebuild
+    // as a direct dependency of the consumer restores the realistic install —
+    // the matching native binding, pinned to the same exact koffi the packed
+    // manifests declare — while the Landlock omission stands.
+    const koffiPin = (JSON.parse(readFileSync(join(root, 'packages/fs/fs-local/package.json'), 'utf8')) as {
+      dependencies?: { koffi?: string }
+    }).dependencies?.koffi
+    const koffiPrebuild = koffiPin === undefined ? {} : {
+      [`@koromix/koffi-${process.platform === 'win32' ? 'win32' : process.platform}-${process.arch}`]: koffiPin,
+    }
+
     writeFileSync(join(consumerRoot, 'package.json'), `${JSON.stringify({
       name: `shres-packed-install-${family.id}`,
       version: '0.0.0',
       private: true,
-      dependencies: Object.fromEntries([...packed].map(([name, entryPacked]) => [name, entryPacked.url])),
+      dependencies: {
+        ...Object.fromEntries([...packed].map(([name, entryPacked]) => [name, entryPacked.url])),
+        ...koffiPrebuild,
+      },
     }, null, 2)}\n`)
+
 
     const environment = consumerEnvironment(consumerRoot)
     console.log(`release verify-packed-install: installing ${String(packed.size)} tarball(s) into ${consumerRoot}`)

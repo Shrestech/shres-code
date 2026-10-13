@@ -5311,7 +5311,7 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       koffi:
-        specifier: ^3.1.2
+        specifier: 3.1.2
         version: 3.1.2
     devDependencies:
       '@shres-code/cordis':
@@ -6082,7 +6082,7 @@ importers:
         specifier: workspace:^
         version: link:../../util/native-command
       koffi:
-        specifier: ^3.1.2
+        specifier: 3.1.2
         version: 3.1.2
     devDependencies:
       '@shres-code/cordis':
@@ -8052,7 +8052,7 @@ importers:
   packages/sandbox/sandbox-windows-acl:
     dependencies:
       koffi:
-        specifier: ^3.1.2
+        specifier: 3.1.2
         version: 3.1.2
     devDependencies:
       '@shres-code/cordis':
@@ -8401,7 +8401,7 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       koffi:
-        specifier: ^3.1.2
+        specifier: 3.1.2
         version: 3.1.2
     devDependencies:
       '@shres-code/cordis':

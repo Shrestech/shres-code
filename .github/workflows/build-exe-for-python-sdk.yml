@@ -51,6 +51,9 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   SHRES_TELEMETRY_DISABLED: '1'
+  # A workflow called with `uses:` does not inherit the caller's env, so this
+  # carries its own heap cap for the full-workspace build (7 GB runners).
+  NODE_OPTIONS: '--max-old-space-size=5120'
 
 jobs:
   # Job-level conditions cannot inspect `matrix`, so validate target names and
