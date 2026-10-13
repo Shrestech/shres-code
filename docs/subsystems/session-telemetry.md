@@ -1,6 +1,6 @@
 # SessionTelemetryBackend
 
-Outbound session reporting is split as a [capability seam](../capability-seams.md): the Service Definition and capture coordinator ([shres-session-telemetry](../../packages/session/session-telemetry), `ctx.sessionTelemetry`) own the capture points, fixed chunk projection, `session-telemetry/record` redaction waterfall, handoff cursor, and minimal backend contract; the Service Provider a deployment loads ([shres-session-telemetry-otel](../../packages/session/session-telemetry-otel)) is the OpenTelemetry JS SDK's log pipeline configured verbatim. It is one optional capability, not part of the agent-loop spine, and nothing here reaches a model request. The boundary axiom — the harness's aspect ends at `emit()`; batching, retry, queueing, and loss policy belong to the reporting SDK — and the rejected alternatives are pinned in the [revival Agent Note](../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md); the capture points, cursor, and projection contracts live in the [Service Definition README](../../packages/session/session-telemetry/README.md).
+Outbound session reporting is split as a [capability seam](../capability-seams.md): the Service Definition and capture coordinator ([shres-session-telemetry](../../packages/session/session-telemetry), `ctx.sessionTelemetry`) own the capture points, fixed chunk projection, `session-telemetry/record` redaction waterfall, handoff cursor, and minimal backend contract; the Service Provider a deployment loads ([shres-session-telemetry-otel](../../packages/session/session-telemetry-otel)) is the OpenTelemetry JS SDK's log pipeline configured verbatim. It is one optional capability, not part of the agent-loop spine, and nothing here reaches a model request. The boundary axiom — the harness's aspect ends at `emit()`; batching, retry, queueing, and loss policy belong to the reporting SDK. The capture points, cursor, and projection contracts live in the [Service Definition README](../../packages/session/session-telemetry/README.md).
 
 Source: [`packages/session/session-telemetry/src/index.ts`](../../packages/session/session-telemetry/src/index.ts)
 
@@ -96,8 +96,7 @@ interface SessionTelemetrySink {
    * leave this unimplemented and let their SDK's own batching cadence govern
    * export timing: a backend that does implement it owns the interaction
    * between its concurrent flushes and {@link shutdown}'s drain (the OTel
-   * backend leaves it unimplemented for exactly that hazard — see the
-   * revival Agent Note).
+   * backend leaves it unimplemented for exactly that hazard).
    */
   flush?(): void
   /**
@@ -154,7 +153,7 @@ flush?(): void
 abstract shutdown(): Promise<void>
 ```
 
-Source: [`packages/session/session-telemetry/src/index.ts:148`](../../packages/session/session-telemetry/src/index.ts)
+Source: [`packages/session/session-telemetry/src/index.ts:147`](../../packages/session/session-telemetry/src/index.ts)
 
 <a id="session-telemetry-events"></a>
 

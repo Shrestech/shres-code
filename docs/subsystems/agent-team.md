@@ -1,6 +1,6 @@
 # Agent Teams
 
-Types shared by the implicit-root Team domain. The [runtime note](../../.agents/notes/implemented/feature/2026-09-11-agent-teams-runtime-and-seats.md) owns live provisioning and steer delivery; the [vocabulary note](../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity and replay; this page records the literal durable forms from [`packages/team/agent-team/src/types.ts`](../../packages/team/agent-team/src/types.ts). The [package README](../../packages/team/agent-team/README.md) owns operation, recovery, and limit behavior.
+Types shared by the implicit-root Team domain. The runtime note owns live provisioning and steer delivery; the vocabulary note owns identity and replay; this page records the literal durable forms from [`packages/team/agent-team/src/types.ts`](../../packages/team/agent-team/src/types.ts). The [package README](../../packages/team/agent-team/README.md) owns operation, recovery, and limit behavior.
 
 ## Identity and roster
 

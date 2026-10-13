@@ -1,6 +1,6 @@
 # @shres-code/shres-code-step-budget
 
-A turn-length backstop, not a model-facing tool: it never appears in the tool list, never inspects a tool call, and adds exactly one behavior — it refuses the first model step a turn proposes past its configured budget, which closes the turn through the loop's existing `agent/pre-step` rejection. Without it nothing in the harness bounds a turn, so a model that keeps calling tools without converging runs until the process, the provider, or the user stops it. Decision record: [the harness-hardening Agent Note](../../../.agents/notes/implemented/feature/2026-08-26-step-budget-and-default-tool-timeout.md).
+A turn-length backstop, not a model-facing tool: it never appears in the tool list, never inspects a tool call, and adds exactly one behavior — it refuses the first model step a turn proposes past its configured budget, which closes the turn through the loop's existing `agent/pre-step` rejection. Without it nothing in the harness bounds a turn, so a model that keeps calling tools without converging runs until the process, the provider, or the user stops it.
 
 ## Config
 

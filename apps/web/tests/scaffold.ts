@@ -1,5 +1,5 @@
-// Shared scaffold for the keyless browser e2e lane (Agent Note:
-// .agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md).
+// Shared scaffold for the keyless browser e2e lane.
+//
 // Boots the REAL web composition — the shres-base and shres-web-app bundle
 // patches over the empty profile root through the vendored Loader (the same
 // layer stack the profile boot composes), patched the
@@ -645,8 +645,7 @@ function rawSessionLog(session: Session): string {
 /**
  * Record-mode fixture write-back: harvest the live session, scrub request
  * headers to {{system}}/{{tools}} (TODO(web-header-pin): the web lane pins no
- * header class — a deliberate deviation logged in the Agent Note's deferred
- * work), tokenize the run-local session id, cwd, and browser RPC id
+ * header class. Tokenize the run-local session id, cwd, and browser RPC id
  * ({{sessionId}}/{{cwd}}/{{rpcId}}, the committed fixture convention —
  * re-records then diff only on real content), and write the fixture.
  * @param scaffold - the record-mode scaffold.

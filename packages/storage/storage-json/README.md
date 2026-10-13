@@ -1,6 +1,6 @@
 # @shres-code/shres-code-storage-json
 
-JSON backend for the [storage hub](../storage/README.md): one human-readable `<unit>.json` file (`single` layout) or one document per record under `<unit>/` (`per-record` layout) under a configured root, registered as backend `json`. Design: [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md). Version-read compatibility: [compatible-versions Agent Note](../../../.agents/notes/implemented/bug-fix/2026-09-11-storage-version-read-compat.md).
+JSON backend for the [storage hub](../storage/README.md): one human-readable `<unit>.json` file (`single` layout) or one document per record under `<unit>/` (`per-record` layout) under a configured root, registered as backend `json`. Design: Version-read compatibility:
 
 ## Model
 
@@ -34,5 +34,5 @@ None — the backend never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
 
-- Windows durability relies on libuv's `rename()` (`MoveFileExW` with replacement) without an explicit write-through flag; the session-log backend's stricter Win32 write-through publish helper is planned to move down here when the append-log facet lands (see the Agent Note's migration section).
-- No cross-process write locking: two processes writing the same root can interleave whole-file replacements (last write wins). Single-host-process deployments are the current consumer; the multi-process story is deferred per the Agent Note's out-of-scope table.
+- Windows durability relies on libuv's `rename()` (`MoveFileExW` with replacement) without an explicit write-through flag; the session-log backend's stricter Win32 write-through publish helper is planned to move down here when the append-log facet lands.
+- No cross-process write locking: two processes writing the same root can interleave whole-file replacements (last write wins). Single-host-process deployments are the current consumer

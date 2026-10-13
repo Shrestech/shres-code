@@ -32,7 +32,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 `engaged(session)` is the single predicate both Consumers read, so the prompt sections and the five tool schemas appear and disappear together. An active seat engages a session when its card is already open — an open card must never lose its driver or its tools across a resume, a fork, or a threshold change — or when the session log contains at least `engageAfterSteps` `step/end` events. `engageAfterSteps` reads through `ctx.jspace.engageAfterSteps`, which resolves a document that omits the field to `0`. A caller with no session, such as a scope-only assembly, carries no horizon and stays unengaged under a non-zero threshold.
 
-Both inputs are folds of the session log — `step/end` count and card status — so engagement adds no session event and keeps the model-visible prompt reconstructable from the log alone. The [adaptive-engagement note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-adaptive-engagement.md) owns the measurement behind the default.
+Both inputs are folds of the session log — `step/end` count and card status — so engagement adds no session event and keeps the model-visible prompt reconstructable from the log alone. The adaptive-engagement note owns the measurement behind the default.
 
 ## Service
 
@@ -62,6 +62,6 @@ None; this package neither assembles nor sends a provider request.
 
 - **`always-open` does not auto-open** — the field is stored; the prompt Consumer opens on the first pre-step with `JSPACE_ALWAYS_OPEN_GOAL` / `JSPACE_ALWAYS_OPEN_NEXT`.
 - **Coverage is a term match** — `requireCoverage` still only matches `by` against configured terms. `evidence` must name a `tool/call` id with a logged, non-error `tool/result`. Evidence-grade status (`verified: true`) is a separate class: the cited call's tool name must be in `verifierTools`.
-- **Workspace fingerprint is deferred** — evidence-grade classification does not yet record or compare a git status/diff hash, so a re-cited verifier result still counts after the workspace changes. Charter ship always re-runs; a recorded `readsFingerprint` on `jspace/charter-run` never skips a check. The [evidence-grade note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-evidence-grade-checkpoints.md) owns the evidence-grade deferral; the [charter note](../../../.agents/notes/implemented/feature/2026-08-26-jspace-executor-enforced-charter.md) owns the charter fingerprint.
+- **Workspace fingerprint is deferred** — evidence-grade classification does not yet record or compare a git status/diff hash, so a re-cited verifier result still counts after the workspace changes. Charter ship always re-runs; a recorded `readsFingerprint` on `jspace/charter-run` never skips a check. The evidence-grade note owns the evidence-grade deferral; the charter note owns the charter fingerprint.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit card events. The fold and invariant detect inconsistency; they do not isolate plugins.
 - **Copy-on-fork inherits Checked** — copy-on-fork copies the parent's Checked lines into the child card while resetting the epoch anchor, so the child's prompt shows checkpoints it has not earned; ship still refuses until a native checkpoint.

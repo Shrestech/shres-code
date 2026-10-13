@@ -39,7 +39,7 @@ The occupancy fields are independent last-wins records and are **not** one atomi
 
 This is deliberate. An occupancy percentage is a user-facing reference figure, not a billing record or a gating input — nothing in the harness makes decisions from it, and compaction reads `measure()` instead. A UI computes occupancy by dividing measured pressure by the separately resolved capacity for the selected model.
 
-The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.md) records the rejected atomic-pair comparison. Consumers that need an exact same-boundary figure should call `measure()` at their own request boundary rather than read this projection.
+ records the rejected atomic-pair comparison. Consumers that need an exact same-boundary figure should call `measure()` at their own request boundary rather than read this projection.
 
 ## Composition
 
@@ -63,5 +63,5 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **The fixed heuristic is approximate** — content without reusable provider usage is priced by character count plus structural overhead, not an exact provider tokenizer or request serializer.
 - **Every measurement clones the current surface** — coherent immutable snapshots make reads O(surface), including below-threshold pressure checks.
 - **Provider usage is only reusable for an identical canonical envelope** — prompt, prefix, tools, provider, model, or call-config changes deliberately fall back to full heuristic estimation.
-- **pi-ai logs written before cache-count reporting read as not reported** — before routes declared `cacheUsage`, the pi-ai adapter omitted a cache count whenever it was 0, so a measured miss in those logs is indistinguishable from an unreported count and lands in `unreportedInputTokens`. That reading is conservative and the logs are not migrated ([Agent Note](../../../.agents/notes/implemented/architecture/2026-09-24-three-state-cache-usage.md)).
+- **pi-ai logs written before cache-count reporting read as not reported** — before routes declared `cacheUsage`, the pi-ai adapter omitted a cache count whenever it was 0, so a measured miss in those logs is indistinguishable from an unreported count and lands in `unreportedInputTokens`. That reading is conservative and the logs are not migrated.
 - **Missing legacy source seqs are handled conservatively** — assistant messages without `sourceEventSeqs` cannot distinguish provider output from listener rewrites, so the fold avoids claiming a known empty or exact chunk stream.

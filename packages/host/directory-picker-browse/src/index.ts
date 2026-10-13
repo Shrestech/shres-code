@@ -5,7 +5,7 @@
  * the per-OS adaptation). Nothing renders on the host display, so this backend
  * serves remote clients the dialog backend cannot. Policy decisions (hidden
  * entries flagged but returned, symlinks followed, whole-filesystem scope) are
- * recorded in the directory-picker seam Agent Note.
+
  * @module @shres-code/shres-code-host-directory-picker-browse
  */
 

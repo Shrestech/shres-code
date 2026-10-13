@@ -1,6 +1,5 @@
 # Sandbox CI: the keyless real-kernel confinement proofs. This master-only
-# reference stays outside the pull-request verdict; rationale lives in
-# .agents/notes/implemented/process/2026-07-21-serial-cross-platform-ci-reference.md.
+# reference stays outside the pull-request verdict.
 # A separate workflow from ci.yml because the axis is different — these jobs
 # fan out over OS×runner (kernel capabilities), not node versions. The Landlock
 # launcher is built from native/landlock-run on each Landlock leg and installed
@@ -24,7 +23,7 @@ env:
   SHRES_TELEMETRY_DISABLED: '1'
 
 jobs:
-  # Keyless real-kernel sandbox proofs (sandbox Agent Note § Testing): each ladder
+  # Keyless real-kernel sandbox proofs: each ladder
   # rung is only provable on a host where it enforces, so this job fans out
   # an OS×runner matrix — bwrap and Landlock on Linux (separate legs: the
   # Landlock files force the bwrap rung off, so each leg proves exactly one

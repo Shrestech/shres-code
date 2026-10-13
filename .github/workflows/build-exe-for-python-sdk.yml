@@ -1,7 +1,6 @@
 name: Build single-exe
 
-# Native builds for the release targets; see
-# .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md.
+# Native builds for the release targets. The fixed route is `@yao-pkg/pkg --sea`.
 # A full target run retains one SDK wheel and three runtime wheels; subset
 # dispatch retains the SDK wheel and selected runtime wheels. Bare executables
 # and source closures are test inputs. Run manually, label a PR `build-exe`
@@ -52,6 +51,9 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   SHRES_TELEMETRY_DISABLED: '1'
+  # A workflow called with `uses:` does not inherit the caller's env, so this
+  # carries its own heap cap for the full-workspace build (7 GB runners).
+  NODE_OPTIONS: '--max-old-space-size=5120'
 
 jobs:
   # Job-level conditions cannot inspect `matrix`, so validate target names and

@@ -1,6 +1,6 @@
 # @shres-code/shres-code-sdk-jsonrpc-demo
 
-Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `shres-jsonrpc-agent` bin resolves bare plugins from the configuration project. The Python SDK's `shres-jsonrpc-agent-pkg` [single-executable runtime](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) uses `lib/packaged-bin.js` instead: packaged bare plugins resolve from its closed runtime tree, while relative plugins remain configuration-relative.
+Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `shres-jsonrpc-agent` bin resolves bare plugins from the configuration project. The Python SDK's `shres-jsonrpc-agent-pkg` single-executable runtime uses `lib/packaged-bin.js` instead: packaged bare plugins resolve from its closed runtime tree, while relative plugins remain configuration-relative.
 
 ## Config discovery
 
@@ -10,7 +10,7 @@ A config without `shres-sdk-jsonrpc-server` is valid and serves nothing; the bin
 
 ## Exit lifecycle
 
-stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exits 130 after the same disposal. EOF may cut off an in-flight turn as documented in the [distribution Agent Note](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md). The `jsonrpc` plugin owns response-before-exit protocol shutdown; both paths are idempotent and safe to race.
+stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exits 130 after the same disposal. The `jsonrpc` plugin owns response-before-exit protocol shutdown; both paths are idempotent and safe to race.
 
 ## stdout is the protocol
 

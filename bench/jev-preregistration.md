@@ -47,7 +47,7 @@ router now requires before it routes from any route. No trial was recorded under
 holds no `route-on` or `route-off` run, and the stored runs in
 `bench/analysis/out-of-loop-stored-runs.json` cover only the J-Space
 experiments. The confirmatory routing preregistration is PR 16 of the
-[routing redesign plan](../.agents/notes/proposed/feature/2026-09-24-model-routing-redesign-plan.md).
+routing redesign plan.
 The judgment engine is the TypeSafe provider on its
 `fast` tier (`jev-preview`, measured at 273 ms against 685 ms for
 `accurate` on a 1.7k-token state), the tier both consumers use here.

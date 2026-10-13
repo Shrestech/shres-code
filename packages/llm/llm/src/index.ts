@@ -61,8 +61,8 @@ declare module '@shres-code/cordis' {
      * adapter's stream, or yield your own chunks to short-circuit.
      * @param options - the full request. A LOOP-built request carries the
      *   process-local {@link markAgentLoopRequest} identity and arrives deep-frozen
-     *   (mutation throws): its content is a pure function of the session log (the
-     *   reconstructability Agent Note), so listeners read it, never rewrite it.
+     *   (mutation throws): its content is a pure function of the session log, so
+     *   listeners read it and never rewrite it.
      *   Hand-built calls do not carry that marker; their messages already obey
      *   the immutable creation contract.
      * @mode waterfall

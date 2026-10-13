@@ -4,7 +4,7 @@
  * (zero RPC; the list rides the plugin's root-context sessions service, the
  * scoped session comes from the per-call projection), pick inserts the
  * literal `@label ` text (plain-text-reference decision, see
- * .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md:
+ *
  * the draft carries plain text, chip
  * visuals are derived by scanning against the source lexicon, and the
  * prompt ships the same literal). Consumption semantics stay with future

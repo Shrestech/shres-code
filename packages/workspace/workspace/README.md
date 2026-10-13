@@ -2,7 +2,6 @@
 
 Workspace entity registry (`ctx.workspaceRegistry`) for the Shres Code: durable workspace records, stable workspace order, and a newest-first candidate session index stored through the domain data form. Consumers see the `Workspace` interface; the entity implementation stays package-private.
 
-The entity/storage rationale lives in the [domain Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); header-only bootstrap and GUI ordering live in the [Workspace UI product-flow Agent Note](../../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
 
 ## Shape
 
@@ -38,5 +37,5 @@ Independent of live requests: the package never touches a request prefix, so it 
 
 ## Known Limitations and Deferred Work
 
-- Session deletion and destructive folder removal are separate, absent capabilities; Workspace registration deletion never substitutes for either ([decision](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)).
+- Session deletion and destructive folder removal are separate, absent capabilities; Workspace registration deletion never substitutes for either.
 - The header index refreshes at startup and when attach must resolve an uncached persisted id; deletion or cwd damage performed by another process is observed after the next refresh or restart.

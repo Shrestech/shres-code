@@ -313,7 +313,7 @@ export interface ReadResultView {
  * `WebSearchSource`: that Service Definition type is authoritative (core cannot depend
  * on the web Service Definition, so the two are declared separately and MUST evolve together).
  * A web tool projects this shape through `output.presentationMeta` because the
- * render text cannot losslessly carry it (see the web-result-card Agent Note); its
+ * render text cannot losslessly carry it; its
  * `presentResult` reads it back.
  */
 export interface WebSource {
@@ -333,7 +333,7 @@ export interface WebSource {
  * One `kind`-tagged union carries both shapes because both are web retrieval and
  * a UI renders them with one component family; a UI switches on `kind`. An
  * incapable UI falls back to the raw `tool/result` content (this view carries no
- * `content` copy — see the web-result-card Agent Note). This is the result-time
+ * `content` copy — This is the result-time
  * analogue of the `web_search`/`web_fetch`/`deep_research` calls' generic call views
  * (`kind: 'search'`/`'fetch'`); those tools keep their generic pending card and
  * add only this completed card.

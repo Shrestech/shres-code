@@ -1,6 +1,6 @@
 # code-runtime/ — code-execution capability family
 
-The code-execution capability seam (see [capability seams](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)): a runtime Service Definition for executing one model-written program against host-provided async bindings, capturing what it printed and returned; replaceable providers; and the tool registry's [Code Mode](../core/tools/README.md) Consumer (`tools: { mode: code }` — the `run_code` tool and the SDK generated in the loaded runtime's `language`). Design is in the [Code Mode Agent Note](../../.agents/notes/implemented/feature/2026-06-15-code-mode.md). **Product** packages.
+The code-execution capability seam (see capability seams): a runtime Service Definition for executing one model-written program against host-provided async bindings, capturing what it printed and returned; replaceable providers; and the tool registry's [Code Mode](../core/tools/README.md) Consumer (`tools: { mode: code }` — the `run_code` tool and the SDK generated in the loaded runtime's `language`). **Product** packages.
 
 | Package | Role | ctx key |
 |---|---|---|

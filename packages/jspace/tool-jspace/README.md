@@ -53,7 +53,7 @@ Native results are compact acknowledgements. The dock and Trajectory read sessio
 | `maxCharterEntries` | `12` | Cap on seeded proposal entries and on the registered charter list at open and amend. Safe integer 1–32. |
 | `charterChecksMustBeReadOnly` | `true` | Refuse write-token charter commands at the floor. |
 
-`requireCoreOnOpen` / `requireCoreForShip` are constraint-capture pressure: they force the card to carry the constraints a task states once, which is what survives compaction. The [constraint-capture note](../../../.agents/notes/implemented/feature/2026-08-26-jspace-constraint-capture.md) owns that measurement. Charter fields are the executor-enforced contract; the [charter note](../../../.agents/notes/implemented/feature/2026-08-26-jspace-executor-enforced-charter.md) owns them. A non-empty charter always runs at checkpoint and ship regardless of `requireCharter`.
+`requireCoreOnOpen` / `requireCoreForShip` are constraint-capture pressure: they force the card to carry the constraints a task states once, which is what survives compaction. The constraint-capture note owns that measurement. Charter fields are the executor-enforced contract; the charter note owns them. A non-empty charter always runs at checkpoint and ship regardless of `requireCharter`.
 
 ## Model Experience
 
@@ -88,7 +88,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 - **Coverage is a term match** — `by` is checked against configured coverage terms; keyword coverage stays the floor for ordinary checkpoints.
-- **Evidence-grade is a verifier citation** — `verified: true` is recorded only when `evidence` names a completed non-error call whose tool is in seat `verifierTools`, or a passed `jspace/charter-run`. A workspace fingerprint is recorded on charter runs but never gates and never skips a re-run; the [evidence-grade note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-evidence-grade-checkpoints.md) defers the git-hash class.
+- **Evidence-grade is a verifier citation** — `verified: true` is recorded only when `evidence` names a completed non-error call whose tool is in seat `verifierTools`, or a passed `jspace/charter-run`. A workspace fingerprint is recorded on charter runs but never gates and never skips a re-run; the evidence-grade note defers the git-hash class.
 - **Constraint capture is a presence check** — `requireCoreOnOpen` and `requireCoreForShip` require a Core line, not the right one; nothing compares Core against the task statement, so a placeholder satisfies both.
 - **Code Mode is unsupported for charter** — nested `bash` with a parent token is allowed under native tool dispatch; model-direct `jspace_checkpoint` from `run_code` is not a proven binding path. Charter compositions stay native-tool.
 - **pwsh charter runner is deferred** — floor tautology lists and comment-stripping are bash-shaped; checks dispatch the `bash` tool.

@@ -1,9 +1,9 @@
 /**
  * Purge Chinese-language documentation artifacts. Deletes every tracked
- * `*.zh.md` and `*.i18n.yaml` outside `vendor/`, plus the retired
- * `roos-translate-docs` / `dsh-translate-docs` skill trees and their
- * `.claude` mirrors. Re-running `--apply` is a no-op once the tree is
- * clean.
+ * `*.zh.md` and `*.i18n.yaml` outside `vendor/`, plus leftover
+ * `roos-translate-docs` / `dsh-translate-docs` skill trees under
+ * `.agents/skills/` or `.claude/skills/`. Re-running `--apply` is a
+ * no-op once the tree is clean.
  *
  * Usage: `pnpm run purge-zh [--apply|--check]`. Without a mode it reports
  * what would change. `--check` asserts the post-state: zero tracked zh

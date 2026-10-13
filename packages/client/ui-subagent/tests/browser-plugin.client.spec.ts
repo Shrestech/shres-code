@@ -6,7 +6,7 @@
  * session list (running children of the projected session, label-contains
  * filtering, childless session → empty), the synchronous lexicon roster,
  * pick → plain-text outcome (the plain-text-reference decision:
- * .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md),
+ *
  * and the reference codec's two
  * projections. Direct driving is deliberate: this spec owns only the
  * source's own contract.

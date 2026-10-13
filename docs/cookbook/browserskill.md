@@ -45,4 +45,4 @@ A disconnected browser requires an explicit Open; Shres does not silently relaun
 
 The native integration is separate from **Customize → Plugins → Manage**. Installing a filesystem skill there copies instructions; it does not provision this managed browser. BrowserSkill's DeepSeek Harness npm adapter is not a Shres bundle. If you intentionally manage the upstream CLI, extension, browser, and permissions yourself, follow the [external CLI tutorial](browserskill-manual.md) instead.
 
-The [integration decision](../../.agents/notes/implemented/feature/2026-09-25-ui-browserskill-installation.md) explains the owned-profile and native-tool choices; the [browser subsystem reference](../subsystems/browser.md) defines its lifecycle and command types.
+The integration decision explains the owned-profile and native-tool choices; the [browser subsystem reference](../subsystems/browser.md) defines its lifecycle and command types.

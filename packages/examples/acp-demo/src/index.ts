@@ -7,7 +7,7 @@
  * It pre-creates no agents and leaves adapters, executors, and optional tools to
  * the leaf, which must likewise avoid stdout loggers. Named exports are
  * required so Loader retains this plugin's `Config` schema (see
- * docs/postmortem/0001).
+ *
  * @module @shres-code/shres-code-acp-demo
  */
 

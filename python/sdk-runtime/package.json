@@ -12,6 +12,7 @@
     "@shres-code/cosmokit": "workspace:^",
     "@shres-code/shres-code-acp": "workspace:^",
     "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
     "@shres-code/shres-code-agent-loop": "workspace:^",
     "@shres-code/shres-code-agent-spine-demo": "workspace:^",
     "@shres-code/shres-code-app-boot": "workspace:^",
@@ -114,6 +115,7 @@
     "@shres-code/shres-code-workflow": "workspace:^",
     "@shres-code/shres-code-workflow-worker-thread": "workspace:^",
     "@shres-code/shres-code-agent-instructions": "workspace:^",
+    "@shres-code/shres-code-untrusted-frame": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/schemastery": "workspace:^"
   }

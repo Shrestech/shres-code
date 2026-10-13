@@ -1,4 +1,0 @@
-interface:
-  display_name: "Shres Pre-Push Checks"
-  short_description: "Run the relevant Shres Code checks before push"
-  default_prompt: "Use $shres-pre-push-checks before pushing this Shres Code branch."

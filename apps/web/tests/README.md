@@ -1,6 +1,6 @@
 # apps/web browser e2e
 
-Most scenarios boot the real Web composition in-process and drive Chromium over real HTTP. The lane’s mechanics, fixtures, goldens, and deliberate differences from `shres web` are documented in [`scaffold.ts`](scaffold.ts) and the [browser e2e Agent Note](../../../.agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md).
+Most scenarios boot the real Web composition in-process and drive Chromium over real HTTP. The lane’s mechanics, fixtures, goldens, and deliberate differences from `shres web` are documented in [`scaffold.ts`](scaffold.ts).
 
 ## Managed installation
 

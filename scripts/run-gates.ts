@@ -3,7 +3,6 @@
  *
  * Package scripts own public aggregate names; this runner owns their validated
  * dependency graphs, scheduler environment, and process diagnostics.
- * @see ../.agents/notes/implemented/process/2026-07-06-parallel-pre-push-gates.md
  */
 import { spawn } from 'node:child_process'
 import { availableParallelism } from 'node:os'
@@ -607,11 +606,7 @@ function docSyncLeafGates(options: {
     pnpmScript('config-source-ownership', 'verify-config-source-ownership', { label: 'config source ownership' }),
     pnpmScript('package-readme-model-experience', 'verify-package-readme-model-experience', { label: 'package README model experience' }),
     pnpmScript('mermaid', 'verify-mermaid'),
-    pnpmScript('agent-note-classification', 'verify-agent-note-classification', { label: 'agent note classification' }),
-    pnpmScript('agent-note-format', 'verify-agent-note-format', { label: 'agent note format' }),
-    pnpmScript('archived-agent-notes', 'verify-archived-agent-notes', { label: 'archived agent notes' }),
     pnpmScript('type-equivalence', 'verify-type-equiv', { label: 'type equivalence' }),
-    pnpmScript('skill-invocation-metadata', 'verify-skill-invocation-metadata', { label: 'skill invocation metadata' }),
     pnpmScript('doc-budgets', 'verify-doc-budgets', { label: 'doc budgets' }),
     pnpmExec('docs-site-projection', ['vitest', 'run', 'scripts/project-doc-site.spec.ts', 'scripts/verify-doc-site-fragments.spec.ts'], {
       label: 'documentation site checks',

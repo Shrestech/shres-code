@@ -7,8 +7,7 @@
 // gateway), reload replays everything from the log (zero further model
 // calls), and the theme scenario proves the shipped dark palette actually
 // cascades: attribute -> alias token flip -> painted surface change. No
-// theme/layout golden: aria snapshots are color-blind (lane scope: the
-// browser-e2e-lane Agent Note); the hero's waiting state gets the one golden
+// theme/layout golden: aria snapshots are color-blind. The hero's waiting state gets the one golden
 // here.
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'

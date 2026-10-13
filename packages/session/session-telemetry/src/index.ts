@@ -9,7 +9,7 @@
  * {@link SessionTelemetryBackend.emit} — batching, retry, queueing, and loss policy — is the
  * reporting SDK's territory and is deliberately not modelled here. The
  * design and its trade-offs are pinned in
- * .agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md.
+ *
  *
  * @module @shres-code/shres-code-session-telemetry
  */
@@ -110,8 +110,7 @@ export interface SessionTelemetrySink {
    * leave this unimplemented and let their SDK's own batching cadence govern
    * export timing: a backend that does implement it owns the interaction
    * between its concurrent flushes and {@link shutdown}'s drain (the OTel
-   * backend leaves it unimplemented for exactly that hazard — see the
-   * revival Agent Note).
+   * backend leaves it unimplemented for exactly that hazard).
    */
   flush?(): void
   /**

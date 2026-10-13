@@ -7,7 +7,7 @@
 
 import type { ShellProcess } from '@shres-code/shres-code-shell'
 
-/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/background.ts (Agent Note). */
+/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/background.ts. */
 
 /**
  * Map a settled background process onto the generic task-outcome vocabulary:

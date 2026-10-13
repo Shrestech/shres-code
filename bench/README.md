@@ -285,7 +285,7 @@ Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator 
 
 ## Priced accounting
 
-Every trial records `priceSnapshot`, the `prices/` snapshot id, and `accounting`, folded over the root session and its descendants by `runner/accounting.js` (fields in its `TrialAccounting` typedef); a chain trial sums its phases. Dollars are API-equivalent list prices from a dated research snapshot, never billing truth: the runtime has no price table, and tokens stay its only cost currency ([Agent Note](../.agents/notes/implemented/process/2026-09-24-bench-priced-accounting.md)). Report dollars across vendors, never token-count equality: tokenizers differ.
+Every trial records `priceSnapshot`, the `prices/` snapshot id, and `accounting`, folded over the root session and its descendants by `runner/accounting.js` (fields in its `TrialAccounting` typedef); a chain trial sums its phases. Dollars are API-equivalent list prices from a dated research snapshot, never billing truth: the runtime has no price table, and tokens stay its only cost currency. Report dollars across vendors, never token-count equality: tokenizers differ.
 
 **Calls.** A billed call is a `usage` chunk, so a failed attempt that reported usage counts; a step's `assistant/message` adds a call only when the step logged no usage chunk. A call's route is the message's model source, else the newest `request/context`, and its request time is the step's `step/start`. `inputTokens`, `outputTokens`, and `tokensIncludingDescendants` keep their message-only numerator, so stored runs stay comparable.
 

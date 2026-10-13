@@ -238,7 +238,7 @@ function buildInstructionText(
   // verbatim and does not wrap it, so any framing must live here in the
   // producer's content (the pattern a future `meta`-driven renderer would
   // generalize — see the deferred note in
-  // ../../../../.agents/notes/implemented/simplification/2026-07-20-unwrap-injected-content-envelopes.md).
+  //
   return [SYSTEM_REMINDER_OPEN, escapeInstructionFrameBody(body.join('\n\n')), SYSTEM_REMINDER_CLOSE].join('\n')
 }
 

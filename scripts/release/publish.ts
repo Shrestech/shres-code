@@ -5,8 +5,7 @@
  * "what this release includes": a version the registry lacks is published, a
  * version whose published tarball has the same integrity is skipped, and a
  * version whose published tarball differs fails the run — that last case means
- * the content changed without a version bump
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * the content changed without a version bump.
  *
  * Skipping on identical integrity is what makes re-running the publish step over
  * the same artifact safe.

@@ -1,7 +1,7 @@
 /**
  * Real-composition guard: a `cordis.yml` row must keep `inject` and `Config`
  * after Loader unwrapExports. `export default apply` would drop both and
- * leave schema defaults unset (docs/postmortem/0001).
+ * leave schema defaults unset (
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'

@@ -8,7 +8,6 @@
  * FIXME: settle the intended `@shres-code/shres-code-timeout-guard` rename before the
  * first tagged release — suggestion only, aligning the name with its `guard/`
  * home; decide at resolution time
- * ([regrouping Agent Note](../../../../.agents/notes/implemented/architecture/2026-07-29-package-regrouping.md)).
  *
  * @module @shres-code/shres-code-tool-call-timeout-policy
  */

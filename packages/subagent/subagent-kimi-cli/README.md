@@ -2,7 +2,7 @@
 
 This package registers the fixed `kimi-cli` subagent provider. Each accepted run starts the official Kimi Code CLI `kimi -p` command in the delegating Session's workspace, submits one self-contained text task, and returns only the final answer through the shared [`shres-subagent`](../subagent/README.md) result contract.
 
-Headless flags, stream-json parse mode, auth, and thinking mapping are recorded in the [Kimi CLI spike](../../../.agents/notes/implemented/architecture/2026-08-16-kimi-cli-headless-spike.md).
+Headless flags, stream-json parse mode, auth, and thinking mapping are recorded in the Kimi CLI spike.
 
 ## Start and ownership
 

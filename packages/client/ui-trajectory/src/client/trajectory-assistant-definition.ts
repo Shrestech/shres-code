@@ -11,7 +11,7 @@ import { addTokenUsage } from '@shres-code/shres-code-llm/usage'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event
- * state machines independent; see ../../../../../.agents/notes/implemented/
+ * state machines independent; see
  * architecture/2026-08-09-client-conversation-node-assembly.md. */
 interface UsageValue {
   readonly inputTokens: number

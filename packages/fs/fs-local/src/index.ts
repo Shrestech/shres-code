@@ -58,7 +58,7 @@ const MAX_DIFF_BASIS_BYTES = Math.min(
 /**
  * The host-filesystem backend. Reads resolve relative paths from {@link Config.cwd}
  * (a resolution default, NOT a containment boundary — see the filesystem
- * capability-seam Agent Note); enforce
+ *; enforce
  * containment with a stricter backend or a `tools/execute` permission plugin.
  */
 export class LocalFileSystem extends FileSystem {

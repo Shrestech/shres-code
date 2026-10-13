@@ -8,15 +8,17 @@
  * those packages live in another release sequence, and this job must not depend
  * on the registry already carrying versions that match — one pull request may
  * bump both families before either publishes — so a shres verification passes the
- * vendored family's pack output too, while publishing only its own
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * vendored family's pack output too, while publishing only its own.
  *
  * What this proves is that `files` selected a complete payload and that the
  * published dependency ranges resolve. A workspace link or a stale `lib/` in the
- * checkout cannot stand in for a missing file here.
+ * checkout cannot stand in for a missing file here. The shres family also
+ * requires the installed headless bundle manifest to declare judgment-shield,
+ * judgment-laya, and model-router, then resolves those packages from that
+ * install.
  */
 
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -66,6 +68,59 @@ function packedDependencies(directories: readonly string[]): Map<string, { url: 
   return dependencies
 }
 
+/**
+ * Packages the headless bundle declares and that a published shres install
+ * must be able to load. They are not the family entry; bundle/headless pulls
+ * them in.
+ */
+export const HEADLESS_CLOSURE = [
+  '@shres-code/shres-code-judgment-shield',
+  '@shres-code/shres-code-judgment-laya',
+  '@shres-code/shres-code-model-router',
+] as const
+
+/**
+ * Reject an installed headless manifest that dropped one of {@link HEADLESS_CLOSURE}.
+ * Node resolution from the consumer root is not enough: every packed tarball is
+ * a direct dependency there, so a missing edge on headless would still resolve.
+ * @param dependencies - the installed `dependencies` object.
+ */
+export function assertHeadlessClosure(dependencies: Readonly<Record<string, unknown>> | undefined): void {
+  const present = dependencies ?? {}
+  const missing = HEADLESS_CLOSURE.filter(name => !Object.hasOwn(present, name))
+  if (missing.length > 0) {
+    throw new Error(`installed @shres-code/shres-code-headless is missing dependency edges: ${missing.join(', ')}`)
+  }
+}
+
+/**
+ * Read the installed headless manifest, require its closure edges, then resolve
+ * each package from that install.
+ * @param consumerRoot - the throwaway consumer directory.
+ * @param environment - the child environment.
+ */
+function assertInstalledHeadlessClosure(consumerRoot: string, environment: NodeJS.ProcessEnv): void {
+  const headlessPackage = join(consumerRoot, 'node_modules', '@shres-code', 'shres-code-headless', 'package.json')
+  if (!existsSync(headlessPackage)) {
+    throw new Error(`installed tree is missing ${headlessPackage}`)
+  }
+  const manifest = JSON.parse(readFileSync(headlessPackage, 'utf8')) as { dependencies?: unknown }
+  const dependencies = manifest.dependencies
+  assertHeadlessClosure(
+    dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)
+      ? dependencies as Record<string, unknown>
+      : undefined,
+  )
+  const script = [
+    "import { createRequire } from 'node:module'",
+    `const require = createRequire(${JSON.stringify(headlessPackage)})`,
+    `const names = ${JSON.stringify(HEADLESS_CLOSURE)}`,
+    'for (const name of names) require.resolve(name)',
+  ].join('\n')
+  capture(process.execPath, ['--input-type=module', '--eval', script], { cwd: consumerRoot, env: environment })
+  console.log(`release verify-packed-install: headless closure resolves ${HEADLESS_CLOSURE.join(', ')}`)
+}
+
 /** Install every tarball under `--from` and drive the `--family` entry. */
 function main(): void {
   const { values } = parseArgs({
@@ -90,12 +145,30 @@ function main(): void {
 
   const consumerRoot = mkdtempSync(join(tmpdir(), `shres-packed-${family.id}-`))
   try {
+    // Koffi's native prebuild ships as koffi's own optionalDependency, which the
+    // install below omits alongside the Landlock musl packages; without the
+    // prebuild present, koffi's install script compiles C++ from source for
+    // whatever version the published ranges resolve to. Declaring the prebuild
+    // as a direct dependency of the consumer restores the realistic install —
+    // the matching native binding, pinned to the same exact koffi the packed
+    // manifests declare — while the Landlock omission stands.
+    const koffiPin = (JSON.parse(readFileSync(join(root, 'packages/fs/fs-local/package.json'), 'utf8')) as {
+      dependencies?: { koffi?: string }
+    }).dependencies?.koffi
+    const koffiPrebuild = koffiPin === undefined ? {} : {
+      [`@koromix/koffi-${process.platform === 'win32' ? 'win32' : process.platform}-${process.arch}`]: koffiPin,
+    }
+
     writeFileSync(join(consumerRoot, 'package.json'), `${JSON.stringify({
       name: `shres-packed-install-${family.id}`,
       version: '0.0.0',
       private: true,
-      dependencies: Object.fromEntries([...packed].map(([name, entryPacked]) => [name, entryPacked.url])),
+      dependencies: {
+        ...Object.fromEntries([...packed].map(([name, entryPacked]) => [name, entryPacked.url])),
+        ...koffiPrebuild,
+      },
     }, null, 2)}\n`)
+
 
     const environment = consumerEnvironment(consumerRoot)
     console.log(`release verify-packed-install: installing ${String(packed.size)} tarball(s) into ${consumerRoot}`)
@@ -113,6 +186,7 @@ function main(): void {
       throw new Error(`installed ${entry.packageName} --version reported ${JSON.stringify(version)}, expected ${expected.version}`)
     }
     console.log(`release verify-packed-install: installed ${entry.packageName} reports ${version}`)
+    if (family.id === 'shres') assertInstalledHeadlessClosure(consumerRoot, environment)
   } finally {
     rmSync(consumerRoot, { recursive: true, force: true })
   }

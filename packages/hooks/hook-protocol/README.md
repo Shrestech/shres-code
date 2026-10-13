@@ -27,7 +27,7 @@ Codex deliberately reimplements a *subset* of the Claude Code hook protocol — 
 
 Declaration-merged into `SessionEventMap` (log-only, like `compaction/*` — NOT a `SurfaceEventType`, no `surfaceOp`): `hook/invoked` (a hook command ran) and `hook/result` (its outcome, paired by `handlerId`, with `appendHookResult` owning the decision rule). Payloads and per-event JSDoc are in the generated [persistence log event catalog](../../../docs/persistence-catalog.md); `stderrSummary` is truncated to the record's `stderrSummaryMaxChars` (the bridge's config, reference default `DEFAULT_STDERR_SUMMARY_MAX_CHARS` = 500; omitted when empty).
 
-Hook invocation/result records must sit inside an open turn. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` satisfy that owner-defined relation by construction. `SessionStart` runs before turn 1 and gets no `hook/*` record; its allowed context remains pending in the inbox until a waking delivery opens a turn — see the hooks Agent Note.
+Hook invocation/result records must sit inside an open turn. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` satisfy that owner-defined relation by construction. `SessionStart` runs before turn 1 and gets no `hook/*` record; its allowed context remains pending in the inbox until a waking delivery opens a turn.
 
 ## Model Experience
 
@@ -39,4 +39,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **`HookOutput.updatedInput` is parsed but not honored** — input rewrite is a deferred consistency-design problem ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)); a bridge logs + warns when a hook sets it. See `src/types.ts` for the full contracts.
+- **`HookOutput.updatedInput` is parsed but not honored** — input rewrite is a deferred consistency-design problem; a bridge logs + warns when a hook sets it. See `src/types.ts` for the full contracts.

@@ -241,7 +241,7 @@ type PluginAdminConfirmOutcome =
 
 ## Bundle and row activation
 
-`ProfileRuntimeControl` owns live application for the booted profile. The core reports selected and applied bundle membership independently, keeps malformed selected bundles visible, and separates a persisted preference from its effective value under higher-priority overlays. Activation does not delete package dependencies or feature runtime data. The [shared management decision](../../.agents/notes/implemented/architecture/2026-09-27-shared-plugin-activation.md) owns this separation from native setup and package installation.
+`ProfileRuntimeControl` owns live application for the booted profile. The core reports selected and applied bundle membership independently, keeps malformed selected bundles visible, and separates a persisted preference from its effective value under higher-priority overlays. Activation does not delete package dependencies or feature runtime data. The shared management decision owns this separation from native setup and package installation.
 
 ```ts type-equiv
 /** The mutations a pluginAdmin user gesture can authorize. */

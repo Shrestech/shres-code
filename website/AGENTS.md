@@ -1,6 +1,6 @@
 # AGENTS.md — Documentation website adapter
 
-Follow the [root instructions](../AGENTS.md), the [documentation standard](../docs/AGENTS.md), and the [documentation-site sync workflow](../.agents/skills/shres-doc-site-sync/SKILL.md).
+Follow the [root instructions](../AGENTS.md) and the [documentation standard](../docs/AGENTS.md). After changing publication mappings or navigation, run `pnpm docs:check`.
 
 ## Keep documentation content out of this tree
 

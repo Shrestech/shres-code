@@ -12,4 +12,4 @@ NOTICE: Protocol and card design is derived from Tiger3807861189 J-Space Cogniti
 | [`jspace-advisor/`](jspace-advisor/README.md) | Background reviewer model seat; `jspace_consult` + advice reprint | — |
 | [`command-jspace/`](command-jspace/README.md) | `/j-space on\|off`; session-local | — |
 
-Design: [J-Space as a Settings-toggled harness card](../../.agents/notes/implemented/feature/2026-08-18-jspace-settings-toggle.md).
+Design: J-Space as a Settings-toggled harness card.

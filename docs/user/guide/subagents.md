@@ -30,4 +30,4 @@ shres models set grok-cli grok-4.6 --effort high
 
 `--effort` is validated against the efforts the route's declaration advertises. The CLI's own tools do not go through Shres Code approval. That is the meaning of the Delegated tag.
 
-The [CLI models guide](./models.md) owns `shres models` / `/model`. The [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note owns the subagent-versus-route split.
+The [CLI models guide](./models.md) owns `shres models` / `/model`. The CLI agent bridges note owns the subagent-versus-route split.

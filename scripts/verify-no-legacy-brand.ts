@@ -1,9 +1,8 @@
 /**
  * Reject tracked leftovers of retired product identities (DeepSeek Harness /
- * DSH and Roos Code) outside the keep-list (LICENSE, NOTICE, archived Agent
- * Notes, the historical rebrand notes, the rebrand/rescope/zh-purge scripts
- * that must still mention old tokens as find-strings, and vendored upstream
- * README/LICENSE). Also rejects the slash-stripped catalog slug
+ * DSH and Roos Code) outside the keep-list (LICENSE, NOTICE, the
+ * rebrand/rescope/zh-purge scripts that must still mention old tokens as
+ * find-strings, and vendored upstream README/LICENSE). Also rejects the slash-stripped catalog slug
  * `deepseek-aidsh` and leftover mermaid node ids (`pkg_*_dsh_*`, `pkg_*_roos_*`).
  * Hyphenated `roos-code` / `shres-code` is not a slash-stripped slug.
  */
@@ -49,10 +48,6 @@ export interface LegacyBrandReference {
 
 function keepListed(file: string): boolean {
   if (file === 'LICENSE' || file === 'NOTICE') return true
-  if (file.startsWith('.agents/notes/archived/')) return true
-  if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
-  if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
-  if (file === '.agents/notes/implemented/process/2026-09-02-purge-legacy-branding-traces.md') return true
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/rescope-vendor.ts' || file === 'scripts/rescope-vendor.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true

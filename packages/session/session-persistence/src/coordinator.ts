@@ -774,7 +774,6 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     // deliberately read-side only: an append-time refusal would stall a live
     // session's durability mid-flight, which costs more than a loud refusal at
     // the log's next load (trade-off owned by the session-log-version-mechanism
-    // Agent Note).
     assertSupportedEvents(events, id)
     if (events.length === 0) return
     this.preparations.assertWritable(id)

@@ -3,8 +3,7 @@
  * run comes from the family's tag and its members are publishable.
  *
  * Publication happens only from GitHub Actions, so the tag and publishability
- * checks are gates on the workflow, not advisory local warnings
- * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
+ * checks are gates on the workflow, not advisory local warnings.
  */
 
 import { parseArgs } from 'node:util'

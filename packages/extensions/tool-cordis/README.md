@@ -1,6 +1,6 @@
 # @shres-code/shres-code-tool-cordis
 
-The self-referential Cordis toolset: five model-facing tools over the live runtime in the current Shres process. The registry, the vm sandbox, and the browser broadcast belong to [`@shres-code/shres-code-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: [the toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
+The self-referential Cordis toolset: five model-facing tools over the live runtime in the current Shres process. The registry, the vm sandbox, and the browser broadcast belong to [`@shres-code/shres-code-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them.
 
 ## What it does
 
@@ -18,7 +18,7 @@ Dynamic packages live only in the shared Shres process memory. They remain activ
 
 ## Trust stance
 
-The sandbox isolates globals but is not a security boundary. Node globals are absent or redirect to Cordis services such as `ctx.fs`, `ctx.web`, and `ctx.bash`, and writes to `globalThis` stay local, but host-realm helpers make escape possible. Mounted plugins receive a façade without framework internals, yet its allowed services affect the live runtime. Dynamic tool schemas and annotations cross the realm through iterative JSON cloning and schema normalization, so valid deep declarations are memory-bounded rather than call-stack-bounded; records with JSON-invisible keys and subclassed or decorated schema arrays reject before normalization. Treat this toolset like bash access; see the [design and trust stance](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
+The sandbox isolates globals but is not a security boundary. Node globals are absent or redirect to Cordis services such as `ctx.fs`, `ctx.web`, and `ctx.bash`, and writes to `globalThis` stay local, but host-realm helpers make escape possible. Mounted plugins receive a façade without framework internals, yet its allowed services affect the live runtime. Dynamic tool schemas and annotations cross the realm through iterative JSON cloning and schema normalization, so valid deep declarations are memory-bounded rather than call-stack-bounded; records with JSON-invisible keys and subclassed or decorated schema arrays reject before normalization. Treat this toolset like bash access; see the design and trust stance.
 
 ## Config
 
@@ -49,7 +49,7 @@ Every tool renders a `generic` card (`read` / `execute` / `delete`); `cordis_def
 
 ## Export shape
 
-Namespace plugin: named exports `name` / `inject` / `apply`, no default export ([docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)). It injects `tools` and `dynamicCordisRunner`.
+Namespace plugin: named exports `name` / `inject` / `apply`, no default export. It injects `tools` and `dynamicCordisRunner`.
 
 ## Model Experience
 

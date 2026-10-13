@@ -35,7 +35,6 @@ apps/desktop/.desktop-build/
 .orig
 .worktrees/
 worktrees/
-.agents/worktrees/
 .typert-*/
 
 # App lifecycle pid/log from the Makefile

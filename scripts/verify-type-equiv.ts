@@ -11,12 +11,11 @@ import { globSync, readFileSync, existsSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 import ts from 'typescript'
 import { markdownFences } from './markdown.ts'
-import { isArchivedAgentNotePath } from './repo-files.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
 /** Scan doc-typecheck's full Markdown scope so unmanifested blocks also fail. */
-const MARKDOWN_GLOBS = ['README.md', '.agents/notes/**/*.md', 'docs/**/*.md', 'packages/*/*.md', 'packages/*/*/*.md']
+const MARKDOWN_GLOBS = ['README.md', 'docs/**/*.md', 'packages/*/*.md', 'packages/*/*/*.md']
 
 /** One manifest entry: a source-equivalence block and its source symbol. */
 interface ManifestEntry {
@@ -210,7 +209,7 @@ const docSet = new Set<string>()
 for (const pattern of MARKDOWN_GLOBS) {
   for (const match of globSync(pattern, { cwd: root })) {
     const normalized = match.split(sep).join('/')
-    if (!isArchivedAgentNotePath(normalized)) docSet.add(normalized)
+    docSet.add(normalized)
   }
 }
 const extractedBlocks: EquivBlock[] = [...docSet].sort().flatMap(extractEquivBlocks)

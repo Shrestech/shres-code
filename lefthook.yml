@@ -4,10 +4,6 @@
 
 pre-commit:
   jobs:
-    - name: archived agent notes
-      glob: '.agents/notes/archived/**'
-      run: node_modules/.bin/tsx scripts/verify-archived-agent-notes.ts
-
     - name: lint (staged)
       glob: '*.{ts,tsx,mts,cts,mjs}'
       exclude:
@@ -30,12 +26,6 @@ pre-commit:
 
     - name: vendor manifest guard
       run: scripts/check-vendor-manifest.sh
-
-pre-merge-commit:
-  jobs:
-    - name: archived agent notes
-      glob: '.agents/notes/archived/**'
-      run: node_modules/.bin/tsx scripts/verify-archived-agent-notes.ts
 
 pre-push:
   jobs:

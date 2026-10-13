@@ -13,7 +13,7 @@ Durable session persistence, semantic checkpoint policy, and the shipped storage
 | [`session-persistence-jsonl/`](session-persistence-jsonl/README.md) | Persists sessions in JSONL files | registers on `ctx.sessionPersistence` |
 | [`session-persistence-sqlite/`](session-persistence-sqlite/README.md) | Persists sessions in SQLite | registers on `ctx.sessionPersistence` |
 
-The [session-persistence decision](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md) records the persistence design. Live RAM retention and SQLite lock/chunk policy are the [windowed-log decision](../../.agents/notes/implemented/feature/2026-08-26-windowed-session-log-and-sqlite-retention.md).
+The session-persistence decision records the persistence design. Live RAM retention and SQLite lock/chunk policy are the windowed-log decision.
 
 ## Projection
 
@@ -40,7 +40,7 @@ Deployments may register one model-backed provider; the service retains a determ
 
 ## SessionTelemetryBackend
 
-Projects session activity into outbound telemetry and delegates delivery to a configured reporting backend. The [telemetry decision](../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md) records the reporting boundary; the [mode decision](../../.agents/notes/implemented/feature/2026-08-05-feedback-gated-session-telemetry.md) records immediate, feedback-gated, and disabled delivery.
+Projects session activity into outbound telemetry and delegates delivery to a configured reporting backend. The telemetry decision records the reporting boundary; the mode decision records immediate, feedback-gated, and disabled delivery.
 
 | Package | Role |
 |---|---|
