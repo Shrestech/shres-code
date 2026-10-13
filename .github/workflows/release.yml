@@ -31,6 +31,9 @@ concurrency:
 env:
   PRIMARY_NODE_VERSION: '24'
   SHRES_TELEMETRY_DISABLED: '1'
+  # The full-workspace build exceeds Node's default heap on the 7 GB hosted
+  # runners; raise the per-process cap (same cap as the desktop workflow).
+  NODE_OPTIONS: '--max-old-space-size=5120'
 
 jobs:
   pack:

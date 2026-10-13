@@ -38,6 +38,9 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   SHRES_TELEMETRY_DISABLED: '1'
+  # The full-workspace build exceeds Node's default heap on the 7 GB hosted
+  # runners (node 22 and Wine lanes capped near 2 GB); raise the per-process cap.
+  NODE_OPTIONS: '--max-old-space-size=5120'
 
 jobs:
 

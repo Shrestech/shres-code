@@ -11414,6 +11414,9 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../packages/core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../packages/core/agent-default-model
       '@shres-code/shres-code-agent-instructions':
         specifier: workspace:^
         version: link:../../packages/context/agent-instructions
@@ -11690,6 +11693,9 @@ importers:
       '@shres-code/shres-code-typert-protocol':
         specifier: workspace:^
         version: link:../../packages/typert/protocol
+      '@shres-code/shres-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../packages/util/untrusted-frame
       '@shres-code/shres-code-user-approval':
         specifier: workspace:^
         version: link:../../packages/interaction/user-approval
@@ -13202,10 +13208,12 @@ packages:
 
   '@modelcontextprotocol/server-everything@2026.7.4':
     resolution: {integrity: sha512-ydMW/M6rk9tK23b+U38trsNLHhd5eF+ntiv2Vr+RPMDhbiKY/IKrZU25ukvSXVPUBvy7TxTPWpeV4KcYcXg72w==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@modelcontextprotocol/server-filesystem@2026.7.10':
     resolution: {integrity: sha512-Mmjg4anFBD5OzbPnGJOA0jPPN8645ERhQk38HQLpSenx1ox9bfdPkmAzUnNjeQtqQGFLtKe13J20RtLBmUKMZA==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@napi-rs/wasm-runtime@1.1.5':
