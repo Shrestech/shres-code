@@ -22,7 +22,9 @@ describe('desktop workflow', () => {
     const workflow = loadWorkflow()
     const events = mapping(workflow.on, 'workflow events')
     expect(events).toHaveProperty('pull_request')
-    expect(mapping(events.push, 'push event').branches).toEqual(['master', 'develop'])
+    const push = mapping(events.push, 'push event')
+    expect(push.branches).toEqual(['master', 'develop'])
+    expect(push.tags).toEqual(['shres-v*'])
 
     const dispatch = mapping(events.workflow_dispatch, 'workflow_dispatch event')
     const publishInput = mapping(mapping(dispatch.inputs, 'dispatch inputs').publish, 'publish input')
@@ -36,11 +38,18 @@ describe('desktop workflow', () => {
     expect(desktop['runs-on']).toBe('macos-14')
     expect(packageJob['runs-on']).toBe('macos-14')
     expect(publish['runs-on']).toBe('macos-14')
-    expect(String(packageJob.if)).toContain("github.event_name != 'workflow_dispatch'")
-    expect(String(packageJob.if)).toContain('inputs.publish != true')
+    expect(String(packageJob.if)).toContain("github.event_name == 'workflow_dispatch'")
+    expect(String(packageJob.if)).toContain('inputs.publish == true')
+    expect(String(packageJob.if)).toContain("github.ref_type == 'tag'")
+    expect(String(packageJob.if)).toContain("startsWith(github.ref_name, 'shres-v')")
+    expect(String(packageJob.if)).toContain('!( ')
     for (const releaseJob of [releaseValidate, publish]) {
       expect(String(releaseJob.if)).toContain("github.event_name == 'workflow_dispatch'")
       expect(String(releaseJob.if)).toContain('inputs.publish == true')
+      expect(String(releaseJob.if)).toContain("github.event_name == 'push'")
+      expect(String(releaseJob.if)).toContain("github.ref_type == 'tag'")
+      expect(String(releaseJob.if)).toContain("startsWith(github.ref_name, 'shres-v')")
+      expect(String(releaseJob.if).includes('!(')).toBe(false)
     }
 
     // Secrets may appear only in the protected publish job. This keeps forked
