@@ -54,11 +54,13 @@ export interface ReleaseMember {
 }
 
 /**
- * Read and parse a JSON file.
+ * Read and parse a JSON file that must hold one object.
  * @param path - absolute file path.
  * @returns The parsed object.
+ * @throws {SyntaxError} when the file holds invalid JSON.
+ * @throws {Error} when the file holds JSON that is not an object, or when the read fails.
  */
-function readManifest(path: string): Record<string, unknown> {
+export function readManifest(path: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${path} is not a JSON object`)
