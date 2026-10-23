@@ -6,7 +6,7 @@ This is an **implementation** package: it registers provider id `brave` into `ct
 
 ## When it is usable
 
-`available()` is true when the section is enabled, a key resolves (literal `apiKey`, or the credential reference `apiKeyEnv` names — default `BRAVE_API_KEY` — through the credentials seam with `.env`/launch-environment fallback), the endpoint base parses, and `count` is a positive integer. A key stored after boot activates on the credentials commit event and on the next search's refresh; availability never makes network calls.
+`available()` is true when the section is enabled, a key resolves (literal `apiKey`, or the credential reference `apiKeyEnv` names — default `BRAVE_API_KEY` — through the credentials seam with `.env`/launch-environment fallback), the endpoint base parses, and `count` is a positive integer. A key that is stored, rotated, or re-pointed at another reference after boot activates on the credentials commit event, on any committed settings change, on the next search's refresh, and when the credentials service activates after this plugin applied; a refresh outside a search that fails is logged against the reference, never its value, rather than dropped. An assembly that never mounts the credentials seam reads `.env`/the launch environment, which is then the only credential source, and availability never makes network calls. A pinned provider is refused with `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` before it is searched, so that log line is the operator's record of why.
 
 ## Mapping
 
@@ -41,4 +41,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Fewer sources than `count` can return** — a row without a non-empty URL is dropped, and mapping always reports `truncated: false`, so the consumer cannot distinguish a short page from a capped one.
 - **Only five row fields are read** — `url`, `title`, `description`, `page_age`, and `age` map to the four `WebSearchSource` fields (`page_age` takes precedence over `age` for `publishedAt`); Brave's other per-result fields (`extra_snippets`, `thumbnail`, `language`, and the rest) never reach the seam's `WebSearchSource`.
 - **Abort classification is error-shape-based** — only an `Error` named `AbortError` maps to `WEB_ABORTED`; an abort carrying a custom reason surfaces as `WEB_PROVIDER_ERROR`.
-- **A subscription token is required** — there is no keyless path: with no resolved key `available()` is false and a direct search throws `WEB_PROVIDER_CREDENTIAL_MISSING`.
+- **A subscription token is required** — there is no keyless path: with no resolved key `available()` is false; the fallback chain skips the provider and a pin is refused with `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`, so `WEB_PROVIDER_CREDENTIAL_MISSING` is reachable only from a direct provider call or a key lost between the availability check and the search.

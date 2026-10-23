@@ -3,7 +3,7 @@
  * and cancellation taxonomy, credential resolution through the seam, and the
  * plugin's registration into `ctx.web`.
  */
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -150,6 +150,133 @@ describe('web-search-brave plugin', () => {
       await ctx.fiber.dispose()
     } finally {
       await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('applies directly with a raw config that bypasses the schema defaults', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ web: { results: [] } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ctx = new Context()
+    await ctx.plugin(WebRuntime, {})
+    await bravePlugin.apply(ctx, { apiKey: 'literal-key' })
+    await ctx.web.search({ query: 'q', provider: 'brave' })
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit]
+    expect(String(url)).toBe('https://api.search.brave.com/res/v1/web/search?q=q&count=8')
+    expect((init.headers as Record<string, string>)['x-subscription-token']).toBe('literal-key')
+    // A commit naming another reference leaves the literal key in place.
+    ctx.emit('credentials/updated', credentialRef('OTHER_KEY'))
+    await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+    await expect(ctx.web.search({ query: 'q', provider: 'brave' })).resolves.toMatchObject({ sources: [] })
+    await ctx.fiber.dispose()
+  })
+
+  it('activates when the credentials service registers after the plugin applied', async () => {
+    const previous = process.env.BRAVE_API_KEY
+    delete process.env.BRAVE_API_KEY
+    const home = await mkdtemp(join(tmpdir(), 'brave-provider-late-'))
+    const filename = join(home, '.credentials.yaml')
+    const fetchMock = vi.fn(async () => jsonResponse({
+      web: { results: [{ url: 'https://late.test', title: 'Late' }] },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ctx = new Context()
+    try {
+      // The token is already on disk, but not through a seam this launch can read.
+      await writeFile(filename, 'BRAVE_API_KEY: late-key\n', { mode: 0o600 })
+      await ctx.plugin(WebRuntime, {})
+      // This plugin applies first: the launch environment is the only
+      // credential source and a GUI launch leaves it without provider keys.
+      await ctx.plugin(bravePlugin, {})
+      await expect(ctx.web.search({ query: 'early', provider: 'brave' }))
+        .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }))
+
+      // The seam arrives after this plugin; the provider converges onto it
+      // without a restart.
+      await ctx.plugin(LocalCredentialProvider, { path: filename, watch: false })
+      await vi.waitFor(async () => {
+        await expect(ctx.web.search({ query: 'late', provider: 'brave' }))
+          .resolves.toMatchObject({ sources: [{ url: 'https://late.test', title: 'Late' }] })
+      })
+      const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [URL, RequestInit]
+      expect(String(url)).toBe('https://api.search.brave.com/res/v1/web/search?q=late&count=8')
+      expect((init.headers as Record<string, string>)['x-subscription-token']).toBe('late-key')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(home, { recursive: true, force: true })
+      if (previous === undefined) delete process.env.BRAVE_API_KEY
+      else process.env.BRAVE_API_KEY = previous
+    }
+  })
+
+  it('reports a failed refresh outside a search instead of dropping it', async () => {
+    const ctx = new Context()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const calls = () => warn.mock.calls as unknown as unknown[][]
+    const reports = () => calls().filter(call => String(call[0]).includes('resolving credential'))
+    ctx.provide('credentials', {
+      resolve: () => Promise.reject(new Error('credential backend down')),
+    } as never)
+    await ctx.plugin(WebRuntime, {})
+    const fiber = await ctx.plugin(bravePlugin, {})
+    // A backend failure is not a missing key: the provider stays keyless until a
+    // later refresh succeeds, and it is reported. Each report names the reference
+    // — never a value — and carries the cause on the line after it.
+    await vi.waitFor(() => { expect(reports().length).toBeGreaterThan(0) })
+    for (const [index, call] of calls().entries()) {
+      if (!String(call[0]).includes('resolving credential')) continue
+      expect(call[1]).toBe('BRAVE_API_KEY')
+      expect(String(calls()[index + 1]?.[0])).toContain('credential backend down')
+    }
+    await expect(ctx.web.search({ query: 'q', provider: 'brave' }))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }))
+    // The commit-event refresh reports its failure the same way.
+    const before = reports().length
+    ctx.emit('credentials/updated', credentialRef('BRAVE_API_KEY'))
+    await vi.waitFor(() => { expect(reports().length).toBeGreaterThan(before) })
+    await fiber.dispose()
+  })
+
+  it('reports a failed refresh when the credentials service activates late', async () => {
+    const ctx = new Context()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    await ctx.plugin(WebRuntime, {})
+    // No seam at apply time, so the boot resolution reads the launch environment
+    // and has nothing to report: only the activation-time refresh can fail here.
+    const fiber = await ctx.plugin(bravePlugin, {})
+    expect(warn).not.toHaveBeenCalled()
+    ctx.provide('credentials', {
+      resolve: () => Promise.reject(new Error('credential backend down')),
+    } as never)
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('resolving credential'), 'BRAVE_API_KEY')
+    })
+    await fiber.dispose()
+  })
+
+  it('resolves from the launching environment when no credentials seam is composed', async () => {
+    const previous = process.env.BRAVE_API_KEY
+    process.env.BRAVE_API_KEY = 'env-key'
+    const fetchMock = vi.fn(async () => jsonResponse({
+      web: { results: [{ url: 'https://env.test', title: 'Env' }] },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ctx = new Context()
+    try {
+      const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+      await ctx.plugin(WebRuntime, {})
+      const fiber = await ctx.plugin(bravePlugin, {})
+      // No seam ever activates, so the boot resolution stands and nothing is
+      // reported as a credential failure.
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+      expect(warn).not.toHaveBeenCalled()
+      await expect(ctx.web.search({ query: 'q', provider: 'brave' }))
+        .resolves.toMatchObject({ sources: [{ url: 'https://env.test', title: 'Env' }] })
+      const [, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit]
+      expect((init.headers as Record<string, string>)['x-subscription-token']).toBe('env-key')
+      await fiber.dispose()
+    } finally {
+      if (previous === undefined) delete process.env.BRAVE_API_KEY
+      else process.env.BRAVE_API_KEY = previous
     }
   })
 })

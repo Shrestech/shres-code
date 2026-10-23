@@ -98,28 +98,56 @@ function resolveOptions(config: Config, box: CredentialBox): BraveSearchProvider
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const box: CredentialBox = { ref: undefined, value: undefined }
   let current: () => Config = () => config
+  /**
+   * The credential reference the current section names.
+   * @returns the reference as written, before branding.
+   */
+  const sectionReference = (): string => current().apiKeyEnv ?? DEFAULT_API_KEY_ENV
+  /**
+   * Resolve the section's credential into the availability cache.
+   * @returns a promise settled once the cache reflects this resolution.
+   */
   const refreshKey = async (): Promise<void> => {
-    const section = current()
-    const ref = credentialRef(section.apiKeyEnv ?? DEFAULT_API_KEY_ENV)
+    const ref = credentialRef(sectionReference())
     const credentials = ctx.get('credentials')
     let value: string | undefined
     if (credentials !== undefined) {
       value = (await credentials.resolve(ref))?.value
     } else {
-      // Without the seam the environment is the whole credential plane.
+      // Without the seam the launch environment is the only credential source.
       const ambient = launchEnvironmentOf(ctx).get(ref)?.value
       value = ambient !== undefined && ambient.length > 0 ? ambient : undefined
     }
     box.ref = ref
     box.value = value !== undefined && value.length > 0 ? value : undefined
   }
+  /**
+   * Report one failed refresh that ran outside a search, against the reference
+   * the section names. A dropped failure hides why a pinned provider stays
+   * unavailable: `ctx.web` refuses it before `search()` can retry the
+   * resolution. The reference is logged; a value never is.
+   * @param error - the failure the refresh raised.
+   */
+  const logRefreshFailure = (error: unknown): void => {
+    ctx.logger.warn(
+      'web-search-brave: resolving credential "%s" failed; availability keeps whatever the last resolution produced until a later refresh succeeds',
+      sectionReference(),
+    )
+    ctx.logger.warn(error)
+  }
   installSettingsSection(ctx, WEB_SEARCH_BRAVE_SETTINGS_NAMESPACE, Config, config, {
     setSource: (source) => {
       current = source
     },
     // The registration carries no resolved value: the provider projects the
-    // section per search, so a committed change needs no re-registration.
-    onChange: () => {},
+    // section per search, so a committed change needs no re-registration. The
+    // credential cache is keyed to the reference the section names, so a
+    // committed change that renames `apiKeyEnv` must resolve it again; otherwise
+    // the cache answers for the old reference, `available()` is false, and
+    // `ctx.web` refuses a pinned provider before a search could refresh.
+    onChange: () => {
+      void refreshKey().catch(logRefreshFailure)
+    },
   })
   ctx.web.registerSearchProvider(new BraveSearchProvider(() => ({
     ...resolveOptions(current(), box),
@@ -130,18 +158,20 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // could never observe the write. The commit event closes that gap, but only
   // the reference this section names is this provider's business.
   ctx.on('credentials/updated', (ref) => {
-    if (ref !== credentialRef(current().apiKeyEnv ?? DEFAULT_API_KEY_ENV)) return
-    void refreshKey().catch(() => {
-      // A failed background refresh only delays activation: availability keeps
-      // its last snapshot and the next search retries the resolution.
-    })
+    if (ref !== sectionReference()) return
+    void refreshKey().catch(logRefreshFailure)
+  })
+  // Activation order is not guaranteed. Applying before the credentials service
+  // exists resolves the launch environment instead, and a GUI-launched desktop
+  // app does not populate that environment with provider keys — so this child
+  // re-resolves the moment the seam appears and the provider converges without a
+  // restart. An assembly that never mounts the seam reads the launch environment,
+  // which is then the only credential source.
+  ctx.inject(['credentials'], () => {
+    void refreshKey().catch(logRefreshFailure)
   })
   // Resolve once at boot so availability reflects an already-stored key; a
-  // backend failure here must not sink the plugin — availability simply stays
-  // keyless until the first search retries.
-  try {
-    await refreshKey()
-  } catch {
-    // Empty box until the first search retries the resolution.
-  }
+  // backend failure leaves the provider keyless rather than sinking the plugin,
+  // and is reported instead of dropped.
+  await refreshKey().catch(logRefreshFailure)
 }

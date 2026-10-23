@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -366,21 +366,108 @@ describe('web-search-perplexity plugin registration', () => {
     }
   })
 
-  it('stays loadable when the credential backend fails at boot', async () => {
+  it('reports a failed refresh outside a search instead of dropping it', async () => {
     const ctx = new Context()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const calls = () => warn.mock.calls as unknown as unknown[][]
+    const reports = () => calls().filter(call => String(call[0]).includes('resolving credential'))
     ctx.provide('credentials', {
       resolve: () => Promise.reject(new Error('credential backend down')),
     } as never)
     await ctx.plugin(WebRuntime, { searchProvider: PERPLEXITY_PROVIDER_ID })
     const fiber = await ctx.plugin(perplexityPlugin, {})
-    // A backend failure is not a missing key: the provider simply stays
-    // keyless until a later refresh succeeds.
+    // A backend failure is not a missing key: the provider stays keyless until a
+    // later refresh succeeds, and it is reported. Each report names the reference
+    // — never a value — and carries the cause on the line after it.
+    await vi.waitFor(() => { expect(reports().length).toBeGreaterThan(0) })
+    for (const [index, call] of calls().entries()) {
+      if (!String(call[0]).includes('resolving credential')) continue
+      expect(call[1]).toBe('PERPLEXITY_API_KEY')
+      expect(String(calls()[index + 1]?.[0])).toContain('credential backend down')
+    }
     await expect(ctx.web.search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }))
-    // The commit-event listener swallows a failed background refresh the same way.
+    // The commit-event refresh reports its failure the same way.
+    const before = reports().length
     ctx.emit('credentials/updated', credentialRef('PERPLEXITY_API_KEY'))
-    await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+    await vi.waitFor(() => { expect(reports().length).toBeGreaterThan(before) })
     await fiber.dispose()
+  })
+
+  it('reports a failed refresh when the credentials service activates late', async () => {
+    const ctx = new Context()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    await ctx.plugin(WebRuntime, { searchProvider: PERPLEXITY_PROVIDER_ID })
+    // No seam at apply time, so the boot resolution reads the launch environment
+    // and has nothing to report: only the activation-time refresh can fail here.
+    const fiber = await ctx.plugin(perplexityPlugin, {})
+    expect(warn).not.toHaveBeenCalled()
+    ctx.provide('credentials', {
+      resolve: () => Promise.reject(new Error('credential backend down')),
+    } as never)
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('resolving credential'), 'PERPLEXITY_API_KEY')
+    })
+    await fiber.dispose()
+  })
+
+  it('activates when the credentials service registers after the plugin applied', async () => {
+    const previous = process.env.PERPLEXITY_API_KEY
+    delete process.env.PERPLEXITY_API_KEY
+    const dir = await mkdtemp(join(tmpdir(), 'shres-web-search-perplexity-late-'))
+    const filename = join(dir, '.credentials.yaml')
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ choices: [{ message: { content: 'a' } }], citations: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ctx = new Context()
+    try {
+      // The key is already on disk, but not through a seam this launch can read.
+      await writeFile(filename, 'PERPLEXITY_API_KEY: late-key\n', { mode: 0o600 })
+      await ctx.plugin(WebRuntime, { searchProvider: PERPLEXITY_PROVIDER_ID })
+      // This plugin applies first: the launch environment is the only
+      // credential source and a GUI launch leaves it without provider keys.
+      await ctx.plugin(perplexityPlugin, {})
+      await expect(ctx.web.search({ query: 'early' }))
+        .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }))
+
+      // The seam arrives after this plugin; the provider converges onto it
+      // without a restart.
+      await ctx.plugin(LocalCredentialProvider, { path: filename, watch: false })
+      await vi.waitFor(async () => {
+        await expect(ctx.web.search({ query: 'late' })).resolves.toMatchObject({ truncated: false })
+      })
+      const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
+      expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer late-key')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(dir, { recursive: true, force: true })
+      if (previous === undefined) delete process.env.PERPLEXITY_API_KEY
+      else process.env.PERPLEXITY_API_KEY = previous
+    }
+  })
+
+  it('resolves from the launching environment when no credentials seam is composed', async () => {
+    const previous = process.env.PERPLEXITY_API_KEY
+    process.env.PERPLEXITY_API_KEY = 'env-key'
+    const fetchMock = vi.fn(async () => jsonResponse({ choices: [{ message: { content: 'a' } }], citations: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ctx = new Context()
+    try {
+      const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+      await ctx.plugin(WebRuntime, { searchProvider: PERPLEXITY_PROVIDER_ID })
+      const fiber = await ctx.plugin(perplexityPlugin, {})
+      // No seam ever activates, so the boot resolution stands and nothing is
+      // reported as a credential failure.
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+      expect(warn).not.toHaveBeenCalled()
+      await expect(ctx.web.search({ query: 'q' })).resolves.toMatchObject({ truncated: false })
+      const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+      expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer env-key')
+      await fiber.dispose()
+    } finally {
+      if (previous === undefined) delete process.env.PERPLEXITY_API_KEY
+      else process.env.PERPLEXITY_API_KEY = previous
+    }
   })
 
   it('activates on a key stored after boot and picks up rotation per search', async () => {

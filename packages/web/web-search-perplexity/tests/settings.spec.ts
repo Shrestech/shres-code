@@ -1,13 +1,20 @@
 /** The `web-search-perplexity` settings section layered over the composition entry. */
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import type { Fiber } from '@shres-code/cordis'
+import LocalCredentialProvider from '@shres-code/shres-code-credentials-local'
 import { SettingsProvider } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import WebRuntime from '@shres-code/shres-code-web'
 import * as perplexityPlugin from '@shres-code/shres-code-web-search-perplexity'
-import { WEB_SEARCH_PERPLEXITY_SETTINGS_NAMESPACE } from '@shres-code/shres-code-web-search-perplexity'
+import {
+  PERPLEXITY_PROVIDER_ID,
+  WEB_SEARCH_PERPLEXITY_SETTINGS_NAMESPACE,
+} from '@shres-code/shres-code-web-search-perplexity'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {
@@ -55,18 +62,31 @@ afterEach(() => {
 })
 
 /**
- * Run one search and answer the endpoint it reached. A fresh `Response` per
- * call because a body can only be read once, and the call history is cleared
- * because repeated `spyOn` returns the same spy.
+ * Run one search and answer the endpoint it reached, with the headers it sent.
+ * A fresh `Response` per call because a body can only be read once, and the
+ * call history is cleared because repeated `spyOn` returns the same spy.
  * @param ctx - context whose `ctx.web` serves the search.
- * @returns the URL the provider fetched.
+ * @returns the URL the provider fetched and the headers it sent.
  */
-async function searchOnce(ctx: Context): Promise<string> {
+async function searchRequest(ctx: Context): Promise<{ url: string; headers: Record<string, string> }> {
   const fetchSpy = vi.spyOn(globalThis, 'fetch')
     .mockImplementation(() => Promise.resolve(jsonResponse(ONE_RESULT)))
   fetchSpy.mockClear()
   await ctx.web.search({ query: 'anything' })
-  return String((fetchSpy.mock.calls.at(-1)?.[0] as URL | string | undefined) ?? '')
+  const call = fetchSpy.mock.calls.at(-1)
+  return {
+    url: String((call?.[0] as URL | string | undefined) ?? ''),
+    headers: (call?.[1]?.headers ?? {}) as Record<string, string>,
+  }
+}
+
+/**
+ * The URL one search reached.
+ * @param ctx - context whose `ctx.web` serves the search.
+ * @returns the fetched URL.
+ */
+async function searchOnce(ctx: Context): Promise<string> {
+  return (await searchRequest(ctx)).url
 }
 
 describe('web-search-perplexity settings section', () => {
@@ -115,6 +135,37 @@ describe('web-search-perplexity settings section', () => {
 
     expect(bench.ctx.settings.describe().map(row => String(row.ns))).not.toContain('web-search-perplexity')
     await bench.ctx.fiber.dispose()
+  })
+
+  it('re-resolves the credential when a committed change renames the reference', async () => {
+    const previous = process.env.PERPLEXITY_API_KEY
+    delete process.env.PERPLEXITY_API_KEY
+    const dir = await mkdtemp(join(tmpdir(), 'shres-web-search-perplexity-refs-'))
+    const filename = join(dir, '.credentials.yaml')
+    const ctx = new Context()
+    try {
+      await writeFile(filename, 'PERPLEXITY_API_KEY: first-key\nALT_PERPLEXITY_KEY: second-key\n', { mode: 0o600 })
+      await ctx.plugin(WebRuntime, { searchProvider: PERPLEXITY_PROVIDER_ID })
+      await ctx.plugin(LocalCredentialProvider, { path: filename, watch: false })
+      const settingsFiber = ctx.plugin(MemorySettings)
+      await settingsFiber.await()
+      const pluginFiber = ctx.plugin(perplexityPlugin, {})
+      await pluginFiber.await()
+      expect((await searchRequest(ctx)).headers['authorization']).toBe('Bearer first-key')
+
+      // The Settings page re-points the credential reference. `ctx.web` refuses
+      // a pinned provider before a search could refresh, so the committed change
+      // itself has to resolve the new reference.
+      await ctx.settings.update(WEB_SEARCH_PERPLEXITY_SETTINGS_NAMESPACE, { apiKeyEnv: 'ALT_PERPLEXITY_KEY' })
+      await vi.waitFor(async () => {
+        expect((await searchRequest(ctx)).headers['authorization']).toBe('Bearer second-key')
+      })
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(dir, { recursive: true, force: true })
+      if (previous === undefined) delete process.env.PERPLEXITY_API_KEY
+      else process.env.PERPLEXITY_API_KEY = previous
+    }
   })
 
   it('drops out of the search pool while a stored section disables it', async () => {
