@@ -43,6 +43,7 @@
     "@shres-code/shres-code-client-ui-browserskill": "workspace:^"
   },
   "peerDependencies": {
+    "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {

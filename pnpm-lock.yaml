@@ -11414,6 +11414,9 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../packages/core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../packages/core/agent-default-model
       '@shres-code/shres-code-agent-instructions':
         specifier: workspace:^
         version: link:../../packages/context/agent-instructions
@@ -11690,6 +11693,9 @@ importers:
       '@shres-code/shres-code-typert-protocol':
         specifier: workspace:^
         version: link:../../packages/typert/protocol
+      '@shres-code/shres-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../packages/util/untrusted-frame
       '@shres-code/shres-code-user-approval':
         specifier: workspace:^
         version: link:../../packages/interaction/user-approval

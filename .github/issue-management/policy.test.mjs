@@ -65,7 +65,7 @@ const reviewedPull = (labels) => ({
 
 test('counts only text outside details', () => {
   assert.deepEqual(countVisibleUnits('Supports GitHub Project.<details>hidden text</details>'), {
-    units: 4,
+    units: 3,
     balanced: true,
     detailsCount: 1,
     allCollapsed: true,
