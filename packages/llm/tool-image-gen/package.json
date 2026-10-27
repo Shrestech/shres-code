@@ -28,10 +28,6 @@
   "files": [
     "lib/index.js",
     "lib/invariant.js",
-    "lib/client.js",
-    "lib/persist.js",
-    "lib/image-gen.js",
-    "lib/config.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
