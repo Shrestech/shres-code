@@ -135,7 +135,7 @@ jobs:
           --package sdk
           --output-dir dist-python
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v6
         with:
           name: shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
           path: dist-python/shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
@@ -310,7 +310,7 @@ jobs:
             /tmp/shres-sdk/bin/python /work/scripts/smoke-python-runtime.py --scenario sdk-default
           '
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.runtime.outputs.wheel }}
           path: dist-python/${{ steps.runtime.outputs.wheel }}

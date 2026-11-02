@@ -151,7 +151,7 @@ jobs:
           (cd "$artifact_dir" && shasum -a 256 -- "${names[@]}" > SHA256SUMS.txt)
 
       - name: Upload unsigned artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shres-code-mac-arm64
           path: |
@@ -339,7 +339,7 @@ jobs:
           (cd "$artifact_dir" && shasum -a 256 -- "${names[@]}" > SHA256SUMS.txt)
 
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shres-code-mac-arm64-release-${{ github.run_id }}
           path: |
