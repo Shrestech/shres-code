@@ -1,6 +1,8 @@
 /**
- * `shres models` / `shres providers` — product CLI over the same settings,
- * credentials, and llm services the Web Settings → Models page uses.
+ * `shres models` / `shres providers` — product CLI over the settings,
+ * credentials, and provider adapters these commands need: the same stores and
+ * route ids as the Web Settings → Models page, over a hand-built composition
+ * that tracks `packages/bundle/base/cordis.patch.yml`.
  *
  * @module @shres-code/shres-code/models-cli
  */
@@ -23,6 +25,7 @@ import * as LlmDeepseek from '@shres-code/shres-code-llm-deepseek'
 import * as LlmCliBridge from '@shres-code/shres-code-llm-cli-bridge'
 import * as LlmGrokSession from '@shres-code/shres-code-llm-grok-session'
 import * as LlmCodexSession from '@shres-code/shres-code-llm-codex-session'
+import * as LlmCursorSession from '@shres-code/shres-code-llm-cursor-session'
 import * as LlmClaudeSession from '@shres-code/shres-code-llm-claude-session'
 import * as LlmXaiApiKey from '@shres-code/shres-code-llm-xai-apikey'
 import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
@@ -171,6 +174,7 @@ export async function bootModelsCli(shresHome?: string): Promise<Context> {
   await ctx.plugin(LlmCliBridge)
   await ctx.plugin(LlmGrokSession)
   await ctx.plugin(LlmCodexSession)
+  await ctx.plugin(LlmCursorSession)
   await ctx.plugin(LlmClaudeSession)
   await ctx.plugin(LlmXaiApiKey)
   return ctx
@@ -223,13 +227,19 @@ async function dispatch(ctx: Context, command: ModelsCliCommand, io: ModelsCliIo
   }
 }
 
+/** One fact that keeps a provider row from serving a chat turn as it stands. */
+type ProviderBlocker =
+  | { kind: 'chat-gated' }
+  | { kind: 'missing-binary'; binary: string }
+  | { kind: 'missing-key' }
+
 interface ProviderRow {
   provider: string
   displayName: string
   active: boolean
-  usable: boolean
   delegated: boolean
   models: string[]
+  blocker?: ProviderBlocker
 }
 
 function mergeProviderRows(ctx: Context): ProviderRow[] {
@@ -243,7 +253,6 @@ function mergeProviderRows(ctx: Context): ProviderRow[] {
       provider: entry.provider,
       displayName: entry.displayName,
       active: live.has(entry.provider),
-      usable: true,
       delegated: entry.kind === 'delegated',
       models: [],
     })
@@ -254,7 +263,6 @@ function mergeProviderRows(ctx: Context): ProviderRow[] {
       provider: provider.id,
       displayName: provider.name,
       active: true,
-      usable: true,
       delegated: provider.kind === 'delegated',
       models: [],
     })
@@ -265,13 +273,14 @@ function mergeProviderRows(ctx: Context): ProviderRow[] {
 async function hydrateRows(ctx: Context, rows: ProviderRow[]): Promise<ProviderRow[]> {
   return Promise.all(rows.map(async (row) => {
     const models = row.active ? (await ctx.llm.listModels(row.provider)).map(model => model.id) : []
-    const usable = await providerUsable(ctx, row.provider)
-    return { ...row, models, usable }
+    const blocker = await providerBlocker(ctx, row.provider)
+    return { ...row, models, ...blocker === undefined ? {} : { blocker } }
   }))
 }
 
 /**
- * Format providers, models, the default, and missing-key flags.
+ * Format providers, models, the default, and the reason each unusable row is
+ * unusable.
  * @param ctx - booted models composition.
  * @returns printable transcript.
  */
@@ -292,7 +301,7 @@ export async function formatProviderList(ctx: Context): Promise<string> {
       ...row.active ? ['active'] : ['dormant'],
       ...row.provider === selected.provider ? ['default'] : [],
       ...row.delegated ? ['delegated'] : [],
-      ...row.usable ? [] : ['unusable until keyed'],
+      ...row.blocker === undefined ? [] : [blockerText(row.blocker)],
     ]
     lines.push(`  ${row.provider}  ${row.displayName}  [${flags.join(', ')}]`)
     if (row.models.length === 0) {
@@ -307,18 +316,49 @@ export async function formatProviderList(ctx: Context): Promise<string> {
   return lines.join('\n')
 }
 
+function blockerText(blocker: ProviderBlocker): string {
+  switch (blocker.kind) {
+    case 'chat-gated':
+      return 'does not serve chat turns'
+    case 'missing-binary':
+      return `binary "${blocker.binary}" not on PATH`
+    case 'missing-key':
+      return 'unusable until keyed'
+    /* v8 ignore next 4 -- closed-union exhaustiveness only */
+    default: {
+      const _never: never = blocker
+      throw new Error(`shres models list: unexpected provider blocker ${JSON.stringify(_never)}`)
+    }
+  }
+}
+
 function effortSuffix(effort: string | undefined): string {
   return effort === undefined ? '' : ` effort=${effort}`
 }
 
-async function providerUsable(ctx: Context, provider: string): Promise<boolean> {
+/**
+ * Why one row cannot serve a chat turn: a chat-gated route refuses every turn,
+ * a delegated route needs its CLI on PATH (its own login can supply the
+ * credential, so a stored key is optional), and any other route owes the
+ * credential its profile names.
+ * @param ctx - booted models composition.
+ * @param provider - provider route id.
+ * @returns the blocker, or `undefined` when the row is servable as it stands.
+ */
+async function providerBlocker(ctx: Context, provider: string): Promise<ProviderBlocker | undefined> {
   const entry = ctx.llm.listConfigurableProviders().find(candidate => candidate.provider === provider)
   const live = ctx.llm.listProviders().find(candidate => candidate.id === provider)
-  if (entry?.kind === 'delegated' || live?.kind === 'delegated') return false
+  if (entry?.chatGated === true) return { kind: 'chat-gated' }
+  if (entry?.kind === 'delegated' || live?.kind === 'delegated') {
+    if (entry?.binaryFound === false && entry.binary !== undefined) {
+      return { kind: 'missing-binary', binary: entry.binary }
+    }
+    return undefined
+  }
   const apiKeyEnv = apiKeyEnvOf(ctx, entry?.settingsNs, entry?.settingsPath)
-  if (apiKeyEnv === undefined) return live !== undefined
+  if (apiKeyEnv === undefined) return undefined
   const info = await ctx.credentials.describe(credentialRef(apiKeyEnv))
-  return info.configured
+  return info.configured ? undefined : { kind: 'missing-key' }
 }
 
 function apiKeyEnvOf(

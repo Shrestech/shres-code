@@ -12,7 +12,7 @@
  *
  * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
  * plugin dependencies by forwarding to pnpm; `models` and `providers` manage
- * the same settings and credentials the Web Settings → Models page uses.
+ * the settings and credentials stores the Web Settings → Models page also uses.
  * @module @shres-code/shres-code/args
  */
 
@@ -279,7 +279,7 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
   const models = program.command('models').description('list or set the default model using the same store as Settings → Models')
   models
     .command('list')
-    .description('list providers and models; the default is marked and missing-key routes are flagged')
+    .description('list providers and models; the default is marked and each unusable route names its blocker')
     .action(() => {
       rejectParentOptions('models')
       resolved = { mode: 'models', command: { kind: 'models-list' } }

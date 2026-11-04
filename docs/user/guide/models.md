@@ -10,7 +10,7 @@ The [provider guide](./providers.md) owns first-run picking, custom route fields
 shres models list
 ```
 
-The transcript prints the current `agent-default-model` default, any stored purpose overrides, then every configurable provider and its advertised models. The default pair is marked. A route that names an `apiKeyEnv` whose credential is not stored is flagged `unusable until keyed`.
+The transcript prints the current `agent-default-model` default, any stored purpose overrides, then every configurable provider and its advertised models. The default pair is marked. Each row's bracket names what keeps it from serving a turn: `unusable until keyed` when a non-delegated route's `apiKeyEnv` has no stored credential, `does not serve chat turns` when the route lists models but refuses them, and `binary "<name>" not on PATH` when a delegated CLI route's command is not installed.
 
 `shres providers list` prints the same transcript.
 
@@ -22,7 +22,7 @@ shres models set deepseek-official deepseek-v4-pro --effort max
 shres models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. A hand-declared delegated CLI route through the `llm-cli-bridge` settings section advertises the efforts that CLI accepts, so `shres models set <custom-route> <model> --effort <level>` is the same write path. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
+`set` writes the `agent-default-model` section, and refuses a chat-gated route before anything is written, because that route lists models without serving turns. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. A hand-declared delegated CLI route through the `llm-cli-bridge` settings section advertises the efforts that CLI accepts, so `shres models set <custom-route> <model> --effort <level>` is the same write path. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
 
 The [product CLI guide](./subagents.md) owns the subagent-versus-delegated-route split and the approval warning on those routes.
 
@@ -54,4 +54,4 @@ An API key is never an argv value. The command prompts on a hidden TTY line or r
 
 ## Switch mid-session
 
-In a session that composes the command registry, `/model` prints the current selection and advertised efforts. `/model <provider> <model> [--effort <level>]` writes the session `ModelSelection` for the next assembled turn and also `saveSelection()`s that pair as the process-wide default used by future sessions and Settings → Models. The gesture is user-authored: `command/run` records `source: { kind: 'user' }`, and the model cannot invoke it as a tool. `/model` is refused on a subagent session so a child switch cannot change the root default.
+In a session that composes the command registry, `/model` prints the current selection and advertised efforts. `/model <provider> <model> [--effort <level>]` writes the session `ModelSelection` for the next assembled turn and also `saveSelection()`s that pair as the process-wide default used by future sessions and Settings → Models. The gesture is user-authored: `command/run` records `source: { kind: 'user' }`, and the model cannot invoke it as a tool. `/model` is refused on a subagent session so a child switch cannot change the root default, and it refuses a chat-gated route with the same message `shres models set` prints, before the session selection or the stored default changes.

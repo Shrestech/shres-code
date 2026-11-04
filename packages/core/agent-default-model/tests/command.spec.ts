@@ -43,6 +43,7 @@ function mockLlm(options: {
   remapEffort?: string
   resolveError?: Error
   infoError?: Error
+  configurable?: { provider: string; chatGated?: boolean }[]
 } = {}) {
   const providers = options.providers ?? [{ id: 'deepseek-official' }]
   const models = options.models ?? {
@@ -50,6 +51,7 @@ function mockLlm(options: {
   }
   return {
     listProviders: () => providers,
+    listConfigurableProviders: () => options.configurable ?? [],
     listModels: (provider: string) => Promise.resolve(models[provider] ?? []),
     resolveModelInfo: (provider: string, model: string) => {
       if (options.infoError !== undefined) return Promise.reject(options.infoError)
@@ -165,6 +167,32 @@ describe('/model command', () => {
     expect(execution?.result.text).not.toContain('web search')
     const run = agent.session.events.find(event => event.type === 'command/run')
     expect(run?.data).toMatchObject({ name: 'model', source: { kind: 'user' } })
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses a chat-gated route through /model and keeps the stored default', async () => {
+    const { ctx, agent } = await boot({
+      llm: mockLlm({
+        providers: [{ id: 'deepseek-official' }, { id: 'cursor-session' }],
+        models: {
+          'deepseek-official': [{ id: 'deepseek-v4-flash', name: 'Flash', provider: 'deepseek-official' }],
+          'cursor-session': [{ id: 'gpt-5.2', name: 'GPT-5.2', provider: 'cursor-session' }],
+        },
+        configurable: [{ provider: 'cursor-session', chatGated: true }],
+      }),
+    })
+    const execution = await ctx.commands.execute(
+      agent, '/model cursor-session gpt-5.2', new AbortController().signal,
+    )
+    expect(execution?.result).toEqual({
+      kind: 'error',
+      text: 'model: provider "cursor-session" lists models but does not serve chat turns; select a serving route',
+    })
+    expect(ctx.agentDefaultModel.currentSelection())
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    expect(ctx.agentDefaultModel.selectionFor(agent).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    expect(agent.session.events.some(event => event.type === 'agent/model-selection')).toBe(false)
     await ctx.fiber.dispose()
   })
 

@@ -97,6 +97,59 @@ describe('shres models / providers', () => {
     expect(result.stdout).toContain('claude-opus-5')
   })
 
+  it('lists the cursor subscription route and flags it as unable to serve chat', async () => {
+    const home = await tempHome()
+    const result = await run(home, { kind: 'models-list' })
+    expect(result.stdout).toContain('cursor-session  Cursor (subscription)  [active, does not serve chat turns]')
+    expect(result.stdout).toContain('cursor-grok-4.6-high')
+  })
+
+  it('refuses to store a chat-gated route and leaves the default alone', async () => {
+    const home = await tempHome()
+    const refused = await run(home, { kind: 'models-set', provider: 'cursor-session', model: 'gpt-5.2' })
+    expect(refused.exit).toBe(1)
+    expect(refused.stderr)
+      .toContain('provider "cursor-session" lists models but does not serve chat turns; select a serving route')
+    const purpose = await run(home, {
+      kind: 'models-set',
+      provider: 'cursor-session',
+      model: 'gpt-5.2',
+      purpose: 'compaction',
+    })
+    expect(purpose.exit).toBe(1)
+    expect(purpose.stderr).toMatch(/does not serve chat turns/)
+    const ctx = await bootModelsCli(home)
+    expect(ctx.agentDefaultModel.currentSelection())
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    expect(ctx.agentDefaultModel.purposeSelections()).toEqual({})
+    await ctx.fiber.dispose()
+  })
+
+  it('flags a delegated route by its binary rather than its optional key', async () => {
+    const home = await tempHome()
+    await seedSettings(home, [
+      'llm-cli-bridge:',
+      '  routes:',
+      '    missing-binary:',
+      '      displayName: Missing binary',
+      '      binary: shres-no-such-cli',
+      '      apiKeyEnv: MISSING_BINARY_KEY',
+      '    found-binary:',
+      '      displayName: Found binary',
+      `      binary: ${JSON.stringify(process.execPath)}`,
+      '      apiKeyEnv: FOUND_BINARY_KEY',
+    ])
+    const listed = await run(home, { kind: 'models-list' })
+    expect(listed.stdout)
+      .toContain('missing-binary  Missing binary  [active, delegated, binary "shres-no-such-cli" not on PATH]')
+    expect(listed.stdout).toContain('found-binary  Found binary  [active, delegated]')
+    // An absent binary is environmental and reported, not a selection refusal:
+    // the bridge raises the spawn failure at request time.
+    const set = await run(home, { kind: 'models-set', provider: 'missing-binary', model: 'probe-1' })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toContain('Default: missing-binary probe-1')
+  })
+
   it('sets a declared CLI route model and rejects an effort it cannot forward', async () => {
     const home = await tempHome()
     // A route with no advertised efforts, like the cursor print-flag shape:
@@ -155,7 +208,7 @@ describe('shres models / providers', () => {
     expect(set.stdout).toContain('Default: my-cli my-4 effort=high')
     const listed = await run(home, { kind: 'models-list' })
     expect(listed.stdout).toContain('Default: my-cli my-4 effort=high')
-    expect(listed.stdout).toContain('my-cli  My CLI  [active, default, delegated, unusable until keyed]')
+    expect(listed.stdout).toContain('my-cli  My CLI  [active, default, delegated, binary "mycli" not on PATH]')
     const unadvertised = await run(home, {
       kind: 'models-set',
       provider: 'my-cli',

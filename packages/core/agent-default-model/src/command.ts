@@ -113,10 +113,12 @@ export async function applyModelSwitch(
 }
 
 /**
- * Reject an unknown provider or an effort the adapter does not advertise.
- * `resolveCallConfig` is a validator, not a defaulting step: an omitted
- * effort is not persisted even when the adapter materializes `defaultEffort`.
- * A requested effort must survive `resolveCallConfig` unchanged.
+ * Reject an unknown provider, a chat-gated route, or an effort the adapter does
+ * not advertise. Resolution runs first, so an unknown model still reports as
+ * unknown ahead of the gate. `resolveCallConfig` is a validator, not a
+ * defaulting step: an omitted effort is not persisted even when the adapter
+ * materializes `defaultEffort`. A requested effort must survive
+ * `resolveCallConfig` unchanged.
  * @param service - default-model service (reads `ctx.llm` when mounted).
  * @param requested - candidate selection.
  * @returns the provider/model pair, plus the requested effort when one was supplied.
@@ -142,6 +144,12 @@ export async function validateSelection(
         ? {}
         : { reasoningEffort: requested.reasoningEffort },
     })
+    if (llm.listConfigurableProviders()
+      .find(entry => entry.provider === resolved.provider)?.chatGated === true) {
+      throw new Error(
+        `model: provider "${resolved.provider}" lists models but does not serve chat turns; select a serving route`,
+      )
+    }
     if (requested.reasoningEffort === undefined) {
       return { provider: resolved.provider, model: resolved.model }
     }

@@ -56,6 +56,7 @@
     "@shres-code/shres-code-llm-claude-session": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
     "@shres-code/shres-code-llm-codex-session": "workspace:^",
+    "@shres-code/shres-code-llm-cursor-session": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
     "@shres-code/shres-code-llm-grok-session": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
