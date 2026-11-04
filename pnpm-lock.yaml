@@ -239,6 +239,9 @@ importers:
       '@shres-code/shres-code-llm-codex-session':
         specifier: workspace:^
         version: link:../../packages/llm/llm-codex-session
+      '@shres-code/shres-code-llm-cursor-session':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm-cursor-session
       '@shres-code/shres-code-llm-deepseek':
         specifier: workspace:^
         version: link:../../packages/llm/llm-deepseek
