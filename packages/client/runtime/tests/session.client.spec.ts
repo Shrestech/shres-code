@@ -176,6 +176,98 @@ function histResponse(events: SessionEvent[], hasMore = false) {
 }
 
 describe('open', () => {
+  it('releases off-screen history while preserving pending interactions and refetches on reopen', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'Q', 'A'), true)
+    await session.open()
+    session.handleMuxEnvelope('rq' as never, { type: 'question/requested', sessionId: SID, questions: [] })
+    const pending = session.getSnapshot().pending[0]
+    session.releaseHistory()
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', nodes: [], hasMore: false })
+    expect(session.getSnapshot().pending[0]).toBe(pending)
+    session.handleMuxEnvelope('late' as never, { type: 'session/event', sessionId: SID, event: ev.user(6, 'background') })
+    expect(chatSeqs(session.getSnapshot())).toEqual([])
+    api.onHistory = () => histResponse(plainTurn(6, 1, 'background', 'completed'))
+    await session.open()
+    expect(chatSeqs(session.getSnapshot())).toEqual([6, 7, 8, 9, 10, 11])
+    expect(session.getSnapshot().pending[0]).toBe(pending)
+  })
+
+  it('reloads older pages on return so an expanded window retains its scroll anchors', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'first', 'first'))
+    await session.open()
+    session.releaseHistory()
+    const beforeSeqs: (number | undefined)[] = []
+    api.onHistory = (payload) => {
+      beforeSeqs.push(payload.beforeSeq)
+      const first = (payload.beforeSeq ?? 18) - 6
+      return histResponse(plainTurn(first, first / 6, 'Q', 'A'), first > 0)
+    }
+    await session.open()
+    expect(beforeSeqs).toEqual([undefined, 12, 6])
+    expect(chatSeqs(session.getSnapshot())).toEqual(Array.from({ length: 18 }, (_, index) => index))
+    expect(session.getSnapshot()).toMatchObject({ openState: 'open', hasMore: false })
+  })
+
+  it('discards a restored older page when another session switch releases the window again', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'first', 'first'))
+    await session.open()
+    session.releaseHistory()
+    const olderPage = deferred<Awaited<ReturnType<typeof histResponse>>>()
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(plainTurn(6, 1, 'tail', 'tail'), true)
+      : olderPage.promise
+    const opening = session.open()
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(3) })
+    session.releaseHistory()
+    olderPage.resolve(await histResponse(plainTurn(0, 0, 'first', 'first')))
+    await opening
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', nodes: [] })
+  })
+
+  it.each(['empty', 'discontinuous', 'error'] as const)('handles %s older history when restoring a released window', async (kind) => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'first', 'first'))
+    await session.open()
+    session.releaseHistory()
+    api.onHistory = (payload) => {
+      if (payload.beforeSeq === undefined) return histResponse(plainTurn(6, 1, 'tail', 'tail'), true)
+      if (kind === 'empty') return histResponse([], true)
+      if (kind === 'discontinuous') return histResponse(plainTurn(1, 0, 'invalid', 'invalid'))
+      return Promise.resolve(err({ code: 'session-not-found', message: 'gone', details: { sessionId: SID } }))
+    }
+    await session.open()
+    if (kind === 'empty') {
+      expect(session.getSnapshot()).toMatchObject({ openState: 'open', hasMore: false })
+      expect(chatSeqs(session.getSnapshot())).toEqual([6, 7, 8, 9, 10, 11])
+    } else {
+      expect(session.getSnapshot()).toMatchObject({ openState: 'error', nodes: [] })
+    }
+  })
+
+  it('does not restore released history from an outstanding open or older-page request', async () => {
+    const { api, session } = makeSession()
+    const openingPage = deferred<Awaited<ReturnType<typeof histResponse>>>()
+    api.onHistory = () => openingPage.promise
+    const opening = session.open()
+    session.releaseHistory()
+    openingPage.resolve(await histResponse(plainTurn(6, 1, 'stale', 'stale'), true))
+    await opening
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', nodes: [] })
+
+    api.onHistory = () => histResponse(plainTurn(6, 1, 'Q', 'A'), true)
+    await session.open()
+    const olderPage = deferred<Awaited<ReturnType<typeof histResponse>>>()
+    api.onHistory = () => olderPage.promise
+    const older = session.loadOlder()
+    session.releaseHistory()
+    olderPage.resolve(await histResponse(plainTurn(0, 0, 'old', 'old')))
+    await older
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', nodes: [], loadingOlder: false })
+  })
+
   it('keeps a bare Session blank until an authoritative lifecycle signal arrives', () => {
     const { session } = makeSession()
     expect(session.getSnapshot()).toMatchObject({ blank: true, composerPhase: 'blank' })
@@ -917,7 +1009,48 @@ describe('remaining branches', () => {
 })
 
 describe('resync', () => {
-  it('rebuilds the window and clears pending; cold instances no-op', async () => {
+  it('keeps a subscribed baseline that arrived before resync for the tail-gap pull', async () => {
+    const { api, session } = makeSession()
+    const firstPage = plainTurn(0, 0, 'a', 'b')
+    const full = [...firstPage, ...plainTurn(6, 1, 'c', 'd')]
+    let calls = 0
+    api.onHistory = () => {
+      calls++
+      return histResponse(calls === 3 ? full : firstPage)
+    }
+    await session.open()
+    // The mux baseline can race ahead of the connection controller's onConnected callback.
+    session.handleMuxEnvelope('rs' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 11 })
+    await session.resync()
+    expect(calls).toBe(3)
+    expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9])
+  })
+
+  it('retains an expanded window and permits paging after reconnect supersedes an older-page request', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = (payload) => {
+      const firstSeq = payload.beforeSeq === undefined ? 12 : 6
+      return histResponse(plainTurn(firstSeq, firstSeq / 6, 'Q', 'A'), true)
+    }
+    const readWindow = api.onHistory
+    await session.open()
+    await session.loadOlder()
+    const stalePage = deferred<Awaited<ReturnType<typeof histResponse>>>()
+    api.onHistory = () => stalePage.promise
+    const staleLoad = session.loadOlder()
+    api.onHistory = readWindow
+    await session.resync()
+    expect(chatSeqs(session.getSnapshot())).toEqual(Array.from({ length: 12 }, (_, index) => index + 6))
+    expect(session.getSnapshot().loadingOlder).toBe(false)
+    stalePage.resolve(await histResponse(plainTurn(0, 0, 'stale', 'stale')))
+    await staleLoad
+    expect(chatSeqs(session.getSnapshot())[0]).toBe(6)
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'older', 'older'))
+    await session.loadOlder()
+    expect(chatSeqs(session.getSnapshot())[0]).toBe(0)
+  })
+
+  it('rebuilds the window without erasing pending until generation cleanup; cold instances no-op', async () => {
     const { api, session } = makeSession()
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
     await session.open()
@@ -926,7 +1059,7 @@ describe('resync', () => {
     await session.resync()
     const snapshot = session.getSnapshot()
     expect(snapshot.openState).toBe('open')
-    expect(snapshot.pending).toEqual([]) // baseline replay re-sends still-pending frames
+    expect(snapshot.pending).toHaveLength(1) // generation cleanup owns stale-wait removal
     expect(snapshot.nodes).toHaveLength(4)
 
     const cold = makeSession()

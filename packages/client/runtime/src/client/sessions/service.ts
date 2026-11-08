@@ -610,6 +610,7 @@ export class SessionRuntime implements ISessions {
     // transiently absent) holds the stage: tearing down on the gap would
     // destroy exactly the frozen scope the mask exists to preserve.
     if (current === undefined || snapshot.byId[current] === undefined || current === this.watched) return
+    if (this.watched !== undefined) this.scopes.get(this.watched)?.session.releaseHistory()
     this.watched = current
     this.sweepDeferred()
     const record = this.resolve(current)

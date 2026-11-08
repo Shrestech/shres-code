@@ -277,7 +277,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
   if (groups.length === 0) return null
   return (
     <Tooltip label={line} side="top" delayMs={500} disabled={!truncated}>
-      <div ref={rootRef} className={css.root}>
+      <div ref={rootRef} className={css.root} data-session-stats="">
         {groups.map((group, i) => (
           <Fragment key={group}>
             {i > 0 && <><span className={css.sep} aria-hidden>|</span>{' '}</>}

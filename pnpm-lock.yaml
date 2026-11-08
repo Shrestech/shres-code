@@ -2412,6 +2412,9 @@ importers:
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@tanstack/react-virtual':
+        specifier: ^3.14.9
+        version: 3.14.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       clsx:
         specifier: ^2.0.0
         version: 2.1.1

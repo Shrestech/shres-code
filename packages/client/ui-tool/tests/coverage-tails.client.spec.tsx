@@ -2,7 +2,7 @@
 // Tool presentation branch tails not reached by the main acceptance specs.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup } from '@testing-library/react'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { RunningToolCall, SessionId, SessionListState, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
@@ -12,6 +12,7 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
@@ -39,6 +40,7 @@ function bashProps(block: RunningToolCall | ToolResultNode): BashRowProps {
   return {
     callId: 'c1', toolName: 'bash', block, openFile: vi.fn(),
     sessionId: SID, useSessions: bindSnapshotSelector(listStore()),
+    ...toolDisclosureProps(),
     t,
   } as unknown as BashRowProps
 }
@@ -61,6 +63,7 @@ describe('Tool presentation tails', () => {
     }
     const props: GenericToolCardProps = {
       callId: 'c5', toolName: 'todo_write', block: settled, openFile: vi.fn(), t,
+      ...toolDisclosureProps(),
     }
     const view = render(<GenericToolCard {...props} />)
     expect(view.container.querySelector('[data-variant="others"] svg')).not.toBeNull()

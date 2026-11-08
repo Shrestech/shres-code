@@ -5,7 +5,7 @@
 // and the details panel's Output section.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
@@ -24,6 +24,7 @@ import { DetailsPanel } from '@shres-code/shres-code-client-ui-conversation/src/
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, testDisclosurePlaceholder, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
@@ -242,7 +243,7 @@ describe('terminalCardModel', () => {
 
 describe('chat row terminal body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'bash', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'bash', block, openFile: vi.fn(), t, ...toolDisclosureProps(),
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -352,9 +353,14 @@ describe('BashRow terminal card', () => {
     currentAddress: undefined,
   })
 
-  const rowProps = (block: RunningToolCall | ToolResultNode): BashRowProps => ({
+  const rowProps = (
+    block: RunningToolCall | ToolResultNode,
+    expanded = false,
+    onExpandedChange: (next: boolean) => void = testDisclosurePlaceholder,
+  ): BashRowProps => ({
     callId: 'c1', toolName: 'bash', block, openFile: vi.fn(),
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
+    expanded, onExpandedChange,
     t,
   } as unknown as BashRowProps)
 
@@ -369,6 +375,22 @@ describe('BashRow terminal card', () => {
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(view.queryByText(/a\.ts/)).toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
+  })
+
+  it('restores an expanded call after its virtual row remounts', () => {
+    let expanded = false
+    const onExpandedChange = (next: boolean): void => { expanded = next }
+    const view = render(<BashRow {...rowProps(settled(), expanded, onExpandedChange)} />)
+    const row = view.container.querySelector('[data-expandable]')!
+    fireEvent.click(row)
+    expect(expanded).toBe(true)
+    view.rerender(<BashRow {...rowProps(settled(), expanded, onExpandedChange)} />)
+    expect(view.container.querySelector('[data-expandable]')?.getAttribute('aria-expanded')).toBe('true')
+
+    view.unmount()
+    const restored = render(<BashRow {...rowProps(settled(), expanded, onExpandedChange)} />)
+    expect(restored.container.querySelector('[data-sample="bash"]')?.getAttribute('aria-expanded')).toBe('true')
+    expect(restored.getByText('a.ts  b.ts', RAW)).toBeTruthy()
   })
 
   // The row's leading StateDot and the card's run-state dot describe the same

@@ -14,6 +14,20 @@ type ChatActions = {
   setActivityOpen: (draft: ChatStoreState, open: boolean) => void
 }
 
+/** Session-local viewing state for Chat rows that may leave the DOM window. */
+export interface ChatRowViewingState {
+  /** Expanded disclosure keys; collapsed rows are omitted. */
+  expanded: Record<string, true>
+  /** Browser deadlines first observed for retry rows, keyed by Chat node key. */
+  retryDeadlines: Record<string, number>
+}
+
+/** Writes exposed to Chat row renderers without exposing the store instance. */
+type ChatRowViewingActions = {
+  setExpanded: (draft: ChatRowViewingState, key: string, expanded: boolean) => void
+  rememberRetryDeadline: (draft: ChatRowViewingState, key: string, deadline: number) => void
+}
+
 /**
  * Declares the per-session chat state and write surface.
  * @returns the store handle.
@@ -35,4 +49,42 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
       setActivityOpen: (d, open: boolean) => { d.activityOpen = open },
     },
   })
+}
+
+/**
+ * Declares transient per-session Chat row viewing state.
+ *
+ * The handle is mounted on each built-in keyed Chat renderer. Its session
+ * instance survives virtual row unmounts while remaining independent of the
+ * durable conversation store and of other sessions.
+ *
+ * @returns the row-viewing store handle.
+ */
+export function createChatRowViewingStore(): EngineStoreHandle<ChatRowViewingState, ChatRowViewingActions> {
+  return defineStore({
+    init: (): ChatRowViewingState => ({ expanded: {}, retryDeadlines: {} }),
+    actions: {
+      setExpanded: (draft, key: string, expanded: boolean) => {
+        if (expanded) draft.expanded[key] = true
+        else {
+          if (draft.expanded[key] === undefined) return
+          const { [key]: _removed, ...remaining } = draft.expanded
+          draft.expanded = remaining
+        }
+      },
+      rememberRetryDeadline: (draft, key: string, deadline: number) => {
+        if (draft.retryDeadlines[key] === undefined) draft.retryDeadlines[key] = deadline
+      },
+    },
+  })
+}
+
+/**
+ * Build a collision-free viewing key under one Chat node.
+ * @param nodeKey - stable Conversation Node identity.
+ * @param part - row or sub-row discriminator within that node.
+ * @returns the store key for the viewing state.
+ */
+export function chatRowViewingKey(nodeKey: string, part: string): string {
+  return JSON.stringify([nodeKey, part])
 }

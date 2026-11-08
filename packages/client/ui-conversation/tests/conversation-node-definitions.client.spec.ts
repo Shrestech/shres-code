@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationEventInput,
   ConversationNodeDefinition, ConversationViewDefinition,
@@ -118,6 +118,76 @@ function toolResult(callId: string, text: string) {
 }
 
 describe('built-in conversation node Definitions', () => {
+  it('keeps whitespace and block replacement semantics without rescanning after first visible content', () => {
+    const whitespace = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: '   ' },
+      }),
+    ])
+    expect(node(snapshot(whitespace), 'assistant-step')).toBeUndefined()
+
+    const whitespaceStream = assembler([
+      at(5, 'turn/start', { turn: 2 }),
+      at(6, 'step/start', { turn: 2, step: 1 }),
+    ])
+    const boundedTrim = vi.spyOn(String.prototype, 'trim').mockImplementation(function (this: string) {
+      if (this.length > 3) throw new Error('trimmed an accumulated whitespace stream')
+      return this.replace(/^\s+|\s+$/g, '')
+    })
+    try {
+      for (let seq = 7; seq < 23; seq++) {
+        whitespaceStream.append(at(seq, 'assistant/chunk', {
+          turn: 2,
+          step: 1,
+          chunk: { type: 'text-delta', index: 0, text: '   ' },
+        }))
+      }
+    } finally {
+      boundedTrim.mockRestore()
+    }
+
+    const value = assembler([
+      at(10, 'turn/start', { turn: 2 }),
+      at(11, 'step/start', { turn: 2, step: 1 }),
+    ])
+    const trim = vi.spyOn(String.prototype, 'trim')
+    try {
+      value.append(at(12, 'assistant/chunk', {
+        turn: 2,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: '   ' },
+      }))
+      value.append(at(13, 'assistant/chunk', {
+        turn: 2,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: 'answer' },
+      }))
+      expect(trim).toHaveBeenCalledTimes(2)
+      value.append(at(14, 'assistant/chunk', {
+        turn: 2,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: ' continued' },
+      }))
+      expect(trim).toHaveBeenCalledTimes(2)
+    } finally {
+      trim.mockRestore()
+    }
+
+    value.append(at(15, 'assistant/chunk', {
+      turn: 2,
+      step: 1,
+      chunk: { type: 'block-end', index: 0, block: { type: 'text', text: 'replacement' } },
+    }))
+    value.flush()
+    expect(node(snapshot(value), 'assistant-step')?.data).toMatchObject({
+      blocks: [{ kind: 'text', text: 'replacement' }],
+    })
+  })
+
   it('keeps one keyed Assistant node while streaming settles and materializes interruption from Location', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

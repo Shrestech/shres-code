@@ -10,7 +10,9 @@ import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@
 import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
-import { apply, inject } from '@shres-code/shres-code-client-ui-conversation/client'
+import { apply, inject, type ChatViewInjected } from '@shres-code/shres-code-client-ui-conversation/client'
+import type { ConversationSettings } from '../src/submission-settings.ts'
+import type { createChatStore } from '../src/client/stores.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
@@ -18,13 +20,21 @@ usePinnedBrowserLanguages('en-US')
 
 const ROOT = 'root-1' as SessionId
 const CHILD = 'child-1' as SessionId
+type ChatInstance = ReturnType<ReturnType<typeof createChatStore>['create']>
+type ChatActions = ChatInstance['actions']
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  const conversationHost = stubSettingsScope<ConversationSettings>()
+  const speechHost = stubSettingsScope<{ talkMode?: boolean }>()
+  runtime.provide('settingsScope', {
+    bind: (request?: { namespace?: string }) => (
+      request?.namespace === 'ui-conversation' ? conversationHost.scope : speechHost.scope
+    ),
+  } as never)
   await runtime.sessions.add({ id: ROOT, summary: { title: 'R', displayTitle: 'R' } }, { current: false })
   await runtime.sessions.add(
     { id: CHILD, summary: { title: 'C', displayTitle: 'C', parentId: ROOT } }, { current: false })
@@ -42,7 +52,7 @@ async function bench() {
   }, (_p: { renderSlot?: unknown }) => null)
 
   const feature = await runtime.mount({ inject: [...inject], apply })
-  return { runtime, feature, slots: runtime.slots }
+  return { runtime, feature, slots: runtime.slots, conversationHost }
 }
 
 /** First stored entry for a key (inject/store live directly on StoredEntry). */
@@ -69,6 +79,40 @@ describe('apply wiring', () => {
     const nodeSlot = b.slots.spec('conversation.chat.node')
     expect(nodeSlot).toMatchObject({ kind: 'keyed', scope: 'session' })
     expect(nodeSlot?.inject?.hooks?.turnData).toBeTypeOf('function')
+    await b.runtime.dispose()
+  })
+
+  it('adopts Host Chat virtualization values through the registered view source', async () => {
+    const b = await bench()
+    b.runtime.renderRoot()
+    const entry = b.slots.entries('conversation.view')[0]
+    const instance = b.runtime.storeOf('conversation.view', ROOT) as ChatInstance
+    const injected = (entry?.inject as unknown as (sessionId: SessionId, actions: ChatActions) => ChatViewInjected)(
+      ROOT, instance.actions)
+    expect(injected.hooks.virtual.getSnapshot()).toEqual({
+      overscanRows: 12,
+      estimatedRowHeight: 96,
+      initialViewportHeight: 600,
+    })
+    b.conversationHost.publish({
+      status: 'ready',
+      value: {
+        busyEnter: 'queue',
+        overscanRows: 4,
+        estimatedRowHeight: 72,
+        initialViewportHeight: 480,
+      },
+      revision: 1,
+      writable: true,
+    })
+    expect(injected.hooks.virtual.getSnapshot()).toEqual({
+      overscanRows: 4,
+      estimatedRowHeight: 72,
+      initialViewportHeight: 480,
+    })
+    expect(b.conversationHost.listenerCount()).toBe(2)
+    await b.feature.dispose()
+    expect(b.conversationHost.listenerCount()).toBe(1)
     await b.runtime.dispose()
   })
 

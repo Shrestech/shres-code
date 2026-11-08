@@ -131,11 +131,25 @@ describe('session export compression config', () => {
       sessionExportCompressionLevel: 6,
       coldBlankProbeMaxBytes: 1024,
       fileViewMaxBytes: 512 * 1024,
+      eventQueueMaxFrames: 4_096,
+      eventQueueMaxBytes: 2 * 1024 * 1024,
     })
     expect(ApiProxyService.Config({ sessionExportCompressionLevel: 0 }))
-      .toEqual({ sessionExportCompressionLevel: 0, coldBlankProbeMaxBytes: 1024, fileViewMaxBytes: 512 * 1024 })
+      .toEqual({
+        sessionExportCompressionLevel: 0,
+        coldBlankProbeMaxBytes: 1024,
+        fileViewMaxBytes: 512 * 1024,
+        eventQueueMaxFrames: 4_096,
+        eventQueueMaxBytes: 2 * 1024 * 1024,
+      })
     expect(ApiProxyService.Config({ sessionExportCompressionLevel: 9 }))
-      .toEqual({ sessionExportCompressionLevel: 9, coldBlankProbeMaxBytes: 1024, fileViewMaxBytes: 512 * 1024 })
+      .toEqual({
+        sessionExportCompressionLevel: 9,
+        coldBlankProbeMaxBytes: 1024,
+        fileViewMaxBytes: 512 * 1024,
+        eventQueueMaxFrames: 4_096,
+        eventQueueMaxBytes: 2 * 1024 * 1024,
+      })
     for (const value of [-1, 10, 1.5]) {
       expect(() => ApiProxyService.Config({ sessionExportCompressionLevel: value } as never)).toThrow()
     }
@@ -145,11 +159,34 @@ describe('session export compression config', () => {
 describe('cold blank probe config', () => {
   it('accepts a per-Session byte bound including zero and rejects invalid bounds', () => {
     expect(ApiProxyService.Config({ coldBlankProbeMaxBytes: 0 }))
-      .toEqual({ sessionExportCompressionLevel: 6, coldBlankProbeMaxBytes: 0, fileViewMaxBytes: 512 * 1024 })
+      .toEqual({
+        sessionExportCompressionLevel: 6,
+        coldBlankProbeMaxBytes: 0,
+        fileViewMaxBytes: 512 * 1024,
+        eventQueueMaxFrames: 4_096,
+        eventQueueMaxBytes: 2 * 1024 * 1024,
+      })
     expect(ApiProxyService.Config({ coldBlankProbeMaxBytes: 2048 }))
-      .toEqual({ sessionExportCompressionLevel: 6, coldBlankProbeMaxBytes: 2048, fileViewMaxBytes: 512 * 1024 })
+      .toEqual({
+        sessionExportCompressionLevel: 6,
+        coldBlankProbeMaxBytes: 2048,
+        fileViewMaxBytes: 512 * 1024,
+        eventQueueMaxFrames: 4_096,
+        eventQueueMaxBytes: 2 * 1024 * 1024,
+      })
     for (const value of [-1, 1.5]) {
       expect(() => ApiProxyService.Config({ coldBlankProbeMaxBytes: value })).toThrow()
+    }
+  })
+})
+
+describe('event queue config', () => {
+  it('requires positive integer frame and byte limits', () => {
+    expect(ApiProxyService.Config({ eventQueueMaxFrames: 12, eventQueueMaxBytes: 4096 }))
+      .toMatchObject({ eventQueueMaxFrames: 12, eventQueueMaxBytes: 4096 })
+    for (const value of [0, -1, 1.5]) {
+      expect(() => ApiProxyService.Config({ eventQueueMaxFrames: value })).toThrow()
+      expect(() => ApiProxyService.Config({ eventQueueMaxBytes: value })).toThrow()
     }
   })
 })

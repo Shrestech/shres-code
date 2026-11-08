@@ -320,7 +320,7 @@ describe('cell (render-layer session kit)', () => {
     const historyCalls = () => b.api.calls.filter(c => c.method === 'session.history')
     // Resolution is addressing, not staging: no window pull.
     b.svc.scope(sid('s1'))
-    b.svc.binding(sid('s1'))
+    const binding = b.svc.binding(sid('s1'))
     expect(historyCalls()).toHaveLength(0)
     b.svc.open(sid('s1'))
     expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1'])
@@ -330,6 +330,10 @@ describe('cell (render-layer session kit)', () => {
     // Stage moves: the new occupant opens.
     b.svc.open(sid('s2'))
     expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1', 's2'])
+    expect(binding?.session.getSnapshot().openState).toBe('cold')
+    b.svc.open(sid('s1'))
+    expect(b.svc.binding(sid('s1'))).toBe(binding)
+    expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1', 's2', 's1'])
   })
 
   it('startup restore: a persisted selection validated by the first projection opens its window unprompted', async () => {

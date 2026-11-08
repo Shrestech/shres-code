@@ -17,10 +17,11 @@ import type { ComposerBlock } from '../input/blocks.ts'
 import type {
   ComposerKeyboard, DraftAttachmentId, EditSelection, InputActions, InputNotice, InputState,
 } from '../input/contract.ts'
-import type { createChatStore } from '../stores.ts'
+import type { createChatRowViewingStore, createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { CallId, CallSelectionTarget, InspectRequest, ViewTab } from './views.ts'
+import type { ChatVirtualizationConfig } from '../config.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -408,6 +409,10 @@ export interface ChatNodeOwnerProps {
 export type ChatNodeViewProps<Kind extends ChatNodeKind = ChatNodeKind> =
   PropsRuntime<'conversation.chat.node', Kind> & PropsLocale<'conversation'>
 
+/** Full props of a built-in Chat renderer that owns persistent row viewing state. */
+export type ChatRowViewingNodeProps<Kind extends ChatNodeKind = ChatNodeKind> =
+  ChatNodeViewProps<Kind> & PropsStore<ChatRowViewingStore>
+
 /** Owner currency of the details panel's Tool output renderer. */
 export interface DetailsToolOwnerProps {
   /** Frozen selected call slice. */
@@ -446,6 +451,9 @@ export type ConvViewProps = PropsRuntime<'conversation.view'>
 
 /** The shared chat store handle type declared by the Session header/body, details, and chat-view registrations. */
 export type ChatStore = ReturnType<typeof createChatStore>
+
+/** The transient store handle mounted on built-in keyed Chat row renderers. */
+export type ChatRowViewingStore = ReturnType<typeof createChatRowViewingStore>
 
 /** Business callbacks injected into the conversation slot. */
 export interface ConversationInjected {
@@ -733,6 +741,8 @@ export type ApprovalComposerProps =
 export interface ChatScrollPosition {
   /** Stable rendered node/call identity nearest the visible reading edge. */
   readonly anchorKey: string
+  /** Stable enclosing chat node used to locate nested call anchors in a virtual window. */
+  readonly flowKey?: string
   /** Anchor top relative to the transcript scrollport when saved. */
   readonly anchorTop: number
   /** Approximate offset used before the semantic anchor is measured. */
@@ -769,6 +779,10 @@ export interface ChatViewInjected {
   }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
+  /** Reactive Chat row-window tunables resolved from Host settings. */
+  hooks: {
+    virtual: ObservableSnapshot<ChatVirtualizationConfig>
+  }
   /**
    * Prose file-mention vocabulary for one closing message, from the optional
    * {@link ChatFileMentions} service (resolved lazily per call, so composing
@@ -781,7 +795,7 @@ export interface ChatViewInjected {
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */
 export type ChatViewSlotProps =
   PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node'>
-  & PropsStore<ChatStore> & ChatViewInjected & PropsLocale<'conversation'>
+  & PropsStore<ChatStore> & InjectFace<ChatViewInjected> & PropsLocale<'conversation'>
 
 /**
  * Injected share of the details slot: the panel is otherwise a pure reader of

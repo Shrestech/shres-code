@@ -7,7 +7,7 @@
 // both grep and glob is pinned here too.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
@@ -26,6 +26,7 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { DetailsPanel } from '@shres-code/shres-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { SearchRow, searchToolview } from '../src/client/tool/toolviews/search-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 /** SearchRow now composes ToolRow, so its props include the locale `t` seat. */
 type SearchRowProps = Parameters<typeof SearchRow>[0]
@@ -186,7 +187,7 @@ describe('searchCardModel', () => {
 
 describe('chat row search body (GenericToolCard fallback)', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+    callId: 'c1', toolName, block, openFile: vi.fn(), t, ...toolDisclosureProps(),
   })
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
@@ -236,7 +237,7 @@ describe('chat row search body (GenericToolCard fallback)', () => {
 
 describe('SearchRow keyed card', () => {
   const rowProps = (block: RunningToolCall | ToolResultNode, toolName: string): SearchRowProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), sessionId: SID, t,
+    callId: 'c1', toolName, block, openFile: vi.fn(), sessionId: SID, t, ...toolDisclosureProps(),
   } as unknown as SearchRowProps)
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */

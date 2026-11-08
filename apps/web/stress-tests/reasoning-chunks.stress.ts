@@ -63,7 +63,9 @@ it('keeps the browser responsive while rendering 100,000 reasoning chunks', asyn
     // cannot acknowledge. Hide only that test overlay; the assembled chat
     // tree beneath it remains mounted and exercises the production renderer.
     await activePage.addStyleTag({ content: '[class*="onboardingOverlay"] { display: none !important; }' })
-    await activePage.locator('[data-sample="bash"]').first().waitFor({ timeout: 30_000 })
+    await expect.poll(async () => Number(
+      await activePage.locator('[data-chat-flow]').getAttribute('data-chat-node-count'),
+    ), { timeout: 30_000 }).toBeGreaterThan(0)
 
     await activePage.evaluate(() => {
       const intervalMs = 50

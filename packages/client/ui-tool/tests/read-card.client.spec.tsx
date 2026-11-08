@@ -7,7 +7,7 @@
 // pins the keyed 'read' toolview registration.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 import { Context } from '@shres-code/cordis'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
@@ -27,6 +27,7 @@ import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/loc
 import { DetailsPanel } from '@shres-code/shres-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { ReadRow, readToolview } from '../src/client/tool/toolviews/read-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 afterEach(cleanup)
 
@@ -129,7 +130,7 @@ describe('readCardModel', () => {
 
 describe('GenericToolCard read body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t, ...toolDisclosureProps(),
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -156,6 +157,7 @@ describe('GenericToolCard read body', () => {
       callId: 'c1', toolName: 'echo', block: settled({
         call: { name: 'echo', argsRaw: '{"text":"x"}' }, callView: null, resultView: null,
       }), openFile: vi.fn(), t,
+      ...toolDisclosureProps(),
     })} />)
     toggleRow(view)
     expect(view.container.querySelector('[data-read]')).toBeNull()
@@ -181,6 +183,7 @@ describe('ReadRow keyed toolview', () => {
     callId: 'c1', toolName: 'read', block, openFile: vi.fn(),
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
     t,
+    ...toolDisclosureProps(),
   } as unknown as Parameters<typeof ReadRow>[0])
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */

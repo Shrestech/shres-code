@@ -9,7 +9,7 @@
 // collapsed by default and appears only once the whole row is expanded.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@shres-code/shres-code-client-runtime/client'
@@ -30,6 +30,7 @@ import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 afterEach(cleanup)
 
@@ -127,7 +128,7 @@ describe('webCardModel', () => {
 
 describe('chat row web body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): ToolCallOwnerProps => ({
-    callId: block.callId, toolName, block, openFile: vi.fn(),
+    callId: block.callId, toolName, block, openFile: vi.fn(), ...toolDisclosureProps(),
   })
   // WebRow reads only toolName/block off the full runtime share plus the locale
   // seat; the standard kit is unused, so the cast supplies the owner slice and

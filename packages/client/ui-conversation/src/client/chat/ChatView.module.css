@@ -44,8 +44,44 @@
   gap: 16px;
 }
 
-/* Settled-flow identity boundary. It is neutral today and becomes the natural
-   measurement/mount unit for a virtualizer without changing the column gap. */
+.virtualColumn {
+  gap: 0;
+}
+
+.virtualPrefix {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.virtualWindow {
+  position: relative;
+  flex: none;
+  width: 100%;
+}
+
+.virtualItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.virtualSuffix {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding-top: 16px;
+  box-sizing: border-box;
+}
+
+/* Stable node identity inside the measured virtual row. */
 .flowItem {
   min-width: 0;
 }

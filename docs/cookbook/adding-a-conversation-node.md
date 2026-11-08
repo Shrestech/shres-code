@@ -195,7 +195,11 @@ export function apply(ctx: ClientContext): void {
 
 `buildLocationData(context, scope)` optionally publishes Definition-owned data onto an engine-owned Turn or Step. Use declaration merging to give each key a precise value type. Another Node in the same Location can consume that value through its constrained slot hook, such as `useTurnData(key)`, without receiving the Session or scanning `snapshot.chat.nodes`.
 
+If `start` and `update` neither retain nor derive State from changing Location metadata, declare `locationUpdates: 'project'`. Live Step/Turn metadata changes then rebuild Location data and view Nodes with the accumulated State. Omit this option when reducers use those metadata: the default replays State when Locations change. History prepends and predecessor changes still replay either kind of Definition.
+
 `target` and `buildViewNode(context)` declare one target-owned rendering contribution and must appear together. Preserve `context.key` as the React-facing identity, choose `anchorSeq` from durable ordering evidence, and return only renderer-ready data. Once a target Node has been published, keep returning the same key; use `visibility: 'hidden'` when it must temporarily leave the visible flow rather than withdrawing it with `null`.
+
+Chat virtualizes its row window, so keyed renderers can unmount while their Nodes remain loaded. Keep viewing state that must survive scrolling in a session-scoped `defineStore` mounted by the renderer registration, keyed by the stable Node or call id. Component-local state lasts only until the row leaves the mounted window.
 
 ## 3. Query an earlier business Context only at start
 

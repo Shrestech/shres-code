@@ -2,7 +2,8 @@
 import type { Context } from '@shres-code/cordis'
 import { resolveSlotLabel, type BoundActions } from '@shres-code/shres-code-client-ui-slots'
 import {
-  resolveWorkspacePath, type ISessions, type SessionId,
+  createSnapshotStore, resolveWorkspacePath, type ISessions, type SessionId,
+  type SnapshotStore,
 } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
@@ -23,6 +24,7 @@ import { ConversationController, UnsupportedImageMediaTypeError } from './servic
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
+import { resolveConfig, type ChatVirtualizationConfig, type Config } from './config.ts'
 import { ComposerImageInputRegistry } from './input/image-input.ts'
 import { InputHub } from './input/hub.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
@@ -112,8 +114,10 @@ function selectApproval({ interactions }: ComposerChainProps): ApprovalWait | nu
 
 /** Mounts the conversation plugin.
  * @param ctx - Client root context.
+ * @param config - Client Chat rendering tunables; omitted direct mounts use schema defaults.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config: Config = {}): void {
+  const virtual: SnapshotStore<ChatVirtualizationConfig> = createSnapshotStore(resolveConfig(config))
   const sessions = ctx.sessions
   const workspaces = ctx.workspaces
   const layout = ctx.layout
@@ -131,9 +135,25 @@ export function apply(ctx: Context): void {
 
   // Apply-time construction keeps store identity bound to this fiber.
   const chatStore = createChatStore()
-  const submissionPolicy = new ComposerSubmissionPolicy(
-    ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
+  const conversationSettings = ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE })
+  const adoptVirtual = (): void => {
+    const section = conversationSettings.getSnapshot().value
+    if (section === undefined) return
+    const next = resolveConfig(section)
+    const current = virtual.getSnapshot()
+    if (
+      current.overscanRows === next.overscanRows
+      && current.estimatedRowHeight === next.estimatedRowHeight
+      && current.initialViewportHeight === next.initialViewportHeight
+    ) return
+    virtual.set(next)
+  }
+  ctx.effect(
+    () => conversationSettings.subscribe(adoptVirtual),
+    'ui-conversation: Chat virtualization settings',
   )
+  adoptVirtual()
+  const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
   const talkScope = ctx.settingsScope.bind<{ talkMode?: boolean }>({ namespace: 'speech' })
   const talkModeSource = {
     getSnapshot: (): boolean => {
@@ -484,6 +504,7 @@ export function apply(ctx: Context): void {
               // Fork or child-rename failure keeps the source view untouched.
             })
         },
+        hooks: { virtual },
       }
     },
   }, ChatView)

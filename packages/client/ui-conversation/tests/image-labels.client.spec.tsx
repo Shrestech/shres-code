@@ -5,10 +5,12 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { AttachmentId } from '@shres-code/shres-code-attachment'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
+import { createChatRowViewingStore } from '../src/client/stores.ts'
 import { attachmentErrorText, imageSizeText } from '../src/client/image-labels.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -16,6 +18,11 @@ afterEach(cleanup)
 
 const t = makeTranslate(en, commonEn)
 const enT = makeTranslate(en, commonEn)
+
+function rowProps(nodeKey = 'image-labels') {
+  const store = createChatRowViewingStore().create('image-labels')
+  return { nodeKey, useStore: bindSnapshotSelector(store), actions: store.actions }
+}
 
 const attachment = {
   attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
@@ -65,6 +72,7 @@ describe('assistant images through the label bridge', () => {
   it('resolves dictionary strings and opens the lightbox on a single click', async () => {
     const view = render(
       <AssistantMarkdown
+        {...rowProps()}
         t={t}
         blocks={[{ kind: 'image', attachment }]}
         streaming={false}
@@ -83,6 +91,7 @@ describe('assistant images through the label bridge', () => {
   it('resolves the active English dictionary', async () => {
     const view = render(
       <AssistantMarkdown
+        {...rowProps()}
         t={enT}
         blocks={[{ kind: 'image', attachment }]}
         streaming={false}
@@ -99,6 +108,7 @@ describe('assistant images through the label bridge', () => {
   it('merges consecutive image blocks into one tiled gallery, split by text', async () => {
     const view = render(
       <AssistantMarkdown
+        {...rowProps()}
         t={t}
         blocks={[
           { kind: 'image', attachment },
@@ -120,6 +130,7 @@ describe('assistant images through the label bridge', () => {
   it('keeps assistant images at their original position between text blocks', async () => {
     const view = render(
       <AssistantMarkdown
+        {...rowProps()}
         t={t}
         blocks={[
           { kind: 'text', text: 'before' },

@@ -12,7 +12,7 @@ import type { SessionProviderComponent } from '@shres-code/shres-code-client-ui-
 import type { DetailsSlotProps, DetailsToolOwnerProps, SelectionTarget } from '@shres-code/shres-code-client-ui-conversation/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
-import { createChatStore } from '../src/client/stores.ts'
+import { createChatRowViewingStore, createChatStore } from '../src/client/stores.ts'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
 import { StatsLine } from '../src/client/chat/StatsLine.tsx'
 import { DetailsPanel } from '../src/client/skeleton/DetailsPanel.tsx'
@@ -21,6 +21,11 @@ import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t: AssistantMarkdownProps['t'] = makeTranslate(en, commonEn)
+
+function rowProps(nodeKey = 'gate-branch') {
+  const store = createChatRowViewingStore().create('gate-branch')
+  return { nodeKey, useStore: bindSnapshotSelector(store), actions: store.actions }
+}
 
 /** jsdom has no ResizeObserver; StatsLine watches its row for ellipsis truncation through one. */
 class ResizeObserverStub {
@@ -59,8 +64,10 @@ function snapshotBase(): ConversationSnapshot {
 
 describe('render branch tails', () => {
   it('AssistantMarkdown reasoning row is ok-state when not the streaming tail', () => {
+    const viewing = rowProps()
     const view = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'done thinking' }, { kind: 'text', text: 'answer' }]}
         streaming
@@ -99,8 +106,9 @@ describe('render branch tails', () => {
   })
 
   it('AssistantMarkdown reasoning as the streaming tail renders the running ring', () => {
+    const viewing = rowProps()
     const view = render(
-      <AssistantMarkdown t={t} blocks={[{ kind: 'reasoning', text: 'still thinking' }]} streaming />,
+      <AssistantMarkdown {...viewing} t={t} blocks={[{ kind: 'reasoning', text: 'still thinking' }]} streaming />,
     )
     expect(view.container.querySelector('[data-state="running"]')).not.toBeNull()
   })

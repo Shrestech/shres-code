@@ -7,13 +7,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useMemo } from 'react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import type {
   ChatConversationViewNode, ConversationNode,
 } from '@shres-code/shres-code-client-runtime/client'
-import type { ChatNodeViewProps } from '../src/client/contract/slots.ts'
+import type { ChatNodeViewProps, ChatRowViewingNodeProps } from '../src/client/contract/slots.ts'
 import {
   formatMessageClock, msUntilNextLocalMidnight, startOfLocalDay,
 } from '../src/client/chat/message-chrome.ts'
@@ -21,6 +22,7 @@ import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, UnknownNodeView,
   UserMessageNodeView,
 } from '../src/client/chat/MessageItem.tsx'
+import { createChatRowViewingStore } from '../src/client/stores.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
 import { StatsLine, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
 import { en } from '../src/client/locales.ts'
@@ -51,6 +53,8 @@ interface MessageItemProps {
 
 /** Legacy-node fixture adapter for the independently registered renderers. */
 function MessageItem({ node, t: translate }: MessageItemProps) {
+  const rowViewing = useMemo(() => createChatRowViewingStore().create('message-item'), [])
+  const useRowViewing = useMemo(() => bindSnapshotSelector(rowViewing), [rowViewing])
   const kind = node.kind === 'assistant' ? 'assistant-step' : node.kind
   const viewNode: ChatConversationViewNode = {
     key: `fixture:${node.kind}:${node.seq}`,
@@ -62,17 +66,22 @@ function MessageItem({ node, t: translate }: MessageItemProps) {
     visibility: 'visible',
     data: node.kind === 'model-retry' ? { attempts: [node], current: node } : node,
   }
-  const props = { node: viewNode, t: translate } as ChatNodeViewProps
+  const props = {
+    node: viewNode,
+    t: translate,
+    useStore: useRowViewing,
+    actions: rowViewing.actions,
+  } as unknown as ChatRowViewingNodeProps
   switch (node.kind) {
     case 'user':
     case 'steering':
       return <UserMessageNodeView {...props as ChatNodeViewProps<'user' | 'steering'>} />
     case 'context':
-      return <ContextMessageNodeView {...props as ChatNodeViewProps<'context'>} />
+      return <ContextMessageNodeView {...props as ChatRowViewingNodeProps<'context'>} />
     case 'compaction':
-      return <CompactionNodeView {...props as ChatNodeViewProps<'compaction'>} />
+      return <CompactionNodeView {...props as ChatRowViewingNodeProps<'compaction'>} />
     case 'model-retry':
-      return <RetryNodeView {...props as ChatNodeViewProps<'model-retry'>} />
+      return <RetryNodeView {...props as ChatRowViewingNodeProps<'model-retry'>} />
     case 'unknown':
       return <UnknownNodeView {...props as ChatNodeViewProps<'unknown'>} />
     default:
@@ -894,6 +903,51 @@ describe('MessageItem arms', () => {
     expect(view.getByRole('status').textContent).toBe('Model request retry cancelled (1/2) · 4s')
   })
 
+  it('keeps retry details and its first-seen deadline after a virtual row remount', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(10_000)
+    const store = createChatRowViewingStore().create('retry-remount')
+    const useStore = bindSnapshotSelector(store)
+    const retryNode = (seq: number) => ({
+      retryId: RETRY_ID,
+      seq,
+      time: 10_000,
+      retryState: 'scheduled' as const,
+      turn: 1,
+      step: 0,
+      provider: 'mock',
+      mode: 'normal' as const,
+      policyKey: 'mock-normal',
+      retry: 1,
+      maxRetries: 2,
+      delayMs: 3_000,
+      failure: { code: 'TRANSPORT', message: 'connection reset' },
+    })
+    const node = (current: ReturnType<typeof retryNode>) => ({
+      key: 'retry-remount', kind: 'model-retry', id: 'retry-remount', target: 'chat',
+      anchorSeq: current.seq, location: { kind: 'session' }, visibility: 'visible',
+      data: { attempts: [current], current },
+    })
+    const props = (current: ReturnType<typeof retryNode>) => ({
+      node: node(current), t, useStore, actions: store.actions,
+    } as unknown as ChatRowViewingNodeProps<'model-retry'>)
+
+    const first = render(<RetryNodeView {...props(retryNode(1))} />)
+    act(() => { vi.advanceTimersByTime(1_500) })
+    expect(first.getByRole('status').textContent).toContain('2s')
+    const summary = first.container.querySelector('summary')
+    if (summary === null) throw new Error('retry summary missing')
+    fireEvent.click(summary)
+    fireEvent(first.container.querySelector('details')!, new Event('toggle'))
+    expect(first.container.querySelector('details')?.open).toBe(true)
+    first.unmount()
+
+    act(() => { vi.setSystemTime(11_000) })
+    const remounted = render(<RetryNodeView {...props(retryNode(1))} />)
+    expect(remounted.container.querySelector('details')?.open).toBe(true)
+    expect(remounted.getByRole('status').textContent).toContain('2s')
+  })
+
 })
 
 describe('formatMessageClock', () => {
@@ -948,8 +1002,16 @@ describe('useCalendarDay boundary refresh', () => {
 
 describe('small branch tails', () => {
   it('AssistantMarkdown single-line reasoning summary skips the newline cut', () => {
+    const store = createChatRowViewingStore().create('branch-tail')
     const view = render(
-      <AssistantMarkdown t={t} blocks={[{ kind: 'reasoning', text: 'one-liner' }]} streaming={false} />,
+      <AssistantMarkdown
+        nodeKey="branch-tail"
+        useStore={bindSnapshotSelector(store)}
+        actions={store.actions}
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'one-liner' }]}
+        streaming={false}
+      />,
     )
     expect(view.getByText('one-liner')).toBeTruthy()
   })

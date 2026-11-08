@@ -1,5 +1,5 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { DisclosureRow, IconThinkOutline14 } from '@shres-code/shres-code-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
@@ -21,11 +21,18 @@ function latestLine(text: string): string {
  * Render one assistant reasoning block as the Think disclosure row.
  * @param props.text - complete or streaming reasoning text.
  * @param props.running - whether this block is the streaming tail.
+ * @param props.expanded - session-scoped disclosure state.
+ * @param props.onToggle - writes the session-scoped disclosure state.
  * @param props.t - conversation locale seat for the running status.
  * @returns the reasoning disclosure.
  */
-export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
-  const [expanded, setExpanded] = useState(false)
+export function ReasoningRow({ text, running, t, expanded, onToggle }: {
+  text: string
+  running: boolean
+  t: ChatViewSlotProps['t']
+  expanded: boolean
+  onToggle: () => void
+}) {
   const summaryRef = useRef<HTMLSpanElement>(null)
   const summary = running ? latestLine(text) : firstLine(text)
   const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
@@ -50,7 +57,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         open={expanded}
         expandable
         expandOnRowClick
-        onToggle={() => { setExpanded(value => !value) }}
+        onToggle={onToggle}
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />

@@ -4,7 +4,7 @@
 // ObservableSnapshot fake, no wire or Tool presentation plugin.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import type {
   AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
@@ -18,11 +18,13 @@ import {
 import { RpcId } from '@shres-code/shres-code-client-connection/client'
 import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
 import type {
-  ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
+  ChatNode, ChatNodeOwnerProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@shres-code/shres-code-client-ui-conversation/client'
+import type { ChatRowViewingNodeProps } from '../src/client/contract/slots.ts'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
-import { createChatStore } from '../src/client/stores.ts'
+import { createChatRowViewingStore, createChatStore } from '../src/client/stores.ts'
+import { resolveConfig } from '../src/client/config.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
 import { en } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
@@ -37,13 +39,84 @@ import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
+  restoreVirtualizerGeometry()
   vi.unstubAllGlobals()
 })
 // Keyless create() persists under the bare declared key; clear between cases
 // so one harness's selection cannot rehydrate into the next.
 beforeEach(() => {
   localStorage.clear()
+  installVirtualizerGeometry()
 })
+
+type PrototypeDescriptor = PropertyDescriptor | undefined
+
+const virtualizerGeometryDescriptors: Readonly<Record<string, PrototypeDescriptor>> = {
+  clientHeight: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight'),
+  clientWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth'),
+  offsetHeight: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight'),
+  offsetWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth'),
+  getBoundingClientRect: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'getBoundingClientRect'),
+  scrollTo: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTo'),
+}
+
+function virtualizerRect(element: HTMLElement): DOMRect {
+  const index = element.dataset.index
+  if (index === undefined) {
+    return {
+      x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0,
+      toJSON: () => ({}),
+    }
+  }
+  const height = 96
+  const top = Number(index) * (height + 16)
+  return {
+    x: 0, y: top, width: 800, height, top, right: 800, bottom: top + height, left: 0,
+    toJSON: () => ({}),
+  }
+}
+
+function installVirtualizerGeometry(): void {
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    get: () => 600,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => 800,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get: function (this: HTMLElement) {
+      return this.dataset.index !== undefined || this.dataset.chatAnchorKey !== undefined
+        ? 96
+        : this.className.includes('virtualPrefix') ? 24 : 600
+    },
+  })
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get: () => 800,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    configurable: true,
+    value: function (this: HTMLElement): DOMRect { return virtualizerRect(this) },
+  })
+  Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+    configurable: true,
+    value: function (this: HTMLElement, xOrOptions: number | ScrollToOptions, y?: number): void {
+      const top = typeof xOrOptions === 'number' ? y ?? 0 : xOrOptions.top ?? this.scrollTop
+      this.scrollTop = top
+    },
+  })
+}
+
+function restoreVirtualizerGeometry(): void {
+  for (const [name, descriptor] of Object.entries(virtualizerGeometryDescriptors)) {
+    if (descriptor === undefined) Reflect.deleteProperty(HTMLElement.prototype, name)
+    else Object.defineProperty(HTMLElement.prototype, name, descriptor)
+  }
+}
 
 const SID = 's1' as SessionId
 type RoutedChatNodeOwner = ChatNodeOwnerProps & { readonly node: ChatNode }
@@ -166,6 +239,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   // Selection rides the REAL chat store (same construction path as
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
+  const rowViewing = createChatRowViewingStore().create(SID)
+  const useRowViewing = bindSnapshotSelector(rowViewing)
   const t = makeTranslate(en, commonEn)
   const toolOwners: Array<{
     callId: string
@@ -194,8 +269,14 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
         ? location.turn.data.get(dataKey)
         : undefined
     })
-    const nodeProps = <Kind extends ChatNode['kind']>(): ChatNodeViewProps<Kind> => (
-      { ...props, ...nodeOwner, useTurnData } as unknown as ChatNodeViewProps<Kind>
+    const nodeProps = <Kind extends ChatNode['kind']>(): ChatRowViewingNodeProps<Kind> => (
+      {
+        ...props,
+        ...nodeOwner,
+        useTurnData,
+        useStore: useRowViewing,
+        actions: rowViewing.actions,
+      } as unknown as ChatRowViewingNodeProps<Kind>
     )
     switch (nodeOwner.node.kind) {
       case 'user':
@@ -288,6 +369,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     inspectCall,
     chatScroll,
     forkAt,
+    useVirtual: bindSnapshotSelector(createSnapshotStore(resolveConfig())),
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
     // Mirrors the real lookup chain (conversation namespace, then common).
@@ -324,6 +406,11 @@ function installScrollMetrics(element: HTMLElement, initialHeight: number, clien
       scrollTop = Math.max(0, Math.min(top, scrollHeight - clientHeight))
     },
   }
+}
+
+/** Browser scrollTop is clamped to the scrollable floor. */
+function maxScroll(scrollHeight: number, clientHeight: number): number {
+  return Math.max(0, scrollHeight - clientHeight)
 }
 
 describe('Chat node rendering', () => {
@@ -393,16 +480,22 @@ describe('ChatView', () => {
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
     const first = view.container.querySelector('[data-chat-flow-key="fixture:user:9"]') as HTMLDivElement
     const next = view.container.querySelector('[data-chat-flow-key="fixture:user:10"]') as HTMLDivElement
-    let firstTop = 100
-    let nextTop = 300
+    let firstDocumentTop = 150
+    let nextDocumentTop = 350
     vi.spyOn(scroller, 'getBoundingClientRect').mockImplementation(
       () => ({ top: 0, bottom: 200 } as DOMRect),
     )
     vi.spyOn(first, 'getBoundingClientRect').mockImplementation(
-      () => ({ top: firstTop, bottom: firstTop + 40 } as DOMRect),
+      () => {
+        const top = firstDocumentTop - scroller.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
+      },
     )
     vi.spyOn(next, 'getBoundingClientRect').mockImplementation(
-      () => ({ top: nextTop, bottom: nextTop + 40 } as DOMRect),
+      () => {
+        const top = nextDocumentTop - scroller.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
+      },
     )
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
@@ -410,11 +503,11 @@ describe('ChatView', () => {
     fireEvent.click(view.getByText('Load earlier'))
     // The reader moves after the request starts; this, not the click-time
     // row, is the intent the arriving page must preserve.
-    firstTop = -200
-    nextTop = 60
+    firstDocumentTop = -110
+    nextDocumentTop = 150
     readerScroll(scroller, 90)
     Object.defineProperty(scroller, 'scrollHeight', { value: 1300, writable: true })
-    nextTop = 560
+    nextDocumentTop = 650
     act(() => { h.set({ nodes: [assistant(2, 'older'), user(9, 'first visible'), user(10, 'next visible')] }) })
     expect(scroller.scrollTop).toBe(590) // latest 90 + the anchored row's 500px prepend shift
   })
@@ -444,6 +537,57 @@ describe('ChatView', () => {
         'fixture:user:1', 'fixture:assistant:2',
         'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
       ])
+  })
+
+  it('virtualizes long history while exposing the logical turn count', async () => {
+    const turns = Array.from({ length: 250 }, (_, index) => {
+      const turn = index + 1
+      const userSeq = index * 2 + 1
+      const assistantSeq = userSeq + 1
+      return [
+        user(userSeq, `long-chat-user-${String(turn)}`),
+        assistant(assistantSeq, `long-chat-answer-${String(turn)}`, turn),
+      ] as const
+    }).flat()
+    const turnEnds = new Map(turns
+      .filter((node): node is AssistantMessageNode => node.kind === 'assistant')
+      .map(node => [node.turn, node.seq]))
+    const logicalNodeCount = turns.length + turnEnds.size
+    const h = makeHarness({ nodes: turns, turnEnds })
+    const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    const clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    const clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 800,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+    try {
+      const view = render(<h.ChatView {...h.props} />)
+      await waitFor(() => {
+        const mounted = view.container.querySelectorAll('[data-chat-virtual-item]')
+        expect(mounted.length).toBeGreaterThan(0)
+        expect(mounted.length).toBeLessThan(logicalNodeCount)
+      })
+      expect(view.container.querySelector('[data-chat-flow]')?.getAttribute('data-chat-turn-count'))
+        .toBe('250')
+      expect(view.container.querySelectorAll('[data-chat-flow-key]').length)
+        .toBeLessThan(logicalNodeCount)
+    } finally {
+      if (offsetHeight === undefined) delete (HTMLElement.prototype as { offsetHeight?: number }).offsetHeight
+      else Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight)
+      if (clientWidth === undefined) delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth
+      else Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidth)
+      if (clientHeight === undefined) delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight
+      else Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeight)
+    }
   })
 
   it('renders Host-pending steering at the flow tail and hands off to the durable node', () => {
@@ -972,7 +1116,7 @@ describe('ChatView', () => {
     expect(owner.inspectCall).toBe(h.inspectCall)
   })
 
-  it('prepend preserves a semantic row; a trailing user node force-scrolls', () => {
+  it('prepend preserves a semantic row; a trailing user node force-scrolls', async () => {
     const h = makeHarness({ nodes: [user(5, 'later'), assistant(6, 'a')], hasMore: true })
     const view = render(<h.ChatView {...h.props} />)
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
@@ -980,20 +1124,23 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 1000, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 400, writable: true })
     const anchored = view.container.querySelector('[data-chat-flow-key="fixture:user:5"]') as HTMLDivElement
-    let anchoredTop = 100
+    let anchoredDocumentTop = 180
     vi.spyOn(anchored, 'getBoundingClientRect').mockImplementation(
-      () => ({ top: anchoredTop, bottom: anchoredTop + 40 } as DOMRect),
+      () => {
+        const top = anchoredDocumentTop - scroller.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
+      },
     )
     readerScroll(scroller, 80)
     // Arm the paging anchor, then deliver an older page (head seq decreases).
     fireEvent.click(view.getByText('Load earlier'))
     Object.defineProperty(scroller, 'scrollHeight', { value: 1600, writable: true })
-    anchoredTop = 700
+    anchoredDocumentTop = 780
     act(() => { h.set({ nodes: [user(1, 'old'), assistant(2, 'b'), user(5, 'later'), assistant(6, 'a')] }) })
-    expect(scroller.scrollTop).toBe(680) // reader offset 80 + the anchored row's 600px shift
-    // A new trailing user bubble (own words) force-scrolls to the bottom.
+    await waitFor(() => { expect(scroller.scrollTop).toBe(680) }) // reader offset 80 + the anchored row's 600px shift
+    // Own words take priority even while measured prepend restoration is pending.
     act(() => { h.set({ nodes: [user(1, 'old'), assistant(2, 'b'), user(5, 'later'), assistant(6, 'a'), user(9, 'mine')] }) })
-    expect(scroller.scrollTop).toBe(1600)
+    await waitFor(() => { expect(scroller.scrollTop).toBe(maxScroll(1_600, 400)) })
   })
 
   it('back-to-bottom cancels an in-flight paging anchor', () => {
@@ -1007,7 +1154,7 @@ describe('ChatView', () => {
     fireEvent.click(view.getByLabelText('Back to bottom'))
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_300, writable: true })
     act(() => { h.set({ nodes: [assistant(2, 'older'), user(9, 'late')] }) })
-    expect(scroller.scrollTop).toBe(1_300)
+    expect(scroller.scrollTop).toBe(maxScroll(1_300, 200))
     expect(h.chatScroll.read()).toBeNull()
   })
 
@@ -1024,7 +1171,7 @@ describe('ChatView', () => {
     act(() => { h.set({ partial: { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'grow' }] } }) })
     expect(scroller.scrollTop).toBe(100)
     fireEvent.click(backButton)
-    expect(scroller.scrollTop).toBe(1000)
+    expect(scroller.scrollTop).toBe(maxScroll(1_000, 300))
     // At the bottom again: follow re-arms and the button unmounts.
     expect(view.queryByLabelText('Back to bottom')).toBeNull()
   })
@@ -1072,10 +1219,11 @@ describe('ChatView', () => {
     const observe = vi.fn()
     class ResizeObserverStub {
       constructor(callback: ResizeObserverCallback) {
-        notify = () => { callback([], this as unknown as ResizeObserver) }
+        notify = () => { callback([], this) }
       }
 
       observe = observe
+      unobserve = vi.fn()
       disconnect = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -1093,7 +1241,7 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_400, writable: true })
     act(() => { notify?.() })
     expect(scroller.scrollTop).toBe(200)
-    expect(observe).toHaveBeenCalledTimes(1)
+    expect(observe).toHaveBeenCalled()
   })
 
   it('entering the at-bottom threshold does not snap the remaining scroll distance', () => {
@@ -1120,30 +1268,31 @@ describe('ChatView', () => {
       const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
       const view = render(<h.ChatView {...h.props} />, { container: host })
       // Open jump uses the host, not the local .scroll node.
-      expect(host.scrollTop).toBe(2000)
+      expect(host.scrollTop).toBe(maxScroll(2_000, 500))
       readerScroll(host, 100)
       expect(view.getByLabelText('Back to bottom')).toBeTruthy()
       fireEvent.click(view.getByLabelText('Back to bottom'))
-      expect(host.scrollTop).toBe(2000)
+      expect(host.scrollTop).toBe(maxScroll(2_000, 500))
     } finally {
       host.remove()
     }
   })
 
-  it('a remount restores the saved semantic row after width reflow', () => {
+  it.each(['view remount', 'same-session reconnect'] as const)('%s restores the saved semantic row after width reflow', async (transition) => {
     const host = document.createElement('div')
     host.setAttribute('data-conversation-scroll', '')
     Object.defineProperty(host, 'scrollHeight', { value: 2000, writable: true, configurable: true })
     Object.defineProperty(host, 'clientHeight', { value: 500, writable: true, configurable: true })
     Object.defineProperty(host, 'scrollTop', { value: 0, writable: true, configurable: true })
     document.body.appendChild(host)
-    let anchorTop = 80
+    let anchorDocumentTop = 180
     vi.spyOn(host, 'getBoundingClientRect').mockImplementation(
       () => ({ top: 0, bottom: 500 } as DOMRect),
     )
     const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       if (this.dataset.chatAnchorKey === 'fixture:user:1') {
-        return { top: anchorTop, bottom: anchorTop + 40 } as DOMRect
+        const top = anchorDocumentTop - host.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
       }
       return { top: 0, bottom: 40 } as DOMRect
     })
@@ -1151,15 +1300,23 @@ describe('ChatView', () => {
       const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
       // Fresh open (nothing saved): the bottom jump stands.
       const view = render(<h.ChatView {...h.props} />, { container: host })
-      expect(host.scrollTop).toBe(2000)
+      expect(host.scrollTop).toBe(maxScroll(2_000, 500))
       // Reader scrolls up; the position is recorded continuously.
       readerScroll(host, 100)
-      // View-tab switch away and back: the view unmounts, then remounts.
-      view.rerender(<div />)
-      anchorTop = 560
+      const saved = h.chatScroll.read()
+      if (transition === 'view remount') view.rerender(<div />)
+      else act(() => { h.set({ openState: 'loading', nodes: [] }) })
+      anchorDocumentTop = 660
       host.scrollTop = 0
-      view.rerender(<h.ChatView {...h.props} />)
-      expect(host.scrollTop).toBe(580) // approximate 100 + the row's 480px reflow shift
+      if (transition === 'view remount') view.rerender(<h.ChatView {...h.props} />)
+      else {
+        Object.defineProperty(host, 'scrollHeight', { value: 500, writable: true, configurable: true })
+        fireEvent.scroll(host)
+        expect(h.chatScroll.read()).toEqual(saved)
+        Object.defineProperty(host, 'scrollHeight', { value: 2000, writable: true, configurable: true })
+        act(() => { h.set({ openState: 'open', nodes: [user(1, 'q'), assistant(2, 'a')] }) })
+      }
+      await waitFor(() => { expect(host.scrollTop).toBe(580) })
       // The restored position is above the floor: follow stays disarmed.
       expect(view.getByLabelText('Back to bottom')).toBeTruthy()
     } finally {
@@ -1168,7 +1325,7 @@ describe('ChatView', () => {
     }
   })
 
-  it('normalizes a semantic restore clamped to the bottom before an immediate remount', () => {
+  it('normalizes a semantic restore clamped to the bottom before an immediate remount', async () => {
     const host = document.createElement('div')
     host.setAttribute('data-conversation-scroll', '')
     Object.defineProperty(host, 'scrollHeight', { value: 2_000, writable: true, configurable: true })
@@ -1180,20 +1337,24 @@ describe('ChatView', () => {
       set: (value: number) => { scrollTop = Math.min(value, 1_500) },
     })
     document.body.appendChild(host)
+    const anchorDocumentTop = 1_580
     const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      if (this.dataset.chatAnchorKey === 'fixture:user:1') return { top: 300, bottom: 340 } as DOMRect
+      if (this.dataset.chatAnchorKey === 'fixture:user:1') {
+        const top = anchorDocumentTop - host.scrollTop
+        return { top, bottom: top + 40 } as DOMRect
+      }
       return { top: 0, bottom: 500 } as DOMRect
     })
     try {
       const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
       h.chatScroll.save({ anchorKey: 'fixture:user:1', anchorTop: 80, scrollTop: 1_400 })
       const view = render(<h.ChatView {...h.props} />, { container: host })
-      expect(host.scrollTop).toBe(1_500)
+      await waitFor(() => { expect(host.scrollTop).toBe(maxScroll(2_000, 500)) })
       expect(h.chatScroll.read()).toBeNull()
       view.rerender(<div />)
       host.scrollTop = 0
       view.rerender(<h.ChatView {...h.props} />)
-      expect(host.scrollTop).toBe(1_500)
+      await waitFor(() => { expect(host.scrollTop).toBe(maxScroll(2_000, 500)) })
     } finally {
       rect.mockRestore()
       host.remove()
@@ -1216,7 +1377,7 @@ describe('ChatView', () => {
       view.rerender(<div />)
       host.scrollTop = 0
       view.rerender(<h.ChatView {...h.props} />)
-      expect(host.scrollTop).toBe(2000)
+      expect(host.scrollTop).toBe(maxScroll(2_000, 500))
     } finally {
       host.remove()
     }

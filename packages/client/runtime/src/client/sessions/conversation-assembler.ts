@@ -205,7 +205,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
         this.timelineDirty = true
         publication = 'immediate'
       }
-      this.replayContexts(this.refreshMatchLocations(changed))
+      this.refreshLocationContexts(this.refreshMatchLocations(changed))
       if (changed.size > 0) publication = 'immediate'
     } else {
       this.locationIndex.appendNonBoundary(input.event)
@@ -527,6 +527,20 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       this.dirty.add(context)
     }
     for (const [kind, contexts] of startsByKind) this.indexStartedContexts(kind, contexts)
+  }
+
+  private refreshLocationContexts(contexts: ReadonlySet<InternalContext>): void {
+    const replay = new Set<InternalContext>()
+    for (const context of contexts) {
+      if (context.definition.locationUpdates !== 'project') {
+        replay.add(context)
+        continue
+      }
+      context.revision++
+      this.revised.add(context)
+      this.dirty.add(context)
+    }
+    this.replayContexts(replay)
   }
 
   private replayContexts(contexts: ReadonlySet<InternalContext>): void {

@@ -5,7 +5,7 @@
 // the details panel's Output section.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
@@ -24,6 +24,7 @@ import { DetailsPanel } from '@shres-code/shres-code-client-ui-conversation/src/
 import { FileMutationRow, fileMutationToolview } from '../src/client/tool/toolviews/file-mutation-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 afterEach(cleanup)
 
@@ -117,7 +118,7 @@ describe('diffCardModel', () => {
 
 describe('chat row diff body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'edit', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'edit', block, openFile: vi.fn(), t, ...toolDisclosureProps(),
   })
 
   it('the expanded body is the applied diff, capped tighter than the panel', () => {
@@ -142,6 +143,7 @@ describe('chat row diff body', () => {
     // args body is the fallback the diff card must not have replaced.
     const view = render(<GenericToolCard {...{
       callId: 'c1', toolName: 'some_tool', openFile: vi.fn(), t,
+      ...toolDisclosureProps(),
       block: settled({
         call: { name: 'some_tool', argsRaw: '{"foo":"bar"}' },
         callView: null, resultView: null,
@@ -167,6 +169,7 @@ describe('FileMutationRow diff card', () => {
     callId: 'c1', toolName, block, openFile: vi.fn(), cwd: '/w/app',
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
     t,
+    ...toolDisclosureProps(),
   } as unknown as FileMutationRowProps)
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */

@@ -12,6 +12,7 @@ import { CordisDefineRow } from './CordisDefineRow.tsx'
 import { CordisRunRow } from './CordisRunRow.tsx'
 import { CordisPanel } from './CordisPanel.tsx'
 import { createCordisInventory } from './inventory.ts'
+import { createCordisDefineViewStore } from './define-view-store.ts'
 import { CordisRunCardRegistry } from './run-card-index.ts'
 import type { CordisDynamicPort } from './dynamic-port.ts'
 import type { CordisCardFace, CordisPanelFace, CordisRunCardFace } from './slots.ts'
@@ -64,6 +65,7 @@ export function apply(ctx: ClientContext): void {
   const runner = ctx.dynamicCordisRunner
   const loaded = { getSnapshot: () => runner.getSnapshot(), subscribe: (fn: () => void) => runner.subscribe(fn) }
   const runCards = new CordisRunCardRegistry()
+  const defineViewStore = createCordisDefineViewStore()
 
   ctx.effect(() => inventory.subscribe(() => {
     const snapshot = inventory.getSnapshot()
@@ -116,6 +118,7 @@ export function apply(ctx: ClientContext): void {
     name: 'tool.call.toolview',
     key: 'cordis_define',
     locale: NS,
+    store: defineViewStore,
     inject: cardFace,
   }, CordisDefineRow))
 

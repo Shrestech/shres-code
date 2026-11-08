@@ -132,6 +132,14 @@ export interface DesktopHostReady {
   readonly appVersion: string
 }
 
+/** Redacted facts accompanying the first fatal host callback. */
+export interface DesktopHostFailureDetails {
+  readonly reason: 'fatal' | 'process-exit' | 'process-stopped' | 'transport'
+  readonly exitCode?: number
+  readonly signal?: NodeJS.Signals
+  readonly hostVersion?: string
+}
+
 /** One desktop host child running under an owned Node-compatible executable. */
 export class DesktopHostProcess {
   private child: ChildProcess | undefined
@@ -152,6 +160,7 @@ export class DesktopHostProcess {
   private exitPromise: Promise<void> | undefined
   private stderr = ''
   private failureReported = false
+  private readyVersion: string | undefined
 
   /**
    * @param executable - Node.js or Electron executable, or undefined for SHRES_DESKTOP_NODE_BINARY and then this process's own executable.
@@ -159,7 +168,7 @@ export class DesktopHostProcess {
    * @param projectDir - active or staged desktop plugin profile.
    * @param inspectPort - optional loopback inspector port for workspace development.
    * @param environment - child environment; Node resolution and desktop-shell overrides are removed.
-   * @param onFailure - receives the first fatal child or transport failure, including after readiness.
+   * @param onFailure - receives the first fatal child or transport failure and redacted lifecycle facts, including after readiness.
    */
   constructor(
     private readonly executable: string | undefined,
@@ -167,7 +176,7 @@ export class DesktopHostProcess {
     private readonly projectDir: string,
     private readonly inspectPort?: number,
     private readonly environment: NodeJS.ProcessEnv = process.env,
-    private readonly onFailure?: (error: Error) => void,
+    private readonly onFailure?: (error: Error, details: DesktopHostFailureDetails) => void,
   ) {}
 
   /**
@@ -229,10 +238,21 @@ export class DesktopHostProcess {
     })
     child.once('error', (error) => { this.fail(error) })
     this.exitPromise = new Promise<void>((resolve) => {
-      child.once('close', (code) => {
+      child.once('close', (code, signal) => {
         const suffix = this.stderr.trim() === '' ? '' : `: ${this.stderr.trim()}`
-        if (code !== 0 && code !== null) this.fail(new Error(`shres desktop host exited with ${String(code)}${suffix}`))
-        else this.fail(new Error(`shres desktop host stopped${suffix}`))
+        if (code !== 0 && code !== null) {
+          this.fail(new Error(`shres desktop host exited with ${String(code)}${suffix}`), {
+            reason: 'process-exit',
+            exitCode: code,
+            ...signal === null ? {} : { signal },
+          })
+        } else {
+          this.fail(new Error(`shres desktop host stopped${suffix}`), {
+            reason: 'process-stopped',
+            ...code === null ? {} : { exitCode: code },
+            ...signal === null ? {} : { signal },
+          })
+        }
         resolve()
       })
     })
@@ -532,21 +552,26 @@ export class DesktopHostProcess {
   private handleMessage(message: DesktopHostEvent): void {
     switch (message.type) {
       case 'ready':
+        this.readyVersion = message.appVersion
         this.readyResolve(message)
         return
       case 'fatal':
-        this.fail(new Error(message.message))
+        this.fail(new Error(message.message), { reason: 'fatal' })
         return
       default:
         message satisfies never
     }
   }
 
-  private fail(error: Error): void {
+  private fail(error: Error, details: Omit<DesktopHostFailureDetails, 'hostVersion'> = { reason: 'transport' }): void {
     this.readyReject(error)
     if (!this.failureReported) {
       this.failureReported = true
-      try { this.onFailure?.(error) } catch (listenerError) {
+      const failure: DesktopHostFailureDetails = {
+        ...details,
+        ...this.readyVersion === undefined ? {} : { hostVersion: this.readyVersion },
+      }
+      try { this.onFailure?.(error, failure) } catch (listenerError) {
         console.error('shres desktop host failure listener failed', listenerError)
       }
     }

@@ -119,7 +119,10 @@ function onRequestFrame(frame) {
       await expect(host.fetch(new Request('shres-app://app/'))).rejects.toThrow('plugin unavailable')
       await host.stop()
       expect(failure).toHaveBeenCalledTimes(1)
-      expect(failure).toHaveBeenCalledWith(new Error('plugin unavailable'))
+      expect(failure).toHaveBeenCalledWith(new Error('plugin unavailable'), {
+        reason: 'fatal',
+        hostVersion: '1.0.0',
+      })
     } finally { await host.stop() }
   })
 

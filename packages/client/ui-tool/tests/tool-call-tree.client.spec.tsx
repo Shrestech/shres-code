@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 /** ToolCallTree-owned root/subcall markers and selection projection. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { ConversationSnapshot, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import type { ToolTreeProps } from '../src/client/contract/slots.ts'
 import { ToolCallTree } from '../src/client/tool/ToolCallTree.tsx'
+import { createToolDisclosureStore } from '../src/client/stores.ts'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(cleanup)
@@ -21,6 +23,7 @@ const root = (callId: string, call: ToolResultNode['call']): ToolResultNode => (
 function props(
   block: ToolResultNode,
   selectedCallId?: string,
+  disclosure = createToolDisclosureStore().create('tool-test'),
 ): ToolTreeProps {
   const snapshot = {} as ConversationSnapshot
   const useSession = ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
@@ -44,6 +47,8 @@ function props(
     inspectCall: vi.fn(),
     forkAt: vi.fn(),
     fileMentions: vi.fn(),
+    useStore: bindSnapshotSelector(disclosure),
+    actions: disclosure.actions,
     t,
   } as unknown as ToolTreeProps
 }
@@ -77,5 +82,22 @@ describe('ToolCallTree', () => {
     expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
     expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
     expect(nests).toHaveLength(2)
+  })
+
+  it('restores a nested generic call disclosure after its virtual row remounts', () => {
+    const leaf = root('parent:leaf', { name: 'mystery_leaf', argsRaw: '{"value":1}' })
+    const block = { ...root('parent', { name: 'mystery_root', argsRaw: '{"value":0}' }), subCalls: [leaf] }
+    const disclosure = createToolDisclosureStore().create('tool-test')
+    const view = render(<ToolCallTree {...props(block, undefined, disclosure)} />)
+    const leafRow = view.container.querySelector('[data-chat-call-id="parent:leaf"]')!
+    const leafToggle = leafRow.querySelector('[aria-expanded]') as HTMLElement
+    fireEvent.click(leafToggle)
+    expect(leafToggle.getAttribute('aria-expanded')).toBe('true')
+
+    view.unmount()
+    const restored = render(<ToolCallTree {...props(block, undefined, disclosure)} />)
+    const restoredToggle = restored.container
+      .querySelector('[data-chat-call-id="parent:leaf"] [aria-expanded]') as HTMLElement
+    expect(restoredToggle.getAttribute('aria-expanded')).toBe('true')
   })
 })

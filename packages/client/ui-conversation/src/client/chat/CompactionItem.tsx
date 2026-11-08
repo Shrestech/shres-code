@@ -6,7 +6,7 @@
 // cited `compaction/summary` event, and a window cut that left that event outside makes the row
 // non-expandable rather than empty.
 
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import type { CompactionSummaryNode } from '@shres-code/shres-code-client-runtime/client'
 import {
   IconApiOutline14,
@@ -25,6 +25,10 @@ interface CompactionItemProps {
   fallbackSummary?: string | null
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
+  /** Session-scoped disclosure state for this Chat node. */
+  expanded: boolean
+  /** Toggle the session-scoped disclosure state. */
+  onToggle: () => void
 }
 
 /**
@@ -37,8 +41,9 @@ export const CompactionItem = memo(function CompactionItem({
   title,
   fallbackSummary,
   t,
+  expanded,
+  onToggle,
 }: CompactionItemProps) {
-  const [expanded, setExpanded] = useState(false)
   const expandable = node.summary !== null
   const open = expandable && expanded
   const summary = node.shadowedItemCount !== null && node.shadowedTokenCount !== null
@@ -55,7 +60,7 @@ export const CompactionItem = memo(function CompactionItem({
         className={css.compactionButton}
         disabled={!expandable}
         aria-expanded={expandable ? open : undefined}
-        onClick={() => { setExpanded(value => !value) }}
+        onClick={onToggle}
       >
         <span className={css.compactionLeading} aria-hidden>
           <span className={css.compactionContextIcon} data-compaction-icon="context">

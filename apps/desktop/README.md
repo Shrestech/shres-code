@@ -17,6 +17,8 @@ pnpm --filter @shres-code/shres-code-desktop run smoke
 
 The smoke check uses the app's own Electron executable in Node mode to execute the bundled terminal helper and boot a disposable profile at `$SHRES_HOME/profiles/desktop`. It reads the injected boot graph, fetches the boot-graph URLs for the module loader, client runtime, and layout bundles, creates a scratch workspace over the production transport, observes its event, and checks shutdown. The host entrypoint heals the installed dependency fallback under `$SHRES_HOME/profiles/node_modules` from the desktop-host manifest before it loads the profile. CI repeats the smoke against the app extracted from the ZIP. `pnpm run dev:desktop` builds and launches from workspace sources; `pnpm run start:desktop` launches existing development outputs.
 
+The shell writes the latest renderer and host lifecycle diagnostic to Electron's logs directory (`app.getPath('logs')/shres-desktop-diagnostic.json`). The current lifecycle event is overwritten rather than appended, while the same bounded record retains the latest `unresponsive`, `render-process-gone`, or `host-failure` event after a later `responsive` event. It contains only event facts, versions, and labeled main-process memory in bytes and renderer memory in kilobytes; it never stores conversation or request content.
+
 ## CI artifacts and releases
 
 The [desktop workflow](../../.github/workflows/desktop.yml) builds and checks pull requests and pushes to `master` and `develop`. Download the `shres-code-mac-arm64` artifact from its Actions run. It contains DMG/ZIP files and SHA-256 checksums, retained for seven days. Archiving the application inside the ZIP preserves executable permissions and Electron framework links across artifact download.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { RequestView } from '@shres-code/shres-code-client-runtime/client'
+import type {
+  AssistantMessageNode, PartialAssistant, RequestView,
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   TrajectoryContribution, TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
 } from '../src/client/trajectory-contract.ts'
@@ -15,6 +17,21 @@ function assistantRequest(startSeq: number, step: number): Extract<RequestView, 
     completedAt: startSeq + 1,
     status: 'complete',
   }
+}
+
+function assistantNode(seq: number, text: string): AssistantMessageNode {
+  return {
+    kind: 'assistant',
+    seq,
+    time: seq,
+    turn: 1,
+    step: 1,
+    blocks: [{ kind: 'text', text }],
+  }
+}
+
+function partialAssistant(text: string): PartialAssistant {
+  return { turn: 1, step: 2, blocks: [{ kind: 'text', text }] }
 }
 
 function contribution(
@@ -233,5 +250,91 @@ describe('TrajectorySnapshotBuilder', () => {
     })
     expect(builder.apply({ upserts: [middle] }).requests.map(request => request.startSeq))
       .toEqual([1, 3, 5])
+  })
+
+  it('updates a streamed partial without rebuilding historical nodes, locations, or requests', () => {
+    const prompt = {
+      config: { provider: 'test', model: 'test' },
+      system: 'system',
+      tools: [],
+    }
+    const historical = contribution('assistant:1', 1, {
+      kind: 'assistant',
+      node: assistantNode(1, 'history'),
+      partial: null,
+      request: assistantRequest(1, 1),
+    })
+    const activeRequest = {
+      ...assistantRequest(5, 2),
+      prompt,
+      requestConfig: prompt.config,
+      promptChange: { seq: 2, time: 2, kind: 'initial' as const },
+    }
+    const active = contribution('assistant:2', 5, {
+      kind: 'assistant',
+      partial: partialAssistant('a'),
+      request: activeRequest,
+    })
+    const builder = new TrajectorySnapshotBuilder()
+    const first = builder.replace({ nodes: [historical, active] })
+    const updated = {
+      ...active,
+      data: {
+        kind: 'assistant' as const,
+        partial: partialAssistant('ab'),
+        request: { ...activeRequest },
+      },
+    }
+
+    const second = builder.apply({ upserts: [updated] })
+
+    expect(second.eventNodes).toBe(first.eventNodes)
+    expect(second.eventLocations).toBe(first.eventLocations)
+    expect(second.requests).toBe(first.requests)
+    expect(second.requests[1]).toBe(first.requests[1])
+    expect(second.requests[1]).toMatchObject({
+      startSeq: 5,
+      startedAt: 5,
+      prompt,
+      requestConfig: prompt.config,
+      promptChange: activeRequest.promptChange,
+    })
+    expect(second.partial).toEqual(updated.data.partial)
+    expect(second.partial).not.toBe(first.partial)
+
+    const withUsage = {
+      ...updated,
+      data: {
+        ...updated.data,
+        partial: partialAssistant('abc'),
+        request: { ...activeRequest, usage: { inputTokens: 3, outputTokens: 2 } },
+      },
+    }
+    const third = builder.apply({ upserts: [withUsage] })
+    expect(third.eventNodes).toBe(second.eventNodes)
+    expect(third.eventLocations).toBe(second.eventLocations)
+    expect(third.requests).not.toBe(second.requests)
+    expect(third.requests[0]).toBe(second.requests[0])
+    expect(third.requests[1]).not.toBe(second.requests[1])
+    expect(third.requests[1]).toMatchObject({ usage: { inputTokens: 3, outputTokens: 2 } })
+    expect(third.partial).toEqual(withUsage.data.partial)
+
+    const settled = {
+      ...withUsage,
+      data: {
+        kind: 'assistant' as const,
+        node: assistantNode(8, 'abc'),
+        partial: null,
+        request: { ...activeRequest, completedAt: 8, status: 'complete' as const, resultSeq: 8 },
+      },
+    }
+    const fourth = builder.apply({ upserts: [settled] })
+    expect(fourth.eventNodes).not.toBe(third.eventNodes)
+    expect(fourth.eventNodes).toEqual([assistantNode(1, 'history'), assistantNode(8, 'abc')])
+    expect(fourth.partial).toBeNull()
+    expect(fourth.requests).toMatchObject([
+      {},
+      { startSeq: 5, status: 'complete', resultSeq: 8 },
+    ])
   })
 })

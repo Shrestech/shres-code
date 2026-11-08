@@ -2,13 +2,20 @@
 /** Provider-hosted calls have named, neutral summaries rather than local execution controls. */
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
+import { createChatRowViewingStore } from '../src/client/stores.ts'
 import { en } from '../src/client/locales.ts'
 
 const t = makeTranslate(en, commonEn)
 afterEach(cleanup)
+
+function rowProps(nodeKey = 'hosted-tools') {
+  const store = createChatRowViewingStore().create('hosted-tools')
+  return { nodeKey, useStore: bindSnapshotSelector(store), actions: store.actions }
+}
 
 describe('hosted search transcript', () => {
   it.each([
@@ -18,7 +25,7 @@ describe('hosted search transcript', () => {
     ['x_thread_fetch', 'thread'],
     ['x_future_search', 'x_future_search'],
   ])('names %s without claiming completion', (name, operation) => {
-    render(<AssistantMarkdown t={t} streaming={false} blocks={[
+    render(<AssistantMarkdown {...rowProps()} t={t} streaming={false} blocks={[
       { kind: 'server-tool-call', block: { type: 'server-tool-call', kind: 'x_search', name } },
     ]} />)
     expect(screen.getByText('Hosted X search · ' + operation)).toBeTruthy()
@@ -28,7 +35,7 @@ describe('hosted search transcript', () => {
   })
 
   it('shows a failure only when the provider reported it', () => {
-    render(<AssistantMarkdown t={t} streaming={false} blocks={[
+    render(<AssistantMarkdown {...rowProps()} t={t} streaming={false} blocks={[
       { kind: 'server-tool-call', block: { type: 'server-tool-call', kind: 'x_search', status: 'failed' } },
     ]} />)
     expect(screen.getByText('Hosted X search')).toBeTruthy()
@@ -36,7 +43,7 @@ describe('hosted search transcript', () => {
   })
 
   it('shows the web category and preserves names of provider extensions', () => {
-    render(<AssistantMarkdown t={t} streaming={false} blocks={[
+    render(<AssistantMarkdown {...rowProps()} t={t} streaming={false} blocks={[
       { kind: 'server-tool-call', block: { type: 'server-tool-call', kind: 'web_search', name: 'web_search', status: 'completed' } },
       { kind: 'server-tool-call', block: { type: 'server-tool-call', kind: 'custom', name: 'x_keyword_search' } },
       { kind: 'server-tool-call', block: { type: 'server-tool-call', kind: 'custom' } },
