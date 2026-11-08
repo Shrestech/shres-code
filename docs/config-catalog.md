@@ -554,6 +554,27 @@ export interface Config {
 
 Source: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
+<a id="shres-codeshres-code-client-ui-conversation"></a>
+
+## `@shres-code/shres-code-client-ui-conversation`
+
+```ts config-catalog
+/** Host composition defaults for the measured Chat row window. */
+export type Config = ChatVirtualizationOptions
+
+/** Raw Chat row-window values accepted by Host and browser plugin configuration. */
+export interface ChatVirtualizationOptions {
+  /** Number of extra mounted rows kept on either side of the visible window. */
+  overscanRows?: number
+  /** Estimated height in pixels used before a Chat row is measured. */
+  estimatedRowHeight?: number
+  /** Initial viewport height in pixels used before the scrollport is measured. */
+  initialViewportHeight?: number
+}
+```
+
+Source: [`packages/client/ui-conversation/src/index.ts:12`](../packages/client/ui-conversation/src/index.ts)
+
 <a id="shres-codeshres-code-code-runtime-worker-thread"></a>
 
 ## `@shres-code/shres-code-code-runtime-worker-thread`
@@ -1037,10 +1058,14 @@ export interface Config {
    * @default 524288
    */
   fileViewMaxBytes?: number
+  /** Maximum buffered frames per live mux or host event stream; overflow closes that stream for reconnect. */
+  eventQueueMaxFrames?: number
+  /** Maximum serialized server-request bytes buffered per live mux or host event stream; overflow closes that stream for reconnect. */
+  eventQueueMaxBytes?: number
 }
 ```
 
-Source: [`packages/host/apiproxy/src/index.ts:41`](../packages/host/apiproxy/src/index.ts)
+Source: [`packages/host/apiproxy/src/index.ts:47`](../packages/host/apiproxy/src/index.ts)
 
 <a id="shres-codeshres-code-host-directory-picker-browse"></a>
 
@@ -5413,7 +5438,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-agent-team` ([`packages/client/ui-agent-team/src/index.ts`](../packages/client/ui-agent-team/src/index.ts))
 - `@shres-code/shres-code-client-ui-browserskill` ([`packages/client/ui-browserskill/src/index.ts`](../packages/client/ui-browserskill/src/index.ts))
 - `@shres-code/shres-code-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
-- `@shres-code/shres-code-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
 - `@shres-code/shres-code-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
 - `@shres-code/shres-code-client-ui-deliverables` — requires `systemPrompt` ([`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts))
 - `@shres-code/shres-code-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))

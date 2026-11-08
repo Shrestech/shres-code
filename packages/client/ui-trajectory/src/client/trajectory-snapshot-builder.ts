@@ -63,6 +63,40 @@ function applyHeader(
     }
 }
 
+function mergeAssistantRequest(
+  previous: AssistantRequest,
+  next: AssistantRequest,
+): AssistantRequest {
+  const prompt = next.prompt ?? previous.prompt
+  const requestConfig = next.requestConfig ?? previous.requestConfig
+  const promptChange = next.promptChange ?? previous.promptChange
+  return {
+    ...next,
+    ...(prompt === undefined ? {} : { prompt }),
+    ...(requestConfig === undefined ? {} : { requestConfig }),
+    ...(promptChange === undefined ? {} : { promptChange }),
+  }
+}
+
+function sameAssistantRequest(left: AssistantRequest, right: AssistantRequest): boolean {
+  return left.startSeq === right.startSeq
+    && left.turn === right.turn
+    && left.step === right.step
+    && left.startedAt === right.startedAt
+    && left.completedAt === right.completedAt
+    && left.status === right.status
+    && left.error === right.error
+    && left.provenance === right.provenance
+    && left.requestConfig === right.requestConfig
+    && left.usage === right.usage
+    && left.resultSeq === right.resultSeq
+    && left.prompt === right.prompt
+    && left.promptChange === right.promptChange
+    && left.retry === right.retry
+    && left.maxRetries === right.maxRetries
+    && left.retryDelayMs === right.retryDelayMs
+}
+
 function withRequestConfig(
   node: AssistantMessageNode,
   prompt: ConversationPromptSnapshot | undefined,
@@ -149,6 +183,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
   private contributions: TrajectoryConversationViewNode[] = []
   private stale = false
   private cached: TrajectorySnapshot | undefined
+  private partialRequestIndex: number | undefined
   readonly empty = EMPTY_TRAJECTORY_SNAPSHOT
 
   replace(input: {
@@ -208,6 +243,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
   }
 
   private applyNodes(upserts: readonly TrajectoryConversationViewNode[]): void {
+    if (this.applyPartialOnly(upserts)) return
     let structural = false
     for (const node of upserts) {
       const previous = this.nodes.get(node.key)
@@ -222,6 +258,53 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     }
     if (structural) this.rebuildContributions()
     this.stale = true
+  }
+
+  private applyPartialOnly(upserts: readonly TrajectoryConversationViewNode[]): boolean {
+    if (upserts.length !== 1 || this.stale || this.cached === undefined) return false
+    const node = upserts[0]
+    if (node === undefined) return false
+    const previous = this.nodes.get(node.key)
+    if (previous === undefined || previous.anchorSeq !== node.anchorSeq
+      || previous.location !== node.location) return false
+    const previousData = previous.data
+    const nextData = node.data
+    if (previousData.kind !== 'assistant' || nextData.kind !== 'assistant'
+      || previousData.node !== undefined || nextData.node !== undefined
+      || nextData.partial === null || nextData.request === undefined
+      || previousData.request === undefined || this.cached.partial !== previousData.partial) {
+      return false
+    }
+    const previousRawRequest = previousData.request
+    const nextRawRequest = nextData.request
+    if (previousRawRequest.startSeq !== nextRawRequest.startSeq
+      || previousRawRequest.turn !== nextRawRequest.turn
+      || previousRawRequest.step !== nextRawRequest.step
+      || previousRawRequest.startedAt !== nextRawRequest.startedAt) return false
+    const requestIndex = this.partialRequestIndex
+    if (requestIndex === undefined) return false
+    const previousRequest = this.cached.requests[requestIndex]
+    if (previousRequest?.purpose !== 'assistant') return false
+    if (previousRequest.startSeq !== nextRawRequest.startSeq
+      || previousRequest.turn !== nextRawRequest.turn
+      || previousRequest.step !== nextRawRequest.step) return false
+    const nextRequest = mergeAssistantRequest(previousRequest, nextRawRequest)
+    if (previousRequest.status !== nextRequest.status
+      || previousRequest.completedAt !== nextRequest.completedAt
+      || previousRequest.error !== nextRequest.error
+      || previousRequest.resultSeq !== nextRequest.resultSeq) return false
+    const requests = sameAssistantRequest(previousRequest, nextRequest)
+      ? this.cached.requests
+      : [...this.cached.requests.slice(0, requestIndex), nextRequest, ...this.cached.requests.slice(requestIndex + 1)]
+    const position = this.positions.get(node.key)
+    if (position === undefined) return false
+    this.nodes.set(node.key, node)
+    this.contributions[position] = node
+    if (this.cached.partial !== nextData.partial || requests !== this.cached.requests) {
+      this.cached = { ...this.cached, partial: nextData.partial, requests }
+    }
+    this.stale = false
+    return true
   }
 
   private buildSnapshot(): TrajectorySnapshot {
@@ -241,6 +324,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     let previousHeader: TrajectoryRequestHeaderState | undefined
     let previousTools: ReadonlyMap<string, ToolSchema> = new Map()
     let partial: TrajectorySnapshot['partial'] = null
+    let partialRequestKey: Pick<AssistantRequest, 'startSeq' | 'turn' | 'step'> | undefined
     const runningCalls: TrajectorySnapshot['runningCalls'][number][] = []
     const decisions: TrajectoryShieldDecision[] = []
     const jspace: TrajectoryJSpaceBadge[] = []
@@ -264,7 +348,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
           ? undefined
           : headerFor(data.request, headersByStep, previousHeader)
         if (data.node !== undefined) finalized.push(withRequestConfig(data.node, header?.prompt))
-        if (data.partial !== null) partial = data.partial
+        if (data.partial !== null) {
+          partial = data.partial
+          partialRequestKey = data.request === undefined ? undefined : data.request
+        }
         if (data.request !== undefined) {
           const includeChange = header?.change !== undefined
             && !consumedPromptChanges.has(header.seq)
@@ -313,6 +400,12 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     }
 
     requests.sort((left, right) => left.startSeq - right.startSeq)
+    this.partialRequestIndex = partial === null || partialRequestKey === undefined
+      ? undefined
+      : requests.findIndex(request => request.purpose === 'assistant'
+        && request.startSeq === partialRequestKey.startSeq
+        && request.turn === partialRequestKey.turn
+        && request.step === partialRequestKey.step)
     interruptCompactions(requests, boundaries)
     applyTurnErrors(requests, turnEndings)
     finalized.sort((left, right) => left.seq - right.seq)

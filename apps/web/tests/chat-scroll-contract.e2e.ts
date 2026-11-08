@@ -1,7 +1,6 @@
-// Browser geometry contracts for a long Chat transcript. These scenarios are
-// deliberately virtualizer-neutral: they assert semantic-row position,
-// bottom ownership, interaction state, and the real outer scroll host rather
-// than DOM cardinality or implementation-specific spacer markup.
+// Long Chat geometry and bounded mounting through the assembled browser app:
+// semantic-row position, bottom ownership, retained interaction state, and
+// the real outer scroll host.
 import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,6 +29,7 @@ const RESTORE_SESSION_B_ID = 'chat-scroll-restore-b-e2e'
 const REPLAY_CONTEXT_WINDOW = 10_000_000
 const STREAM_PACE_MS = 24
 const GEOMETRY_TOLERANCE = 2
+const MAX_MOUNTED_CHAT_ROWS = 160
 const LIVE_TEXT_PROMPT = 'CHAT_SCROLL_LIVE_USER Continue this long conversation while I inspect older history.'
 const LIVE_TEXT_FIRST = 'CHAT_SCROLL_LIVE_FIRST'
 const LIVE_TEXT_DONE = 'CHAT_SCROLL_LIVE_DONE'
@@ -251,15 +251,31 @@ function scrollGeometry(page: Page): Promise<ScrollGeometry> {
 }
 
 /**
- * Rendered transcript rows in the loaded window. The stats strip cannot serve
+ * Logical Chat nodes in the loaded window. The stats strip cannot serve
  * as this probe: its turn/step counts ride the whole-log sessionStats
- * projection and stay fixed across paging by design, while the row count is
+ * projection and stay fixed across paging by design, while the node count is
  * exactly what grows when an older page prepends or a live turn streams in.
  * @param page - the scenario page.
- * @returns the number of mounted chat flow rows.
+ * @returns the number of loaded logical chat nodes.
  */
-async function loadedFlowRows(page: Page): Promise<number> {
-  return page.locator('[data-chat-flow-key]').count()
+async function loadedChatNodes(page: Page): Promise<number> {
+  return Number(await page.locator('[data-chat-flow]').getAttribute('data-chat-node-count'))
+}
+
+interface ChatMountSnapshot {
+  readonly logicalTurns: number
+  readonly logicalNodes: number
+  readonly mountedRows: number
+  readonly virtualRows: number
+}
+
+async function chatMountSnapshot(page: Page): Promise<ChatMountSnapshot> {
+  return page.locator('[data-chat-flow]').evaluate(flow => ({
+    logicalTurns: Number(flow.getAttribute('data-chat-turn-count') ?? 0),
+    logicalNodes: Number(flow.getAttribute('data-chat-node-count') ?? 0),
+    mountedRows: flow.querySelectorAll('[data-chat-flow-key]').length,
+    virtualRows: flow.querySelectorAll('[data-chat-virtual-item]').length,
+  }))
 }
 
 async function openSeed(page: Page, fixture: ChatScrollFixture, tailMarker?: string): Promise<void> {
@@ -429,9 +445,9 @@ async function loadEarlierWithAnchor(page: Page): Promise<void> {
   const older = page.getByRole('button', { name: 'Load earlier', exact: true })
   await older.waitFor({ timeout: 10_000 })
   const anchor = await visibleFlowAnchor(page)
-  const before = await loadedFlowRows(page)
+  const before = await loadedChatNodes(page)
   await older.click()
-  await expect.poll(() => loadedFlowRows(page), { timeout: 30_000 }).toBeGreaterThan(before)
+  await expect.poll(() => loadedChatNodes(page), { timeout: 30_000 }).toBeGreaterThan(before)
   await nextPaint(page)
   await expectSameFlowTop(page, anchor)
 }
@@ -502,7 +518,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await world.page.getByRole('button', { name: 'Send message', exact: true }).click()
         await world.page.getByText(LIVE_TEXT_FIRST, { exact: false }).last().waitFor({ timeout: 15_000 })
         await wheelToHistoryStart(world.page)
-        const beforeRows = await loadedFlowRows(world.page)
+        const beforeRows = await loadedChatNodes(world.page)
         await world.page.getByRole('button', { name: 'Load earlier', exact: true }).click()
         await expect.poll(() => held, { timeout: 10_000 }).toBe(true)
 
@@ -515,7 +531,7 @@ describe('web e2e: long Chat scroll contract', () => {
         ).toBeGreaterThan(chunksAfterAnchor + 5)
 
         releaseHistory()
-        await expect.poll(() => loadedFlowRows(world.page), { timeout: 30_000 }).toBeGreaterThan(beforeRows)
+        await expect.poll(() => loadedChatNodes(world.page), { timeout: 30_000 }).toBeGreaterThan(beforeRows)
         await nextPaint(world.page)
         await expectSameFlowTop(world.page, readerAnchor)
       } finally {
@@ -524,6 +540,7 @@ describe('web e2e: long Chat scroll contract', () => {
 
       await settled
       await expect.poll(() => world.page.locator('[data-streaming="true"]').count(), { timeout: 15_000 }).toBe(0)
+      await world.page.getByRole('button', { name: 'Back to bottom', exact: true }).click()
       await world.page.getByText(LIVE_TEXT_DONE, { exact: false }).last().waitFor({ timeout: 15_000 })
       await world.page.unroute('**/api/session.history')
 
@@ -541,6 +558,24 @@ describe('web e2e: long Chat scroll contract', () => {
       expect(await world.page.locator('[data-conversation-scroll]')
         .getByText(HISTORY_FIXTURE.markers.user(1), { exact: false }).count()).toBe(1)
       expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(0)
+      const mounted = await chatMountSnapshot(world.page)
+      expect(mounted.logicalTurns).toBeGreaterThanOrEqual(HISTORY_FIXTURE.turns)
+      expect(mounted.mountedRows).toBeLessThan(mounted.logicalNodes)
+      expect(mounted.mountedRows).toBeLessThanOrEqual(MAX_MOUNTED_CHAT_ROWS)
+      expect(mounted.virtualRows).toBeGreaterThan(0)
+      expect({
+        logicalHistoryComplete: mounted.logicalTurns >= HISTORY_FIXTURE.turns,
+        logicalNodesRetained: mounted.logicalNodes > mounted.mountedRows,
+        mountedRowsBounded: mounted.mountedRows <= MAX_MOUNTED_CHAT_ROWS,
+        virtualWindowActive: mounted.virtualRows > 0,
+      }).toMatchInlineSnapshot(`
+        {
+          "logicalHistoryComplete": true,
+          "logicalNodesRetained": true,
+          "mountedRowsBounded": true,
+          "virtualWindowActive": true,
+        }
+      `)
       assertClean(world)
     })
   }, 180_000)
@@ -625,6 +660,7 @@ describe('web e2e: long Chat scroll contract', () => {
       await expect.poll(() => liveRow.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
       await expectSameFlowTop(world.page, toolAnchor)
       await wheelToHistoryStart(world.page)
+      await expect.poll(() => liveRow.count(), { timeout: 10_000 }).toBe(0)
       await world.page.getByRole('button', { name: 'Back to bottom', exact: true }).click()
       await expectBottom(world.page)
       await wheelUntilMounted(world.page, liveRowSelector, -1_100)

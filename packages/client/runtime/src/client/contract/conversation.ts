@@ -173,6 +173,13 @@ export interface ConversationNodeDefinition<State = unknown> {
   /** Sole view target owned by this Definition; omitted for state-only Contexts. */
   readonly target?: string
   /**
+   * Live Turn/Step metadata changes replay State by default. `project` preserves
+   * State and rebuilds Location data and view Nodes; its reducers must not
+   * retain or derive State from changing Location metadata. History and
+   * predecessor changes still replay the Context.
+   */
+  readonly locationUpdates?: 'replay' | 'project'
+  /**
    * Extract this Definition's stable business identity from one event.
    * @param event - raw Session event; no Context or history access is available.
    * @returns identity and lifecycle role, or null when unrelated.

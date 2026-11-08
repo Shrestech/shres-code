@@ -108,6 +108,7 @@ export type {
   ProjectionsBaseline, ProjectionValueStore, SessionProjectionMap, UseProjection,
 } from './sessions/projection-store.ts'
 export type { SessionId } from '@shres-code/shres-code-client-connection/client'
+export type { CallId } from '@shres-code/shres-code-llm/brand'
 
 /** Client-side Cordis context after declaration merging. */
 export type ClientContext = Context

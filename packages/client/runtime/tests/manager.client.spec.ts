@@ -878,6 +878,57 @@ describe('remaining branches', () => {
 })
 
 describe('connected generation', () => {
+  it('keeps a replayed pending interaction delivered before onConnected on an opened session', async () => {
+    const api = new FakeApiClient()
+    const manager = new SessionManager(api, fakeRemote())
+    const session = manager.get(S1)
+    await session.open()
+
+    manager.handleMuxEnvelope({
+      rpcId: 'approval-1' as never,
+      payload: { type: 'approval/requested', sessionId: S1, approvalId: 'ap1' as never, toolName: 'rm' },
+    })
+    expect(session.getSnapshot().pending).toHaveLength(1)
+
+    manager.handleDisconnected()
+    expect(session.getSnapshot().pending).toEqual([])
+
+    // The mux stream can replay this frame before the readiness handshake calls onConnected.
+    manager.handleMuxEnvelope({
+      rpcId: 'approval-1' as never,
+      payload: { type: 'approval/requested', sessionId: S1, approvalId: 'ap1' as never, toolName: 'rm' },
+    })
+    expect(session.getSnapshot().pending).toHaveLength(1)
+
+    manager.handleConnected()
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(2) })
+    expect(session.getSnapshot().pending).toMatchObject([{ key: 'a:approval-1', kind: 'approval' }])
+  })
+
+  it('clears transient agent errors at generation death and keeps a replayed error', async () => {
+    const api = new FakeApiClient()
+    const manager = new SessionManager(api, fakeRemote())
+    const session = manager.get(S1)
+    await session.open()
+
+    manager.handleHostEnvelope({
+      rpcId: 'stale-error' as never,
+      payload: { type: 'host/agent-error', sessionId: S1, message: 'stale' },
+    })
+    expect(session.getSnapshot().lastAgentError).toBe('stale')
+
+    manager.handleDisconnected()
+    expect(session.getSnapshot().lastAgentError).toBeNull()
+
+    manager.handleHostEnvelope({
+      rpcId: 'fresh-error' as never,
+      payload: { type: 'host/agent-error', sessionId: S1, message: 'fresh' },
+    })
+    manager.handleConnected()
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(2) })
+    expect(session.getSnapshot().lastAgentError).toBe('fresh')
+  })
+
   it('refreshes the list and resyncs only opened instances', async () => {
     const api = new FakeApiClient()
     api.onHistory = () => Promise.resolve(ok({

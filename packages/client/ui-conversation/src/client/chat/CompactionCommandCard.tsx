@@ -9,10 +9,12 @@ import { GenericCommandCard } from './GenericCommandCard.tsx'
 
 interface CompactionCommandCardProps extends CommandRowOwnerProps {
   t: ChatViewSlotProps['t']
+  expanded: boolean
+  onToggle: () => void
 }
 
 /** Render one manual compaction lifecycle without duplicating its checkpoint marker. */
-export function CompactionCommandCard({ node, compaction, t }: CompactionCommandCardProps) {
+export function CompactionCommandCard({ node, compaction, t, expanded, onToggle }: CompactionCommandCardProps) {
   if (compaction !== undefined) {
     return (
       <CompactionItem
@@ -20,9 +22,11 @@ export function CompactionCommandCard({ node, compaction, t }: CompactionCommand
         title="compact"
         fallbackSummary={node.outcome?.text ?? null}
         t={t}
+        expanded={expanded}
+        onToggle={onToggle}
       />
     )
   }
-  if (node.outcome !== null) return <GenericCommandCard node={node} t={t} />
-  return <GenericCommandCard node={node} t={t} runningSummary={t('message.compaction.running')} />
+  if (node.outcome !== null) return <GenericCommandCard node={node} t={t} expanded={expanded} onToggle={onToggle} />
+  return <GenericCommandCard node={node} t={t} runningSummary={t('message.compaction.running')} expanded={expanded} onToggle={onToggle} />
 }

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
+import { createChatRowViewingStore } from '../src/client/stores.ts'
 import { en } from '../src/client/locales.ts'
 
 let nextAnimationFrameId = 1
@@ -38,10 +40,17 @@ afterEach(() => {
 
 const t = makeTranslate(en, commonEn)
 
+function rowProps(nodeKey = 'reasoning-test') {
+  const store = createChatRowViewingStore().create('reasoning-test')
+  return { nodeKey, useStore: bindSnapshotSelector(store), actions: store.actions }
+}
+
 describe('ReasoningRow', () => {
   it('follows the latest streaming line, scrolls to its end, then restores the settled first line', () => {
+    const viewing = rowProps()
     const view = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'Inspect the session\nNewest reasoning tokens' }]}
         streaming
@@ -56,6 +65,7 @@ describe('ReasoningRow', () => {
 
     view.rerender(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'Inspect the session\nNewest reasoning tokens keep arriving' }]}
         streaming
@@ -70,6 +80,7 @@ describe('ReasoningRow', () => {
 
     view.rerender(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'Inspect the session\nNewest reasoning tokens keep arriving\n' }]}
         streaming={false}
@@ -83,8 +94,10 @@ describe('ReasoningRow', () => {
   })
 
   it('expands from either Think or the reasoning summary', () => {
+    const viewing = rowProps()
     const view = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'Inspect the session\nCheck persistence' }]}
         streaming={false}
@@ -100,9 +113,37 @@ describe('ReasoningRow', () => {
     expect(row.getAttribute('aria-expanded')).toBe('false')
   })
 
+  it('keeps an expanded reasoning block open after its virtual row remounts', () => {
+    const viewing = rowProps('reasoning-remount')
+    const first = render(
+      <AssistantMarkdown
+        {...viewing}
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'Inspect the session\nKeep this open' }]}
+        streaming={false}
+      />,
+    )
+    fireEvent.click(first.getByRole('button'))
+    expect(first.getByRole('button').getAttribute('aria-expanded')).toBe('true')
+    first.unmount()
+
+    const remounted = render(
+      <AssistantMarkdown
+        {...viewing}
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'Inspect the session\nKeep this open' }]}
+        streaming={false}
+      />,
+    )
+    expect(remounted.getByRole('button').getAttribute('aria-expanded')).toBe('true')
+    expect(remounted.getByText(/Keep this open/)).toBeTruthy()
+  })
+
   it('expanded Think drops the inline summary and renders plain prose, no IN card', () => {
+    const viewing = rowProps()
     const view = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'reasoning', text: 'Inspect the session\nCheck persistence' }]}
         streaming={false}

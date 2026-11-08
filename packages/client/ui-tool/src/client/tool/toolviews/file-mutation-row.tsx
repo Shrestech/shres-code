@@ -29,7 +29,7 @@ type FileMutationRowProps = ToolCallViewProps & PropsLocale<'conversation'>
  * model-facing error text through its Output section and its first line in the
  * collapsed summary instead.
  */
-export function FileMutationRow({ toolName, block, cwd, openFile, inspect, t }: FileMutationRowProps) {
+export function FileMutationRow({ toolName, block, cwd, openFile, inspect, expanded, onExpandedChange, t }: FileMutationRowProps) {
   const model = toolRowModel(toolName, block, cwd)
   const diff = diffCardModel(block)
   return (
@@ -48,6 +48,8 @@ export function FileMutationRow({ toolName, block, cwd, openFile, inspect, t }: 
       filePath={model.filePath}
       onOpenFile={openFile}
       inspect={inspect}
+      expanded={expanded}
+      onExpandedChange={onExpandedChange}
     />
   )
 }

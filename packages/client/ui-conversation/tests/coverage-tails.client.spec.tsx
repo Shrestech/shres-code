@@ -5,14 +5,21 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { cleanup, render } from '@testing-library/react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
+import { createChatRowViewingStore } from '../src/client/stores.ts'
 import { en } from '../src/client/locales.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t: AssistantMarkdownProps['t'] = makeTranslate(en, commonEn)
+
+function rowProps(nodeKey = 'coverage-tail') {
+  const store = createChatRowViewingStore().create('coverage-tail')
+  return { nodeKey, useStore: bindSnapshotSelector(store), actions: store.actions }
+}
 
 afterEach(cleanup)
 
@@ -22,8 +29,10 @@ describe('tails', () => {
   })
 
   it('AssistantMarkdown renders reasoning as a Think row and unknown blocks as JSON fallback', () => {
+    const viewing = rowProps()
     const view = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[
           { kind: 'reasoning', text: 'thinking hard\nsecond line' },
@@ -37,7 +46,7 @@ describe('tails', () => {
     expect(view.getByText('thinking hard')).toBeTruthy()
     expect(view.getByText(/Unknown content block/)).toBeTruthy()
     const stopped = render(
-      <AssistantMarkdown t={t} blocks={[{ kind: 'text', text: 'partial words' }]} streaming={false} interrupted />,
+      <AssistantMarkdown {...viewing} t={t} blocks={[{ kind: 'text', text: 'partial words' }]} streaming={false} interrupted />,
     )
     expect(stopped.getByText('Stopped')).toBeTruthy()
   })
@@ -45,15 +54,17 @@ describe('tails', () => {
   it('AssistantMarkdown skips the root shell when only tool-call heads remain', () => {
     // Tool heads are drawn by ChatView's tool groups; an empty root between
     // groups is layout noise (no text, no pulse, no interrupted marker).
+    const viewing = rowProps()
     const empty = render(
       <AssistantMarkdown
+        {...viewing}
         t={t}
         blocks={[{ kind: 'tool-call', callId: 'c', name: 'todo_write', argsRaw: '{}' }]}
         streaming={false}
       />,
     )
     expect(empty.container.firstChild).toBeNull()
-    const blank = render(<AssistantMarkdown t={t} blocks={[]} streaming={false} />)
+    const blank = render(<AssistantMarkdown {...viewing} t={t} blocks={[]} streaming={false} />)
     expect(blank.container.firstChild).toBeNull()
   })
 

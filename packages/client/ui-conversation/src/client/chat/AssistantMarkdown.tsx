@@ -15,12 +15,16 @@ import type { AssistantBlock } from '@shres-code/shres-code-client-runtime/clien
 import { JsonBlock, MarkdownText } from '@shres-code/shres-code-client-ui-primitives'
 import type { MarkdownFileMentions } from '@shres-code/shres-code-client-ui-primitives'
 import { ImageGallery, type ImageLoader } from '@shres-code/shres-code-client-ui-attachment'
-import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type { PropsStore } from '@shres-code/shres-code-client-ui-slots'
+import type { ChatRowViewingStore, ChatViewSlotProps } from '../contract/slots.ts'
+import { chatRowViewingKey } from '../stores.ts'
 import { messageImageLabels } from '../image-labels.ts'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import css from './AssistantMarkdown.module.css'
 
 export interface AssistantMarkdownProps {
+  /** Stable Chat node key used to address each reasoning block's disclosure. */
+  nodeKey: string
   blocks: readonly AssistantBlock[]
   streaming: boolean
   /** Frozen partial of an aborted turn: rendered with a stopped marker. */
@@ -31,6 +35,9 @@ export interface AssistantMarkdownProps {
   mentions?: MarkdownFileMentions | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
+  /** Session-scoped row viewing snapshot and write actions. */
+  useStore: PropsStore<ChatRowViewingStore>['useStore']
+  actions: PropsStore<ChatRowViewingStore>['actions']
 }
 
 /** Provider extensions retain their reported names instead of acquiring known-tool semantics. */
@@ -51,13 +58,14 @@ function hostedLabel(block: Extract<AssistantBlock, { kind: 'server-tool-call' }
 
 /** Assistant prose, reasoning, provider-hosted calls, and extension blocks in transcript order. */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, streaming, interrupted, loadImage, mentions, t,
+  nodeKey, blocks, streaming, interrupted, loadImage, mentions, t, useStore, actions,
 }: AssistantMarkdownProps) {
   const imageLoader = loadImage ?? (() => Promise.reject(new Error(t('image.serviceUnavailable'))))
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
   const codeLabels = useMemo(() => ({ copyLabel: t('copy'), copiedLabel: t('copied') }), [t])
   const last = blocks.length - 1
+  const expandedRows = useStore(state => state.expanded)
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
   // between tool groups — skip the shell unless something visible remains.
@@ -82,7 +90,19 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         )
         break
       case 'reasoning':
-        rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last} t={t} />)
+        {
+          const rowKey = chatRowViewingKey(nodeKey, `reasoning:${i}`)
+          rendered.push(
+            <ReasoningRow
+              key={i}
+              text={block.text}
+              running={streaming && i === last}
+              t={t}
+              expanded={expandedRows[rowKey] === true}
+              onToggle={() => { actions.setExpanded(rowKey, expandedRows[rowKey] !== true) }}
+            />,
+          )
+        }
         break
       case 'image': {
         // Consecutive image blocks share one gallery so several images tile

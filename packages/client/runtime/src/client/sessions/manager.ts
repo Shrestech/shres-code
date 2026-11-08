@@ -879,12 +879,17 @@ export class SessionManager {
    * The moment a connection generation dies (before any next-generation frame
    * can arrive — onConnected waits for the readiness handshake while replayed
    * frames flow from stream open, so clearing there would race the replay):
-   * drop generation-scoped live state. Interactions resolved while disconnected
+   * drop generation-scoped live state, including transient out-of-turn agent
+   * errors. Interactions resolved while disconnected
    * send no frame, so stale statuses and buffered answerable frames must not
    * survive into the next generation — mux-open replay re-adds every still-pending
    * request with its live rpcId.
   */
   handleDisconnected(): void {
+    for (const session of this.sessions.values()) {
+      session.clearPendingForGeneration()
+      session.handleAgentError(null)
+    }
     if (this.pendingInteractions.size > 0) {
       this.pendingInteractions.clear()
       this.notifier.markDirty()

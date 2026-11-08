@@ -7,7 +7,7 @@
  * semantics for interrupted/failed calls, and generic fallbacks on
  * malformed results.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
@@ -15,6 +15,7 @@ import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales
 // Export discipline: packages/client/AGENTS.md.
 import { AskQuestionRow, askQuestionToolview } from '../src/client/tool/toolviews/ask-question-row.tsx'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 afterEach(cleanup)
 
@@ -39,6 +40,7 @@ function rowProps(block: unknown): Parameters<typeof AskQuestionRow>[0] {
     openFile: vi.fn(),
     sessionId: 's1',
     useSessions: () => undefined,
+    ...toolDisclosureProps(),
   } as unknown as Parameters<typeof AskQuestionRow>[0]
 }
 

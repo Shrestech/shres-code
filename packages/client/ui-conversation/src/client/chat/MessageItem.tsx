@@ -3,18 +3,19 @@
 // assistant answers), pending steering (copy only), context injection,
 // compaction marker, retry disclosure, and unknown-surface JSON rows.
 
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@shres-code/shres-code-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@shres-code/shres-code-client-ui-primitives'
-import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatNodeViewProps, ChatRowViewingNodeProps, ChatViewSlotProps } from '../contract/slots.ts'
 import { ImageGallery, type ImageLoader } from '@shres-code/shres-code-client-ui-attachment'
 import { messageImageLabels } from '../image-labels.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { chatRowViewingKey } from '../stores.ts'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
@@ -47,14 +48,25 @@ interface RetryCountdown {
   seconds: number
 }
 
-function ModelRetryItem({ node, active, t }: {
+function ModelRetryItem({ node, active, t, nodeKey, useStore, actions }: {
   node: ModelRetryNode
   active: boolean
   t: ChatViewSlotProps['t']
+  nodeKey: string
+  useStore: ChatRowViewingNodeProps<'model-retry'>['useStore']
+  actions: ChatRowViewingNodeProps<'model-retry'>['actions']
 }) {
   // Anchor the host-scheduled delay to this browser's first render of the
-  // retry node. Host event time and Date.now() may belong to different clocks.
-  const deadline = useMemo(() => Date.now() + node.delayMs, [node.delayMs, node.seq])
+  // retry node. Host event time and Date.now() may belong to different clocks;
+  // the session store keeps that first observation across virtual remounts.
+  const storedDeadline = useStore(state => state.retryDeadlines[nodeKey])
+  const firstSeenDeadline = useRef<{ nodeKey: string; deadline: number } | undefined>(undefined)
+  if (firstSeenDeadline.current?.nodeKey !== nodeKey) {
+    firstSeenDeadline.current = { nodeKey, deadline: Date.now() + node.delayMs }
+  }
+  const deadline = storedDeadline ?? firstSeenDeadline.current.deadline
+  const detailsKey = chatRowViewingKey(nodeKey, 'retry')
+  const detailsOpen = useStore(state => state.expanded[detailsKey] === true)
   const scheduledSeconds = retrySeconds(node.delayMs)
   const maximum = node.mode === 'normal' ? node.maxRetries : '∞'
   const [countdown, setCountdown] = useState<RetryCountdown>(() => ({
@@ -64,6 +76,10 @@ function ModelRetryItem({ node, active, t }: {
   const remainingSeconds = countdown.deadline === deadline
     ? countdown.seconds
     : retrySeconds(deadline - Date.now())
+
+  useEffect(() => {
+    if (storedDeadline === undefined) actions.rememberRetryDeadline(nodeKey, deadline)
+  }, [actions, deadline, nodeKey, storedDeadline])
 
   useEffect(() => {
     if (!active) return
@@ -93,7 +109,12 @@ function ModelRetryItem({ node, active, t }: {
   const seconds = active ? remainingSeconds : scheduledSeconds
 
   return (
-    <details className={css.retryRow} data-active={active || undefined}>
+    <details
+      className={css.retryRow}
+      data-active={active || undefined}
+      open={detailsOpen}
+      onToggle={(event) => { actions.setExpanded(detailsKey, event.currentTarget.open) }}
+    >
       <summary className={css.retrySummary}>
         <span className={css.retryText} role="status">
           {t('message.retry.status', { label, retry: node.retry, maximum, seconds })}
@@ -258,8 +279,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
 })
 
 /** Injected-context keyed Chat renderer. */
-export const ContextMessageNodeView = memo(function ContextMessageNodeView({ node, t }: ChatNodeViewProps<'context'>) {
+export const ContextMessageNodeView = memo(function ContextMessageNodeView({ node, t, useStore, actions }: ChatRowViewingNodeProps<'context'>) {
   const data = node.data
+  const rowKey = chatRowViewingKey(node.key, 'context')
+  const open = useStore(state => state.expanded[rowKey] === true)
   return (
     <ContextInjectionRow
       content={data.content}
@@ -267,19 +290,39 @@ export const ContextMessageNodeView = memo(function ContextMessageNodeView({ nod
       provenance={data.provenance}
       form={data.form}
       t={t}
+      open={open}
+      onToggle={() => { actions.setExpanded(rowKey, !open) }}
     />
   )
 })
 
 /** Automatic compaction keyed Chat renderer. */
-export const CompactionNodeView = memo(function CompactionNodeView({ node, t }: ChatNodeViewProps<'compaction'>) {
-  return <CompactionItem node={node.data} t={t} />
+export const CompactionNodeView = memo(function CompactionNodeView({ node, t, useStore, actions }: ChatRowViewingNodeProps<'compaction'>) {
+  const rowKey = chatRowViewingKey(node.key, 'compaction')
+  const expanded = useStore(state => state.expanded[rowKey] === true)
+  return (
+    <CompactionItem
+      node={node.data}
+      t={t}
+      expanded={expanded}
+      onToggle={() => { actions.setExpanded(rowKey, !expanded) }}
+    />
+  )
 })
 
 /** Correlated retry-chain keyed Chat renderer. */
-export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeViewProps<'model-retry'>) {
+export const RetryNodeView = memo(function RetryNodeView({ node, t, useStore, actions }: ChatRowViewingNodeProps<'model-retry'>) {
   const data = node.data
-  return <ModelRetryItem node={data.current} active={data.current.retryState === 'scheduled'} t={t} />
+  return (
+    <ModelRetryItem
+      node={data.current}
+      active={data.current.retryState === 'scheduled'}
+      t={t}
+      nodeKey={node.key}
+      useStore={useStore}
+      actions={actions}
+    />
+  )
 })
 
 /** Terminal turn-error keyed Chat renderer. */

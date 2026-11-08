@@ -1,6 +1,6 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
-import { memo, useMemo, type ReactNode } from 'react'
-import type { ToolCallBlock } from '@shres-code/shres-code-client-runtime/client'
+import { memo, useCallback, useMemo, type ReactNode } from 'react'
+import type { CallId, ToolCallBlock } from '@shres-code/shres-code-client-runtime/client'
 import type { ToolCallOwnerProps, ToolTreeProps } from '../contract/slots.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
@@ -12,14 +12,21 @@ function callName(node: ToolCallBlock): string {
 
 /** One atomic call dispatched through the Tool-owned keyed slot. */
 const ToolCall = memo(function ToolCall({
-  renderSlot, callId, toolName, block, openFile, selected, cwd, inspectCall, t, children,
+  renderSlot, callId, toolName, block, openFile, selected, cwd, inspectCall, t, useStore, actions, children,
 }: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 't'> & {
+  useStore: ToolTreeProps['useStore']
+  actions: ToolTreeProps['actions']
   callId: string
   toolName: string
   block: ToolCallBlock
   selected: boolean
   children?: ReactNode
 }) {
+  const id = callId as CallId
+  const expanded = useStore(state => state.expanded[id] === true)
+  const onExpandedChange = useCallback((value: boolean): void => {
+    actions.setExpanded(id, value)
+  }, [actions, id])
   const owner: ToolCallOwnerProps = useMemo(() => ({
     callId,
     toolName,
@@ -27,7 +34,9 @@ const ToolCall = memo(function ToolCall({
     openFile,
     cwd,
     inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, block, openFile, cwd, inspectCall])
+    expanded,
+    onExpandedChange,
+  }), [callId, toolName, block, openFile, cwd, inspectCall, expanded, onExpandedChange])
   return (
     <div
       className={css.callRow}
@@ -45,8 +54,10 @@ const ToolCall = memo(function ToolCall({
 })
 
 const ToolCallBranch = memo(function ToolCallBranch({
-  renderSlot, block, selectedCallId, cwd, openFile, inspectCall, t,
+  renderSlot, block, selectedCallId, cwd, openFile, inspectCall, t, useStore, actions,
 }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
+  useStore: ToolTreeProps['useStore']
+  actions: ToolTreeProps['actions']
   block: ToolCallBlock
 }) {
   return (
@@ -60,6 +71,8 @@ const ToolCallBranch = memo(function ToolCallBranch({
       cwd={cwd}
       inspectCall={inspectCall}
       t={t}
+      useStore={useStore}
+      actions={actions}
     >
       {block.subCalls.length > 0 ? (
         <div className={css.subCalls} data-subcalls>
@@ -73,6 +86,8 @@ const ToolCallBranch = memo(function ToolCallBranch({
               openFile={openFile}
               inspectCall={inspectCall}
               t={t}
+              useStore={useStore}
+              actions={actions}
             />
           ))}
         </div>
@@ -88,7 +103,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
  * @returns the Tool call tree.
  */
 export function ToolCallTree({
-  renderSlot, node, selectedCallId, cwd, openFile, inspectCall, t,
+  renderSlot, node, selectedCallId, cwd, openFile, inspectCall, t, useStore, actions,
 }: ToolTreeProps) {
   const block = node.data.root
   return (
@@ -100,6 +115,8 @@ export function ToolCallTree({
       openFile={openFile}
       inspectCall={inspectCall}
       t={t}
+      useStore={useStore}
+      actions={actions}
     />
   )
 }

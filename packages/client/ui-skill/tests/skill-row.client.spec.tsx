@@ -4,13 +4,14 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import type { RunningToolCall, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
-import { SkillRow } from '../src/client/SkillRow.tsx'
+import { SkillRow as SkillRowView } from '../src/client/SkillRow.tsx'
 import { en } from '../src/client/locales.ts'
 
-type SkillRowProps = Parameters<typeof SkillRow>[0]
+type SkillRowProps = Parameters<typeof SkillRowView>[0]
 
 const t: SkillRowProps['t'] = makeTranslate(en, commonEn)
 
@@ -50,7 +51,36 @@ function props(block: SkillRowProps['block'], inspect?: () => void): SkillRowPro
   } as unknown as SkillRowProps
 }
 
+/** Test owner that supplies the controlled disclosure seat. */
+function SkillRow(props: SkillRowProps) {
+  const [expanded, setExpanded] = useState(false)
+  return <SkillRowView {...props} expanded={expanded} onExpandedChange={setExpanded} />
+}
+
+/** Owner whose child can be removed and remounted while its state survives. */
+function SkillOwner({ block, inspect, visible = true }: {
+  block: SkillRowProps['block']
+  inspect?: () => void
+  visible?: boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  return visible
+    ? <SkillRowView {...props(block, inspect)} expanded={expanded} onExpandedChange={setExpanded} />
+    : null
+}
+
 describe('SkillRow', () => {
+  it('restores an expanded call after its virtual row remounts', () => {
+    const view = render(<SkillOwner block={settled()} />)
+    const row = screen.getByRole('button', { name: 'Skillshres-manage-issues' })
+    fireEvent.click(row)
+    expect(row.getAttribute('aria-expanded')).toBe('true')
+
+    view.rerender(<SkillOwner block={settled()} visible={false} />)
+    view.rerender(<SkillOwner block={settled()} />)
+    expect(screen.getByRole('button', { name: 'Skillshres-manage-issues' }).getAttribute('aria-expanded')).toBe('true')
+  })
+
   it('renders a compact Bash-shaped summary and discloses the exact instructions', () => {
     const inspect = vi.fn()
     const view = render(<SkillRow {...props(settled(), inspect)} />)

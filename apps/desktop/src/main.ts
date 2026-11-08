@@ -16,6 +16,7 @@ import { resolveDesktopLocale } from './locale.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { desktopErrorState } from './startup-error.ts'
 import { startupFailureDocument } from './startup-document.ts'
+import { DesktopDiagnostics, type DesktopRendererMemory } from './diagnostics.ts'
 
 const SCHEME = 'shres-app'
 const RECOVERY_HOSTS = ['restart', 'plugins', 'reset'] as const
@@ -117,6 +118,20 @@ function createWindow(preload: string, show = false): BrowserWindow {
   return window
 }
 
+/** Read only Electron process metrics for the primary renderer, without page data. */
+function primaryRendererMemory(window: BrowserWindow | undefined): DesktopRendererMemory | undefined {
+  if (window === undefined || window.isDestroyed()) return undefined
+  const pid = window.webContents.getOSProcessId()
+  const metric = app.getAppMetrics().find(candidate => candidate.pid === pid)
+  if (metric === undefined) return undefined
+  return {
+    pid,
+    workingSetSize: metric.memory.workingSetSize,
+    peakWorkingSetSize: metric.memory.peakWorkingSetSize,
+    ...metric.memory.privateBytes === undefined ? {} : { privateBytes: metric.memory.privateBytes },
+  }
+}
+
 function assertDesktopSender(event: IpcMainInvokeEvent, hostnames: readonly string[]): void {
   const senderFrame = event.senderFrame
   if (senderFrame === null) throw new Error('shres desktop: rejected IPC without a sender frame')
@@ -165,6 +180,13 @@ async function main(): Promise<void> {
   let navigation: { window: BrowserWindow; url: string; promise: Promise<void> } | undefined
   let emergencyDocument = false
   let starting: Promise<void> | undefined
+  let hostAppVersion: string | undefined
+  let suppressHostFailureDiagnostics = false
+  const diagnostics = new DesktopDiagnostics({
+    logDir: app.getPath('logs'),
+    appVersion: app.getVersion(),
+    rendererMemory: () => primaryRendererMemory(mainWindow),
+  })
 
   const backendState = (): DesktopBackendState => pageError ?? state
   const publishBackend = (next: DesktopBackendState): void => {
@@ -196,7 +218,9 @@ async function main(): Promise<void> {
   const stopHost = async (): Promise<void> => {
     const current = host
     host = undefined
-    await current?.stop()
+    suppressHostFailureDiagnostics = true
+    try { await current?.stop() }
+    finally { suppressHostFailureDiagnostics = false }
   }
 
   const showStartupError = async (error: unknown): Promise<void> => {
@@ -215,16 +239,30 @@ async function main(): Promise<void> {
       await navigateMain(startupUrl)
       publishBackend({ phase: 'starting' })
       if (development === undefined) ensureDesktopProfile(activeProject, app.getVersion())
+      hostAppVersion = undefined
       const child = new DesktopHostProcess(
         resources.node,
         resources.runtime,
         activeProject,
         developmentHostInspectPort(development !== undefined),
         process.env,
-        (error) => { void showStartupError(error).catch((failure: unknown) => { console.error(failure) }) },
+        (error, details) => {
+          if (!quitting && !suppressHostFailureDiagnostics) {
+            const version = details.hostVersion ?? hostAppVersion
+            diagnostics.record({
+              event: 'host-failure',
+              reason: details.reason,
+              ...details.exitCode === undefined ? {} : { exitCode: details.exitCode },
+              ...details.signal === undefined ? {} : { signal: details.signal },
+              ...version === undefined ? {} : { hostVersion: version },
+            })
+          }
+          void showStartupError(error).catch((failure: unknown) => { console.error(failure) })
+        },
       )
       host = child
-      await child.start()
+      const ready = await child.start()
+      hostAppVersion = ready.appVersion
       state = { phase: 'ready' }
       publishBackend(backendState())
       await navigateMain(applicationUrl)
@@ -295,7 +333,31 @@ async function main(): Promise<void> {
     window.webContents.on('preload-error', (_event, _path, error) => {
       void showEmergencyError(error).catch((failure: unknown) => { console.error(failure) })
     })
+    window.webContents.on('unresponsive', () => {
+      if (quitting) return
+      diagnostics.record({
+        event: 'unresponsive',
+        reason: 'renderer-unresponsive',
+        ...hostAppVersion === undefined ? {} : { hostVersion: hostAppVersion },
+      })
+    })
+    window.webContents.on('responsive', () => {
+      if (quitting) return
+      diagnostics.record({
+        event: 'responsive',
+        reason: 'renderer-responsive',
+        ...hostAppVersion === undefined ? {} : { hostVersion: hostAppVersion },
+      })
+    })
     window.webContents.on('render-process-gone', (_event, details) => {
+      if (!quitting) {
+        diagnostics.record({
+          event: 'render-process-gone',
+          reason: details.reason,
+          exitCode: details.exitCode,
+          ...hostAppVersion === undefined ? {} : { hostVersion: hostAppVersion },
+        })
+      }
       navigation = undefined
       emergencyDocument = false
       void showStartupError(new Error('desktop renderer exited: ' + details.reason))

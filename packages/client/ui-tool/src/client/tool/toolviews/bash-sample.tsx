@@ -13,7 +13,7 @@
 // full output (maxLines Infinity — no middle collapse). An error row's
 // collapsed summary is the failure's first line in the error color.
 
-import { useState, type KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react'
 import type { Context } from '@shres-code/cordis'
 import clsx from 'clsx'
 import {
@@ -51,9 +51,11 @@ function stateStatus(state: ToolRowState, t: BashRowProps['t']): string | null {
 /**
  * Bash row: icon + Bash · {description} in the shared ToolRow chrome, the
  * whole row toggling the command's terminal or generic error card (ToolRow's unified
- * expand interaction, replicated locally per the registrant posture).
+ * expand interaction). Disclosure state is keyed by call id in the row's
+ * owner's session-scoped store so virtual unmount/remount does not close an
+ * open card.
  */
-export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }: BashRowProps) {
+export function BashRow({ toolName, block, sessionId, useSessions, expanded, onExpandedChange, inspect, t }: BashRowProps) {
   const model = toolRowModel(toolName, block)
   // Session workspace root: the terminal view's cwd resolves against it (an
   // omitted workdir IS the workspace), which the pure presenter cannot do.
@@ -65,7 +67,6 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     ? 'error'
     : model.state
   const status = stateStatus(state, t)
-  const [expanded, setExpanded] = useState(false)
   // Execution failures (for example cancellation before the process reports a
   // terminal result) use the generic presenter. Keep their recorded args and
   // full error reachable instead of collapsing the row to the first line.
@@ -76,7 +77,8 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
   const open = expanded && expandable
   const failureLine = model.state === 'error' ? model.errorSummary : null
   const toggleExpand = () => {
-    setExpanded(v => !v)
+    const next = !open
+    onExpandedChange(next)
   }
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
@@ -176,6 +178,10 @@ export const bashToolviewSample = {
    */
   apply(ctx: Context): void {
     ctx.slots.inject('tool.call.toolview', () =>
-      ctx.slots.register({ name: 'tool.call.toolview', key: 'bash', locale: NS }, BashRow))
+      ctx.slots.register({
+        name: 'tool.call.toolview',
+        key: 'bash',
+        locale: NS,
+      }, BashRow))
   },
 }

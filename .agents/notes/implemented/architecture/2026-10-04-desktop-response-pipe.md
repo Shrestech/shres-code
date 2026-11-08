@@ -10,6 +10,8 @@ The desktop page cannot open a WebSocket, so session events are a long `POST` bo
 
 The shell keeps reading the response pipe while a slow body has unread bytes. Each body may queue 256 KiB. Further frames for that body wait in a side buffer. The shared pipe pauses only after the shell is holding 2 MiB across every body, and it resumes as the renderer reads. Event downlinks coalesce up to 16 KiB or 8 ms of NDJSON into one chunk, and they wait when that chunk's own queue is full. Response data frames copy each payload once, into the frame buffer. Host stderr kept for the exit diagnostic is capped at 64 KiB.
 
+The upstream API event queues have separate configurable frame and serialized-byte limits; overflow ends the affected stream and releases its listeners so reconnect can rebuild it. The [long-chat performance decision](2026-11-08-desktop-long-chat-performance.md) owns those producer limits.
+
 The composer shell compares the fields its takeover selectors read and skips a render when only chat text changed. Rows still subscribe to their own nodes. The trajectory builder stages node updates and builds its snapshot on read, so a hidden Trajectory tab does not walk the loaded window. Nested `tool/code-dispatch` updates publish on the animation frame. The fetch-stream reader copies the unread tail once per read and yields to the event loop after 32 lines.
 
 ## Alternatives considered

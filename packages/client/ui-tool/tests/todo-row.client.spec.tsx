@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /** todo_write atomic Tool presentation and its plan-summary model. */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TodoItem, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
@@ -9,6 +9,7 @@ import { TodoRow, todoToolview } from '../src/client/tool/toolviews/todo-row.tsx
 import { planSummary } from '../src/client/tool/toolviews/plan-summary.ts'
 import { CONVERSATION_NS as NS } from '../src/client/locale.ts'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 type TodoRowProps = Parameters<typeof TodoRow>[0]
 
@@ -70,6 +71,7 @@ function rowProps(block: unknown): TodoRowProps {
     openFile: vi.fn(),
     sessionId: 's1',
     useSessions: () => undefined,
+    ...toolDisclosureProps(),
     t,
   } as unknown as TodoRowProps
 }

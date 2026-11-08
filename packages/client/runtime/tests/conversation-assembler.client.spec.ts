@@ -318,7 +318,7 @@ describe('ConversationNodeAssembler', () => {
     ], false)).toThrow('received an update before its start Match')
   })
 
-  it('replays a window-gap reader when prepend supplies a nearer predecessor', () => {
+  it('replays a projected window-gap reader when prepend supplies a nearer predecessor', () => {
     const source: ConversationNodeDefinition<number> = {
       kind: 'source',
       match: event => event.type === 'user/message'
@@ -339,6 +339,7 @@ describe('ConversationNodeAssembler', () => {
       match: event => event.type === 'assistant/message'
         ? { id: `${event.data.turn}:${event.data.step}`, role: 'start' }
         : null,
+      locationUpdates: 'project',
       start: consumerStart,
       update: context => context.state,
       target: 'chat',
@@ -594,6 +595,93 @@ describe('ConversationNodeAssembler', () => {
     expect(starts).toHaveBeenCalledTimes(2)
     expect(apply).toHaveBeenCalledOnce()
     expect([...chatSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe('closed')
+  })
+
+  it('preserves accumulated content while live step closures refresh projected Locations', () => {
+    const updates = vi.fn((context: { state: number }) => context.state + 1)
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'stream',
+      target: 'chat',
+      locationUpdates: 'project',
+      match: event => event.type === 'step/start' || event.type === 'assistant/chunk'
+        ? { id: `${event.data.turn}:${event.data.step}`, role: event.type === 'step/start' ? 'start' : 'update' }
+        : null,
+      start: () => 0,
+      update: updates,
+      buildViewNode: context => node(context, {
+        count: context.state,
+        status: context.start?.location.kind === 'step' ? context.start.location.step.status : 'missing',
+      }),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]),
+      new TestViewDefinitions([testView()]),
+    )
+    let seq = 0
+    assembler.replaceWindow([input(at(seq++, 'turn/start', { turn: 1 }))], false)
+    for (let step = 0; step < 10; step++) {
+      assembler.append(input(at(seq++, 'step/start', { turn: 1, step })))
+      for (let chunk = 0; chunk < 100; chunk++) {
+        assembler.append(input(at(seq++, 'assistant/chunk', {
+          turn: 1, step, chunk: { type: 'text-delta', index: 0, text: 'a' },
+        })))
+      }
+      assembler.append(input(at(seq++, 'step/end', { turn: 1, step })))
+      assembler.flush()
+      expect([...chatSnapshot(assembler)?.nodes.values() ?? []].map(value => value.data))
+        .toEqual(Array.from({ length: step + 1 }, () => ({ count: 100, status: 'closed' })))
+    }
+    assembler.append(input(at(seq++, 'turn/end', { turn: 1 })))
+    assembler.flush()
+    expect(updates).toHaveBeenCalledTimes(1_000)
+  })
+
+  it('replays dependents when a projected predecessor Location changes', () => {
+    const source: ConversationNodeDefinition<number> = {
+      kind: 'projected-source',
+      target: 'chat',
+      locationUpdates: 'project',
+      match: event => event.type === 'step/start'
+        ? { id: 'one', role: 'start' }
+        : null,
+      start: () => 1,
+      update: context => context.state,
+      buildViewNode: () => null,
+    }
+    const dependentStart = vi.fn((
+      _context: Parameters<ConversationNodeDefinition<number>['start']>[0],
+      _match: Parameters<ConversationNodeDefinition<number>['start']>[1],
+      reader: Parameters<ConversationNodeDefinition<number>['start']>[2],
+    ) => reader.previous<number>('projected-source')?.state ?? -1)
+    const dependent: ConversationNodeDefinition<number> = {
+      kind: 'projected-dependent',
+      target: 'chat',
+      match: event => (event.type as string) === 'projected/consumer'
+        ? { id: 'one', role: 'start' }
+        : null,
+      start: dependentStart,
+      update: context => context.state,
+      buildViewNode: context => node(context, context.state),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([source, dependent]),
+      new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([
+      input(at(1, 'turn/start', { turn: 1 })),
+      input(at(2, 'step/start', { turn: 1, step: 1 })),
+      input(at(3, 'step/end', { turn: 1, step: 1 })),
+      input(at(4, 'projected/consumer', { turn: null })),
+    ], false)
+    assembler.flush()
+    expect(dependentStart).toHaveBeenCalledOnce()
+    expect([...chatSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
+
+    assembler.append(input(at(5, 'turn/end', { turn: 1, reason: { kind: 'completed' } })))
+    assembler.flush()
+
+    expect(dependentStart).toHaveBeenCalledTimes(2)
+    expect([...chatSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
   })
 
   it('lets one Context publish Step and Turn data in phase order', () => {

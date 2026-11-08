@@ -12,7 +12,8 @@
 // container so a long payload scrolls internally instead of taking over the
 // message flow. Every card kind starts collapsed, so a run of tool calls stays
 // scannable; the details panel is the single-call full-height reading surface.
-// Expand state is component-local view state. File-tool summaries are path
+// Expand state is supplied by the owning Tool registration; direct standalone
+// uses retain component-local state. File-tool summaries are path
 // links that open through the host (stopPropagation keeps the two gestures
 // independent); an error row's collapsed summary is the failure's first line in
 // the error color.
@@ -99,6 +100,10 @@ export interface ToolRowProps {
    * over the expanded body. Absent = no affordance.
    */
   inspect?: (() => void) | undefined
+  /** Session-scoped expansion value when the owning call registration provides one. */
+  expanded?: boolean | undefined
+  /** Update the owning call's session-scoped expansion value. */
+  onExpandedChange?: ((expanded: boolean) => void) | undefined
 }
 
 /** Leading-slot state substitution: the tool icon yields to the terminal state
@@ -145,8 +150,11 @@ export function ToolRow({
   filePath,
   onOpenFile,
   inspect,
+  expanded: expandedOverride,
+  onExpandedChange,
 }: ToolRowProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+  const expanded = expandedOverride ?? localExpanded
   const terminalBody = terminal ?? null
   const diffBody = diff ?? null
   const readBody = read ?? null
@@ -172,7 +180,9 @@ export function ToolRow({
   // The failure line is error prose, not the path: no open-file affordance.
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
   const toggleExpand = () => {
-    setExpanded(v => !v)
+    const next = !open
+    if (onExpandedChange !== undefined) onExpandedChange(next)
+    else setLocalExpanded(next)
   }
   const openFile = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()

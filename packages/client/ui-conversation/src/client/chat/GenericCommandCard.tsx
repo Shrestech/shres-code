@@ -4,7 +4,7 @@
 // fallback (an unregistered command name lands here); registrants may compose
 // it as a base, feeding the same owner payload through.
 
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { ChatViewSlotProps, CommandRowOwnerProps } from '../contract/slots.ts'
 import { DisclosureRow, IconApiOutline14, StateDot } from '@shres-code/shres-code-client-ui-primitives'
 import a11yCss from './accessibility.module.css'
@@ -27,10 +27,13 @@ export interface GenericCommandCardProps extends CommandRowOwnerProps {
   t: ChatViewSlotProps['t']
   /** Command-specific running copy; absent uses the generic command label. */
   runningSummary?: string | undefined
+  /** Session-scoped disclosure state for the enclosing Chat node. */
+  expanded: boolean
+  /** Toggle the session-scoped disclosure state. */
+  onToggle: () => void
 }
 
-export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCardProps) {
-  const [expanded, setExpanded] = useState(false)
+export function GenericCommandCard({ node, t, runningSummary, expanded, onToggle }: GenericCommandCardProps) {
   const text = node.outcome?.text
   const summary = node.outcome === null
     ? runningSummary ?? t('command.running')
@@ -58,7 +61,7 @@ export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCa
         expandable={body !== null}
         expandOnRowClick
         keepContentWhenOpen
-        onToggle={() => { setExpanded(value => !value) }}
+        onToggle={onToggle}
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />

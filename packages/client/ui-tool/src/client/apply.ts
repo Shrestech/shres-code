@@ -1,6 +1,7 @@
 /** Register the Tool call tree, details renderer, and built-in atomic views. */
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
+import { createToolDisclosureStore } from './stores.ts'
 import { ToolCallTree } from './tool/ToolCallTree.tsx'
 import { ToolDetails } from './tool/ToolDetails.tsx'
 import { CONVERSATION_NS as NS } from './locale.ts'
@@ -20,10 +21,12 @@ export const inject = ['slots']
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
+  const disclosureStore = createToolDisclosureStore()
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'tool-call',
     locale: NS,
+    store: disclosureStore,
     children: {
       'tool.call.toolview': { kind: 'keyed', scope: 'session' },
     },

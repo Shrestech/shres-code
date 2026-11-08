@@ -115,15 +115,12 @@ describe('web e2e: whole-session stats survive history paging', () => {
     await page.getByRole('button', { name: 'Load earlier' }).click()
     await expect.poll(() => page.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     expect(await strip.textContent()).toBe(stripBeforePaging)
-    // With the whole log loaded, the window mounts one turn-tail footer per
-    // settled turn — the loaded-window probe the scroll/perf lanes count now
-    // that the strip is whole-log-scoped.
-    expect(await page.locator('[data-chat-flow-key^="9:turn-tail"]').count()).toBe(TURNS)
+    expect(Number(await page.locator('[data-chat-flow]').getAttribute('data-chat-turn-count'))).toBe(TURNS)
   }, 60_000)
 
   it('matches the paged-stats aria golden', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-stats-paged-aria'))
-    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
+    const snapshot = (await captureStableAria(page, '[data-session-stats]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
   })

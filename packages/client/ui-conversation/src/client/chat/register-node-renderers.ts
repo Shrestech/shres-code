@@ -1,5 +1,6 @@
 import type { Context } from '@shres-code/cordis'
 import { NS } from '../locales.ts'
+import { createChatRowViewingStore } from '../stores.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
 import {
@@ -13,26 +14,28 @@ import { TurnTailNodeView } from './TurnTailNodeView.tsx'
  * @param ctx - owning UI Conversation context.
  */
 export function registerChatNodeRenderers(ctx: Context): void {
+  const rowViewingStore = createChatRowViewingStore()
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'user', locale: NS }, UserMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'steering', locale: NS }, UserMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'context', locale: NS }, ContextMessageNodeView))
+    { name: 'conversation.chat.node', key: 'context', locale: NS, store: rowViewingStore }, ContextMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'assistant-step', locale: NS }, AssistantNodeView))
+    { name: 'conversation.chat.node', key: 'assistant-step', locale: NS, store: rowViewingStore }, AssistantNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'command',
     locale: NS,
+    store: rowViewingStore,
     children: { 'conversation.chat.commandview': { kind: 'keyed', scope: 'session' } },
   }, CommandNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'manual-compaction', locale: NS }, ManualCompactionNodeView))
+    { name: 'conversation.chat.node', key: 'manual-compaction', locale: NS, store: rowViewingStore }, ManualCompactionNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'compaction', locale: NS }, CompactionNodeView))
+    { name: 'conversation.chat.node', key: 'compaction', locale: NS, store: rowViewingStore }, CompactionNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'model-retry', locale: NS }, RetryNodeView))
+    { name: 'conversation.chat.node', key: 'model-retry', locale: NS, store: rowViewingStore }, RetryNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'turn-error', locale: NS }, TurnErrorNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(

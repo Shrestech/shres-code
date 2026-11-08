@@ -14,6 +14,8 @@ The package also fills `conversation.details.tool` with `ToolDetails`. The row a
 
 Generic rows classify known Tool names into search, read, shell, write, edit, code, or generic variants. Running, successful, failed, and interrupted lifecycle states come only from the frozen call/result slice. File paths resolve against the session `cwd` only when the user invokes the Host open-file callback; presentation code does not read Session services.
 
+Tool rows keep expanded calls keyed by `callId` in one session-scoped viewing store, including nested calls. Virtualized transcript rows may unmount while the user is reading elsewhere, but remounting the same call restores its disclosure; collapsing it removes the id from that session's store.
+
 ## Atomic Tool views
 
 An owning business package registers its wire Tool name into `tool.call.toolview`:
@@ -26,7 +28,7 @@ ctx.slots.inject('tool.call.toolview', () =>
   }, BusinessToolRow))
 ```
 
-The owner payload is `ToolCallOwnerProps`: `callId`, `toolName`, the frozen `block`, optional `cwd`, and plain `openFile`/`inspect` callbacks. The registration receives the normal session slot runtime share. It does not receive React nodes, Runtime services, or root/subcall knowledge.
+The owner payload is `ToolCallOwnerProps`: `callId`, `toolName`, the frozen `block`, optional `cwd`, plain `openFile`/`inspect` callbacks, and controlled `expanded`/`onExpandedChange` disclosure props. Custom expandable views use those props to retain disclosure across virtual remounts. The registration receives the normal session slot runtime share. It does not receive React nodes, Runtime services, or root/subcall knowledge.
 
 This package currently owns the generic fallback and the built-in shell/pwsh, read, write/edit, grep/glob, web, todo, question, and Code Dispatch presentations. `ui-skill` demonstrates a business-owned registration for `skill`.
 

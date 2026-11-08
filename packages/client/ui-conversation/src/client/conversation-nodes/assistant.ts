@@ -1,4 +1,5 @@
 import type { Context } from '@shres-code/cordis'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationLocation, ConversationMatch,
   ConversationNodeContext, ConversationNodeDefinition,
@@ -32,7 +33,7 @@ interface AssistantState {
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
   readonly hidden: boolean
-  readonly final: ConversationMatch | undefined
+  readonly final: SessionEvent<'assistant/message'> | undefined
   readonly usage: unknown
 }
 
@@ -54,12 +55,14 @@ function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): Assista
   return blocks.filter((block): block is AssistantBlock => block !== undefined)
 }
 
+function isVisibleBlock(block: AssistantBlock | undefined): boolean {
+  if (block === undefined || block.kind === 'tool-call') return false
+  if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+  return true
+}
+
 function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
-  return blocks.some((block) => {
-    if (block.kind === 'tool-call') return false
-    if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
-    return true
-  })
+  return blocks.some(isVisibleBlock)
 }
 
 function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
@@ -116,7 +119,10 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     default:
       return state
   }
-  const visible = hasVisibleContent(compactBlocks(blocks))
+  const visible = state.firstVisibleSeq !== undefined
+    || (chunk.type === 'text-delta' || chunk.type === 'reasoning-delta'
+      ? chunk.text.trim() !== ''
+      : isVisibleBlock(blocks[chunk.index]))
   const firstToken = isTokenDelta(chunk)
   return {
     ...state,
@@ -147,8 +153,8 @@ function finalNode(
   context: ConversationNodeContext<AssistantState>,
 ): AssistantMessageNode | undefined {
   const final = state.final
-  if (final?.event.type === 'assistant/message') {
-    const event = final.event
+  if (final?.type === 'assistant/message') {
+    const event = final
     return {
       kind: 'assistant',
       seq: event.seq,
@@ -194,7 +200,7 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
         ...state,
         blocks: toAssistantBlocks(match.event.data.message.content),
         hidden: false,
-        final: match,
+        final: match.event,
         usage: match.event.data.usage,
       }
       continue
@@ -218,7 +224,9 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
   if (state === undefined) return undefined
   const settled = finalNode(state, context)
   const blocks = settled?.blocks ?? compactBlocks(state.blocks)
-  const visible = hasVisibleContent(blocks)
+  const visible = settled === undefined
+    ? state.firstVisibleSeq !== undefined
+    : hasVisibleContent(blocks)
   const status = settled?.interrupted === true
     ? 'interrupted'
     : settled === undefined ? 'running' : 'settled'
@@ -244,6 +252,7 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
 export const assistantDefinition: ConversationNodeDefinition<AssistantState> = {
   kind: 'assistant-step',
   target: 'chat',
+  locationUpdates: 'project',
   match: (event) => {
     if (event.type === 'step/start') return { id: `${event.data.turn}:${event.data.step}`, role: 'start' }
     if (event.type === 'assistant/chunk'
@@ -266,7 +275,7 @@ export const assistantDefinition: ConversationNodeDefinition<AssistantState> = {
         ...context.state,
         blocks: toAssistantBlocks(match.event.data.message.content),
         hidden: false,
-        final: match,
+        final: match.event,
         usage: match.event.data.usage,
       }
     }

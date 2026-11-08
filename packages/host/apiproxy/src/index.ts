@@ -16,7 +16,13 @@ import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import type {} from '@shres-code/shres-code-agent-default-model'
 import type { ApiProxy } from './api/index.ts'
-import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES, DEFAULT_FILE_VIEW_MAX_BYTES } from './api-proxy.ts'
+import {
+  createApiProxy,
+  DEFAULT_COLD_BLANK_PROBE_MAX_BYTES,
+  DEFAULT_EVENT_QUEUE_MAX_BYTES,
+  DEFAULT_EVENT_QUEUE_MAX_FRAMES,
+  DEFAULT_FILE_VIEW_MAX_BYTES,
+} from './api-proxy.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
   type SessionLogCompressionLevel,
@@ -65,6 +71,10 @@ export interface Config {
    * @default 524288
    */
   fileViewMaxBytes?: number
+  /** Maximum buffered frames per live mux or host event stream; overflow closes that stream for reconnect. */
+  eventQueueMaxFrames?: number
+  /** Maximum serialized server-request bytes buffered per live mux or host event stream; overflow closes that stream for reconnect. */
+  eventQueueMaxBytes?: number
 }
 
 /**
@@ -84,6 +94,8 @@ export class ApiProxyService extends Service implements ApiProxy {
       .default(DEFAULT_SESSION_LOG_COMPRESSION_LEVEL) as z<SessionLogCompressionLevel>,
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
     fileViewMaxBytes: z.natural().default(DEFAULT_FILE_VIEW_MAX_BYTES),
+    eventQueueMaxFrames: z.natural().min(1).default(DEFAULT_EVENT_QUEUE_MAX_FRAMES),
+    eventQueueMaxBytes: z.natural().min(1).default(DEFAULT_EVENT_QUEUE_MAX_BYTES),
   })
 
   readonly sessions: ApiProxy['sessions']
@@ -117,6 +129,12 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.fileViewMaxBytes === undefined
         ? {}
         : { fileViewMaxBytes: config.fileViewMaxBytes }),
+      ...(config.eventQueueMaxFrames === undefined
+        ? {}
+        : { eventQueueMaxFrames: config.eventQueueMaxFrames }),
+      ...(config.eventQueueMaxBytes === undefined
+        ? {}
+        : { eventQueueMaxBytes: config.eventQueueMaxBytes }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents

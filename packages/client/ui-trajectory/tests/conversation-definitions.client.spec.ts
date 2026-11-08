@@ -1,5 +1,5 @@
 import type { Context } from '@shres-code/cordis'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   ConversationEventInput, ConversationNodeDefinition, ConversationViewDefinition,
 } from '@shres-code/shres-code-client-runtime/client'
@@ -120,6 +120,62 @@ function assistantMessage(
 }
 
 describe('Trajectory conversation Definitions', () => {
+  it('keeps whitespace and block replacement semantics without rescanning after first visible content', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+    ])
+    const whitespaceStream = assembler([
+      at(5, 'turn/start', { turn: 2 }),
+      at(6, 'step/start', { turn: 2, step: 1 }),
+    ])
+    const boundedTrim = vi.spyOn(String.prototype, 'trim').mockImplementation(function (this: string) {
+      if (this.length > 3) throw new Error('trimmed an accumulated whitespace stream')
+      return this.replace(/^\s+|\s+$/g, '')
+    })
+    try {
+      for (let seq = 7; seq < 23; seq++) {
+        whitespaceStream.append(at(seq, 'assistant/chunk', {
+          turn: 2,
+          step: 1,
+          chunk: { type: 'text-delta', index: 0, text: '   ' },
+        }))
+      }
+    } finally {
+      boundedTrim.mockRestore()
+    }
+    const trim = vi.spyOn(String.prototype, 'trim')
+    try {
+      value.append(at(3, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: '   ' },
+      }))
+      value.append(at(4, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: 'answer' },
+      }))
+      expect(trim).toHaveBeenCalledTimes(2)
+      value.append(at(5, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: ' continued' },
+      }))
+      expect(trim).toHaveBeenCalledTimes(2)
+    } finally {
+      trim.mockRestore()
+    }
+
+    value.append(at(6, 'assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'block-end', index: 0, block: { type: 'text', text: 'replacement' } },
+    }))
+    value.flush()
+    expect(snapshot(value).partial?.blocks).toEqual([{ kind: 'text', text: 'replacement' }])
+  })
+
   it('assembles streaming usage, preserves retry facts, and materializes interruption', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

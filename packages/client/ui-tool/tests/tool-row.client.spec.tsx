@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent } from '@testing-library/react'
 
 import type { RunningToolCall, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
@@ -10,6 +10,7 @@ import { classifyTool, resultText, toolRowModel } from '../src/client/tool/model
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { renderWithToolDisclosure as render, toolDisclosureProps } from './tool-disclosure.client.tsx'
 
 afterEach(() => {
   cleanup()
@@ -376,7 +377,7 @@ describe('ToolRow', () => {
 
 describe('GenericToolCard', () => {
   const props = (toolName: string, block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+    callId: 'c1', toolName, block, openFile: vi.fn(), t, ...toolDisclosureProps(),
   })
 
   it('renders the classified variant row from the frozen slice', () => {

@@ -2,7 +2,7 @@
 // The compact accent row keeps loaded instructions scannable in the transcript;
 // the exact durable tool output remains available in a bounded disclosure card.
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import {
   IconChevronDownOutline14, IconInspectOutline12, IconSkillOutline16, StateDot,
 } from '@shres-code/shres-code-client-ui-primitives'
@@ -114,15 +114,14 @@ function stateStatus(state: SkillRowState, t: SkillRowProps['t']): string | null
  * @param props - keyed toolview payload plus the skill locale seat.
  * @returns the dedicated skill row.
  */
-export function SkillRow({ block, inspect, t }: SkillRowProps) {
+export function SkillRow({ block, inspect, expanded, onExpandedChange, t }: SkillRowProps) {
   const model = skillRowModel(block)
-  const [expanded, setExpanded] = useState(false)
   const expandable = model.output !== null
   const open = expanded && expandable
   const status = stateStatus(model.state, t)
   const summary = model.errorSummary ?? model.name
   const toggleExpand = (): void => {
-    setExpanded(value => !value)
+    onExpandedChange(!open)
   }
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return

@@ -1,4 +1,5 @@
 import type { Context } from '@shres-code/cordis'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationLocation, ConversationMatch,
   ConversationNodeContext, ConversationNodeDefinition, PartialAssistant, RequestView,
@@ -39,10 +40,10 @@ interface AssistantState {
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
-  readonly final: ConversationMatch | undefined
+  readonly final: SessionEvent<'assistant/message'> | undefined
   readonly usage: UsageValue | undefined
   readonly retry: RetryValue | undefined
-  readonly stepEnd: ConversationMatch | undefined
+  readonly stepEnd: SessionEvent<'step/end'> | undefined
 }
 
 function initialState(
@@ -74,12 +75,10 @@ function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): Assista
   return blocks.filter((block): block is AssistantBlock => block !== undefined)
 }
 
-function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
-  return blocks.some((block) => {
-    if (block.kind === 'tool-call') return false
-    if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
-    return true
-  })
+function isVisibleBlock(block: AssistantBlock | undefined): boolean {
+  if (block === undefined || block.kind === 'tool-call') return false
+  if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+  return true
 }
 
 function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
@@ -139,7 +138,10 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     default:
       return { ...state, sawChunk: true }
   }
-  const visible = hasVisibleContent(compactBlocks(blocks))
+  const visible = state.firstVisibleSeq !== undefined
+    || (chunk.type === 'text-delta' || chunk.type === 'reasoning-delta'
+      ? chunk.text.trim() !== ''
+      : isVisibleBlock(blocks[chunk.index]))
   return {
     ...state,
     sawChunk: true,
@@ -156,7 +158,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
 function closedBoundary(
   context: ConversationNodeContext<AssistantState>,
 ): { seq: number; time: number } | undefined {
-  if (context.state?.stepEnd?.event.type === 'step/end') return context.state.stepEnd.event
+  if (context.state?.stepEnd?.type === 'step/end') return context.state.stepEnd
   const location: ConversationLocation | undefined = context.start?.location
     ?? context.matches.at(-1)?.location
   if (location?.kind === 'step' && location.step.status === 'closed') return location.step.end
@@ -177,11 +179,11 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
       state = {
         ...state,
         blocks: toAssistantBlocks(event.data.message.content),
-        final: match,
+        final: event,
         usage: state.usage ?? event.data.usage,
       }
     } else if (event.type === 'step/end' && state !== undefined) {
-      state = { ...state, stepEnd: match }
+      state = { ...state, stepEnd: event }
     }
   }
   return state
@@ -192,8 +194,8 @@ function finalNode(
   context: ConversationNodeContext<AssistantState>,
 ): AssistantMessageNode | undefined {
   const final = state.final
-  if (final?.event.type === 'assistant/message') {
-    const event = final.event
+  if (final?.type === 'assistant/message') {
+    const event = final
     return {
       kind: 'assistant',
       seq: event.seq,
@@ -267,6 +269,7 @@ function assistantRequest(
 const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> = {
   kind: 'trajectory-assistant-step',
   target: 'trajectory',
+  locationUpdates: 'project',
   match: (event) => {
     if (event.type === 'step/start') {
       return { id: `${event.data.turn}:${event.data.step}`, role: 'start' }
@@ -297,11 +300,11 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
       return {
         ...context.state,
         blocks: toAssistantBlocks(match.event.data.message.content),
-        final: match,
+        final: match.event,
         usage: context.state.usage ?? match.event.data.usage,
       }
     }
-    if (match.event.type === 'step/end') return { ...context.state, stepEnd: match }
+    if (match.event.type === 'step/end') return { ...context.state, stepEnd: match.event }
     if (match.event.type !== 'llm/retry') return context.state
     const data = match.event.data
     return {

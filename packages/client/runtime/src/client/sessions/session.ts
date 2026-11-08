@@ -1,4 +1,4 @@
-// Sessions remain resident after creation so they continue consuming mux frames off-screen.
+// Off-screen Sessions retain interactions and projections; only the staged history window stays resident.
 
 import type { Context } from '@shres-code/cordis'
 import type { AttachmentIdType, ImageAttachmentRef } from '@shres-code/shres-code-attachment'
@@ -69,13 +69,13 @@ export class Session implements SessionFace {
    *  Kept parallel rather than merged so `events` stays the raw log slice (model-visible ⟺ logged). */
   private views: (ToolEventView | undefined)[] = []
   private baseSeq = 0
+  /** Oldest loaded sequence needed to restore an off-screen window without retaining its events. */
+  private releasedBaseSeq: number | undefined
   private hasMore = false
   private openState: OpenState = 'cold'
   private openError: RpcError | null = null
   private openPromise: Promise<void> | null = null
-  /** Bumped by resync to invalidate an in-flight doOpen: a reconnect must rebuild, never adopt
-   *  a pre-disconnect open whose history request is already doomed. Stale doOpen
-   *  passes drop all writes once the generation moves on. */
+  /** Invalidates outstanding history reads when reconnecting or releasing the window. */
   private openGeneration = 0
   private loadingOlder = false
   private pending = new Map<string, PendingInteraction>()
@@ -376,10 +376,12 @@ export class Session implements SessionFace {
   /** Page up: pull one earlier page with the window's first seq as beforeSeq and prepend. */
   async loadOlder(): Promise<void> {
     if (this.openState !== 'open' || !this.hasMore || this.loadingOlder) return
+    const generation = this.openGeneration
     this.loadingOlder = true
     this.notifier.markDirty()
     try {
       const { result } = await this.history({ beforeSeq: this.baseSeq, maxMessages: PAGE_MESSAGES })
+      if (generation !== this.openGeneration) return
       if (!result.ok) return // keep the window as-is; do not overwrite openError (open already succeeded)
       const older = result.value.events
       if (older.length === 0) {
@@ -402,17 +404,45 @@ export class Session implements SessionFace {
       this.hasMore = result.value.hasMore
       this.conversation.prepend(older.map(conversationInput), this.hasMore)
     } catch (error) {
-      console.error('[web-runtime] loadOlder failed:', error)
+      if (generation === this.openGeneration) console.error('[web-runtime] loadOlder failed:', error)
     } finally {
-      this.loadingOlder = false
-      this.notifier.markDirty()
+      if (generation === this.openGeneration) {
+        this.loadingOlder = false
+        this.notifier.markDirty()
+      }
     }
   }
 
+  /**
+   * Release an off-screen conversation window while retaining interactions,
+   * projections, and scoped UI state. In-flight history cannot repopulate it;
+   * the next open reloads the previous window and resumes live ingestion.
+   */
+  releaseHistory(): void {
+    if (this.events.length > 0) this.releasedBaseSeq = this.baseSeq
+    this.openGeneration++
+    this.openPromise = null
+    this.openState = 'cold'
+    this.openError = null
+    this.loadingOlder = false
+    this.stitching = false
+    this.events = []
+    this.views = []
+    this.baseSeq = 0
+    this.hasMore = false
+    this.liveBuffer = []
+    this.subscribedLastSeq = null
+    this.conversation.replaceWindow([], false)
+    this.notifier.markDirty()
+    // Unobserved sessions otherwise retain their previous snapshot until read.
+    this.notifier.ensureFresh()
+  }
+
   /** Reconnect rebuild (manager calls this on onConnected for instances that were opened):
-   *  reset the window and rerun open; pending waits for the baseline replay. Invalidates any
-   *  in-flight open first — its history request rode the dead connection and must not settle
-   *  the fresh generation into 'error'. */
+   *  reset the window and rerun open. Pending waits were cleared at generation death; requested
+   *  frames replayed before this callback must survive the rebuild. Invalidates any in-flight
+   *  open first — its history request rode the dead connection and must not settle the fresh
+   *  generation into 'error'. */
   async resync(): Promise<void> {
     // The queue mirror is NOT cleared here: onConnected (which drives resync)
     // races the mux frames — the fresh generation's baseline may have landed
@@ -420,18 +450,18 @@ export class Session implements SessionFace {
     // session/subscribed frame instead (same stream as the queue snapshot
     // that follows it, so ordering is guaranteed).
     if (this.openState === 'cold') return // never opened: no window to rebuild (doOpen flips to 'loading' synchronously, so cold implies no in-flight open)
+    if (this.events.length > 0) this.releasedBaseSeq = this.baseSeq
     this.openGeneration++
     this.openPromise = null
     this.openState = 'cold'
     this.openError = null
+    this.loadingOlder = false
+    this.stitching = false
     this.events = []
     this.views = []
     this.baseSeq = 0
-    // Superseded, not settled: the baseline replay re-sends still-pending requested frames verbatim
-    // (same rpcId), re-minting fresh waits; a stale reference's respond() still reaches the host.
-    this.pending.clear()
-    this.pendingRev++
-    this.subscribedLastSeq = null
+    // Keep the latest baseline: session/subscribed can arrive before onConnected, and clearing it
+    // here would suppress the tail-gap pull needed to catch events beyond the first history page.
     this.liveBuffer = []
     this.notifier.markDirty()
     await this.open()
@@ -514,6 +544,14 @@ export class Session implements SessionFace {
     }
   }
 
+  /** Clear generation-scoped waits before a reconnecting mux can replay fresh requested frames. */
+  clearPendingForGeneration(): void {
+    if (this.pending.size === 0) return
+    this.pending.clear()
+    this.pendingRev++
+    this.notifier.markDirty()
+  }
+
   /**
    * Running-bit relay from the host stream (list entry and snapshot stay consistent).
    * @param running - the new running state.
@@ -578,10 +616,11 @@ export class Session implements SessionFace {
   }
 
   /**
-   * host/agent-error relay: the only outlet for live failures with no turn position.
-   * @param message - the stringified error.
+   * Host/agent-error relay: the only outlet for live failures with no turn position.
+   * @param message - the stringified error, or null when its connection generation ends.
    */
-  handleAgentError(message: string): void {
+  handleAgentError(message: string | null): void {
+    if (this.lastAgentError === message) return
     this.lastAgentError = message
     this.notifier.markDirty()
   }
@@ -616,7 +655,7 @@ export class Session implements SessionFace {
     this.openError = null
     this.notifier.markDirty()
     try {
-      let { result } = await this.history({ maxMessages: PAGE_MESSAGES })
+      let { result } = await this.openHistory(generation)
       if (generation !== this.openGeneration) return
       if (!result.ok) {
         this.openState = 'error'
@@ -627,11 +666,12 @@ export class Session implements SessionFace {
       // Gap detection: baseline past the window tail and liveBuffer did not cover it -> pull the tail page once more.
       const tailSeq = this.windowTailSeq()
       if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
-        result = (await this.history({ maxMessages: PAGE_MESSAGES })).result
+        result = (await this.openHistory(generation)).result
         if (generation !== this.openGeneration) return
         if (result.ok) this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
       }
       this.openState = 'open'
+      this.releasedBaseSeq = undefined
     } catch (error) {
       if (generation !== this.openGeneration) return
       this.openState = 'error'
@@ -641,6 +681,30 @@ export class Session implements SessionFace {
     } finally {
       if (generation === this.openGeneration) this.notifier.markDirty()
     }
+  }
+
+  /** Reload a released window far enough back to preserve saved scroll anchors. */
+  private async openHistory(generation: number): ReturnType<Session['history']> {
+    const response = await this.history({ maxMessages: PAGE_MESSAGES })
+    if (!response.result.ok || generation !== this.openGeneration || this.releasedBaseSeq === undefined) return response
+    const value = response.result.value
+    const pages = [value.events]
+    let firstSeq = value.events[0]?.event.seq
+    let hasMore = value.hasMore
+    while (hasMore && firstSeq !== undefined && firstSeq > this.releasedBaseSeq) {
+      const older = await this.history({ beforeSeq: firstSeq, maxMessages: PAGE_MESSAGES })
+      if (generation !== this.openGeneration || !older.result.ok) return older
+      const page = older.result.value
+      if (page.events.length === 0) {
+        hasMore = false
+        break
+      }
+      if (page.events.at(-1)?.event.seq !== firstSeq - 1) throw new Error('history page discontinuous while restoring released window')
+      pages.push(page.events)
+      firstSeq = page.events[0]?.event.seq
+      hasMore = page.hasMore
+    }
+    return { ...response, result: { ok: true, value: { ...value, events: pages.reverse().flat(), hasMore } } }
   }
 
   /** Install the history window + stitch the liveBuffer (seq is the sole dedup key).
@@ -717,9 +781,9 @@ export class Session implements SessionFace {
         this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
       }
     } catch (error) {
-      console.error('[web-runtime] gap repair failed:', error)
+      if (generation === this.openGeneration) console.error('[web-runtime] gap repair failed:', error)
     } finally {
-      this.stitching = false
+      if (generation === this.openGeneration) this.stitching = false
     }
   }
 

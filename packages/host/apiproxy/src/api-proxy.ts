@@ -118,6 +118,12 @@ import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-
 /** Page size when history is called without maxMessages. */
 const DEFAULT_MAX_MESSAGES = 50
 
+/** Maximum buffered event frames per live mux or host stream by default. */
+export const DEFAULT_EVENT_QUEUE_MAX_FRAMES = 4_096
+
+/** Maximum serialized event-envelope bytes per live mux or host stream by default. */
+export const DEFAULT_EVENT_QUEUE_MAX_BYTES = 2 * 1024 * 1024
+
 /**
  * Non-model settings namespaces intentionally served to the Web client. The
  * plugin-owned entries (`agent-loop`, `shell`, `web-search-brave`,
@@ -440,38 +446,183 @@ function presetFailure(request: RpcRequest<unknown>, error: unknown): RpcRespons
   return undefined
 }
 
-/** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up. */
+interface FrameQueueEntry<F> {
+  readonly item: F
+  readonly bytes: number
+}
+
+interface FrameQueueOptions<F> {
+  readonly label: string
+  readonly maxFrames: number
+  readonly maxBytes: number
+  readonly sizeOf: (item: F) => number
+}
+
+/** Error delivered to one carrier when its event consumer cannot keep up. */
+class FrameQueueOverflowError extends Error {
+  constructor(label: string, maxFrames: number, maxBytes: number, frames: number, bytes: number, itemBytes: number) {
+    const byItem = itemBytes > maxBytes
+    const limit = byItem
+      ? `${String(itemBytes)}-byte frame exceeds eventQueueMaxBytes=${String(maxBytes)}`
+      : frames > maxFrames
+        ? `eventQueueMaxFrames=${String(maxFrames)} reached`
+        : `eventQueueMaxBytes=${String(maxBytes)} reached`
+    super(`${label} closed because its consumer fell behind: ${limit} (${String(frames)} frames, ${String(bytes)} bytes); increase eventQueueMaxFrames or eventQueueMaxBytes`)
+    this.name = 'FrameQueueOverflowError'
+  }
+}
+
+/** Bounded async queue: core callbacks push, the AsyncIterable pulls, and termination releases every retained frame. */
 class FrameQueue<F> {
-  private buffer: F[] = []
+  private buffer: Array<FrameQueueEntry<F> | undefined> = []
+  private head = 0
+  private bufferedFrames = 0
+  private bufferedBytes = 0
   private waiter: (() => void) | undefined
   private done = false
+  private failure: Error | undefined
+  private cleanup: (() => void) | undefined
+  private cleanupComplete = false
+  private detachAbort: (() => void) | undefined
+
+  constructor(private readonly options: FrameQueueOptions<F>) {}
 
   push(item: F): void {
     if (this.done) return
-    this.buffer.push(item)
-    this.waiter?.()
+    let itemBytes: number
+    try {
+      itemBytes = this.options.sizeOf(item)
+    } catch (error: unknown) {
+      this.terminate(error instanceof Error ? error : new Error(String(error)))
+      return
+    }
+    const nextFrames = this.bufferedFrames + 1
+    const nextBytes = this.bufferedBytes + itemBytes
+    if (itemBytes > this.options.maxBytes || nextFrames > this.options.maxFrames || nextBytes > this.options.maxBytes) {
+      this.terminate(new FrameQueueOverflowError(
+        this.options.label,
+        this.options.maxFrames,
+        this.options.maxBytes,
+        nextFrames,
+        nextBytes,
+        itemBytes,
+      ))
+      return
+    }
+    this.buffer.push({ item, bytes: itemBytes })
+    this.bufferedFrames = nextFrames
+    this.bufferedBytes = nextBytes
+    this.wake()
   }
 
   end(): void {
-    this.done = true
-    this.waiter?.()
+    this.terminate()
   }
 
-  async *iterate(signal: AbortSignal, cleanup: () => void): AsyncGenerator<F> {
-    const onAbort = (): void => { this.end() }
-    signal.addEventListener('abort', onAbort, { once: true })
-    try {
-      while (true) {
-        while (this.buffer.length > 0) yield this.buffer.shift() as F
-        if (this.done || signal.aborted) return
-        await new Promise<void>((resolve) => { this.waiter = resolve })
-        this.waiter = undefined
-      }
-    } finally {
-      signal.removeEventListener('abort', onAbort)
-      cleanup()
+  /** Register cancellation and cleanup before the caller pulls its first frame. */
+  iterate(signal: AbortSignal, cleanup: () => void): AsyncIterableIterator<F> {
+    this.cleanup = cleanup
+    if (!this.done) {
+      const onAbort = (): void => { this.end() }
+      signal.addEventListener('abort', onAbort, { once: true })
+      this.detachAbort = () => { signal.removeEventListener('abort', onAbort) }
+      if (signal.aborted) this.end()
+    } else {
+      this.runCleanup()
+    }
+    const generator = this.consume(signal)
+    return {
+      next: (...args: [] | [unknown]) => generator.next(...args),
+      return: async (value) => {
+        this.end()
+        return generator.return(value)
+      },
+      throw: async (reason) => {
+        this.terminate(reason instanceof Error ? reason : new Error(String(reason)))
+        return generator.throw(reason)
+      },
+      [Symbol.asyncIterator]() { return this },
     }
   }
+
+  private async *consume(signal: AbortSignal): AsyncGenerator<F> {
+    try {
+      while (true) {
+        if (this.failure !== undefined) throw this.failure
+        const entry = this.take()
+        if (entry !== undefined) {
+          yield entry.item
+          continue
+        }
+        if (this.done || signal.aborted) return
+        await new Promise<void>((resolve) => { this.waiter = resolve })
+      }
+    } finally {
+      this.terminate()
+    }
+  }
+
+  private take(): FrameQueueEntry<F> | undefined {
+    const entry = this.buffer[this.head]
+    if (entry === undefined) return undefined
+    this.buffer[this.head] = undefined
+    this.head += 1
+    this.bufferedFrames -= 1
+    this.bufferedBytes -= entry.bytes
+    const remaining = this.buffer.length - this.head
+    if (remaining === 0) {
+      this.buffer = []
+      this.head = 0
+    } else if (this.head >= this.options.maxFrames || this.head >= remaining) {
+      this.buffer = this.buffer.slice(this.head)
+      this.head = 0
+    }
+    return entry
+  }
+
+  private terminate(failure?: Error): void {
+    if (this.done) {
+      if (failure !== undefined && this.failure === undefined) this.failure = failure
+      this.runCleanup()
+      this.wake()
+      return
+    }
+    this.done = true
+    this.failure = failure
+    this.buffer = []
+    this.head = 0
+    this.bufferedFrames = 0
+    this.bufferedBytes = 0
+    this.wake()
+    this.runCleanup()
+  }
+
+  private wake(): void {
+    const waiter = this.waiter
+    this.waiter = undefined
+    waiter?.()
+  }
+
+  private runCleanup(): void {
+    this.detachAbort?.()
+    this.detachAbort = undefined
+    if (this.cleanupComplete || this.cleanup === undefined) return
+    this.cleanupComplete = true
+    const cleanup = this.cleanup
+    this.cleanup = undefined
+    cleanup()
+  }
+}
+
+/** Count the full server-request JSON envelope plus the desktop NDJSON newline. */
+function serverRequestBytes(frame: RpcRequest<MuxFrame | HostFrame>): number {
+  const envelope = {
+    type: 'server-request' as const,
+    rpcId: frame.rpcId,
+    method: frame.payload.type,
+    payload: frame.payload,
+  }
+  return Buffer.byteLength(JSON.stringify(envelope), 'utf8') + 1
 }
 
 /**
@@ -732,6 +883,10 @@ export interface ApiProxyDefaults {
   sessionExportCompressionLevel?: SessionLogCompressionLevel
   /** Maximum artifact size eligible for one cold blankness read. */
   coldBlankProbeMaxBytes?: number
+  /** Maximum buffered frames per live mux or host event stream. */
+  eventQueueMaxFrames?: number
+  /** Maximum serialized server-request bytes buffered per live mux or host event stream. */
+  eventQueueMaxBytes?: number
   /**
    * Whether handing a path to the native opener can work at all — the
    * `hasDocument` capability the preset roster reports, and the switch
@@ -1182,6 +1337,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
   const fileViewMaxBytes = defaults.fileViewMaxBytes ?? DEFAULT_FILE_VIEW_MAX_BYTES
+  const eventQueueMaxFrames = defaults.eventQueueMaxFrames ?? DEFAULT_EVENT_QUEUE_MAX_FRAMES
+  const eventQueueMaxBytes = defaults.eventQueueMaxBytes ?? DEFAULT_EVENT_QUEUE_MAX_BYTES
   /** The seed model each create/resume declares; re-read so it never goes stale. */
   const agentOptions = (): AgentOptions => {
     const { provider, model } = defaults.defaultModelSelection()
@@ -3630,7 +3787,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
     events: {
       mux(_request, signal) {
-        const queue = new FrameQueue<RpcRequest<MuxFrame>>()
+        const queue = new FrameQueue<RpcRequest<MuxFrame>>({
+          label: 'events.mux',
+          maxFrames: eventQueueMaxFrames,
+          maxBytes: eventQueueMaxBytes,
+          sizeOf: serverRequestBytes,
+        })
         muxQueues.add(queue)
         for (const session of ctx.sessions.list()) {
           subscribeSession(queue, session)
@@ -3734,7 +3896,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       host(_request, signal) {
-        const queue = new FrameQueue<RpcRequest<HostFrame>>()
+        const queue = new FrameQueue<RpcRequest<HostFrame>>({
+          label: 'events.host',
+          maxFrames: eventQueueMaxFrames,
+          maxBytes: eventQueueMaxBytes,
+          sizeOf: serverRequestBytes,
+        })
         const committedWorkspaces = ctx.workspaceRegistry.list()
         const committedWorkspaceIds = new Set(
           committedWorkspaces.map(workspace => String(workspace.id)),

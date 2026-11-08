@@ -1,22 +1,23 @@
 /** Read-only `cordis_define` card with Host and Client source tabs. */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import {
   CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, StateDot,
 } from '@shres-code/shres-code-client-ui-primitives'
-import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { CallId } from '@shres-code/shres-code-client-runtime/client'
+import type { InjectFace, PropsLocale, PropsStore } from '@shres-code/shres-code-client-ui-slots'
 import type { ToolCallViewProps } from '@shres-code/shres-code-client-ui-tool/client'
 import { cordisDefineCard, type CordisToolState } from './card-model.ts'
+import type { CordisDefineViewStore, CordisSourceTab } from './define-view-store.ts'
 import type { CordisCardFace } from './slots.ts'
 import { cordisVisibleStatus, type CordisVisibleStatus } from './status.ts'
 import type { CordisKey } from './locales.ts'
 import css from './CordisDefineRow.module.css'
 
 /** Full card props composed by the keyed Tool slot. */
-export type CordisDefineRowProps = ToolCallViewProps & InjectFace<CordisCardFace> & PropsLocale<'cordis'>
+export type CordisDefineRowProps = ToolCallViewProps & PropsStore<CordisDefineViewStore> & InjectFace<CordisCardFace> & PropsLocale<'cordis'>
 
 type CardReading = CordisVisibleStatus | 'removed'
-type SourceTab = 'client' | 'host'
 
 const READING_LABELS = {
   idle: 'status.idle',
@@ -44,13 +45,14 @@ function leadingFor(state: CordisToolState): ReactNode {
 
 /** Render one immutable Package definition. */
 export function CordisDefineRow({
-  callId, block, inspect, useInventory, useLoaded, t,
+  callId, block, inspect, useInventory, useLoaded, useStore, actions, expanded, onExpandedChange, t,
 }: CordisDefineRowProps) {
   const card = cordisDefineCard(block)
   const inventory = useInventory(snapshot => snapshot)
   const loaded = useLoaded(snapshot => snapshot)
-  const [expanded, setExpanded] = useState(false)
-  const [selectedSource, setSelectedSource] = useState<SourceTab>(card.clientCode !== null ? 'client' : 'host')
+  const id = callId as CallId
+  const defaultSource: CordisSourceTab = card.clientCode !== null ? 'client' : 'host'
+  const selectedSource = useStore(state => state.sourceByCall[id] ?? defaultSource)
   const sourcePanelId = useId()
 
   const row = card.pluginId === null
@@ -66,7 +68,7 @@ export function CordisDefineRow({
   const open = expanded && expandable
   const a11yState = stateStatus(card.state)
   const hasSource = card.clientCode !== null || card.hostCode !== null
-  const activeSource: SourceTab = selectedSource === 'client' && card.clientCode !== null
+  const activeSource: CordisSourceTab = selectedSource === 'client' && card.clientCode !== null
     ? 'client'
     : selectedSource === 'host' && card.hostCode !== null
       ? 'host'
@@ -94,7 +96,7 @@ export function CordisDefineRow({
         expandable={expandable}
         expandOnRowClick
         keepContentWhenOpen
-        onToggle={() => { setExpanded(value => !value) }}
+        onToggle={() => { onExpandedChange(!open) }}
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />
@@ -128,7 +130,7 @@ export function CordisDefineRow({
                       aria-selected={activeSource === source}
                       className={activeSource === source ? `${css.sourceTab} ${css.sourceTabActive}` : css.sourceTab}
                       disabled={!available}
-                      onClick={() => { setSelectedSource(source) }}
+                      onClick={() => { actions.setSource(id, source) }}
                     >
                       {t(source === 'client' ? 'body.clientCode' : 'body.hostCode')}
                     </button>

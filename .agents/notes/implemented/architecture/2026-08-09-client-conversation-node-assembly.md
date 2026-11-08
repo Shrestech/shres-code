@@ -152,7 +152,7 @@ A Definition owns at most one view target; state-only Definitions omit both `tar
 
 The engine exposes no fixed `end()` lifecycle. A single-Event business completes in `start()`, a multi-Event business records completion in its own update, and a long-lived instantaneous-state business creates a new Context for every Event.
 
-Step and Turn closure are external Location facts and do not mutate business State. A boundary change replays and builds affected Contexts; each business combines its own completion State with whether its Location is closed to produce normal, running, or interrupted presentation.
+Step and Turn closure are external Location facts and do not mutate business State. A boundary change replays and builds affected Contexts by default; `locationUpdates: 'project'` instead preserves State for Definitions whose reducers neither retain nor derive State from changing Location metadata. Both modes refresh Matches and rebuild Location data and view Nodes; history and predecessor changes still replay. See the [long-chat performance decision](2026-11-08-desktop-long-chat-performance.md). Each business combines its own completion State with whether its Location is closed to produce normal, running, or interrupted presentation.
 
 IDs are never reused. Completed Contexts remain in the current window, providing stable render identity and possible predecessor evidence for later Readers.
 

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { ContextMessageNode } from '@shres-code/shres-code-client-runtime/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { DisclosureRow, IconBrowseOutline16 } from '@shres-code/shres-code-client-ui-primitives'
@@ -15,6 +14,10 @@ export interface ContextInjectionRowProps {
   form: ContextMessageNode['form']
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
+  /** Session-scoped disclosure state for this Chat node. */
+  open: boolean
+  /** Toggle the session-scoped disclosure state. */
+  onToggle: () => void
 }
 
 /**
@@ -28,8 +31,7 @@ export interface ContextInjectionRowProps {
  * @param props - Durable content, its projected producer role/name and form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
-export function ContextInjectionRow({ content, source, provenance, form, t }: ContextInjectionRowProps) {
-  const [open, setOpen] = useState(false)
+export function ContextInjectionRow({ content, source, provenance, form, t, open, onToggle }: ContextInjectionRowProps) {
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
   const { rendered, summary, body } = contextBody(form, { content, source, t })
@@ -59,7 +61,7 @@ export function ContextInjectionRow({ content, source, provenance, form, t }: Co
       open={open}
       expandable
       expandOnRowClick
-      onToggle={() => { setOpen(value => !value) }}
+      onToggle={onToggle}
     >
       <div className={css.body} data-context-injection-body data-context-form={rendered ?? undefined}>
         {body}

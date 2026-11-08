@@ -30,11 +30,11 @@ const VARIANT_ICONS: Record<ToolRowVariant, ReactNode> = {
 }
 
 /** Card props: the owner payload plus the render site's locale seat (plain prop). */
-export interface GenericToolCardProps extends ToolCallOwnerProps {
+export type GenericToolCardProps = ToolCallOwnerProps & {
   t: ToolTreeProps['t']
 }
 
-export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: GenericToolCardProps) {
+export function GenericToolCard({ toolName, block, cwd, openFile, inspect, expanded, onExpandedChange, t }: GenericToolCardProps) {
   const model = toolRowModel(toolName, block, cwd)
   const terminal = terminalCardModel(block, cwd)
   const read = readCardModel(block, cwd)
@@ -77,6 +77,8 @@ export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: 
       filePath={model.filePath}
       onOpenFile={singleFile ? openFile : undefined}
       inspect={inspect}
+      expanded={expanded}
+      onExpandedChange={onExpandedChange}
     />
   )
 }

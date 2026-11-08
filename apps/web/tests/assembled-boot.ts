@@ -65,6 +65,7 @@ class ResizeObserverStub {
 
 const win = window as FixtureWindow
 let unmount: (() => void) | undefined
+let restoreLayout = (): void => {}
 
 /**
  * Register the per-test jsdom setup and teardown the assembled boot needs:
@@ -87,12 +88,23 @@ export function installAssembledBootEnv(): void {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
       setTimeout(() => { callback(0) }, 0) as unknown as number)
     vi.stubGlobal('cancelAnimationFrame', (id: number) => { clearTimeout(id) })
+    // These assembly scenarios inspect every card in the 78-node fixture
+    // tail. A measurable viewport exposes that tail through the virtualizer;
+    // browser scroll and stress lanes own viewport-sized mounting behavior.
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute('data-conversation-scroll') ? 10_000 : 0
+    })
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute('data-conversation-scroll') ? 1280 : 0
+    })
+    restoreLayout = () => { height.mockRestore(); width.mockRestore() }
   })
 
   afterEach(() => {
     act(() => { unmount?.() })
     unmount = undefined
     cleanup()
+    restoreLayout()
     delete win.__SHRES_BOOT__
     delete win.__ModuleLoader__
     document.body.innerHTML = ''
