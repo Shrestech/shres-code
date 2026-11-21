@@ -47,7 +47,10 @@ import { ExtensionLoadError, OwnedChrome } from './chrome.ts'
 import { acquireRuntimeLease, LEASE_FILE_NAME, LeaseRefusedError, type HeldRuntimeLease, type LeaseCleanupHooks } from './lease.ts'
 import { isOwnedChromeProcess } from './process-group.ts'
 import { SessionRegistry } from './sessions.ts'
-import { artifactPaths, ensureLaunchArtifacts, preflight, ProvisionRefusedError, provisionArtifacts, readProvisionedState, type ProvisionedState } from './provision.ts'
+import {
+  artifactPaths, ensureLaunchArtifacts, preflight, ProvisionRefusedError, provisionArtifacts,
+  readProvisionedRecord, type StoredProvisionedState,
+} from './provision.ts'
 import type { ResolvedBrowserSkillConfig } from '../config.ts'
 import { isJsonValue } from '@shres-code/shres-code-session'
 import type { JsonValue } from '@shres-code/shres-code-session/types'
@@ -163,6 +166,7 @@ export interface BrowserSkillRuntimeInternals {
   provision?: typeof provisionArtifacts
   preflight?: typeof preflight
   ensureLaunchArtifacts?: typeof ensureLaunchArtifacts
+  readProvisionedRecord?: typeof readProvisionedRecord
   pickDaemonPort?: typeof pickAvailableLoopbackPort
   acquireLease?: typeof acquireRuntimeLease
   reservePort?: typeof reserveLoopbackPort
@@ -209,7 +213,7 @@ export class BrowserSkillRuntime {
   private state: BrowserSkillState = { kind: 'absent' }
   private operation: BrowserSkillOperation | undefined
   private chromeVersion: string | undefined
-  private provisioned: ProvisionedState | undefined
+  private provisioned: StoredProvisionedState | undefined
   private lease: HeldRuntimeLease | undefined
   private defaultPortHold: PortReservation | undefined
   private runner: BskRunner | undefined
@@ -235,6 +239,7 @@ export class BrowserSkillRuntime {
       provision: provisionArtifacts,
       preflight,
       ensureLaunchArtifacts,
+      readProvisionedRecord,
       pickDaemonPort: pickAvailableLoopbackPort,
       acquireLease: acquireRuntimeLease,
       reservePort: reserveLoopbackPort,
@@ -242,12 +247,27 @@ export class BrowserSkillRuntime {
     })
   }
 
-  /** Read the durable artifact record so a constructed runtime reports provisioned state. */
+  /**
+   * Read the durable artifact record so a constructed runtime reports what is
+   * actually installed. A record that does not equal this build's pins is
+   * `outdated`, never `provisioned` — a healthy-looking card whose Open always
+   * fails until the pinned release is installed.
+   */
   async refreshProvisioned(): Promise<void> {
-    const state = await readProvisionedState(this.root)
-    if (state === undefined) return
-    this.provisioned = state
-    if (this.state.kind === 'absent') this.setState({ kind: 'provisioned' })
+    const record = await this.internals().readProvisionedRecord(this.root)
+    if (record === undefined) return
+    this.provisioned = record.state
+    if (this.state.kind !== 'absent') return
+    if (record.kind === 'current') {
+      this.setState({ kind: 'provisioned' })
+      return
+    }
+    this.setState({
+      kind: 'outdated',
+      installed: { bsk: record.state.bsk.version, extension: record.state.extension.version },
+      pinned: { bsk: BSK_VERSION, extension: EXTENSION_VERSION },
+      changes: record.changes,
+    })
   }
 
   /**
@@ -262,8 +282,8 @@ export class BrowserSkillRuntime {
       ...(this.chromeVersion === undefined ? {} : { chrome: { version: this.chromeVersion } }),
       ...(this.provisioned === undefined ? {} : {
         artifacts: {
-          bsk: { version: BSK_VERSION, sha256: this.provisioned.bsk.binarySha256 },
-          extension: { version: EXTENSION_VERSION, sha256: this.provisioned.extension.archiveSha256 },
+          bsk: { version: this.provisioned.bsk.version, sha256: this.provisioned.bsk.binarySha256 },
+          extension: { version: this.provisioned.extension.version, sha256: this.provisioned.extension.archiveSha256 },
         },
       }),
       consent: {
@@ -388,7 +408,9 @@ export class BrowserSkillRuntime {
   private async runVerb(verb: BrowserSkillVerb, options: BrowserSkillStartOptions | undefined, signal: AbortSignal): Promise<void> {
     switch (verb) {
       case 'provision':
-        if (this.provisioned === undefined) await this.provisionUnderLease(signal)
+        // Update runs the same consented flow as a first install: a record
+        // that no longer equals the pins must install the pinned release.
+        if (this.provisioned === undefined || this.state.kind === 'outdated') await this.provisionUnderLease(signal)
         // Already ready: the stack is up under the held lease, so reopen is a
         // no-op success — reacquiring our own lease would refuse and poison a
         // healthy state.
@@ -396,6 +418,12 @@ export class BrowserSkillRuntime {
         await this.openUnderLease(signal)
         return
       case 'open':
+        // Outdated refuses before preflight and before any lease, so the
+        // answer never depends on the installed Chrome and the UI can always
+        // offer Update instead.
+        if (this.state.kind === 'outdated') {
+          throw new ProvisionRefusedError({ kind: 'outdated', installed: this.state.installed, pinned: this.state.pinned })
+        }
         // Already ready: reopen is a no-op success for the same reason.
         if (this.state.kind === 'ready') return
         await this.openUnderLease(signal)

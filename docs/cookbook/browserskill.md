@@ -10,8 +10,8 @@ The managed browser does not use your everyday Chrome profile. Any account you s
 
 ## 1. Review and install
 
-1. Open **Settings → BrowserSkill**.
-2. Review the download URLs, pinned versions and hashes, install and profile locations, extension permissions, and update-metadata endpoint. Update-metadata requests continue even with automatic updates disabled.
+1. Open **Settings → BrowserSkill**. In the desktop app, first enable the optional BrowserSkill bundle under **Plugins → Bundles**, then quit and reopen Shres Code; a desktop profile ships the bundle unselected.
+2. Review the download URLs, pinned versions and hashes, install and profile locations, extension permissions, and update-metadata endpoint. Update-metadata requests continue even with automatic updates disabled. The pinned extension asks for 13 permissions, including `offscreen` for its offscreen document and `tabGroups` for group control.
 3. Choose **Install** to authorize provisioning and opening the browser together. No runtime download begins before this action.
 4. Wait for **Ready** and the separate Chrome window. Ready means the host has verified and paired its own daemon and extension instance, not merely copied a skill.
 
@@ -27,7 +27,11 @@ The agent uses the native browser tools and a session owned by that conversation
 
 Stopping the conversation's browser session does not close the managed browser. Other conversations use their own sessions; they cannot use yours.
 
-## 3. Close and reopen
+## 3. Update a runtime from an earlier Shres release
+
+When Shres ships a newer pinned BrowserSkill release, a runtime installed by an earlier build opens the settings card as **Update BrowserSkill runtime** instead of Ready. Review the installed and pinned versions and any permissions the update adds, then choose **Update runtime**. It runs the same consented provisioning as a first install and ends Ready; declining leaves the card in place, the old artifacts on disk, and the browser closed.
+
+## 4. Close and reopen
 
 1. Return to **Settings → BrowserSkill** and choose **Close browser**.
 2. Wait for **Browser closed. The BrowserSkill daemon is stopped.** before quitting Shres.
@@ -35,7 +39,7 @@ Stopping the conversation's browser session does not close the managed browser. 
 
 A disconnected browser requires an explicit Open; Shres does not silently relaunch it. If teardown is incomplete, the ownership lock stays in place. Resolve the reported leftover process and retry Close rather than deleting its files. Host-exit limits and stale ownership recovery are described in the [runtime reference](../../packages/browser/browserskill/README.md#known-limitations-and-deferred-work).
 
-## 4. Reset or remove the managed installation
+## 5. Reset or remove the managed installation
 
 **Reset…** asks for confirmation before closing the browser and deleting the managed profile, including its sign-ins. The next Open creates a fresh profile.
 

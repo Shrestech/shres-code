@@ -13,19 +13,29 @@ import {
 } from 'node:fs'
 import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
-import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@shres-code/cordis'
 import type { PatchOptions } from '@shres-code/cordis-plugin-include'
+import type { EntryOptions } from '@shres-code/cordis-plugin-loader'
 import {
   boot,
   composeEntries,
+  flattenProfileRows,
   healProfilesModuleFallback,
+  listProfileBundles,
   loadLayeredEnv,
   loadOverlayPatches,
   loadProfileDirectory,
+  nodePnpmRunner,
+  OPTIONAL_BUNDLES,
   provideProfileRuntime,
+  resolveProfile,
+  setBundleEnabled,
+  setPluginEnabled,
   type Profile,
+  type ProfileMutationCandidate,
+  type ProfileRuntimeControl,
 } from '@shres-code/shres-code-app-boot'
 import { provideCmdline } from '@shres-code/shres-code-cmdline'
 import { SHRES_LAUNCH_ENVIRONMENT_KEY } from '@shres-code/shres-code-launch-environment'
@@ -224,6 +234,69 @@ function desktopComposition(
     }])
   }
   return { installAnchor, profile, patches: layers.flat() }
+}
+
+/**
+ * Bundle names the desktop profile may select: the booted layers followed by
+ * every optional bundle the installation ships.
+ * @param bootBundles - bundle package names captured at boot, in composition order.
+ * @returns the shipped bundle names without duplicates.
+ */
+export function desktopShippedBundles(bootBundles: readonly string[]): string[] {
+  return [...new Set([...bootBundles, ...OPTIONAL_BUNDLES])]
+}
+
+/**
+ * Desktop profile control: every accepted change is saved for the next launch
+ * because the running composition is never reconciled. A row the desktop
+ * patch outranks reports `overridden` instead of a success the next boot would
+ * not show.
+ * @param composition - the profile, install anchor, and patch source this host booted.
+ * @returns the control the pluginAdmin namespace drives.
+ */
+export function desktopProfileControl(composition: DesktopComposition): ProfileRuntimeControl {
+  const bootBundles = composition.profile.layers.map(layer => layer.packageName)
+  const shippedBundles = desktopShippedBundles(bootBundles)
+  const options = {
+    runner: nodePnpmRunner,
+    invokingCwd: composition.profile.dir,
+    installAnchor: composition.installAnchor,
+    shippedBundles,
+  }
+  /** The one row the candidate composition leaves for `id`, when a row exists at all. */
+  const candidateRow = (candidate: ProfileMutationCandidate, id: string): EntryOptions | undefined => {
+    const layers: PatchOptions[][] = [
+      ...resolveProfile(NAME, basename(composition.profile.dir), composition.profile.dir, {
+        shres: { profile: { bundles: [...candidate.bundles] } },
+      }, composition.installAnchor, { userLayer: false }).layers.map(layer => layer.patches),
+      [...candidate.profilePatches],
+      loadOverlayPatches(NAME, DESKTOP_PATCH),
+    ]
+    const targets = flattenProfileRows(composeEntries(layers)).filter(row => row.id === id)
+    return targets.length === 1 ? targets[0] : undefined
+  }
+  return {
+    listBundles: () => listProfileBundles(composition.profile.dir, bootBundles, {
+      installAnchor: composition.installAnchor,
+      shippedBundles,
+    }),
+    setBundleEnabled: (name, enabled, signal) => setBundleEnabled(composition.profile.dir, name, enabled, {
+      ...options,
+      signal,
+      apply: () => Promise.resolve('restart-required'),
+    }),
+    setPluginEnabled: (request, signal) => setPluginEnabled(composition.profile.dir, request, {
+      ...options,
+      signal,
+      apply: (candidate) => {
+        const row = candidateRow(candidate, request.id)
+        // A row that is absent, grouped, or expression-disabled cannot be
+        // verified against the request, so it is never reported as a success.
+        const honored = row !== undefined && typeof row.disabled === 'boolean' && row.disabled === !request.enabled
+        return Promise.resolve(honored ? 'restart-required' : 'overridden')
+      },
+    }),
+  }
 }
 
 function appVersionOf(runtimeDir: string): string {
@@ -454,10 +527,17 @@ export async function runDesktopHost(
     // Before any config-tree entry mounts, so every plugin reads the same
     // immutable launch-environment provenance snapshot.
     hostCtx.provide(SHRES_LAUNCH_ENVIRONMENT_KEY, environment)
+    // This app owns its profile and ships no package manager, so it accepts
+    // bundle selection and row overrides for the next launch and refuses
+    // package installs. A Windows build inherits the shared core's platform
+    // refusal for the same operations.
     provideProfileRuntime(hostCtx, {
       profileDir: absoluteProject,
       bootBundles: composition.profile.layers.map(layer => layer.packageName),
-      pluginMutations: 'unsupported',
+      pluginMutations: { activation: process.platform !== 'win32', packages: false },
+      installAnchor: composition.installAnchor,
+      shippedBundles: desktopShippedBundles(composition.profile.layers.map(layer => layer.packageName)),
+      control: desktopProfileControl(composition),
     })
     // The desktop composition runs without the webserver row, while the
     // client-modules and client-connection node halves statically inject

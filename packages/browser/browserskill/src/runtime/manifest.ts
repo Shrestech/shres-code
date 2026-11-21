@@ -1,9 +1,11 @@
 /**
  * Pinned BrowserSkill release facts, recorded in source from measured
- * evidence. Every hash here was computed from the exact release bytes: the
- * extension zip and the darwin-arm64 CLI archive were hashed locally and the
- * archive hash independently matches the upstream `version.json` entry; the
- * extracted binary hash comes from the verified pilot probe. Platform support
+ * evidence. Every hash here was computed from the exact release bytes of the
+ * pinned version: the extension zip and the darwin-arm64 CLI archive were
+ * hashed locally, the archive hash independently matches the upstream
+ * `version.json` entry, and the extracted binary and unpacked tree were
+ * hashed without executing the CLI. The bump procedure is
+ * [docs/cookbook/browserskill-pin-bump.md](../../../../../docs/cookbook/browserskill-pin-bump.md). Platform support
  * is initially darwin-arm64 only — the only platform with measured evidence —
  * and every other platform refuses before any download.
  *
@@ -14,10 +16,10 @@ import type { ResolvedBrowserSkillConfig } from '../config.ts'
 import type { BrowserSkillConsentDownload } from '../types.ts'
 
 /** Pinned bsk CLI version. */
-export const BSK_VERSION = '0.3.1'
+export const BSK_VERSION = '0.5.0'
 
 /** Pinned Chrome extension version. */
-export const EXTENSION_VERSION = '0.3.1'
+export const EXTENSION_VERSION = '0.5.0'
 
 /** Upstream release tag carrying the CLI archives. */
 export const BSK_RELEASE_TAG = `cli-v${BSK_VERSION}`
@@ -65,7 +67,7 @@ export const CHROME_MINIMUM_MAJOR = 125
 /** The pinned extension's `permissions`, recorded from the verified zip's manifest. */
 export const EXTENSION_PERMISSIONS: readonly string[] = [
   'alarms', 'activeTab', 'debugger', 'downloads', 'idle',
-  'notifications', 'scripting', 'tabs', 'storage', 'webNavigation', 'windows',
+  'notifications', 'offscreen', 'scripting', 'tabs', 'tabGroups', 'storage', 'webNavigation', 'windows',
 ]
 
 /** The pinned extension's `host_permissions`. */
@@ -83,7 +85,7 @@ export const DEFAULT_UPDATE_MANIFEST_URL = 'https://github.com/Tencent/BrowserSk
  * resolves through `releases/latest`; an artifact mirror replaces it only via
  * the config's `artifactBaseUrl`.
  */
-export const BSK_ARCHIVE_URL = 'https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.3.1/bsk-v0.3.1-aarch64-apple-darwin.tar.gz'
+export const BSK_ARCHIVE_URL = 'https://github.com/Tencent/BrowserSkill/releases/download/cli-v0.5.0/bsk-v0.5.0-aarch64-apple-darwin.tar.gz'
 
 /** One pinned release asset: exact URL and the SHA-256 the bytes must match. */
 export interface PinnedArtifact {
@@ -97,7 +99,7 @@ export interface PinnedArtifact {
  * hash is the extracted executable the probe verified, rechecked before every
  * spawn.
  */
-export const BSK_DARWIN_ARM64_ASSET = 'bsk-v0.3.1-aarch64-apple-darwin.tar.gz'
+export const BSK_DARWIN_ARM64_ASSET = 'bsk-v0.5.0-aarch64-apple-darwin.tar.gz'
 
 /** Platform pin for the only measured platform. */
 export interface BskPlatformPin {
@@ -115,8 +117,8 @@ export interface BskPlatformPin {
 export const BSK_PLATFORM_PIN: BskPlatformPin = {
   platform: 'darwin-arm64',
   assetName: BSK_DARWIN_ARM64_ASSET,
-  archiveSha256: '78f1651215b1ce95e40fb886985d1476e2cd2fb089beb146e6ecc6fa4a4aab89',
-  binarySha256: 'bba24de58d403625268ffd6bbef31cdedb2d06eb031e9d0d1773120f4c0578bc',
+  archiveSha256: 'a16b66ab9d3629045d663f645fd2c2b8f544116ac3cc9efb94b34867fcfe1756',
+  binarySha256: '29687fa084a658a0d2cb285e796abcac0631994e3da24a24db6af050d6fadea3',
 }
 
 /**
@@ -124,8 +126,8 @@ export const BSK_PLATFORM_PIN: BskPlatformPin = {
  * SHA-256 of that asset, verified byte-identical to the release download.
  */
 export const EXTENSION_ASSET: PinnedArtifact = {
-  url: 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.3.1/browser-skill-extension-v0.3.1-chrome.zip',
-  sha256: '9d41a8450653dbdcea365b611a163d9ddbbf0c0078bff42dbe8e2cf5910cbb8e',
+  url: 'https://github.com/Tencent/BrowserSkill/releases/download/ext-v0.5.0/browser-skill-extension-v0.5.0-chrome.zip',
+  sha256: '4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9',
 }
 
 /**
@@ -139,7 +141,7 @@ export const EXTENSION_ASSET: PinnedArtifact = {
  * verification failure, never a digest input. The state record stores this
  * digest only as a receipt — the manifest pin is the trust anchor.
  */
-export const EXTENSION_TREE_SHA256 = '5219928bf1f28edafff4082e6d2cde93bfaad2e54e96c10e22906bed83684662'
+export const EXTENSION_TREE_SHA256 = '4937bd2a7c4a057be4bede3aded22d2a008e345e984a9c87968b1308a1478b45'
 
 /**
  * Resolve the platform pin for the running process.

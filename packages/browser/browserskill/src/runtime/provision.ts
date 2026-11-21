@@ -36,6 +36,8 @@ import {
   BSK_VERSION,
   CHROME_MINIMUM_MAJOR,
   EXTENSION_ASSET,
+  EXTENSION_HOST_PERMISSIONS,
+  EXTENSION_PERMISSIONS,
   EXTENSION_TREE_SHA256,
   EXTENSION_VERSION,
   bskArchiveUrl,
@@ -44,7 +46,7 @@ import {
 } from './manifest.ts'
 import { ArtifactTreeError, computeTreeDigest, extractTarArchive, extractZipArchive, sha256Bytes, sha256File, soleFile } from './extract.ts'
 import type { ResolvedBrowserSkillConfig } from '../config.ts'
-import type { BrowserSkillRefusal } from '../types.ts'
+import type { BrowserSkillRefusal, BrowserSkillUpgradeChanges } from '../types.ts'
 
 /** Provisioning or launch verification refused; the reason is user-displayable. */
 export class ProvisionRefusedError extends Error {
@@ -57,7 +59,7 @@ export class ProvisionRefusedError extends Error {
 /** The durable record of what provisioning published. */
 export interface ProvisionedState {
   /** Record format version; bumped only on an incompatible change. */
-  version: 1
+  version: 2
   bsk: {
     /** Pinned CLI version. */
     version: string
@@ -77,8 +79,25 @@ export interface ProvisionedState {
     archiveSha256: string
     /** Tree digest receipt; {@link EXTENSION_TREE_SHA256} is the trust anchor. */
     treeDigest: string
+    /** The extension's declared permissions at provisioning, as consent disclosed them. */
+    permissions: readonly string[]
+    /** The extension's declared host permissions at provisioning. */
+    hostPermissions: readonly string[]
   }
 }
+
+/**
+ * A version-1 record: enough to name the installed artifacts, but it carries
+ * no permission receipt, so it is classified as outdated and never launched.
+ */
+export interface LegacyProvisionedState {
+  version: 1
+  bsk: ProvisionedState['bsk']
+  extension: Omit<ProvisionedState['extension'], 'permissions' | 'hostPermissions'>
+}
+
+/** Any parseable record on disk, whatever its format version. */
+export type StoredProvisionedState = ProvisionedState | LegacyProvisionedState
 
 /**
  * The integrity pins one provisioning or verification run is measured
@@ -113,10 +132,11 @@ export function manifestArtifactPins(): ArtifactPins {
 /** Validate persisted provisioning state at the durable boundary. Records
  * from before the tree-digest receipt are refused: they name artifacts that
  * were never verified as a tree, so they provision again instead of loading. */
-function parseProvisionedState(raw: unknown): ProvisionedState | undefined {
+function parseProvisionedState(raw: unknown): StoredProvisionedState | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
   const wire = raw as Record<string, unknown>
-  if (wire.version !== 1 || typeof wire.bsk !== 'object' || wire.bsk === null || typeof wire.extension !== 'object' || wire.extension === null) {
+  if ((wire.version !== 1 && wire.version !== 2) || typeof wire.bsk !== 'object' || wire.bsk === null
+    || typeof wire.extension !== 'object' || wire.extension === null) {
     return undefined
   }
   const bsk = wire.bsk as Record<string, unknown>
@@ -129,10 +149,25 @@ function parseProvisionedState(raw: unknown): ProvisionedState | undefined {
   ) {
     return undefined
   }
+  const bskState = {
+    version: bsk.version, executablePath: bsk.executablePath, binarySha256: bsk.binarySha256, archiveSha256: bsk.archiveSha256,
+  }
+  const extensionState = {
+    version: extension.version, dir: extension.dir, archiveSha256: extension.archiveSha256, treeDigest: extension.treeDigest,
+  }
+  if (wire.version === 1) return { version: 1, bsk: bskState, extension: extensionState }
+  const permissions = extension.permissions
+  const hostPermissions = extension.hostPermissions
+  if (
+    !Array.isArray(permissions) || !permissions.every(entry => typeof entry === 'string') ||
+    !Array.isArray(hostPermissions) || !hostPermissions.every(entry => typeof entry === 'string')
+  ) {
+    return undefined
+  }
   return {
-    version: 1,
-    bsk: { version: bsk.version, executablePath: bsk.executablePath, binarySha256: bsk.binarySha256, archiveSha256: bsk.archiveSha256 },
-    extension: { version: extension.version, dir: extension.dir, archiveSha256: extension.archiveSha256, treeDigest: extension.treeDigest },
+    version: 2,
+    bsk: bskState,
+    extension: { ...extensionState, permissions, hostPermissions },
   }
 }
 
@@ -155,16 +190,114 @@ export function artifactPaths(root: string): { bskExecutable: string; extensionD
  * from a crashed run is recognizable without trusting directory contents. */
 const STAGING_PREFIX = 'staging-'
 
+/** The classification of what is installed against the pins this build runs. */
+export type ProvisionedRecord = {
+  /** Every receipted fact equals the pins; the only launchable classification. */
+  kind: 'current'
+  state: ProvisionedState
+} | {
+  /** The record names other bytes or another release; Update re-provisions under consent. */
+  kind: 'outdated'
+  state: StoredProvisionedState
+  changes: BrowserSkillUpgradeChanges
+}
+
+/**
+ * Compare one stored record with the pins. Every input is a local receipt or
+ * a compiled pin; nothing here reads the network.
+ * @param root - the owned runtime root the record was written for.
+ * @param stored - any parseable record.
+ * @param pins - the pins to compare against; defaults to the manifest pins.
+ * @returns the classification, and what an Update changes when outdated.
+ */
+function classifyProvisioned(root: string, stored: StoredProvisionedState, pins: ArtifactPins): ProvisionedRecord {
+  const paths = artifactPaths(root)
+  const versions = stored.bsk.version !== BSK_VERSION || stored.extension.version !== EXTENSION_VERSION
+  const artifacts = stored.bsk.binarySha256 !== pins.bskBinarySha256
+    || stored.bsk.archiveSha256 !== pins.bskArchiveSha256
+    || stored.extension.archiveSha256 !== pins.extensionArchiveSha256
+    || stored.extension.treeDigest !== pins.extensionTreeDigest
+    || stored.bsk.executablePath !== paths.bskExecutable
+    || stored.extension.dir !== paths.extensionDir
+  const installedPermissionsKnown = stored.version === 2
+  const installedPermissions = stored.version === 2 ? stored.extension.permissions : []
+  const installedHostPermissions = stored.version === 2 ? stored.extension.hostPermissions : []
+  const permissionsMatch = installedPermissionsKnown
+    && EXTENSION_PERMISSIONS.every(permission => installedPermissions.includes(permission))
+    && installedPermissions.length === EXTENSION_PERMISSIONS.length
+    && EXTENSION_HOST_PERMISSIONS.every(permission => installedHostPermissions.includes(permission))
+    && installedHostPermissions.length === EXTENSION_HOST_PERMISSIONS.length
+  if (stored.version === 2 && !versions && !artifacts && permissionsMatch) {
+    return { kind: 'current', state: stored }
+  }
+  return {
+    kind: 'outdated',
+    state: stored,
+    changes: {
+      versions,
+      artifacts,
+      addedPermissions: installedPermissionsKnown
+        ? EXTENSION_PERMISSIONS.filter(permission => !installedPermissions.includes(permission))
+        : [],
+      removedPermissions: installedPermissionsKnown
+        ? installedPermissions.filter(permission => !EXTENSION_PERMISSIONS.includes(permission))
+        : [],
+      installedPermissionsKnown,
+    },
+  }
+}
+
 /**
  * Read the durable provisioning record.
  * @param root - the owned runtime root.
  * @returns the record, or `undefined` when absent, malformed, or missing the integrity receipts.
  */
-export async function readProvisionedState(root: string): Promise<ProvisionedState | undefined> {
+export async function readProvisionedState(root: string): Promise<StoredProvisionedState | undefined> {
   try {
     return parseProvisionedState(JSON.parse(await readFile(artifactPaths(root).stateFile, 'utf8')))
   } catch {
     return undefined
+  }
+}
+
+/**
+ * Read the durable provisioning record and classify it against the pins.
+ * @param root - the owned runtime root.
+ * @param pins - the pins to compare against; defaults to the manifest pins.
+ * @returns the classification, or `undefined` when the record is absent or malformed.
+ */
+export async function readProvisionedRecord(
+  root: string,
+  pins: ArtifactPins = manifestArtifactPins(),
+): Promise<ProvisionedRecord | undefined> {
+  const stored = await readProvisionedState(root)
+  return stored === undefined ? undefined : classifyProvisioned(root, stored, pins)
+}
+
+/**
+ * Remove CLI artifact directories published by earlier pins. Only
+ * version-shaped names other than the pinned one are removed; staging
+ * residue belongs to the staging cleaner, and a removal failure leaves the
+ * directory in place because verification never reads it.
+ * @param root - the owned runtime root.
+ */
+export async function collectSupersededArtifacts(root: string): Promise<void> {
+  const artifacts = join(root, 'artifacts')
+  const pinnedDir = `bsk-v${BSK_VERSION}`
+  let entries: string[]
+  try {
+    entries = await readdir(artifacts)
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (entry === pinnedDir || !/^bsk-v\d+\.\d+\.\d+$/.test(entry)) continue
+    try {
+      await rm(join(artifacts, entry), { recursive: true, force: true })
+    } catch {
+      // A superseded directory that cannot be removed is never read: every
+      // launch resolves the pinned path. Collection is best effort.
+    }
   }
 }
 
@@ -524,16 +657,20 @@ export async function provisionArtifacts(options: {
     }
 
     const state: ProvisionedState = {
-      version: 1,
+      version: 2,
       bsk: { version: BSK_VERSION, executablePath: paths.bskExecutable, binarySha256: binarySha, archiveSha256: pins.bskArchiveSha256 },
       extension: {
         version: EXTENSION_VERSION,
         dir: paths.extensionDir,
         archiveSha256: pins.extensionArchiveSha256,
         treeDigest: pins.extensionTreeDigest,
+        permissions: EXTENSION_PERMISSIONS,
+        hostPermissions: EXTENSION_HOST_PERMISSIONS,
       },
     }
     await writeFileAtomic(paths.stateFile, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
+    // The pinned record is committed, so earlier releases' directories can go.
+    await collectSupersededArtifacts(root)
     return state
   } finally {
     await rm(staging, { recursive: true, force: true })
@@ -574,18 +711,18 @@ export async function ensureLaunchArtifacts(
 ): Promise<ProvisionedState> {
   const resolvedPins = pins ?? manifestArtifactPins()
   const paths = artifactPaths(root)
-  const state = await readProvisionedState(root)
-  if (state === undefined) {
+  const record = await readProvisionedRecord(root, resolvedPins)
+  if (record === undefined) {
     throw new ProvisionRefusedError({ kind: 'download-failed', detail: 'no verified provisioning record exists; run provision first' })
   }
-  if (
-    state.bsk.version !== BSK_VERSION || state.bsk.binarySha256 !== resolvedPins.bskBinarySha256 ||
-    state.bsk.archiveSha256 !== resolvedPins.bskArchiveSha256 || state.bsk.executablePath !== paths.bskExecutable ||
-    state.extension.version !== EXTENSION_VERSION || state.extension.archiveSha256 !== resolvedPins.extensionArchiveSha256 ||
-    state.extension.dir !== paths.extensionDir
-  ) {
-    throw new ProvisionRefusedError({ kind: 'download-failed', detail: 'the provisioning record does not match the pinned release; run provision first' })
+  if (record.kind === 'outdated') {
+    throw new ProvisionRefusedError({
+      kind: 'outdated',
+      installed: { bsk: record.state.bsk.version, extension: record.state.extension.version },
+      pinned: { bsk: BSK_VERSION, extension: EXTENSION_VERSION },
+    })
   }
+  const state = record.state
   signal?.throwIfAborted()
   // The canonical computed path is hashed, never the recorded one: a mutated
   // record cannot point the verification at bytes outside the owned root.

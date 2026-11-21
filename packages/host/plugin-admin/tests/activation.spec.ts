@@ -59,7 +59,7 @@ describe('managed plugin entries', () => {
   it('enforces row protection at the executor and distinguishes a live override from an applied change', async () => {
     const ctx = await composition()
     provideProfileRuntime(ctx, {
-      profileDir: directories.at(-1)!, bootBundles: [], pluginMutations: 'enabled',
+      profileDir: directories.at(-1)!, bootBundles: [], pluginMutations: { activation: true, packages: true },
     })
     const change = vi.fn<PluginAdminCore['setPluginEnabled']>(async (_runtime, request) => {
       await ctx.loader.update('include:feature', { disabled: !request.enabled })
@@ -93,6 +93,19 @@ describe('managed plugin entries', () => {
       token: gateway.begin({ verb: 'plugin-enable', target: feature.entryId }).token,
       entryId: feature.entryId, enabled: true,
     })).resolves.toEqual({ kind: 'saved', application: 'overridden' })
+  })
+
+  it('marks every row read-only on a host that accepts no activation', async () => {
+    const ctx = await composition()
+    provideProfileRuntime(ctx, {
+      profileDir: directories.at(-1)!, bootBundles: [], pluginMutations: { activation: false, packages: false },
+    })
+    await ctx.plugin(PluginAdminGateway)
+    const gateway = ctx.get('pluginAdmin') as PluginAdminGateway
+    const rows = gateway.listPlugins()
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every(row => row.readOnlyReason !== undefined)).toBe(true)
+    expect(rows.find(row => row.entryId === 'include:feature')?.readOnlyReason).toBe('unsupported')
   })
 
   it('protects infrastructure even when its row is disabled', async () => {

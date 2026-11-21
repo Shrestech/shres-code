@@ -32,7 +32,7 @@ export const en = {
   failed: 'Mount failed',
   unloading: 'Unloading',
   manageTab: 'Manage',
-  unsupported: 'Plugin installation is unavailable in this host. Skills can still be added and removed here.',
+  unsupported: 'Installing plugin packages is unavailable in this host. Skills can still be added and removed here.',
   consent: 'Installing a plugin adds third-party code to this profile, and that code runs with full access on every future start. Confirming an install authorizes the operation; it does not prove that a person made the request.',
   installHeading: 'Install plugin',
   specLabel: 'Package spec',

@@ -91,7 +91,9 @@ export const nodePluginAdminCore: PluginAdminCore = {
       : runtime.installAnchor === undefined ? [] : await listProfileBundles(runtime.profileDir, runtime.bootBundles, {
         installAnchor: runtime.installAnchor, ...runtime.shippedBundles === undefined ? {} : { shippedBundles: runtime.shippedBundles },
       })
-    return runtime.pluginMutations === 'enabled' ? rows : rows.map(row => ({ ...row, readOnlyReason: 'Plugin changes are unavailable on this host.' }))
+    return runtime.pluginMutations.activation
+      ? rows
+      : rows.map(row => ({ ...row, readOnlyReason: 'Plugin changes are unavailable on this host.' }))
   },
   setBundleEnabled: (runtime, name, enabled, options) => runtime.control !== undefined
     ? runtime.control.setBundleEnabled(name, enabled, options.signal)

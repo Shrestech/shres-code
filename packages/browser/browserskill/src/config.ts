@@ -59,10 +59,10 @@ export interface ResolvedBrowserSkillConfig {
 }
 
 /**
- * Defaults backed by the measured bsk 0.3.1 release on macOS arm64: the
- * command timeout covers the measured seven-second status wait plus slack,
- * and the download bound sits far above the largest pinned asset
- * (5,244,474 bytes) while still bounding a hostile response.
+ * Defaults backed by the measured bsk releases on macOS arm64: the command
+ * timeout covers the measured seven-second status wait plus slack, and the
+ * download bound sits far above the largest pinned asset (the 7,432,887-byte
+ * CLI archive of 0.5.0) while still bounding a hostile response.
  */
 const DEFAULTS = {
   healthIntervalMs: 5_000,

@@ -44,9 +44,9 @@ const ASSISTANT_ROW = '[data-chat-flow-kind="assistant-step"]'
 // Mirrored from the BrowserSkill manifest pins: the release asset file names the
 // downloads fetch under an artifact-base override. A drift surfaces as a 404 the
 // runtime refuses loud, never as a silent pass.
-const BSK_ASSET_NAME = 'bsk-v0.3.1-aarch64-apple-darwin.tar.gz'
-const EXTENSION_ASSET_NAME = 'browser-skill-extension-v0.3.1-chrome.zip'
-const PINNED_VERSION = '0.3.1'
+const BSK_ASSET_NAME = 'bsk-v0.5.0-aarch64-apple-darwin.tar.gz'
+const EXTENSION_ASSET_NAME = 'browser-skill-extension-v0.5.0-chrome.zip'
+const PINNED_VERSION = '0.5.0'
 const ARTIFACT_PATHS = ['/' + BSK_ASSET_NAME, '/' + EXTENSION_ASSET_NAME]
 // Deliberate difference from the sibling lanes: no committed ARIA goldens. Every
 // milestone of this section discloses the per-run loopback ports, which the

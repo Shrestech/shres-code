@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "bskVersion": "0.5.0",
+      "extensionVersion": "0.5.0",
+      "platform": "darwin-arm64",
+      "measuredAt": "2026-11-17",
+      "measuredBy": "archive and zip hashed locally after download; binary and tree hashed without execution; wire forms confirmed by running the CLI in a disposable BSK_HOME",
+      "bsk": {
+        "assetName": "bsk-v0.5.0-aarch64-apple-darwin.tar.gz",
+        "bytes": 7432887,
+        "archiveSha256": "a16b66ab9d3629045d663f645fd2c2b8f544116ac3cc9efb94b34867fcfe1756",
+        "binaryBytes": 16796960,
+        "binarySha256": "29687fa084a658a0d2cb285e796abcac0631994e3da24a24db6af050d6fadea3",
+        "upstreamVersionJsonMatch": true
+      },
+      "extension": {
+        "assetName": "browser-skill-extension-v0.5.0-chrome.zip",
+        "bytes": 1280007,
+        "archiveSha256": "4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9",
+        "treeFiles": 34,
+        "treeSha256": "4937bd2a7c4a057be4bede3aded22d2a008e345e984a9c87968b1308a1478b45",
+        "minimumChromeVersion": "125",
+        "permissions": [
+          "alarms",
+          "activeTab",
+          "debugger",
+          "downloads",
+          "idle",
+          "notifications",
+          "offscreen",
+          "scripting",
+          "tabs",
+          "tabGroups",
+          "storage",
+          "webNavigation",
+          "windows"
+        ],
+        "hostPermissions": [
+          "<all_urls>"
+        ],
+        "storageKeys": [
+          "bsk_daemon_port",
+          "bh_label",
+          "bsk_instance_id",
+          "bh_connection_enabled",
+          "bsk_control_hints_hidden"
+        ],
+        "defaultDaemonEndpoint": "ws://127.0.0.1:52800"
+      },
+      "wire": {
+        "cliProtocolVersion": "1.9",
+        "statusFields": [
+          "daemon_version",
+          "pid",
+          "ws_port",
+          "browsers",
+          "sessions"
+        ],
+        "browsersFields": [
+          "instance_id",
+          "label"
+        ],
+        "acceptedArgv": [
+          "status --json",
+          "browsers --json",
+          "daemon start --foreground --port",
+          "daemon stop",
+          "session start --json --browser --no-focus --name",
+          "session stop --json",
+          "navigate --json --session -- <url>",
+          "observe --json --session",
+          "click --json --session --ref",
+          "fill --json --session --ref --value=",
+          "press --json --session -- <key>"
+        ],
+        "chromePairingReverified": false
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Shres Code desktop
 
-The Electron application bundles the shared web UI and a private [desktop host](../desktop-host/README.md). Both desktop packages share the Shres version and remain outside npm publication. The app serves requests over `shres-app://` and child-process pipes; a separate web server is unnecessary. The shell creates a missing desktop profile under `$SHRES_HOME/profiles/desktop` and preserves existing configuration.
+The Electron application bundles the shared web UI and a private [desktop host](../desktop-host/README.md). Both desktop packages share the Shres version and remain outside npm publication. The app serves requests over `shres-app://` and child-process pipes; a separate web server is unnecessary. The shell creates a missing desktop profile under `$SHRES_HOME/profiles/desktop` and preserves existing configuration. A new profile composes the base and web-app bundles; optional shipped bundles stay unselected until the user picks them in **Plugins → Bundles**, and an accepted change applies at the next launch. The BrowserSkill bundle is this route: selecting it mounts the browser tools and its Plugins section, and the managed browser still downloads nothing and opens nothing until the user consents in **Plugins → BrowserSkill**.
 
 ## Build and verify
 

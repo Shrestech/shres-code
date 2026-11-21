@@ -4,7 +4,7 @@ A profile is a named directory of bundle layers plus the user's own patch layer,
 
 ## Profile runtime
 
-A launcher provides `ProfileRuntime` under the `profileRuntime` context key through `provideProfileRuntime` before any tree entry mounts. Boot metadata is frozen. An optional `control` owner exposes current bundle membership and serializes explicit activation with live patch reconciliation; hosts without that owner retain restart-required behavior. The CLI provides `'enabled'`; the packaged desktop provides `'unsupported'` because it has no executable plugin-install owner. A composition whose launcher provides no runtime has no managed profile at all.
+A launcher provides `ProfileRuntime` under the `profileRuntime` context key through `provideProfileRuntime` before any tree entry mounts. Boot metadata and the mutation capabilities are frozen. An optional `control` owner exposes current bundle membership and serializes explicit activation with live patch reconciliation; hosts without that owner save accepted changes for their next restart. The CLI accepts both capabilities. The packaged desktop accepts bundle selection and row overrides and refuses package installs, because the application ships its runtime and owns no package manager for the profile. A composition whose launcher provides no runtime has no managed profile at all.
 
 ```ts type-equiv
 /**
@@ -17,12 +17,8 @@ interface ProfileRuntime {
   readonly profileDir: string
   /** Bundle names captured at boot, in `shres.profile.bundles` order. */
   readonly bootBundles: readonly string[]
-  /**
-   * Whether this surface permits plugin mutations through the shared core.
-   * `'unsupported'` marks a surface with no executable plugin-install owner:
-   * it serves status and refuses mutations with its own message.
-   */
-  readonly pluginMutations: 'enabled' | 'unsupported'
+  /** Which plugin mutations this surface executes through the shared core. */
+  readonly pluginMutations: PluginMutationCapabilities
   /** Package anchor used to resolve installed profile bundles. */
   readonly installAnchor?: string
   /** Required and optional bundles available from the running installation. */
@@ -160,18 +156,34 @@ type PluginConfirmToken = Branded<'PluginConfirmToken'>
 
 ```ts type-equiv
 /**
- * Whether this host may install or remove profile plugins. `'unsupported'`
- * marks a host with no executable plugin-install owner for its profile: the
- * packaged desktop, or a composition whose launcher provided no
- * `profileRuntime`. Skill add and remove stay available in both states.
+ * Which profile mutations a launcher's surface can execute. The two
+ * capabilities have independent owners: `activation` rewrites only the
+ * profile manifest and its patch layer, which takes effect at the next boot,
+ * while `packages` adds or removes plugin package directories and needs a
+ * package-manager owner for the profile.
  */
-type PluginMutations = 'enabled' | 'unsupported'
+interface PluginMutationCapabilities {
+  /** Whether bundle selection and plugin-row overrides are accepted. */
+  readonly activation: boolean
+  /** Whether plugin package installs and removals are accepted. */
+  readonly packages: boolean
+}
+```
+
+```ts type-equiv
+/**
+ * Which profile mutations this host executes (see the app-boot launcher
+ * contract). A composition whose launcher provided no `profileRuntime`
+ * answers with both capabilities false. Skill add and remove stay available
+ * in every case.
+ */
+type PluginMutations = PluginMutationCapabilities
 ```
 
 ```ts type-equiv
 /** Full plugin-and-skill picture for a fresh page load. */
 interface PluginAdminStatusResult {
-  /** Whether this host may install or remove profile plugins. */
+  /** Which profile mutations this host executes. */
   mutations: PluginMutations
   /** Every profile plugin with its restart readiness; empty when no profile runtime was provided. */
   plugins: PluginStateEntry[]
@@ -219,8 +231,8 @@ interface InstalledSkillView {
 ```ts type-equiv
 /**
  * Install outcome: a parked transaction with its confirm token, a core
- * refusal with the rollback report, or `unsupported` when this host has no
- * plugin-install owner (see {@link PluginMutations}); `unsupported` touches
+ * refusal with the rollback report, or `unsupported` when this host accepts no
+ * package installs (see {@link PluginMutations}); `unsupported` touches
  * nothing.
  */
 type PluginAdminInstallOutcome =

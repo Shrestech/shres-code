@@ -16,7 +16,7 @@ import type { PluginConfirmToken, PluginGestureToken } from '@shres-code/shres-c
 usePinnedBrowserLanguages('en-US')
 afterEach(cleanup)
 
-const EMPTY_STATUS = { mutations: 'enabled', plugins: [], skills: [] }
+const EMPTY_STATUS = { mutations: { activation: true, packages: true }, plugins: [], skills: [] }
 type StatusResult =
   | { readonly ok: true; readonly value: typeof EMPTY_STATUS }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }

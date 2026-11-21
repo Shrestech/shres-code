@@ -23,7 +23,7 @@ afterEach(cleanup)
 const t = ((key: PluginInventoryLocaleKey): string => en[key]) as PluginManageSettingsTabProps['t']
 
 const STATUS: PluginAdminStatusResult = {
-  mutations: 'enabled',
+  mutations: { activation: true, packages: true },
   plugins: [
     { name: '@fixture/hello', version: '1.0.0', state: 'active', removable: true },
     { name: '@fixture/added', state: 'installed-restart-required', removable: true },
@@ -132,8 +132,8 @@ describe('PluginManageSettingsTab', () => {
     view.unmount()
   })
 
-  it('renders the host capability notice in unsupported mode and keeps skill operations', async () => {
-    const { view } = await renderReady({}, { mutations: 'unsupported' })
+  it('renders the package-install notice without a package owner and keeps skill operations', async () => {
+    const { view } = await renderReady({}, { mutations: { activation: true, packages: false } })
     expect(screen.getByText(en.unsupported)).toBeTruthy()
     expect(screen.queryByText(en.installHeading)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove: @fixture/hello' })).toBeNull()

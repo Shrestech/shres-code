@@ -22,14 +22,23 @@ function recordingContext(): { ctx: Context; recorded: Recorded[] } {
 describe('provideProfileRuntime', () => {
   it('provides the booted profile facts under the profileRuntime key', () => {
     const { ctx, recorded } = recordingContext()
-    provideProfileRuntime(ctx, { profileDir: '/profiles/main', bootBundles: ['base', 'demo'], pluginMutations: 'enabled' })
-    expect(recorded).toEqual([{ key: PROFILE_RUNTIME_KEY, value: { profileDir: '/profiles/main', bootBundles: ['base', 'demo'], pluginMutations: 'enabled' } }])
+    provideProfileRuntime(ctx, {
+      profileDir: '/profiles/main', bootBundles: ['base', 'demo'], pluginMutations: { activation: true, packages: true },
+    })
+    expect(recorded).toEqual([{
+      key: PROFILE_RUNTIME_KEY,
+      value: {
+        profileDir: '/profiles/main',
+        bootBundles: ['base', 'demo'],
+        pluginMutations: { activation: true, packages: true },
+      },
+    }])
   })
 
   it('freezes the bundle copy against later caller mutations', () => {
     const { ctx, recorded } = recordingContext()
     const bootBundles = ['base']
-    provideProfileRuntime(ctx, { profileDir: '/profiles/main', bootBundles, pluginMutations: 'unsupported' })
+    provideProfileRuntime(ctx, { profileDir: '/profiles/main', bootBundles, pluginMutations: { activation: false, packages: false } })
     bootBundles.push('late-comer')
     expect(recorded[0]?.value.bootBundles).toEqual(['base'])
     expect(Object.isFrozen(recorded[0]?.value.bootBundles)).toBe(true)

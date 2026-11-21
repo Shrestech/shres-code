@@ -68,7 +68,10 @@ export {
   withRecoveredProfile,
   pluginStates,
 } from './profile-plugins.ts'
-export { listProfileBundles, setBundleEnabled, setPluginEnabled, type ProfileActivationApplication, type ProfileMutationCandidate, type ProfileMutationOptions } from './profile-activation.ts'
+export {
+  flattenProfileRows, listProfileBundles, setBundleEnabled, setPluginEnabled,
+  type ProfileActivationApplication, type ProfileMutationCandidate, type ProfileMutationOptions,
+} from './profile-activation.ts'
 export { isProfileManagementModule } from './profile-management-policy.ts'
 export { nodePnpmRunner, type PnpmOutcome, type PnpmRunner } from './profile-pnpm.ts'
 export { loadOptionalPatches, loadOverlayPatches } from './patch-files.ts'
@@ -76,7 +79,7 @@ export {
   ProfilePluginError, type CoreOptions, type InstallPreview, type InstallRefusal, type InstallRefused,
   type InstallCommitted, type InstallBegin, type ParkedInstall, type RollbackReport, type RemoveOutcome,
   type RecoveredProfile, type RecoveryOutcome, type PluginStateEntry,
-  type ProfileActivationOutcome, type ProfileBundleState,
+  type ProfileActivationOutcome, type ProfileBundleState, type PluginMutationCapabilities,
 } from './profile-plugin-types.ts'
 
 /**

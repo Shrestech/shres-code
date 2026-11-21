@@ -4,8 +4,9 @@
  * installed-skill add/remove with live shadowing disclosure. Remove renders
  * only for a row the status reports removable; the host still owns the
  * refusal verdict, so its mapped copy stays reachable. Plugin
- * mutations render the unsupported-host notice when the host reports
- * `mutations: 'unsupported'`; skill operations stay available. The host is
+ * capabilities are separate: a host that accepts bundle selection and row
+ * overrides without owning a package manager renders no install form and no
+ * removal control, while skill operations stay available. The host is
  * built from the same source as this client, so every outcome union is
  * closed and handled exhaustively; a transport failure is the only error
  * path and renders the generic failure notice.
@@ -391,7 +392,7 @@ export function PluginManageSettingsTab(props: PluginManageSettingsTabProps): Re
   }
 
   const result = view.result
-  const canMutate = result.mutations === 'enabled'
+  const canInstall = result.mutations.packages
   const plugins = result.plugins
   const skills = result.skills
   const needsRestart = plugins.some(plugin => plugin.state !== 'active')
@@ -399,7 +400,7 @@ export function PluginManageSettingsTab(props: PluginManageSettingsTabProps): Re
 
   return (
     <div className={css.section}>
-      {canMutate ? null : <p className={css.unsupported} role="note">{t('unsupported')}</p>}
+      {canInstall ? null : <p className={css.unsupported} role="note">{t('unsupported')}</p>}
       {banner === null ? null : banner.tone === 'ok' ? (
         <div className={css.notice} role="status">
           <p>{t(banner.key)}{banner.detail === undefined ? null : <> <strong>{banner.detail}</strong></>}</p>
@@ -440,7 +441,7 @@ export function PluginManageSettingsTab(props: PluginManageSettingsTabProps): Re
           </div>
         </section>
       )}
-      {canMutate ? (
+      {canInstall ? (
         <section className={css.card} data-install="">
           <h3 className={css.heading}>{t('installHeading')}</h3>
           <form
@@ -487,7 +488,7 @@ export function PluginManageSettingsTab(props: PluginManageSettingsTabProps): Re
                 </span>
                 <span className={css.rowTrailing}>
                   <span className={css.stateTag} data-state={plugin.state}>{t(PLUGIN_STATE_KEYS[plugin.state])}</span>
-                  {canMutate && plugin.removable ? (
+                  {canInstall && plugin.removable ? (
                     <button
                       type="button"
                       className={css.secondaryButton}

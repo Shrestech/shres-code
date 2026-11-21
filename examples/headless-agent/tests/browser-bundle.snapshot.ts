@@ -100,4 +100,63 @@ describe.runIf(process.platform !== 'win32')('BrowserSkill optional bundle headl
       }
     `)
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('saves a bundle change for the next launch on an activation-only host', async () => {
+    const result = await runLoaderSmoke({
+      label: 'BrowserSkill activation-only host snapshot',
+      tempDirPrefix: 'browser-bundle-activation-',
+      binScript,
+      libBinScript: binScript,
+      configPath,
+      binArgs: [configPath, 'activation-only'],
+      tsconfigPath,
+      env: { SHRES_SNAPSHOT: 'refresh' },
+    })
+    expect(result.stderr).toBe('')
+    expect(JSON.parse(result.stdout.trim())).toMatchInlineSnapshot(`
+      {
+        "snapshots": [
+          {
+            "label": "restart-required host",
+            "mutations": {
+              "activation": true,
+              "packages": false,
+            },
+          },
+          {
+            "operation": "install",
+            "outcome": {
+              "kind": "unsupported",
+            },
+          },
+          {
+            "operation": "disable",
+            "outcome": {
+              "application": "restart-required",
+              "kind": "saved",
+            },
+          },
+          {
+            "bundle": [
+              {
+                "active": true,
+                "selected": false,
+                "shipped": true,
+              },
+            ],
+            "label": "deselected",
+            "skills": [
+              "browserskill",
+            ],
+            "tools": [
+              "browser_act",
+              "browser_navigate",
+              "browser_observe",
+              "browser_session",
+            ],
+          },
+        ],
+      }
+    `)
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })

@@ -2722,6 +2722,11 @@
     },
     {
       "doc": "docs/subsystems/profiles.md",
+      "symbol": "PluginMutationCapabilities",
+      "source": "packages/boot/app-boot/src/profile-plugin-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/profiles.md",
       "symbol": "PluginMutations",
       "source": "packages/host/plugin-admin/src/types.ts"
     },
@@ -2749,6 +2754,11 @@
       "doc": "docs/subsystems/profiles.md",
       "symbol": "PluginAdminConfirmOutcome",
       "source": "packages/host/plugin-admin/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillUpgradeChanges",
+      "source": "packages/browser/browserskill/src/types.ts"
     },
     {
       "doc": "docs/subsystems/browser.md",

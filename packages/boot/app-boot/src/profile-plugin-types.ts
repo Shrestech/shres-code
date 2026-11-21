@@ -1,6 +1,20 @@
 /** Managed profile-plugin transaction results shared by CLI and host consumers. */
 import type { PnpmRunner } from './profile-pnpm.ts'
 
+/**
+ * Which profile mutations a launcher's surface can execute. The two
+ * capabilities have independent owners: `activation` rewrites only the
+ * profile manifest and its patch layer, which takes effect at the next boot,
+ * while `packages` adds or removes plugin package directories and needs a
+ * package-manager owner for the profile.
+ */
+export interface PluginMutationCapabilities {
+  /** Whether bundle selection and plugin-row overrides are accepted. */
+  readonly activation: boolean
+  /** Whether plugin package installs and removals are accepted. */
+  readonly packages: boolean
+}
+
 /** Explicit process dependencies for a profile operation. */
 export interface CoreOptions {
   runner: PnpmRunner
