@@ -248,7 +248,7 @@ describe('PluginAdminGateway', () => {
     const core = fabricatedCore()
     const gateway = await harness(core)
     const entryId = 'include:missing' as never
-    expect(gateway.listPlugins()).toEqual([])
+    expect(await gateway.listPlugins()).toEqual([])
     await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-enable', target: entryId }).token,
       entryId, enabled: true })).resolves.toEqual({ kind: 'refused', code: 'unknown-plugin' })
     const unavailable = await harness(core, { mutations: null })

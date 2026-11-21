@@ -201,6 +201,10 @@ describe('BrowserSkillSettingsSection', () => {
       },
     })
     expect(screen.getByText(en.outdatedPermissionsUnknown)).toBeTruthy()
+    // The copy points at the pinned list, so the card must render it.
+    expect(view.container.querySelector('[data-update-permissions]')?.textContent)
+      .toBe(consent().extensionPermissions.join(', '))
+    expect(screen.getByText(en.hostPermissionsLabel)).toBeTruthy()
     view.unmount()
   })
 

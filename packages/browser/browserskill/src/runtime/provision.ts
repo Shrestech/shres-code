@@ -236,11 +236,19 @@ function classifyProvisioned(root: string, stored: StoredProvisionedState, pins:
     changes: {
       versions,
       artifacts,
+      // Host permissions ride the same lists: a pinned host grant the install
+      // lacks is as much a consent change as an API permission.
       addedPermissions: installedPermissionsKnown
-        ? EXTENSION_PERMISSIONS.filter(permission => !installedPermissions.includes(permission))
+        ? [
+          ...EXTENSION_PERMISSIONS.filter(permission => !installedPermissions.includes(permission)),
+          ...EXTENSION_HOST_PERMISSIONS.filter(permission => !installedHostPermissions.includes(permission)),
+        ]
         : [],
       removedPermissions: installedPermissionsKnown
-        ? installedPermissions.filter(permission => !EXTENSION_PERMISSIONS.includes(permission))
+        ? [
+          ...installedPermissions.filter(permission => !EXTENSION_PERMISSIONS.includes(permission)),
+          ...installedHostPermissions.filter(permission => !EXTENSION_HOST_PERMISSIONS.includes(permission)),
+        ]
         : [],
       installedPermissionsKnown,
     },

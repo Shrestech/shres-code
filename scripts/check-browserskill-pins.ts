@@ -10,8 +10,9 @@
  */
 
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { fileURLToPath } from 'node:url'
 
 const ROOT = join(import.meta.dirname, '..')
 const MANIFEST = 'packages/browser/browserskill/src/runtime/manifest.ts'
@@ -134,4 +135,5 @@ async function main(): Promise<void> {
   }
 }
 
-await main()
+// Importing this module (its spec does) must not run the report.
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()

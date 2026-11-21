@@ -27,7 +27,7 @@ A changed reply name or a newly required flag is not a pin bump; it expands into
 1. Write the measurements into `scripts/browserskill-pin-evidence.json` for the new version pair.
 2. Update `BSK_VERSION`, `EXTENSION_VERSION`, the derived asset names and URLs, `BSK_PLATFORM_PIN`, `EXTENSION_ASSET`, `EXTENSION_TREE_SHA256`, and `EXTENSION_PERMISSIONS` in `manifest.ts`. Leave `CHROME_MINIMUM_MAJOR`, the daemon port, the owned label, the storage keys and both patterns alone unless a measurement disproves them.
 3. If the extension's permission set changed, say so in the Agent Note and the consent copy; an update that adds a permission re-takes consent.
-4. Update the pinned-version assertions in the package's manifest spec, the fixture URLs in its provisioning spec, and the fake daemon's reported version.
+4. Update the pinned-version assertions in the package's manifest spec, the fixture URLs in its provisioning spec, the fake daemon's reported version, and the version sentence in [the package README](../../packages/browser/browserskill/README.md).
 5. Run the package suite, `pnpm run verify-type-equiv`, and `pnpm run doc-sync`. Then pair the browser once through **Plugins → BrowserSkill** on macOS arm64 to re-prove the consent, provisioning, pairing and tool path end to end.
 
 ## 5. Ship and check

@@ -24,7 +24,11 @@ export interface ProfileRuntime {
   readonly profileDir: string
   /** Bundle names captured at boot, in `shres.profile.bundles` order. */
   readonly bootBundles: readonly string[]
-  /** Which plugin mutations this surface executes through the shared core. */
+  /**
+   * Which plugin mutations this surface executes through the shared core.
+   * `activation` requires `installAnchor` or `control`: without one of them the
+   * host cannot resolve the bundles an activation names.
+   */
   readonly pluginMutations: PluginMutationCapabilities
   /** Package anchor used to resolve installed profile bundles. */
   readonly installAnchor?: string

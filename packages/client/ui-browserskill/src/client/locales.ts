@@ -15,7 +15,7 @@ export const en = {
   outdatedNote: 'This browser runtime was provisioned by an earlier Shres build. Updating installs the release this build pins, using the same download consent as a first install.',
   outdatedVersionsLabel: 'Installed to pinned',
   outdatedPermissionsLabel: 'Permissions added by the update',
-  outdatedPermissionsUnknown: 'The installed release kept no permission record, so the full pinned permission list below applies after the update.',
+  outdatedPermissionsUnknown: 'The installed release kept no permission record, so the pinned permission list below is the full set that applies after the update.',
   outdatedArtifactsNote: 'The recorded artifacts differ from this build’s pinned hashes.',
   updateAction: 'Update runtime',
   updateBusyAction: 'Updating…',

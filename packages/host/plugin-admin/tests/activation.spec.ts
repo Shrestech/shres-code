@@ -72,14 +72,14 @@ describe('managed plugin entries', () => {
     const gateway = ctx.get('pluginAdmin') as PluginAdminGateway
     const manager: EntryOptions = { id: 'manager', name: '@shres-code/shres-code-host-plugin-admin', disabled: true }
     await ctx.loader.create(manager)
-    const protectedRow = gateway.listPlugins().find(row => row.entryId === 'manager')!
+    const protectedRow = (await gateway.listPlugins()).find(row => row.entryId === 'manager')!
     await expect(gateway.setPluginEnabled({
       token: gateway.begin({ verb: 'plugin-enable', target: protectedRow.entryId }).token,
       entryId: protectedRow.entryId, enabled: true,
     })).resolves.toEqual({ kind: 'refused', code: 'management-required' })
     expect(change).not.toHaveBeenCalled()
 
-    const feature = gateway.listPlugins().find(row => row.entryId === 'include:feature')!
+    const feature = (await gateway.listPlugins()).find(row => row.entryId === 'include:feature')!
     await expect(gateway.setPluginEnabled({
       token: gateway.begin({ verb: 'plugin-disable', target: feature.entryId }).token,
       entryId: feature.entryId, enabled: false,
@@ -95,6 +95,29 @@ describe('managed plugin entries', () => {
     })).resolves.toEqual({ kind: 'saved', application: 'overridden' })
   })
 
+  it('marks a row outside the writable profile composition read-only', async () => {
+    const ctx = await composition()
+    provideProfileRuntime(ctx, {
+      profileDir: directories.at(-1)!, bootBundles: [], pluginMutations: { activation: true, packages: false },
+    })
+    class Gateway extends PluginAdminGateway {
+      constructor(ctx: Context) {
+        super(ctx, undefined, { ...nodePluginAdminCore, writableRowIds: async () => new Set(['feature']) })
+      }
+    }
+    await ctx.plugin(Gateway)
+    const gateway = ctx.get('pluginAdmin') as PluginAdminGateway
+    // A launcher-level row exists in the Loader but no profile layer names it.
+    const launcherRow: EntryOptions = { id: 'launcher-row', name: './feature.mjs' }
+    await ctx.loader.create(launcherRow)
+    const rows = await gateway.listPlugins()
+    expect(rows.map(row => [row.entryId, row.readOnlyReason])).toEqual([
+      ['include', 'unaddressable'],
+      ['include:feature', undefined],
+      ['launcher-row', 'unaddressable'],
+    ])
+  })
+
   it('marks every row read-only on a host that accepts no activation', async () => {
     const ctx = await composition()
     provideProfileRuntime(ctx, {
@@ -102,7 +125,7 @@ describe('managed plugin entries', () => {
     })
     await ctx.plugin(PluginAdminGateway)
     const gateway = ctx.get('pluginAdmin') as PluginAdminGateway
-    const rows = gateway.listPlugins()
+    const rows = await gateway.listPlugins()
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.every(row => row.readOnlyReason !== undefined)).toBe(true)
     expect(rows.find(row => row.entryId === 'include:feature')?.readOnlyReason).toBe('unsupported')

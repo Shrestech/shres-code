@@ -17,7 +17,7 @@ import type { Logger } from '@shres-code/cordis'
 import { isPortOccupied, reserveLoopbackPort, type PortReservation } from '../src/runtime/endpoints.ts'
 import { acquireRuntimeLease, LEASE_FILE_NAME, LeaseRefusedError } from '../src/runtime/lease.ts'
 import {
-  ProvisionRefusedError, readProvisionedRecord, readProvisionedState, type ProvisionedState,
+  ProvisionRefusedError, readProvisionedRecord, readProvisionedState, type ArtifactPins, type ProvisionedState,
 } from '../src/runtime/provision.ts'
 import type { OwnedBrowser } from '../src/runtime/chrome.ts'
 import { BSK_VERSION, DEFAULT_DAEMON_PORT, EXTENSION_HOST_PERMISSIONS, EXTENSION_PERMISSIONS, EXTENSION_VERSION } from '../src/runtime/manifest.ts'
@@ -242,6 +242,8 @@ async function makeRuntime(options: {
   now?: BrowserSkillRuntimeInternals['now']
   /** Classify the staged record against the compiled pins instead of trusting it. */
   useCompiledRecord?: boolean
+  /** Replace the record-classification seam for one test. */
+  recordSeam?: BrowserSkillRuntimeInternals['readProvisionedRecord']
   chromeSeam?: BrowserSkillRuntimeInternals['chrome']
   chromeLauncherError?: string
   daemonStopError?: string
@@ -489,7 +491,8 @@ async function makeRuntime(options: {
     ...(leaseInternal === undefined ? {} : { acquireLease: leaseInternal }),
     preflight: async () => ({ executablePath: '/fake/Chrome', chromeVersion: '153.0.8010.53' }),
     ensureLaunchArtifacts: fixtureLaunchArtifacts(),
-    readProvisionedRecord: options.useCompiledRecord === true ? readProvisionedRecord : fixtureProvisionRecord,
+    readProvisionedRecord: options.recordSeam
+      ?? (options.useCompiledRecord === true ? readProvisionedRecord : fixtureProvisionRecord),
     provision: async ({ root: ownedRoot, onStep }) => {
       for (const step of options.provisionSteps ?? []) onStep?.(step)
       return writeFakeProvisionState(ownedRoot, fakeScript)
@@ -586,7 +589,15 @@ function fixtureLaunchArtifacts(): NonNullable<BrowserSkillRuntimeInternals['ens
     verifySignal?.throwIfAborted()
     // The fixture seeds a complete record; the seam only exists so lifecycle
     // tests need no compiled-pin measurement.
-    return { ...state, version: 2 } as ProvisionedState
+    return {
+      ...state,
+      version: 2,
+      extension: {
+        ...state.extension,
+        permissions: state.version === 2 ? state.extension.permissions : EXTENSION_PERMISSIONS,
+        hostPermissions: state.version === 2 ? state.extension.hostPermissions : EXTENSION_HOST_PERMISSIONS,
+      },
+    } satisfies ProvisionedState
   }
 }
 
@@ -679,6 +690,53 @@ describe('BrowserSkillRuntime lifecycle', () => {
     await expect(settle(runtime, 'open')).resolves.toMatchObject({ verb: 'open', phase: 'failed', refusal: { kind: 'outdated' } })
     expect(fake.launches).toBe(0)
     await expect(readFile(join(root, 'runtime.lock'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('classifies through the canonical root so a symlinked owned root is not reported outdated', async () => {
+    const real = await mkdtemp(join(tmpdir(), 'shres-bsk-canonical-'))
+    cleanup.push({ dir: real, children: [] })
+    const aliasParent = await mkdtemp(join(tmpdir(), 'shres-bsk-alias-'))
+    cleanup.push({ dir: aliasParent, children: [] })
+    const alias = join(aliasParent, 'owned')
+    await symlink(real, alias)
+    // Provisioning writes the record with the canonical root, so the fixture
+    // must too; the pins match the fixture receipts it wrote.
+    // macOS tmpdirs are themselves symlinked (/var -> /private/var), so the
+    // record is seeded through the fully canonical path, as provisioning does.
+    const canonical = realpathSync(real)
+    const fakeScript = await writeFakeBsk(canonical)
+    const record = await writeFakeProvisionState(canonical, fakeScript)
+    // Provisioning records the pinned artifact path, not the fixture's script.
+    record.bsk.executablePath = artifactPaths(canonical).bskExecutable
+    await writeFile(artifactPaths(canonical).stateFile, JSON.stringify(record))
+    const pins: ArtifactPins = {
+      bskArchiveSha256: record.bsk.archiveSha256,
+      bskBinarySha256: record.bsk.binarySha256,
+      extensionArchiveSha256: record.extension.archiveSha256,
+      extensionTreeDigest: record.extension.treeDigest,
+    }
+    const { runtime } = await makeRuntime({
+      root: alias,
+      seedProvisioned: false,
+      recordSeam: async root => readProvisionedRecord(root, pins),
+    })
+    await runtime.refreshProvisioned()
+    expect(runtime.status().state).toMatchObject({ kind: 'provisioned' })
+  })
+
+  it('keeps reporting outdated after a reset, which clears the profile but not the artifacts', async () => {
+    const { runtime } = await makeRuntime({ seedProvisioned: true, useCompiledRecord: true })
+    await runtime.refreshProvisioned()
+    expect(runtime.status().state).toMatchObject({ kind: 'outdated' })
+    await expect(settle(runtime, 'reset')).resolves.toMatchObject({ verb: 'reset', phase: 'succeeded' })
+    expect(runtime.status().state).toMatchObject({ kind: 'outdated' })
+  })
+
+  it('keeps reporting outdated after a close, so the Update card does not disappear', async () => {
+    const { runtime } = await makeRuntime({ seedProvisioned: true, useCompiledRecord: true })
+    await runtime.refreshProvisioned()
+    await expect(settle(runtime, 'close')).resolves.toMatchObject({ verb: 'close', phase: 'succeeded' })
+    expect(runtime.status().state).toMatchObject({ kind: 'outdated' })
   })
 
   it('re-runs provisioning from outdated instead of short-circuiting on the stale record', async () => {

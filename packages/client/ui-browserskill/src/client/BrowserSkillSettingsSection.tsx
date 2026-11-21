@@ -454,7 +454,21 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
                 </ul>
               </dd>
             </div>
+            <div>
+              <dt>{t('permissionsLabel')}</dt>
+              <dd data-update-permissions="">{consent.extensionPermissions.join(', ')}</dd>
+            </div>
+            <div>
+              <dt>{t('hostPermissionsLabel')}</dt>
+              <dd>{consent.extensionHostPermissions.join(', ')}</dd>
+            </div>
+            <div>
+              <dt>{t('updateManifestLabel')}</dt>
+              <dd><code>{consent.updateManifestUrl}</code> — {t('updateManifestNote')}</dd>
+            </div>
           </dl>
+          <p className={css.consent}>{t('gestureNote')}</p>
+          <p className={css.consent}>{t('agentCapabilityNote')}</p>
           <button
             type="button"
             className={css.primaryButton}

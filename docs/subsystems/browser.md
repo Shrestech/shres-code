@@ -38,7 +38,7 @@ type SessionOwner = SessionId
 
 ## Readiness, consent, upgrade, and operation records
 
-The provisioning record names the release it published and the permission set consent disclosed. Reading it classifies the install as `current` when every receipted version, hash and owned path equals this build's pins, and `outdated` otherwise — including a record from before the permission receipt existed. Only `current` launches: `open` on an `outdated` install refuses before the platform and Chrome preflight and before any lease, so the answer never depends on the installed browser. Update is the existing consented `provision` verb against this build's pins, and it reports the versions and permission additions the change carries. Superseded `bsk-v*` directories are removed once the new record is committed.
+The provisioning record names the release it published and the permission set consent disclosed. Reading it classifies the install as `current` when every receipted version, hash, owned path and permission set equals this build's pins, and `outdated` otherwise — including a record from before the permission receipt existed. Only `current` launches: `open` on an `outdated` install refuses before the platform and Chrome preflight and before any lease, so the answer never depends on the installed browser. Update is the existing consented `provision` verb against this build's pins, and it reports the versions and permission additions the change carries. Superseded `bsk-v*` directories are removed once the new record is committed.
 
 ```ts type-equiv
 /**

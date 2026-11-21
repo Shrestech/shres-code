@@ -210,10 +210,18 @@ export class PluginAdminGateway extends TypertRemoteService {
    * @returns Loader-owned runtime state, including disabled rows.
    */
   @Remote('listPlugins')
-  listPlugins(): ManagedPlugin[] {
+  async listPlugins(): Promise<ManagedPlugin[]> {
+    const runtime = this.profileRuntime()
     const rows = managedPlugins(this.ctx)
-    return this.profileRuntime()?.pluginMutations.activation === true ? rows
-      : rows.map(row => ({ ...row, readOnlyReason: row.readOnlyReason ?? 'unsupported' }))
+    const writable = runtime === undefined ? undefined : await this.core.writableRowIds?.(runtime)
+    // A row outside the profile's writable composition — one a launcher patch
+    // inserts — cannot be addressed by a patch-layer override.
+    const scoped = writable === undefined ? rows : rows.map((row) => {
+      const id = row.entryId.startsWith('include:') ? row.entryId.slice('include:'.length) : row.entryId
+      return writable.has(id) ? row : { ...row, readOnlyReason: row.readOnlyReason ?? 'unaddressable' }
+    })
+    return runtime?.pluginMutations.activation === true ? scoped
+      : scoped.map(row => ({ ...row, readOnlyReason: row.readOnlyReason ?? 'unsupported' }))
   }
 
   /**
@@ -243,7 +251,7 @@ export class PluginAdminGateway extends TypertRemoteService {
     const runtime = this.mutableRuntime()
     if (runtime === undefined) return { kind: 'unsupported' }
     this.requireFreeSlot()
-    const row = this.listPlugins().find(entry => entry.entryId === request.entryId)
+    const row = (await this.listPlugins()).find(entry => entry.entryId === request.entryId)
     if (row === undefined) return { kind: 'refused', code: 'unknown-plugin' }
     if (row.readOnlyReason !== undefined) return {
       kind: 'refused', code: row.readOnlyReason === 'management-required' ? 'management-required' : 'unaddressable',
@@ -255,7 +263,7 @@ export class PluginAdminGateway extends TypertRemoteService {
         id: entry.options.id, moduleName: row.moduleName, enabled: request.enabled,
       }, { signal, invokingCwd: this.invokingCwd })
       if (outcome.kind !== 'saved' || outcome.application !== 'applied') return outcome
-      const current = this.listPlugins().find(item => item.entryId === request.entryId)
+      const current = (await this.listPlugins()).find(item => item.entryId === request.entryId)
       return current?.enabled === request.enabled
         ? outcome : { kind: 'saved', application: 'overridden' }
     })
