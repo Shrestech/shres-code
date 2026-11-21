@@ -31,6 +31,10 @@ concurrency:
 env:
   PRIMARY_NODE_VERSION: '24'
   SHRES_TELEMETRY_DISABLED: '1'
+  # GitHub's Linux runners have no CUDA toolkit, and onnxruntime-node's install
+  # script would otherwise download the CUDA EP package, which is not used here
+  # and whose release asset upstream may remove.
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
 jobs:
   pack:
