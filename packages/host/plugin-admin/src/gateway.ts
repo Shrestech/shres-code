@@ -2,10 +2,12 @@
  * The pluginAdmin Remote namespace: the gesture-gated mutation surface over
  * the shared plugin and skill install core for the profile this host booted.
  * It never takes a profile name from the wire, registers no tools, and
- * writes no session events. Every method is loopback-pinned through the
- * client-connection PRIVILEGED_METHODS set; the gesture gate lives HERE, in
- * the operations that spend it, because scope validation needs the
- * verb/target semantics the carrier must not learn.
+ * writes no session events. The Web carrier loopback-pins every method
+ * through the client-connection PRIVILEGED_METHODS set; a carrier that passes
+ * no set, such as the desktop host's single-user pipes, reaches them without
+ * that pin. The gesture gate lives HERE, in the operations that spend it,
+ * because scope validation needs the verb/target semantics the carrier must
+ * not learn.
  *
  * The tokens prove a begin→spend sequence scoped to one verb and target,
  * from a loopback peer, single use. They do not prove a human gesture
@@ -125,9 +127,10 @@ function isRelativePathSpec(spec: string): boolean {
  * the settlement.
  *
  * The `profileRuntime` service is optional: a composition whose launcher did
- * not provide one (a raw Web deployment) reports `mutations: 'unsupported'`,
- * answers `unsupported` for plugin install and remove, and still serves the
- * skill operations.
+ * not provide one (a raw Web deployment) reports both mutation capabilities
+ * false, answers `unsupported` for every plugin mutation, and still serves
+ * the skill operations. A runtime that accepts bundle selection and row
+ * overrides without a package manager reports `packages: false` alone.
  */
 export class PluginAdminGateway extends TypertRemoteService {
   static inject = []
@@ -183,7 +186,7 @@ export class PluginAdminGateway extends TypertRemoteService {
     ])
     const transaction = this.transaction
     return {
-      mutations: runtime?.pluginMutations ?? 'unsupported',
+      mutations: runtime?.pluginMutations ?? { activation: false, packages: false },
       plugins,
       skills,
       ...(transaction?.phase === 'parked'
@@ -207,10 +210,18 @@ export class PluginAdminGateway extends TypertRemoteService {
    * @returns Loader-owned runtime state, including disabled rows.
    */
   @Remote('listPlugins')
-  listPlugins(): ManagedPlugin[] {
+  async listPlugins(): Promise<ManagedPlugin[]> {
+    const runtime = this.profileRuntime()
     const rows = managedPlugins(this.ctx)
-    return this.profileRuntime()?.pluginMutations === 'enabled' ? rows
-      : rows.map(row => ({ ...row, readOnlyReason: row.readOnlyReason ?? 'unsupported' }))
+    const writable = runtime === undefined ? undefined : await this.core.writableRowIds?.(runtime)
+    // A row outside the profile's writable composition — one a launcher patch
+    // inserts — cannot be addressed by a patch-layer override.
+    const scoped = writable === undefined ? rows : rows.map((row) => {
+      const id = row.entryId.startsWith('include:') ? row.entryId.slice('include:'.length) : row.entryId
+      return writable.has(id) ? row : { ...row, readOnlyReason: row.readOnlyReason ?? 'unaddressable' }
+    })
+    return runtime?.pluginMutations.activation === true ? scoped
+      : scoped.map(row => ({ ...row, readOnlyReason: row.readOnlyReason ?? 'unsupported' }))
   }
 
   /**
@@ -240,7 +251,7 @@ export class PluginAdminGateway extends TypertRemoteService {
     const runtime = this.mutableRuntime()
     if (runtime === undefined) return { kind: 'unsupported' }
     this.requireFreeSlot()
-    const row = this.listPlugins().find(entry => entry.entryId === request.entryId)
+    const row = (await this.listPlugins()).find(entry => entry.entryId === request.entryId)
     if (row === undefined) return { kind: 'refused', code: 'unknown-plugin' }
     if (row.readOnlyReason !== undefined) return {
       kind: 'refused', code: row.readOnlyReason === 'management-required' ? 'management-required' : 'unaddressable',
@@ -252,7 +263,7 @@ export class PluginAdminGateway extends TypertRemoteService {
         id: entry.options.id, moduleName: row.moduleName, enabled: request.enabled,
       }, { signal, invokingCwd: this.invokingCwd })
       if (outcome.kind !== 'saved' || outcome.application !== 'applied') return outcome
-      const current = this.listPlugins().find(item => item.entryId === request.entryId)
+      const current = (await this.listPlugins()).find(item => item.entryId === request.entryId)
       return current?.enabled === request.enabled
         ? outcome : { kind: 'saved', application: 'overridden' }
     })
@@ -275,8 +286,8 @@ export class PluginAdminGateway extends TypertRemoteService {
   /**
    * Run one plugin install into the booted profile and park it for consent.
    * The transaction slot is reserved synchronously, so two interleaved
-   * installs cannot both reach the core. A host without an enabled profile
-   * runtime answers `unsupported` without touching anything.
+   * installs cannot both reach the core. A host whose profile runtime owns no
+   * package manager answers `unsupported` without touching anything.
    * @param request - the granted install with its package spec.
    * @returns the parked transaction, the core refusal, or `unsupported`.
    */
@@ -288,7 +299,7 @@ export class PluginAdminGateway extends TypertRemoteService {
     if (isRelativePathSpec(request.spec)) {
       throw new PluginAdminError('invalid-target', `install spec "${request.spec}" is a relative path; pass an absolute directory`)
     }
-    const runtime = this.mutableRuntime()
+    const runtime = this.packageRuntime()
     if (runtime === undefined) return { kind: 'unsupported' }
     this.requireFreeSlot()
     const controller = new AbortController()
@@ -322,17 +333,17 @@ export class PluginAdminGateway extends TypertRemoteService {
   }
 
   /**
-   * Remove one bundle package from the booted profile. A host without an
-   * enabled profile runtime answers `unsupported`; an install transaction
-   * holding the profile lock refuses the removal immediately instead of
-   * waiting on the lock.
+   * Remove one bundle package from the booted profile. A host whose profile
+   * runtime owns no package manager answers `unsupported`; an install
+   * transaction holding the profile lock refuses the removal immediately
+   * instead of waiting on the lock.
    * @param request - the granted remove with the package name.
    * @returns the removal outcome.
    */
   @Remote('removePlugin')
   async removePlugin(request: PluginAdminRemoveRequest): Promise<PluginAdminRemoveOutcome> {
     this.requireGesture(request.token, 'remove', request.name)
-    const runtime = this.mutableRuntime()
+    const runtime = this.packageRuntime()
     if (runtime === undefined) return { kind: 'unsupported' }
     this.requireFreeSlot()
     return this.track(signal => this.core.removePlugin(runtime.profileDir, request.name, {
@@ -384,10 +395,16 @@ export class PluginAdminGateway extends TypertRemoteService {
     return this.ctx.get(PROFILE_RUNTIME_KEY)
   }
 
-  /** The profile runtime when it permits plugin mutations. */
+  /** The profile runtime when it accepts bundle selection and row overrides. */
   private mutableRuntime(): ProfileRuntime | undefined {
     const runtime = this.profileRuntime()
-    return runtime?.pluginMutations === 'enabled' ? runtime : undefined
+    return runtime?.pluginMutations.activation === true ? runtime : undefined
+  }
+
+  /** The profile runtime when it owns a package manager for installs and removals. */
+  private packageRuntime(): ProfileRuntime | undefined {
+    const runtime = this.profileRuntime()
+    return runtime?.pluginMutations.packages === true ? runtime : undefined
   }
 
   /** Refuse a plugin mutation while an install transaction owns the profile. */

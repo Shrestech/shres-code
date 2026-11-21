@@ -13,6 +13,7 @@ import type {
   InstallCommitted,
   InstallPreview,
   InstallRefusal,
+  PluginMutationCapabilities,
   PluginStateEntry,
   RemoveOutcome,
   RollbackReport,
@@ -35,12 +36,12 @@ export type PluginTransactionId = Branded<'PluginTransactionId'>
 export type PluginConfirmToken = Branded<'PluginConfirmToken'>
 
 /**
- * Whether this host may install or remove profile plugins. `'unsupported'`
- * marks a host with no executable plugin-install owner for its profile: the
- * packaged desktop, or a composition whose launcher provided no
- * `profileRuntime`. Skill add and remove stay available in both states.
+ * Which profile mutations this host executes (see the app-boot launcher
+ * contract). A composition whose launcher provided no `profileRuntime`
+ * answers with both capabilities false. Skill add and remove stay available
+ * in every case.
  */
-export type PluginMutations = 'enabled' | 'unsupported'
+export type PluginMutations = PluginMutationCapabilities
 
 /** Wire grant from `pluginAdmin/begin`: spendable on exactly one matching mutation. */
 export interface PluginGestureGrant {
@@ -128,7 +129,7 @@ export interface InstalledSkillView {
 
 /** Full plugin-and-skill picture for a fresh page load. */
 export interface PluginAdminStatusResult {
-  /** Whether this host may install or remove profile plugins. */
+  /** Which profile mutations this host executes. */
   mutations: PluginMutations
   /** Every profile plugin with its restart readiness; empty when no profile runtime was provided. */
   plugins: PluginStateEntry[]
@@ -140,8 +141,8 @@ export interface PluginAdminStatusResult {
 
 /**
  * Install outcome: a parked transaction with its confirm token, a core
- * refusal with the rollback report, or `unsupported` when this host has no
- * plugin-install owner (see {@link PluginMutations}); `unsupported` touches
+ * refusal with the rollback report, or `unsupported` when this host accepts no
+ * package installs (see {@link PluginMutations}); `unsupported` touches
  * nothing.
  */
 export type PluginAdminInstallOutcome =
@@ -159,7 +160,7 @@ export type PluginAdminConfirmOutcome =
 
 /**
  * Remove outcome: the core's removal result or refusal, or `unsupported`
- * when this host has no plugin-install owner. A `pnpm` value of `'failed'`
+ * when this host accepts no package removals. A `pnpm` value of `'failed'`
  * means the plugin is deactivated but its packages may remain in node_modules.
  */
 export type PluginAdminRemoveOutcome = RemoveOutcome | { kind: 'unsupported' }

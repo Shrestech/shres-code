@@ -4,11 +4,11 @@
  * response frames, the fail-loud composition checks, and teardown.
  */
 
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { runDesktopHost } from '../src/index.ts'
+import { desktopProfileControl, desktopShippedBundles, runDesktopHost } from '../src/index.ts'
 
 const FRAME_MAGIC = 0x53485233
 const HEADER_BYTES = 13
@@ -85,6 +85,7 @@ function stubServices(muxEvents: number): string {
       + '        yield { rpcId: frame.rpcId, payload: { type: "session/frame", seq, pad } }\n'
       + '      }'
   return [
+    'import { writeFileSync } from "node:fs"',
     'export const name = "stub-host-services"',
     'export const inject = []',
     'export function apply(ctx) {',
@@ -100,6 +101,13 @@ function stubServices(muxEvents: number): string {
     '      }',
     '    },',
     '  })',
+    '  const profile = ctx.get("profileRuntime")',
+    '  writeFileSync(new URL("./profile-runtime.json", import.meta.url), JSON.stringify({',
+    '    mutations: profile.pluginMutations,',
+    '    shippedBundles: profile.shippedBundles,',
+    '    hasControl: profile.control !== undefined,',
+    '    hasInstallAnchor: profile.installAnchor !== undefined,',
+    '  }))',
     '  ctx.provide("clientModules", {',
     '    graph: () => ({ entries: [{ id: "known-plugin", url: "/plugins/known-plugin/client.js", rev: "abc" }] }),',
     '    fetchBundle: async request => {',
@@ -152,6 +160,7 @@ function stageProject(root: string, bundles: readonly string[], stubServicesEnab
 interface Harness {
   readonly controller: Awaited<ReturnType<typeof runDesktopHost>>
   readonly frames: Buffer[]
+  readonly projectDir: string
 }
 
 async function bootFixture(
@@ -172,7 +181,7 @@ async function bootFixture(
   }, {
     ...(options.allowLinkedPackages === undefined ? {} : { allowLinkedPackages: options.allowLinkedPackages }),
   })
-  return { controller, frames }
+  return { controller, frames, projectDir }
 }
 
 function framesOf(frames: readonly Buffer[], streamId: number): DecodedFrame[] {
@@ -290,6 +299,69 @@ describe('runDesktopHost', () => {
   it('fails loud when the composition provides no clientModules', async () => {
     await expect(bootFixture({ stubServices: false }))
       .rejects.toThrow('composition did not provide clientModules')
+  })
+
+  it('provides activation-only profile mutations for the app-owned profile', async () => {
+    const { controller, projectDir, frames } = await bootFixture()
+    void frames
+    expect(JSON.parse(readFileSync(join(projectDir, 'profile-runtime.json'), 'utf8'))).toEqual({
+      mutations: { activation: process.platform !== 'win32', packages: false },
+      shippedBundles: ['@shres-code/shres-code-browser-bundle'],
+      hasControl: true,
+      hasInstallAnchor: true,
+    })
+    await controller.dispose()
+  })
+
+  it('saves bundle selection for the next launch and reports a row the desktop patch outranks', async () => {
+    const { root, runtimeDir } = stageRuntime()
+    const bundlePatch = [
+      '- insert:',
+      '    - id: plain-row',
+      "      name: '@fixture/plain'",
+      '    - id: directory-picker',
+      "      name: '@fixture/directory-picker'",
+      '',
+    ].join('\n')
+    writeJson(join(runtimeDir, 'node_modules', '@fixture', 'bundle', 'package.json'), {
+      name: '@fixture/bundle',
+      version: '1.0.0',
+      shres: { bundle: { patch: './cordis.patch.yml' } },
+    })
+    writeFile(join(runtimeDir, 'node_modules', '@fixture', 'bundle', 'cordis.patch.yml'), bundlePatch)
+    const projectDir = join(root, 'control-project')
+    writeJson(join(projectDir, 'package.json'), {
+      name: 'shres-desktop-control-profile',
+      private: true,
+      shres: { profile: { bundles: ['@fixture/bundle'] } },
+    })
+    writeFile(join(projectDir, 'cordis.patch.yml'), '[]\n')
+    const control = desktopProfileControl({
+      installAnchor: join(runtimeDir, 'node_modules', '@shres-code', 'shres-code', 'package.json'),
+      profile: { name: 'control-project', dir: projectDir, layers: [], patchPath: join(projectDir, 'cordis.patch.yml'), patches: [] },
+      patches: [],
+    })
+    const signal = new AbortController().signal
+    const browser = (await control.listBundles()).filter(row => row.shipped)
+    expect(browser.map(row => row.name)).toContain('@shres-code/shres-code-browser-bundle')
+    expect(browser.every(row => row.readOnlyReason === undefined)).toBe(true)
+
+    expect(await control.setPluginEnabled({ id: 'directory-picker', moduleName: '@fixture/directory-picker', enabled: true }, signal))
+      .toEqual({ kind: 'saved', application: 'overridden' })
+    expect(await control.setPluginEnabled({ id: 'plain-row', moduleName: '@fixture/plain', enabled: false }, signal))
+      .toEqual({ kind: 'saved', application: 'restart-required' })
+
+    expect(await control.setBundleEnabled('@fixture/bundle', false, signal))
+      .toEqual({ kind: 'saved', application: 'restart-required' })
+    const saved = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8')) as {
+      shres: { profile: { bundles: string[] } }
+    }
+    expect(saved.shres.profile.bundles).toEqual([])
+  })
+
+  it('lists the booted layers beside every optional bundle once', () => {
+    expect(desktopShippedBundles(['@shres-code/shres-code-base', '@shres-code/shres-code-browser-bundle']))
+      .toEqual(['@shres-code/shres-code-base', '@shres-code/shres-code-browser-bundle'])
   })
 
   it('refuses a bundle resolved outside the runtime and profile unless the development option allows it', async () => {

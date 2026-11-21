@@ -22,6 +22,10 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   SHRES_TELEMETRY_DISABLED: '1'
+  # GitHub's Linux runners have no CUDA toolkit, and onnxruntime-node's install
+  # script would otherwise download the CUDA EP package, which is not used here
+  # and whose release asset upstream may remove.
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
 jobs:
   # Keyless real-kernel sandbox proofs (sandbox Agent Note § Testing): each ladder

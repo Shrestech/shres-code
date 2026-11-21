@@ -14,6 +14,9 @@ const home = process.env.SHRES_HOME
 if (home === undefined) throw new Error('Browser bundle snapshot requires SHRES_HOME')
 
 const BUNDLE = '@shres-code/shres-code-browser-bundle'
+/** Extra argv element selecting the desktop-shaped host: activation accepted, packages refused, no live control. */
+const ACTIVATION_ONLY = 'activation-only'
+const activationOnly = process.argv[3] === ACTIVATION_ONLY
 const profileDir = join(home, 'profiles', 'web')
 const installAnchor = join(profileDir, 'package.json')
 let bundlePatches: PatchOptions[] = []
@@ -105,10 +108,18 @@ function snapshot(ctx: Context, manager: PluginAdminGateway, label: string): Pro
 }
 
 const ctx = await boot('browser-bundle-snapshot', config, rootPatches(true), (hostCtx) => {
-  provideProfileRuntime(hostCtx, {
+  // The desktop host saves selection for the next launch and owns no package
+  // manager; the default fixture reconciles the running tree instead.
+  provideProfileRuntime(hostCtx, activationOnly ? {
     profileDir,
     bootBundles: [BUNDLE],
-    pluginMutations: 'enabled',
+    pluginMutations: { activation: true, packages: false },
+    installAnchor,
+    shippedBundles: [BUNDLE],
+  } : {
+    profileDir,
+    bootBundles: [BUNDLE],
+    pluginMutations: { activation: true, packages: true },
     installAnchor,
     shippedBundles: [BUNDLE],
     control,
@@ -120,13 +131,26 @@ try {
   const managerCandidate: unknown = ctx.get('pluginAdmin')
   if (!(managerCandidate instanceof PluginAdminGateway)) throw new Error('browser bundle fixture did not mount PluginAdminGateway')
   const manager = managerCandidate
-  const snapshots: unknown[] = [await snapshot(ctx, manager, 'selected')]
-  const disable = manager.begin({ verb: 'bundle-disable', target: BUNDLE })
-  snapshots.push({ operation: 'disable', outcome: await manager.setBundleEnabled({ token: disable.token, name: BUNDLE, enabled: false }) })
-  snapshots.push(await snapshot(ctx, manager, 'deselected'))
-  const enable = manager.begin({ verb: 'bundle-enable', target: BUNDLE })
-  snapshots.push({ operation: 'enable', outcome: await manager.setBundleEnabled({ token: enable.token, name: BUNDLE, enabled: true }) })
-  snapshots.push(await snapshot(ctx, manager, 'reselected'))
+  const snapshots: unknown[] = []
+  if (activationOnly) {
+    snapshots.push({ label: 'restart-required host', mutations: (await manager.status()).mutations })
+    const install = manager.begin({ verb: 'install', target: '/plugins/example' })
+    snapshots.push({
+      operation: 'install',
+      outcome: await manager.stageInstall({ token: install.token, spec: '/plugins/example' }),
+    })
+    const disable = manager.begin({ verb: 'bundle-disable', target: BUNDLE })
+    snapshots.push({ operation: 'disable', outcome: await manager.setBundleEnabled({ token: disable.token, name: BUNDLE, enabled: false }) })
+    snapshots.push(await snapshot(ctx, manager, 'deselected'))
+  } else {
+    snapshots.push(await snapshot(ctx, manager, 'selected'))
+    const disable = manager.begin({ verb: 'bundle-disable', target: BUNDLE })
+    snapshots.push({ operation: 'disable', outcome: await manager.setBundleEnabled({ token: disable.token, name: BUNDLE, enabled: false }) })
+    snapshots.push(await snapshot(ctx, manager, 'deselected'))
+    const enable = manager.begin({ verb: 'bundle-enable', target: BUNDLE })
+    snapshots.push({ operation: 'enable', outcome: await manager.setBundleEnabled({ token: enable.token, name: BUNDLE, enabled: true }) })
+    snapshots.push(await snapshot(ctx, manager, 'reselected'))
+  }
   process.stdout.write(JSON.stringify({ snapshots }) + String.fromCharCode(10))
 } finally {
   await ctx.fiber.dispose()

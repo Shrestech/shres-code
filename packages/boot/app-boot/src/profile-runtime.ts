@@ -9,6 +9,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import type {
+  PluginMutationCapabilities,
   ProfileActivationOutcome,
   ProfileBundleState,
 } from './profile-plugin-types.ts'
@@ -24,11 +25,11 @@ export interface ProfileRuntime {
   /** Bundle names captured at boot, in `shres.profile.bundles` order. */
   readonly bootBundles: readonly string[]
   /**
-   * Whether this surface permits plugin mutations through the shared core.
-   * `'unsupported'` marks a surface with no executable plugin-install owner:
-   * it serves status and refuses mutations with its own message.
+   * Which plugin mutations this surface executes through the shared core.
+   * `activation` requires `installAnchor` or `control`: without one of them the
+   * host cannot resolve the bundles an activation names.
    */
-  readonly pluginMutations: 'enabled' | 'unsupported'
+  readonly pluginMutations: PluginMutationCapabilities
   /** Package anchor used to resolve installed profile bundles. */
   readonly installAnchor?: string
   /** Required and optional bundles available from the running installation. */
@@ -87,13 +88,16 @@ declare module '@shres-code/cordis' {
  * list is copied and frozen, so a later mutation of the caller's array cannot
  * change what injected plugins observe.
  * @param ctx - the host context the tree will mount under.
- * @param value - the booted profile's directory, bundle layers, and mutation policy.
+ * @param value - the booted profile's directory, bundle layers, and mutation capabilities.
  */
 export function provideProfileRuntime(ctx: Context, value: ProfileRuntime): void {
   ctx.provide(PROFILE_RUNTIME_KEY, Object.freeze({
     profileDir: value.profileDir,
     bootBundles: Object.freeze([...value.bootBundles]),
-    pluginMutations: value.pluginMutations,
+    pluginMutations: Object.freeze({
+      activation: value.pluginMutations.activation,
+      packages: value.pluginMutations.packages,
+    }),
     ...value.installAnchor === undefined ? {} : { installAnchor: value.installAnchor },
     ...value.shippedBundles === undefined ? {} : { shippedBundles: Object.freeze([...value.shippedBundles]) },
     ...value.control === undefined ? {} : { control: value.control },

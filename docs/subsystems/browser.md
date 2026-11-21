@@ -36,7 +36,9 @@ type BrowserSkillOperationId = Branded<'BrowserSkillOperationId'>
 type SessionOwner = SessionId
 ```
 
-## Readiness, consent, and operation records
+## Readiness, consent, upgrade, and operation records
+
+The provisioning record names the release it published and the permission set consent disclosed. Reading it classifies the install as `current` when every receipted version, hash, owned path and permission set equals this build's pins, and `outdated` otherwise — including a record from before the permission receipt existed. Only `current` launches: `open` on an `outdated` install refuses before the platform and Chrome preflight and before any lease, so the answer never depends on the installed browser. Update is the existing consented `provision` verb against this build's pins, and it reports the versions and permission additions the change carries. Superseded `bsk-v*` directories are removed once the new record is committed.
 
 ```ts type-equiv
 /**
@@ -55,6 +57,14 @@ type BrowserSkillState = {
   step: 'download' | 'verify' | 'extract'
 } | {
   kind: 'provisioned'
+} | {
+  kind: 'outdated'
+  /** Versions recorded by the install on disk; a v1 record carries no permission receipt. */
+  installed: { bsk: string; extension: string }
+  /** Versions this build pins and would install on Update. */
+  pinned: { bsk: string; extension: string }
+  /** What an Update changes besides the version labels. */
+  changes: BrowserSkillUpgradeChanges
 } | {
   kind: 'starting'
 } | {
@@ -107,6 +117,12 @@ type BrowserSkillRefusal = {
   /** Present when the refusal carries a manual recovery step beyond the pid. */
   detail?: string
 } | {
+  kind: 'outdated'
+  /** Versions recorded by the install on disk. */
+  installed: { bsk: string; extension: string }
+  /** Versions this build pins; Update installs them. */
+  pinned: { bsk: string; extension: string }
+} | {
   kind: 'operation-in-progress'
 } | {
   kind: 'disposed'
@@ -114,6 +130,25 @@ type BrowserSkillRefusal = {
 } | {
   kind: 'shutdown-incomplete'
   detail: string
+}
+```
+
+```ts type-equiv
+/**
+ * What an Update from the installed release to the pinned release changes.
+ * Derived from the provisioning receipts and compiled pins, never the network.
+ */
+interface BrowserSkillUpgradeChanges {
+  /** The recorded version labels differ from the pins. */
+  versions: boolean
+  /** Any receipted hash or owned path differs from the pin. */
+  artifacts: boolean
+  /** Permissions the pinned extension adds over the recorded set. */
+  addedPermissions: readonly string[]
+  /** Permissions the pinned extension no longer requests. */
+  removedPermissions: readonly string[]
+  /** False for a v1 record, which carried no permission receipt. */
+  installedPermissionsKnown: boolean
 }
 ```
 

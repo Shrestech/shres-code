@@ -47,7 +47,10 @@ import { ExtensionLoadError, OwnedChrome } from './chrome.ts'
 import { acquireRuntimeLease, LEASE_FILE_NAME, LeaseRefusedError, type HeldRuntimeLease, type LeaseCleanupHooks } from './lease.ts'
 import { isOwnedChromeProcess } from './process-group.ts'
 import { SessionRegistry } from './sessions.ts'
-import { artifactPaths, ensureLaunchArtifacts, preflight, ProvisionRefusedError, provisionArtifacts, readProvisionedState, type ProvisionedState } from './provision.ts'
+import {
+  artifactPaths, ensureLaunchArtifacts, preflight, ProvisionRefusedError, provisionArtifacts,
+  readProvisionedRecord, type ProvisionedRecord, type StoredProvisionedState,
+} from './provision.ts'
 import type { ResolvedBrowserSkillConfig } from '../config.ts'
 import { isJsonValue } from '@shres-code/shres-code-session'
 import type { JsonValue } from '@shres-code/shres-code-session/types'
@@ -163,6 +166,7 @@ export interface BrowserSkillRuntimeInternals {
   provision?: typeof provisionArtifacts
   preflight?: typeof preflight
   ensureLaunchArtifacts?: typeof ensureLaunchArtifacts
+  readProvisionedRecord?: typeof readProvisionedRecord
   pickDaemonPort?: typeof pickAvailableLoopbackPort
   acquireLease?: typeof acquireRuntimeLease
   reservePort?: typeof reserveLoopbackPort
@@ -209,7 +213,9 @@ export class BrowserSkillRuntime {
   private state: BrowserSkillState = { kind: 'absent' }
   private operation: BrowserSkillOperation | undefined
   private chromeVersion: string | undefined
-  private provisioned: ProvisionedState | undefined
+  private provisioned: StoredProvisionedState | undefined
+  /** The last classification of the record on disk, so an idle stack reports what is installed. */
+  private record: ProvisionedRecord | undefined
   private lease: HeldRuntimeLease | undefined
   private defaultPortHold: PortReservation | undefined
   private runner: BskRunner | undefined
@@ -235,6 +241,7 @@ export class BrowserSkillRuntime {
       provision: provisionArtifacts,
       preflight,
       ensureLaunchArtifacts,
+      readProvisionedRecord,
       pickDaemonPort: pickAvailableLoopbackPort,
       acquireLease: acquireRuntimeLease,
       reservePort: reserveLoopbackPort,
@@ -242,12 +249,36 @@ export class BrowserSkillRuntime {
     })
   }
 
-  /** Read the durable artifact record so a constructed runtime reports provisioned state. */
+  /**
+   * Read the durable artifact record so a constructed runtime reports what is
+   * actually installed. A record that does not equal this build's pins is
+   * `outdated`, never `provisioned` — a healthy-looking card whose Open always
+   * fails until the pinned release is installed.
+   */
   async refreshProvisioned(): Promise<void> {
-    const state = await readProvisionedState(this.root)
-    if (state === undefined) return
-    this.provisioned = state
-    if (this.state.kind === 'absent') this.setState({ kind: 'provisioned' })
+    // Boot-time refresh stays read-only: resolve the alias without creating
+    // the root. The record stores canonical paths, so classifying against a
+    // raw symlinked path would report an exact install as outdated.
+    const root = await realpath(this.root).catch(() => this.root)
+    const record = await this.internals().readProvisionedRecord(root)
+    if (record === undefined) return
+    this.record = record
+    this.provisioned = record.state
+    if (this.state.kind !== 'absent') return
+    this.setState(this.idleState())
+  }
+
+  /** The idle state for the artifacts currently on disk: installed, outdated, or absent. */
+  private idleState(): BrowserSkillState {
+    const record = this.record
+    if (record === undefined) return { kind: 'absent' }
+    if (record.kind === 'current') return { kind: 'provisioned' }
+    return {
+      kind: 'outdated',
+      installed: { bsk: record.state.bsk.version, extension: record.state.extension.version },
+      pinned: { bsk: BSK_VERSION, extension: EXTENSION_VERSION },
+      changes: record.changes,
+    }
   }
 
   /**
@@ -262,8 +293,8 @@ export class BrowserSkillRuntime {
       ...(this.chromeVersion === undefined ? {} : { chrome: { version: this.chromeVersion } }),
       ...(this.provisioned === undefined ? {} : {
         artifacts: {
-          bsk: { version: BSK_VERSION, sha256: this.provisioned.bsk.binarySha256 },
-          extension: { version: EXTENSION_VERSION, sha256: this.provisioned.extension.archiveSha256 },
+          bsk: { version: this.provisioned.bsk.version, sha256: this.provisioned.bsk.binarySha256 },
+          extension: { version: this.provisioned.extension.version, sha256: this.provisioned.extension.archiveSha256 },
         },
       }),
       consent: {
@@ -388,7 +419,9 @@ export class BrowserSkillRuntime {
   private async runVerb(verb: BrowserSkillVerb, options: BrowserSkillStartOptions | undefined, signal: AbortSignal): Promise<void> {
     switch (verb) {
       case 'provision':
-        if (this.provisioned === undefined) await this.provisionUnderLease(signal)
+        // Update runs the same consented flow as a first install: a record
+        // that no longer equals the pins must install the pinned release.
+        if (this.provisioned === undefined || this.state.kind === 'outdated') await this.provisionUnderLease(signal)
         // Already ready: the stack is up under the held lease, so reopen is a
         // no-op success — reacquiring our own lease would refuse and poison a
         // healthy state.
@@ -396,6 +429,12 @@ export class BrowserSkillRuntime {
         await this.openUnderLease(signal)
         return
       case 'open':
+        // Outdated refuses before preflight and before any lease, so the
+        // answer never depends on the installed Chrome and the UI can always
+        // offer Update instead.
+        if (this.state.kind === 'outdated') {
+          throw new ProvisionRefusedError({ kind: 'outdated', installed: this.state.installed, pinned: this.state.pinned })
+        }
         // Already ready: reopen is a no-op success for the same reason.
         if (this.state.kind === 'ready') return
         await this.openUnderLease(signal)
@@ -403,7 +442,7 @@ export class BrowserSkillRuntime {
       case 'close': {
         // The one teardown path: retire the ready lifetime, or close the
         // partial stack a failed open left behind — never a bare close.
-        const closed = await this.retireCurrent({ kind: this.provisioned === undefined ? 'absent' : 'provisioned' })
+        const closed = await this.retireCurrent(this.idleState())
         if (!closed.ok) throw closed.error
         return
       }
@@ -428,7 +467,9 @@ export class BrowserSkillRuntime {
         } finally {
           await this.releaseLease(lease)
         }
-        this.setState({ kind: 'provisioned' })
+        // Reset clears the profile and runtime state, never the artifacts, so
+        // the card keeps reporting what is installed: outdated stays outdated.
+        this.setState(this.idleState())
         return
       }
       case 'uninstall': {
@@ -450,7 +491,10 @@ export class BrowserSkillRuntime {
             if (keepProfile && name === PROFILE_DIR_NAME) continue
             const path = join(root, name)
             // Recursive deletion can partially remove the receipt before failing.
-            if (path === dirname(artifactPaths(root).stateFile)) this.provisioned = undefined
+            if (path === dirname(artifactPaths(root).stateFile)) {
+              this.provisioned = undefined
+              this.record = undefined
+            }
             await rm(path, { recursive: true, force: true })
           }
           // The lock survived the purge and still excludes peers mid-deletion.
@@ -473,6 +517,7 @@ export class BrowserSkillRuntime {
           }
         }
         this.provisioned = undefined
+        this.record = undefined
         this.chromeVersion = undefined
         this.setState({ kind: 'absent' })
         return
@@ -504,7 +549,7 @@ export class BrowserSkillRuntime {
     if (inFlight !== undefined) {
       await inFlight.settled
     }
-    const result = await this.retireCurrent({ kind: this.provisioned === undefined ? 'absent' : 'provisioned' })
+    const result = await this.retireCurrent(this.idleState())
     if (!result.ok) {
       // Shutdown failures stay visible: the state carries the refusal and the
       // lease with its recorded pids stays retained for a later retry.
@@ -835,6 +880,8 @@ export class BrowserSkillRuntime {
         onStep: (step) =>{  this.setState({ kind: 'provisioning', step }) },
         signal,
       })
+      // The pinned record is committed: a later idle report is current.
+      this.record = { kind: 'current', state: this.provisioned }
     } finally {
       await this.releaseLease(lease)
     }
@@ -854,6 +901,7 @@ export class BrowserSkillRuntime {
     try {
       const provisioned = await internals.ensureLaunchArtifacts(root, this.config, signal)
       this.provisioned = provisioned
+      this.record = { kind: 'current', state: provisioned }
       let port = await readDaemonPort(root)
       if (port === undefined) {
         port = await pickEphemeralDaemonPort(internals.pickDaemonPort)
@@ -1267,7 +1315,9 @@ function notReady(state: BrowserSkillState): BrowserSkillCommandResult<never> {
   return {
     ok: false,
     reason: 'not-ready',
-    detail: `BrowserSkill browser is not ready (state ${state.kind}); open it from Plugins → BrowserSkill`,
+    detail: state.kind === 'outdated'
+      ? 'BrowserSkill browser is not ready (state outdated); update it from Plugins → BrowserSkill'
+      : `BrowserSkill browser is not ready (state ${state.kind}); open it from Plugins → BrowserSkill`,
   }
 }
 

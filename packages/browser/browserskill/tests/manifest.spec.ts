@@ -23,11 +23,11 @@ import { resolveBrowserSkillConfig } from '../src/config.ts'
 
 describe('release pins', () => {
   it('pins the measured platform, versions, and hashes', () => {
-    expect(BSK_VERSION).toBe('0.3.1')
+    expect(BSK_VERSION).toBe('0.5.0')
     expect(BSK_PLATFORM_PIN.platform).toBe('darwin-arm64')
-    expect(BSK_PLATFORM_PIN.archiveSha256).toBe('78f1651215b1ce95e40fb886985d1476e2cd2fb089beb146e6ecc6fa4a4aab89')
-    expect(BSK_PLATFORM_PIN.binarySha256).toBe('bba24de58d403625268ffd6bbef31cdedb2d06eb031e9d0d1773120f4c0578bc')
-    expect(EXTENSION_ASSET.sha256).toBe('9d41a8450653dbdcea365b611a163d9ddbbf0c0078bff42dbe8e2cf5910cbb8e')
+    expect(BSK_PLATFORM_PIN.archiveSha256).toBe('a16b66ab9d3629045d663f645fd2c2b8f544116ac3cc9efb94b34867fcfe1756')
+    expect(BSK_PLATFORM_PIN.binarySha256).toBe('29687fa084a658a0d2cb285e796abcac0631994e3da24a24db6af050d6fadea3')
+    expect(EXTENSION_ASSET.sha256).toBe('4de785b340e401de855448410be3b7bad5e685a9e5128c0bd4ec4edeba5c9fc9')
     expect(EXTENSION_TREE_SHA256).toMatch(/^[0-9a-f]{64}$/)
     // Two distinct facts about the same release: the archive bytes and the
     // tree those bytes unpack to never share a pin value.
@@ -63,8 +63,8 @@ describe('release pins', () => {
     const config = resolveBrowserSkillConfig()
     if (platformPin() === undefined) return
     const archive = bskArchiveUrl(config)
-    expect(archive?.href).toContain('bsk-v0.3.1-aarch64-apple-darwin.tar.gz')
-    expect(extensionArchiveUrl(config).href).toContain('browser-skill-extension-v0.3.1-chrome.zip')
+    expect(archive?.href).toContain('bsk-v0.5.0-aarch64-apple-darwin.tar.gz')
+    expect(extensionArchiveUrl(config).href).toContain('browser-skill-extension-v0.5.0-chrome.zip')
   })
 
   it('appends the missing slash when composing an override base URL', () => {
@@ -78,9 +78,9 @@ describe('release pins', () => {
   it('honors the artifact base override by appending the pinned file name', () => {
     const config = resolveBrowserSkillConfig({ artifactBaseUrl: 'http://127.0.0.1:9/assets' })
     const extension = extensionArchiveUrl(config)
-    expect(extension.href).toBe('http://127.0.0.1:9/assets/browser-skill-extension-v0.3.1-chrome.zip')
+    expect(extension.href).toBe('http://127.0.0.1:9/assets/browser-skill-extension-v0.5.0-chrome.zip')
     if (platformPin() !== undefined) {
-      expect(bskArchiveUrl(config)?.href).toBe('http://127.0.0.1:9/assets/bsk-v0.3.1-aarch64-apple-darwin.tar.gz')
+      expect(bskArchiveUrl(config)?.href).toBe('http://127.0.0.1:9/assets/bsk-v0.5.0-aarch64-apple-darwin.tar.gz')
     }
     const pinned = artifactUrl(EXTENSION_ASSET, config, 'x.zip')
     expect(pinned.href).toBe('http://127.0.0.1:9/assets/x.zip')
@@ -100,7 +100,7 @@ describe('release pins', () => {
       return
     }
     expect(downloads.map(row => row.artifact)).toEqual(['bsk', 'extension'])
-    expect(downloads[0]).toMatchObject({ version: '0.3.1' })
+    expect(downloads[0]).toMatchObject({ version: '0.5.0' })
   })
 })
 
@@ -109,6 +109,9 @@ describe('fixed protocol constants', () => {
     expect(DEFAULT_DAEMON_PORT).toBe(52_800)
     expect(EXTENSION_PERMISSIONS).toContain('debugger')
     expect(EXTENSION_PERMISSIONS).toContain('tabs')
+    // 0.5.0 adds an offscreen document and tab-group control to the pinned set.
+    expect(EXTENSION_PERMISSIONS).toContain('offscreen')
+    expect(EXTENSION_PERMISSIONS).toContain('tabGroups')
   })
 
   it('bounds the model-controlled values', () => {

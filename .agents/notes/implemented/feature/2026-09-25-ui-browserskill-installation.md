@@ -10,7 +10,7 @@ The [managed installation decision](../../implemented/feature/2026-09-24-managed
 
 The optional [BrowserSkill bundle](../../../../packages/bundle/browser/README.md) composes a first-party [host plugin](../../../../packages/browser/browserskill/README.md) and [setup contribution](../../../../packages/client/ui-browserskill/README.md). The [shared plugin activation decision](../architecture/2026-09-27-shared-plugin-activation.md) owns bundle selection and Plugins navigation. Runtime setup provisions resources without changing npm dependencies or plugin selection. The native tools and guide are registered at mount and return a stable not-ready result until the owned browser is connected. The manual skill route remains independently available.
 
-Use the installed Google Chrome executable with a separate Shres-owned profile. The initial supported platform is macOS arm64. Missing Chrome, an unsupported platform, or a version below the extension's minimum is refused before downloading. Extension-protocol compatibility is checked during launch; there is no automatic browser download or manual store-install fallback.
+Use the installed Google Chrome executable with a separate Shres-owned profile. The supported platform is macOS arm64. Missing Chrome, an unsupported platform, or a version below the extension's minimum is refused before downloading. The [pin-freshness note](../../implemented/architecture/2026-11-17-browserskill-pin-freshness.md) owns which release a build pins, the upgrade state, and what re-measuring a bump requires. Extension-protocol compatibility is checked during launch; there is no automatic browser download or manual store-install fallback.
 
 ### Consent and artifacts
 
@@ -42,7 +42,7 @@ The plugin entry constructs BrowserSkillGateway directly with the runtime and ow
 
 ## Verification
 
-An isolated pilot using installed Chrome 153.0.8010.53, Puppeteer Core 25.12, and pinned bsk/extension 0.3.1 reached a local form, observed it, filled and clicked it, verified the server receipt, and stopped the owned session and daemon. Chrome's load-extension flag was ignored; Extensions.loadUnpacked and extension-worker storage configuration worked. The observed default-port contact count was zero in that run; the reservation, not that timing observation, provides isolation. No model API or everyday Chrome profile was used.
+An isolated pilot using installed Chrome 153.0.8010.53, Puppeteer Core 25.12, and the then-pinned bsk/extension 0.3.1 reached a local form, observed it, filled and clicked it, verified the server receipt, and stopped the owned session and daemon. Chrome's load-extension flag was ignored; Extensions.loadUnpacked and extension-worker storage configuration worked. The observed default-port contact count was zero in that run; the reservation, not that timing observation, provides isolation. No model API or everyday Chrome profile was used.
 
 Focused tests cover the runner, daemon, process identities, lease coordination, artifacts, gateway, tools, and UI. A [real-Loader keyless snapshot](../../../../examples/headless-agent/tests/browserskill-native.snapshot.ts) exercises the shipping plugin entry, guide, tool schemas, and not-ready output. It does not establish Web bundle readiness or successful native control.
 

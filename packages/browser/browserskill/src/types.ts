@@ -48,6 +48,14 @@ export type BrowserSkillState = {
 } | {
   kind: 'provisioned'
 } | {
+  kind: 'outdated'
+  /** Versions recorded by the install on disk; a v1 record carries no permission receipt. */
+  installed: { bsk: string; extension: string }
+  /** Versions this build pins and would install on Update. */
+  pinned: { bsk: string; extension: string }
+  /** What an Update changes besides the version labels. */
+  changes: BrowserSkillUpgradeChanges
+} | {
   kind: 'starting'
 } | {
   kind: 'ready'
@@ -57,6 +65,23 @@ export type BrowserSkillState = {
 } | {
   kind: 'failed'
   refusal: BrowserSkillRefusal
+}
+
+/**
+ * What an Update from the installed release to the pinned release changes.
+ * Derived from the provisioning receipts and compiled pins, never the network.
+ */
+export interface BrowserSkillUpgradeChanges {
+  /** The recorded version labels differ from the pins. */
+  versions: boolean
+  /** Any receipted hash or owned path differs from the pin. */
+  artifacts: boolean
+  /** Permissions the pinned extension adds over the recorded set. */
+  addedPermissions: readonly string[]
+  /** Permissions the pinned extension no longer requests. */
+  removedPermissions: readonly string[]
+  /** False for a v1 record, which carried no permission receipt. */
+  installedPermissionsKnown: boolean
 }
 
 /** Why a lifecycle operation refused to proceed. Every member is user-displayable. */
@@ -96,6 +121,12 @@ export type BrowserSkillRefusal = {
   pid: number
   /** Present when the refusal carries a manual recovery step beyond the pid. */
   detail?: string
+} | {
+  kind: 'outdated'
+  /** Versions recorded by the install on disk. */
+  installed: { bsk: string; extension: string }
+  /** Versions this build pins; Update installs them. */
+  pinned: { bsk: string; extension: string }
 } | {
   kind: 'operation-in-progress'
 } | {

@@ -20,9 +20,16 @@ function setBundles(manifest: ManagedManifest, bundles: string[]): ManagedManife
   return { ...manifest, shres: { ...manifest.shres, profile: { ...manifest.shres?.profile, bundles } } }
 }
 
-/** Flatten groups in the root Include; nested Include trees are independently owned. */
-function flatten(entries: EntryOptions[]): EntryOptions[] {
-  return entries.flatMap(entry => [entry, ...(entry.group && Array.isArray(entry.config) ? flatten(entry.config as EntryOptions[]) : [])])
+/**
+ * Flatten the groups of one root Include; nested Include trees are independently owned.
+ * @param entries - composed entries of one Include.
+ * @returns every entry of that Include with its group parents in place.
+ */
+export function flattenProfileRows(entries: readonly EntryOptions[]): EntryOptions[] {
+  return entries.flatMap(entry => [
+    entry,
+    ...(entry.group && Array.isArray(entry.config) ? flattenProfileRows(entry.config as EntryOptions[]) : []),
+  ])
 }
 
 /** Project protected rows with the enclosing group options that control their activation. */
@@ -143,7 +150,7 @@ async function readBundleMetadata(
   const patch = manifest.shres?.bundle?.patch
   if (typeof patch !== 'string' || patch.length === 0) throw new Error('package does not declare a profile patch')
   const patches = loadOverlayPatches('shres', join(packageDir, patch))
-  const rows = flatten(composeEntries([patches]))
+  const rows = flattenProfileRows(composeEntries([patches]))
   return {
     ...typeof manifest.description === 'string' ? { description: manifest.description } : {},
     ...typeof manifest.version === 'string' ? { version: manifest.version } : {},
@@ -331,7 +338,7 @@ export async function setPluginEnabled(
       profile = resolveProfile('shres', basename(profileDir), profileDir, manifest as ProfileManifest, options.installAnchor, { userLayer: false })
       current = await readProfilePatches(profileDir)
       const composed = composeEntries([...profile.layers.map(layer => layer.patches), current.patches])
-      const targets = flatten(composed).filter(row => row.id === request.id)
+      const targets = flattenProfileRows(composed).filter(row => row.id === request.id)
       const target = targets[0]
       if (targets.length !== 1 || target === undefined || target.group) return refused('unaddressable')
       if (target.name !== request.moduleName) return refused('unknown-plugin', 'The plugin identity changed; refresh the inventory.')

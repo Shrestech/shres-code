@@ -12,6 +12,7 @@ import { chmod, mkdir, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { BSK_VERSION } from '../src/runtime/manifest.ts'
 
 /** The stand-in script source. State lives under the BSK_HOME the runner supplies. */
 const SCRIPT = `#!${process.execPath}
@@ -66,7 +67,7 @@ if (command === 'daemon' && argv[1] === 'start') {
   record({ command: 'status' })
   const daemon = readJson('daemon.json', undefined)
   if (daemon === undefined || !existsSync(state('daemon.json'))) fail(1, 'no daemon')
-  reply({ daemon_version: '0.3.1', pid: daemon.pid, ws_port: daemon.port, uptime_secs: 1 })
+  reply({ daemon_version: ${JSON.stringify(BSK_VERSION)}, pid: daemon.pid, ws_port: daemon.port, uptime_secs: 1 })
 } else if (command === 'browsers') {
   record({ command: 'browsers' })
   reply(readJson('instances.json', []))

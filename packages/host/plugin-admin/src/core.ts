@@ -8,7 +8,10 @@
  */
 
 import {
+  composeEntries,
+  flattenProfileRows,
   listProfileBundles,
+  loadProfileDirectory,
   setBundleEnabled,
   setPluginEnabled,
   beginPluginInstall,
@@ -60,6 +63,12 @@ export interface InstalledSkillRow {
  */
 export interface PluginAdminCore {
   listBundles(runtime: ProfileRuntime): Promise<ManagedBundle[]>
+  /**
+   * Loader entry ids the profile's own layers can address — the rows a
+   * patch-layer override can reach. Absent means the host cannot say, and
+   * every addressable row keeps its own verdict.
+   */
+  writableRowIds?(runtime: ProfileRuntime): Promise<ReadonlySet<string> | undefined>
   setBundleEnabled(
     runtime: ProfileRuntime, name: string, enabled: boolean, options: PluginAdminCoreOptions,
   ): Promise<PluginActivationOutcome>
@@ -84,14 +93,38 @@ export function resolveSkillRoots(cwd: string, override?: SkillInstallRoots): Sk
   return override ?? defaultSkillInstallRoots(cwd)
 }
 
+/**
+ * Loader entry ids the profile's own layers can address.
+ * @param runtime - the booted profile's launcher facts.
+ * @returns the ids a patch-layer override can reach, or `undefined` when the profile cannot be read.
+ */
+function writableRowIdsOf(runtime: ProfileRuntime): ReadonlySet<string> | undefined {
+  if (runtime.installAnchor === undefined) return undefined
+  try {
+    // The writable composition is exactly the bundle layers plus the profile's
+    // own patch: a launcher patch applied above them cannot be addressed,
+    // which is why its rows are read-only.
+    const profile = loadProfileDirectory('shres', runtime.profileDir, runtime.installAnchor)
+    const rows = flattenProfileRows(composeEntries([...profile.layers.map(layer => layer.patches), profile.patches]))
+    return new Set(rows.flatMap(row => typeof row.id === 'string' ? [row.id] : []))
+  } catch {
+    // An unreadable profile is the profile API's refusal to report, not a
+    // reason to hide every row: rows keep their Loader-derived verdict.
+    return undefined
+  }
+}
+
 /** Production core: the shared app-boot plugin core plus the shared skill-filesystem installer. */
 export const nodePluginAdminCore: PluginAdminCore = {
+  writableRowIds: runtime => Promise.resolve(writableRowIdsOf(runtime)),
   listBundles: async (runtime) => {
     const rows = runtime.control !== undefined ? await runtime.control.listBundles()
       : runtime.installAnchor === undefined ? [] : await listProfileBundles(runtime.profileDir, runtime.bootBundles, {
         installAnchor: runtime.installAnchor, ...runtime.shippedBundles === undefined ? {} : { shippedBundles: runtime.shippedBundles },
       })
-    return runtime.pluginMutations === 'enabled' ? rows : rows.map(row => ({ ...row, readOnlyReason: 'Plugin changes are unavailable on this host.' }))
+    return runtime.pluginMutations.activation
+      ? rows
+      : rows.map(row => ({ ...row, readOnlyReason: 'Plugin changes are unavailable on this host.' }))
   },
   setBundleEnabled: (runtime, name, enabled, options) => runtime.control !== undefined
     ? runtime.control.setBundleEnabled(name, enabled, options.signal)

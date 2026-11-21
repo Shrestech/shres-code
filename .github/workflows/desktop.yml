@@ -28,6 +28,10 @@ concurrency:
 env:
   PRIMARY_NODE_VERSION: '24'
   SHRES_TELEMETRY_DISABLED: '1'
+  # GitHub's Linux runners have no CUDA toolkit, and onnxruntime-node's install
+  # script would otherwise download the CUDA EP package, which is not used here
+  # and whose release asset upstream may remove.
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
   # `tsc -b tsconfig.host.json` peaks above the arm64 macOS runner's default
   # 2 GB heap cap and the build dies with "Ineffective mark-compacts near heap
   # limit". The runner image has 7 GB, so a 4 GB cap leaves headroom for the

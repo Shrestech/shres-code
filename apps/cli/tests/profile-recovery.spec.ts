@@ -104,7 +104,7 @@ describe('profile recovery lifetime', () => {
     const result = await runProfile(invocation)
     expect(leaseLog).toEqual(['acquire:/profiles/test', 'recovery', 'compose', 'ensure', 'release', 'boot'])
     expect(mocks.metadata).toHaveBeenCalledWith(result.ctx, {
-      profileDir: '/profiles/test', bootBundles: ['demo'], pluginMutations: 'enabled',
+      profileDir: '/profiles/test', bootBundles: ['demo'], pluginMutations: { activation: true, packages: true },
     })
     await result.shutdown.shutdown(0)
   })

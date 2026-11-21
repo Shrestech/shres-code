@@ -14,7 +14,7 @@ import type {
   PluginConfirmToken,
   SkillInstallOutcome,
 } from '../src/types.ts'
-import type { InstallBegin, ParkedInstall } from '@shres-code/shres-code-app-boot'
+import type { InstallBegin, ParkedInstall, PluginMutationCapabilities } from '@shres-code/shres-code-app-boot'
 
 const contexts: Context[] = []
 const tempDirs: string[] = []
@@ -125,8 +125,8 @@ function fakeSkills(skills: { name: string; source: string }[]): { snapshot: () 
 }
 
 interface HarnessOptions {
-  /** Plugin mutation policy of the provided profile runtime; `null` provides none. */
-  mutations?: 'enabled' | 'unsupported' | null
+  /** Plugin mutation capabilities of the provided profile runtime; `null` provides none. */
+  mutations?: PluginMutationCapabilities | null
   skills?: unknown
   confirmTtlMs?: number
 }
@@ -141,7 +141,7 @@ async function harness(core: PluginAdminCore, options: HarnessOptions = {}): Pro
     ctx.provide(PROFILE_RUNTIME_KEY as never, {
       profileDir,
       bootBundles: ['plugin-hello'],
-      pluginMutations: options.mutations ?? 'enabled',
+      pluginMutations: options.mutations ?? { activation: true, packages: true },
     })
   }
   if (options.skills !== undefined) ctx.provide('skills' as never, options.skills)
@@ -227,26 +227,28 @@ describe('PluginAdminGateway', () => {
     await expect(gateway.setBundleEnabled({ token: enabledToken, name, enabled: true })).rejects.toMatchObject({ code: 'gesture-refused' })
   })
 
-  it.each([null, 'unsupported'] as const)('does not attempt activation on an unsupported host (%s)', async (mutations) => {
-    const core = fabricatedCore()
-    const bundle = vi.spyOn(core, 'setBundleEnabled')
-    const plugin = vi.spyOn(core, 'setPluginEnabled')
-    const gateway = await harness(core, { mutations })
-    const name = '@example/browser'
-    const entryId = 'include:browser' as never
-    await expect(gateway.setBundleEnabled({ token: gateway.begin({ verb: 'bundle-enable', target: name }).token,
-      name, enabled: true })).resolves.toEqual({ kind: 'unsupported' })
-    await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-disable', target: entryId }).token,
-      entryId, enabled: false })).resolves.toEqual({ kind: 'unsupported' })
-    expect(bundle).not.toHaveBeenCalled()
-    expect(plugin).not.toHaveBeenCalled()
-  })
+  it.each([null, { activation: false, packages: false }] as const)(
+    'does not attempt activation on an unsupported host (%o)', async (mutations) => {
+      const core = fabricatedCore()
+      const bundle = vi.spyOn(core, 'setBundleEnabled')
+      const plugin = vi.spyOn(core, 'setPluginEnabled')
+      const gateway = await harness(core, { mutations })
+      const name = '@example/browser'
+      const entryId = 'include:browser' as never
+      await expect(gateway.setBundleEnabled({ token: gateway.begin({ verb: 'bundle-enable', target: name }).token,
+        name, enabled: true })).resolves.toEqual({ kind: 'unsupported' })
+      await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-disable', target: entryId }).token,
+        entryId, enabled: false })).resolves.toEqual({ kind: 'unsupported' })
+      expect(bundle).not.toHaveBeenCalled()
+      expect(plugin).not.toHaveBeenCalled()
+    },
+  )
 
   it('refuses unknown Loader identities and lists an absent profile without touching core storage', async () => {
     const core = fabricatedCore()
     const gateway = await harness(core)
     const entryId = 'include:missing' as never
-    expect(gateway.listPlugins()).toEqual([])
+    expect(await gateway.listPlugins()).toEqual([])
     await expect(gateway.setPluginEnabled({ token: gateway.begin({ verb: 'plugin-enable', target: entryId }).token,
       entryId, enabled: true })).resolves.toEqual({ kind: 'refused', code: 'unknown-plugin' })
     const unavailable = await harness(core, { mutations: null })
@@ -302,7 +304,9 @@ describe('PluginAdminGateway', () => {
     const core = fabricatedCore(async () => ({ kind: 'parked', install: parked }))
     const gateway = await harness(core)
     const before = await gateway.status()
-    expect(before).toMatchObject({ mutations: 'enabled', plugins: [{ name: 'plugin-hello', state: 'active' }] })
+    expect(before).toMatchObject({
+      mutations: { activation: true, packages: true }, plugins: [{ name: 'plugin-hello', state: 'active' }],
+    })
     expect(before.parked).toBeUndefined()
     const outcome = await install(gateway)
     if (outcome.kind !== 'parked') throw new Error('unreachable arm')
@@ -403,8 +407,8 @@ describe('PluginAdminGateway', () => {
 
   it('answers unsupported for plugin mutations while skills stay enabled', async () => {
     const core = fabricatedCore()
-    const gateway = await harness(core, { mutations: 'unsupported', skills: fakeSkills([]) })
-    expect((await gateway.status()).mutations).toBe('unsupported')
+    const gateway = await harness(core, { mutations: { activation: false, packages: false }, skills: fakeSkills([]) })
+    expect((await gateway.status()).mutations).toEqual({ activation: false, packages: false })
     expect(await install(gateway)).toEqual({ kind: 'unsupported' })
     expect(core.beginCalls).toHaveLength(0)
     expect(await gateway.removePlugin({ token: gateway.begin({ verb: 'remove', target: 'plugin-hello' }).token, name: 'plugin-hello' }))
@@ -415,10 +419,29 @@ describe('PluginAdminGateway', () => {
     expect(core.addCalls).toHaveLength(1)
   })
 
+  it('accepts bundle selection and row overrides without a package owner', async () => {
+    const core = fabricatedCore()
+    const gateway = await harness(core, { mutations: { activation: true, packages: false }, skills: fakeSkills([]) })
+    expect((await gateway.status()).mutations).toEqual({ activation: true, packages: false })
+    expect(await gateway.setBundleEnabled({
+      token: gateway.begin({ verb: 'bundle-enable', target: 'plugin-hello' }).token,
+      name: 'plugin-hello',
+      enabled: true,
+    })).toEqual({ kind: 'saved', application: 'applied' })
+    expect(await install(gateway)).toEqual({ kind: 'unsupported' })
+    expect(core.beginCalls).toHaveLength(0)
+    expect(await gateway.removePlugin({
+      token: gateway.begin({ verb: 'remove', target: 'plugin-hello' }).token, name: 'plugin-hello',
+    })).toEqual({ kind: 'unsupported' })
+    expect(core.removeCalls).toHaveLength(0)
+  })
+
   it('mounts without a profile runtime and serves unsupported status plus skill operations', async () => {
     const core = fabricatedCore()
     const gateway = await harness(core, { mutations: null })
-    expect(await gateway.status()).toEqual({ mutations: 'unsupported', plugins: [], skills: [] })
+    expect(await gateway.status()).toEqual({
+      mutations: { activation: false, packages: false }, plugins: [], skills: [],
+    })
     expect(await install(gateway)).toEqual({ kind: 'unsupported' })
     expect(core.beginCalls).toHaveLength(0)
     const source = await skillSource()

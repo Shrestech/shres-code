@@ -120,6 +120,7 @@ const REFUSAL_KEYS: Record<BrowserSkillRefusal['kind'], BrowserSkillLocaleKey> =
   'operation-in-progress': 'refuseOperationInProgress',
   'disposed': 'refuseDisposed',
   'shutdown-incomplete': 'refuseShutdownIncomplete',
+  'outdated': 'refuseOutdated',
   'unsupported-platform': 'unsupportedPlatform',
   'chrome-missing': 'chromeMissing',
   'chrome-too-old': 'chromeTooOld',
@@ -176,6 +177,9 @@ function refusalDetail(refusal: BrowserSkillRefusal): string | undefined {
     case 'instance-mismatch':
     case 'operation-in-progress':
       return undefined
+    case 'outdated':
+      return 'Installed bsk ' + refusal.installed.bsk + ' / extension ' + refusal.installed.extension
+        + '; this build pins bsk ' + refusal.pinned.bsk + ' / extension ' + refusal.pinned.extension + '.'
     /* v8 ignore next -- closed union; the compiler rejects an unhandled arm. */
     default:
       return unreachable(refusal)
@@ -355,7 +359,8 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
   // Controls stay disabled until the accepted operation settles, so no
   // second gesture can start while one is still running.
   const busyActions = pending !== null || tracked !== undefined
-  const ownedState = state.kind === 'provisioned' || state.kind === 'ready' || state.kind === 'disconnected' || state.kind === 'failed'
+  const ownedState = state.kind === 'provisioned' || state.kind === 'ready' || state.kind === 'disconnected'
+    || state.kind === 'failed' || state.kind === 'outdated'
   const currentState = result.operation?.phase === 'running' ? result.operation : undefined
 
   return (
@@ -401,6 +406,77 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
               <span className={css.stepPhase}>{t('stepPending')}</span>
             </li>
           </ol>
+        </section>
+      ) : null}
+      {state.kind === 'outdated' ? (
+        <section className={css.card} data-consent="">
+          <h3 className={css.heading}>{t('outdatedHeading')}</h3>
+          <p className={css.consent}>{t('outdatedNote')}</p>
+          <dl className={css.details}>
+            <div>
+              <dt>{t('outdatedVersionsLabel')}</dt>
+              <dd>
+                <code className={css.artifactFact}>
+                  bsk {state.installed.bsk} → {state.pinned.bsk} · extension {state.installed.extension} → {state.pinned.extension}
+                </code>
+              </dd>
+            </div>
+            {state.changes.installedPermissionsKnown
+              ? state.changes.addedPermissions.length === 0 ? null : (
+                <div>
+                  <dt>{t('outdatedPermissionsLabel')}</dt>
+                  <dd><code className={css.artifactFact}>{state.changes.addedPermissions.join(', ')}</code></dd>
+                </div>
+              )
+              : (
+                <div>
+                  <dt>{t('outdatedPermissionsLabel')}</dt>
+                  <dd>{t('outdatedPermissionsUnknown')}</dd>
+                </div>
+              )}
+            {state.changes.artifacts ? <p className={css.consent}>{t('outdatedArtifactsNote')}</p> : null}
+          </dl>
+          <h4 className={css.subheading}>{t('disclosureHeading')}</h4>
+          <dl className={css.details}>
+            <div>
+              <dt>{t('downloadsLabel')}</dt>
+              <dd>
+                <ul className={css.artifacts}>
+                  {consent.downloads.map(download => (
+                    <DownloadRow
+                      key={download.artifact}
+                      artifact={download.artifact}
+                      url={download.url}
+                      version={download.version}
+                      sha256={download.sha256}
+                    />
+                  ))}
+                </ul>
+              </dd>
+            </div>
+            <div>
+              <dt>{t('permissionsLabel')}</dt>
+              <dd data-update-permissions="">{consent.extensionPermissions.join(', ')}</dd>
+            </div>
+            <div>
+              <dt>{t('hostPermissionsLabel')}</dt>
+              <dd>{consent.extensionHostPermissions.join(', ')}</dd>
+            </div>
+            <div>
+              <dt>{t('updateManifestLabel')}</dt>
+              <dd><code>{consent.updateManifestUrl}</code> — {t('updateManifestNote')}</dd>
+            </div>
+          </dl>
+          <p className={css.consent}>{t('gestureNote')}</p>
+          <p className={css.consent}>{t('agentCapabilityNote')}</p>
+          <button
+            type="button"
+            className={css.primaryButton}
+            disabled={busyActions}
+            onClick={() => { spendVerb('provision', token => provision(token)) }}
+          >
+            {pending === 'provision' ? t('updateBusyAction') : t('updateAction')}
+          </button>
         </section>
       ) : null}
       {state.kind === 'absent' ? (
@@ -509,15 +585,17 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
             </div>
           </dl>
           <p className={css.consent}>{t('agentCapabilityNote')}</p>
-          <button
-            type="button"
-            className={css.primaryButton}
-            disabled={busyActions}
-            data-open-action=""
-            onClick={() => { spendVerb('open', token => openBrowser(token)) }}
-          >
-            {pending === 'open' ? t('openBusyAction') : t('openAction')}
-          </button>
+          {state.kind === 'outdated' ? null : (
+            <button
+              type="button"
+              className={css.primaryButton}
+              disabled={busyActions}
+              data-open-action=""
+              onClick={() => { spendVerb('open', token => openBrowser(token)) }}
+            >
+              {pending === 'open' ? t('openBusyAction') : t('openAction')}
+            </button>
+          )}
           {state.kind === 'ready' ? (
             <button
               type="button"

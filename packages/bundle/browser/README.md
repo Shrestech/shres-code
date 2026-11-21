@@ -1,6 +1,6 @@
 # `@shres-code/shres-code-browser-bundle`
 
-The optional BrowserSkill layer for the Shres Web surface. Select this bundle after [`shres-web-app`](../web-app/README.md) in `shres.profile.bundles` to mount the managed BrowserSkill host tools and the BrowserSkill Plugins section together. The layer does not download runtime assets or open a browser; the user starts provisioning from **Plugins → BrowserSkill** after the host is running.
+The optional BrowserSkill layer for the Shres Web surface. Select this bundle after [`shres-web-app`](../web-app/README.md) in `shres.profile.bundles` — from **Plugins → Bundles** in the Shres web app or the desktop app, or in the profile manifest of a launcher without that UI — to mount the managed BrowserSkill host tools and the BrowserSkill Plugins section together. The layer does not download runtime assets or open a browser; the user starts provisioning from **Plugins → BrowserSkill** after the host is running.
 
 The bundle has no runtime API. Its [`cordis.patch.yml`](cordis.patch.yml) inserts [`shres-browserskill`](../../browser/browserskill/README.md) and [`ui-browserskill`](../../client/ui-browserskill/README.md), and the profile composer resolves the patch through the `shres.bundle.patch` manifest field.
 

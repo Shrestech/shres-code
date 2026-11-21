@@ -1,0 +1,63 @@
+# Daily drift report for the pinned BrowserSkill release. The pins are a
+# security invariant compiled into the build, so this job never moves them:
+# it reports how far they trail upstream and keeps one issue current.
+name: BrowserSkill pin drift
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: browserskill-pin-drift
+  cancel-in-progress: true
+
+env:
+  SHRES_TELEMETRY_DISABLED: '1'
+  # GitHub's Linux runners have no CUDA toolkit, and onnxruntime-node's install
+  # script would otherwise download the CUDA EP package, which is not used here
+  # and whose release asset upstream may remove.
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
+jobs:
+  drift:
+    name: Report pin drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pnpm run check:browserskill-pins --remote | tee drift.txt
+          # Advisory only: this job reports and never fails the schedule.
+          title='BrowserSkill pin drift'
+          body=$(tail -n +2 drift.txt)
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if grep -q '^behind:' drift.txt; then
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --body "$body"
+            else
+              gh issue create --title "$title" --body "$body"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --comment 'The pins name the newest upstream release pair.'
+          fi

@@ -10,15 +10,20 @@ import {
   downloadVerified,
   evaluateInstalledChrome,
   manifestArtifactPins,
+  collectSupersededArtifacts,
   preflight,
   provisionArtifacts,
+  readProvisionedRecord,
   ProvisionRefusedError,
   readProvisionedState,
   type ArtifactPins,
   type DownloadFetch,
 } from '../src/runtime/provision.ts'
 import { computeTreeDigest, extractZipArchive, sha256Bytes, sha256File } from '../src/runtime/extract.ts'
-import { BSK_VERSION, EXTENSION_ASSET, EXTENSION_TREE_SHA256, EXTENSION_VERSION, BSK_PLATFORM_PIN, bskArchiveUrl, extensionArchiveUrl, platformPin } from '../src/runtime/manifest.ts'
+import {
+  BSK_VERSION, EXTENSION_ASSET, EXTENSION_HOST_PERMISSIONS, EXTENSION_PERMISSIONS, EXTENSION_TREE_SHA256,
+  EXTENSION_VERSION, BSK_PLATFORM_PIN, bskArchiveUrl, extensionArchiveUrl, platformPin,
+} from '../src/runtime/manifest.ts'
 import { resolveBrowserSkillConfig } from '../src/config.ts'
 import type { ResolvedBrowserSkillConfig } from '../src/config.ts'
 import type { BrowserSkillRefusal } from '../src/types.ts'
@@ -172,8 +177,8 @@ async function fixturePins(dir: string): Promise<ArtifactPins> {
 }
 
 const MIRROR = resolveBrowserSkillConfig({ artifactBaseUrl: 'http://127.0.0.1:9/assets' })
-const BSK_URL = 'http://127.0.0.1:9/assets/bsk-v0.3.1-aarch64-apple-darwin.tar.gz'
-const EXTENSION_URL = 'http://127.0.0.1:9/assets/browser-skill-extension-v0.3.1-chrome.zip'
+const BSK_URL = 'http://127.0.0.1:9/assets/bsk-v0.5.0-aarch64-apple-darwin.tar.gz'
+const EXTENSION_URL = 'http://127.0.0.1:9/assets/browser-skill-extension-v0.5.0-chrome.zip'
 
 /** BodyInit requires an ArrayBuffer-backed view; copy so the type is exact. */
 const abBytes = (bytes: Uint8Array): Uint8Array<ArrayBuffer> => new Uint8Array(bytes)
@@ -208,7 +213,7 @@ async function seedProvisionedRoot(root: string, pins: ArtifactPins): Promise<vo
   await writeFile(paths.bskExecutable, EXECUTABLE_BYTES, { mode: 0o500 })
   await writeFile(paths.extensionArchive, FIXTURE_ZIP, { mode: 0o600 })
   const state = {
-    version: 1 as const,
+    version: 2 as const,
     bsk: {
       version: BSK_VERSION,
       executablePath: paths.bskExecutable,
@@ -220,6 +225,8 @@ async function seedProvisionedRoot(root: string, pins: ArtifactPins): Promise<vo
       dir: paths.extensionDir,
       archiveSha256: pins.extensionArchiveSha256,
       treeDigest: pins.extensionTreeDigest,
+      permissions: EXTENSION_PERMISSIONS,
+      hostPermissions: EXTENSION_HOST_PERMISSIONS,
     },
   }
   await writeFile(paths.stateFile, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
@@ -567,8 +574,8 @@ describe('launch verification', () => {
     const stale = JSON.parse(await readFile(paths.stateFile, 'utf8')) as { extension: { archiveSha256: string } }
     stale.extension.archiveSha256 = 'd'.repeat(64)
     await writeState(root, stale)
-    const refusal = await refusalOfKind(() => ensureLaunchArtifacts(root, config, undefined, fixture), 'download-failed')
-    expect(refusal.detail).toMatch(/run provision/)
+    const refusal = await refusalOfKind(() => ensureLaunchArtifacts(root, config, undefined, fixture), 'outdated')
+    expect(refusal.pinned).toEqual({ bsk: BSK_VERSION, extension: EXTENSION_VERSION })
     expect(await readFile(join(paths.extensionDir, 'manifest.json'), 'utf8')).toBe('corrupted before the stale record')
   })
 
@@ -581,7 +588,7 @@ describe('launch verification', () => {
     escaped.extension.dir = '/tmp/foreign-extension'
     await writeState(root, escaped)
     const refusal = await refusalOf(() => ensureLaunchArtifacts(root, config, undefined, fixture))
-    expect(refusal.kind).toBe('download-failed')
+    expect(refusal.kind).toBe('outdated')
   })
 
   it('refuses an old draft record missing the tree-digest receipt', async () => {
@@ -703,6 +710,99 @@ describe.skipIf(platformPin() === undefined || process.env.SHRES_BSK_ASSET_DIR =
   }, 60_000)
 })
 
+describe('installed-release classification', () => {
+  const freshPins = async (): Promise<ArtifactPins> => fixturePins(await fixtureDir())
+
+  it('classifies the pinned release as current', async () => {
+    const root = await ownedRoot('classify-current')
+    const pins = await freshPins()
+    await seedProvisionedRoot(root, pins)
+    const record = await readProvisionedRecord(root, pins)
+    expect(record?.kind).toBe('current')
+  })
+
+  it('classifies a version-1 record as outdated with no permission receipt', async () => {
+    const root = await ownedRoot('classify-legacy')
+    const pins = await freshPins()
+    await seedProvisionedRoot(root, pins)
+    const paths = artifactPaths(root)
+    const current = JSON.parse(await readFile(paths.stateFile, 'utf8')) as {
+      bsk: { version: string }
+      extension: { version: string }
+    }
+    const legacy = {
+      version: 1,
+      bsk: { version: '0.3.1', executablePath: paths.bskExecutable, binarySha256: pins.bskBinarySha256, archiveSha256: pins.bskArchiveSha256 },
+      extension: {
+        version: '0.3.1',
+        dir: paths.extensionDir,
+        archiveSha256: pins.extensionArchiveSha256,
+        treeDigest: pins.extensionTreeDigest,
+      },
+    }
+    await writeState(root, legacy)
+    const record = await readProvisionedRecord(root, pins)
+    expect(record).toMatchObject({
+      kind: 'outdated',
+      changes: { versions: true, installedPermissionsKnown: false, addedPermissions: [], removedPermissions: [] },
+    })
+    expect(current.bsk.version).toBe(BSK_VERSION)
+  })
+
+  it('reports the permissions an update adds against the recorded set', async () => {
+    const root = await ownedRoot('classify-permissions')
+    const pins = await freshPins()
+    await seedProvisionedRoot(root, pins)
+    const paths = artifactPaths(root)
+    const draft = JSON.parse(await readFile(paths.stateFile, 'utf8')) as { extension: { permissions: string[]; hostPermissions: string[] } }
+    // The installed release requested a permission the pin no longer uses, and
+    // predates the two the pin adds.
+    draft.extension.permissions = [
+      ...draft.extension.permissions.filter(permission => permission !== 'offscreen' && permission !== 'tabGroups'),
+      'legacyPermission',
+    ]
+    await writeState(root, draft)
+    const record = await readProvisionedRecord(root, pins)
+    expect(record).toMatchObject({
+      kind: 'outdated',
+      changes: {
+        versions: false,
+        installedPermissionsKnown: true,
+        addedPermissions: ['offscreen', 'tabGroups'],
+        removedPermissions: ['legacyPermission'],
+      },
+    })
+  })
+
+  it('refuses a version-2 record whose permission receipts are malformed', async () => {
+    const root = await ownedRoot('classify-bad-permissions')
+    const pins = await freshPins()
+    await seedProvisionedRoot(root, pins)
+    const paths = artifactPaths(root)
+    for (const malformed of [{ permissions: 'not-an-array' }, { hostPermissions: [7] }]) {
+      const draft = JSON.parse(await readFile(paths.stateFile, 'utf8')) as { extension: Record<string, unknown> }
+      Object.assign(draft.extension, malformed)
+      await writeState(root, draft)
+      expect(await readProvisionedState(root)).toBeUndefined()
+    }
+  })
+
+  it('collects nothing when the artifact root does not exist yet', async () => {
+    const root = await ownedRoot('collect-absent')
+    await expect(collectSupersededArtifacts(root)).resolves.toBeUndefined()
+  })
+
+  it('collects superseded CLI directories and leaves everything else alone', async () => {
+    const root = await ownedRoot('collect-superseded')
+    const artifacts = join(root, 'artifacts')
+    for (const name of [`bsk-v${BSK_VERSION}`, 'bsk-v0.3.1', 'bsk-v0.4.2', 'staging-abc', 'extension']) {
+      await mkdir(join(artifacts, name), { recursive: true })
+    }
+    await collectSupersededArtifacts(root)
+    expect((await readdir(artifacts)).sort()).toEqual([`bsk-v${BSK_VERSION}`, 'extension', 'staging-abc'].sort())
+  })
+})
+
 describe('extraction defects and error propagation', () => {
   const config = resolveBrowserSkillConfig()
   const setupWith = async (): Promise<{ root: string; pins: ArtifactPins; dir: string }> => {
@@ -723,8 +823,19 @@ describe('extraction defects and error propagation', () => {
   it('refuses a record pinned by another pin set when verification runs with the manifest pins', async () => {
     const root = await ownedRoot('defect-manifest-pins')
     await seedProvisionedRoot(root, await freshPins())
-    const refusal = await refusalOfKind(() => ensureLaunchArtifacts(root, config), 'download-failed')
-    expect(refusal.detail).toMatch(/run provision/)
+    const refusal = await refusalOfKind(() => ensureLaunchArtifacts(root, config), 'outdated')
+    expect(refusal.installed).toEqual({ bsk: BSK_VERSION, extension: EXTENSION_VERSION })
+  })
+
+  it('falls back to the manifest pins when a provision call supplies none', async () => {
+    const root = await ownedRoot('defect-default-pins')
+    // Fixture bytes never match the manifest pins, so the download path is
+    // entered with the compiled pins and refuses at the archive hash.
+    const dir = await fixtureDir()
+    const archive = await fixtureBskArchive(dir)
+    const { fetchImpl } = await fixtureFetch(archive)
+    const refusal = await refusalOf(() => provisionArtifacts({ root, config: MIRROR, fetchImpl }))
+    expect(refusal).toMatchObject({ kind: 'hash-mismatch', artifact: 'bsk' })
   })
 
   it('refuses when the archive pin matches but the extracted binary does not', async () => {

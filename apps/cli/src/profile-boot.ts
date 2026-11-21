@@ -433,7 +433,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     provideProfileRuntime(hostCtx, {
       profileDir: composed.profile.dir,
       bootBundles: composed.profile.layers.map(layer => layer.packageName),
-      pluginMutations: 'enabled',
+      pluginMutations: { activation: true, packages: true },
       installAnchor: INSTALL_ANCHOR,
       shippedBundles,
       control: profileControl,

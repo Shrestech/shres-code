@@ -9,6 +9,7 @@ import { BskRunner } from '../src/runtime/runner.ts'
 import { BskDaemon, DaemonPortInUseError, DaemonStartError } from '../src/runtime/daemon.ts'
 import { reserveLoopbackPort } from '../src/runtime/endpoints.ts'
 import { writeFakeBsk } from './fake-bsk.ts'
+import { BSK_VERSION } from '../src/runtime/manifest.ts'
 import type { ResolvedBrowserSkillConfig } from '../src/config.ts'
 
 const cleanup: string[] = []
@@ -81,7 +82,7 @@ async function fakeDaemon(): Promise<{
   const port = await freePort()
   // This process double implements the event, signal and stdio members the daemon owns.
   const spawnLongLived = vi.spyOn(runner, 'spawnLongLived').mockResolvedValue(child as unknown as ChildProcess)
-  const runJson = vi.spyOn(runner, 'runJson').mockResolvedValue({ daemonVersion: '0.3.1', wsPort: port, pid: child.pid })
+  const runJson = vi.spyOn(runner, 'runJson').mockResolvedValue({ daemonVersion: BSK_VERSION, wsPort: port, pid: child.pid })
   const run = vi.spyOn(runner, 'run').mockRejectedValue(new Error('graceful request failed'))
   const daemon = new BskDaemon({ runner, config: config() })
   daemons.push(daemon)

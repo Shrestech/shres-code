@@ -100,6 +100,114 @@ describe('BrowserSkillSettingsSection', () => {
     expect(screen.queryByRole('button', { name: en.retry })).toBeNull()
   })
 
+  it('offers Update with the version and permission delta for an outdated install', async () => {
+    const { view } = await renderReady({}, {
+      state: {
+        kind: 'outdated',
+        installed: { bsk: '0.3.1', extension: '0.3.1' },
+        pinned: { bsk: '0.5.0', extension: '0.5.0' },
+        changes: {
+          versions: true,
+          artifacts: true,
+          addedPermissions: ['offscreen', 'tabGroups'],
+          removedPermissions: [],
+          installedPermissionsKnown: true,
+        },
+      },
+    })
+    expect(view.container.querySelector('[data-browserskill-state]')?.getAttribute('data-browserskill-state')).toBe('outdated')
+    expect(screen.getByText(en.outdatedHeading)).toBeTruthy()
+    expect(view.container.textContent).toContain('bsk 0.3.1 → 0.5.0')
+    expect(screen.getByText('offscreen, tabGroups')).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.updateAction })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.openAction })).toBeNull()
+    view.unmount()
+  })
+
+  it('drives Update from the outdated card and shows its busy label', async () => {
+    const provisionFn = vi.fn(face().provision)
+    const { view } = await renderReady({ provision: provisionFn }, {
+      state: {
+        kind: 'outdated',
+        installed: { bsk: '0.3.1', extension: '0.3.1' },
+        pinned: { bsk: '0.5.0', extension: '0.5.0' },
+        // Versions differ but every receipted hash already matches.
+        changes: {
+          versions: true,
+          artifacts: false,
+          addedPermissions: [],
+          removedPermissions: [],
+          installedPermissionsKnown: true,
+        },
+      },
+    })
+    expect(screen.queryByText(en.outdatedArtifactsNote)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en.updateAction }))
+    expect(await screen.findByRole('button', { name: en.updateBusyAction })).toBeTruthy()
+    await waitFor(() => { expect(provisionFn).toHaveBeenCalledOnce() })
+    view.unmount()
+  })
+
+  it('renders an outdated refusal with both version pairs', async () => {
+    const { view } = await renderReady({}, {
+      state: {
+        kind: 'failed',
+        refusal: {
+          kind: 'outdated',
+          installed: { bsk: '0.3.1', extension: '0.3.1' },
+          pinned: { bsk: '0.5.0', extension: '0.5.0' },
+        },
+      },
+    })
+    expect(screen.getByText(en.refuseOutdated)).toBeTruthy()
+    expect(view.container.textContent).toContain('Installed bsk 0.3.1 / extension 0.3.1; this build pins bsk 0.5.0 / extension 0.5.0.')
+    view.unmount()
+  })
+
+  it('omits the permission row when an update adds no permission', async () => {
+    const { view } = await renderReady({}, {
+      state: {
+        kind: 'outdated',
+        installed: { bsk: '0.4.2', extension: '0.4.2' },
+        pinned: { bsk: '0.5.0', extension: '0.5.0' },
+        changes: {
+          versions: true,
+          artifacts: true,
+          addedPermissions: [],
+          removedPermissions: [],
+          installedPermissionsKnown: true,
+        },
+      },
+    })
+    expect(screen.queryByText(en.outdatedPermissionsLabel)).toBeNull()
+    expect(screen.queryByText(en.outdatedPermissionsUnknown)).toBeNull()
+    expect(screen.getByRole('button', { name: en.updateAction })).toBeTruthy()
+    view.unmount()
+  })
+
+  it('discloses the full pinned permission list when the install kept no receipt', async () => {
+    const { view } = await renderReady({}, {
+      state: {
+        kind: 'outdated',
+        installed: { bsk: '0.3.1', extension: '0.3.1' },
+        pinned: { bsk: '0.5.0', extension: '0.5.0' },
+        changes: {
+          versions: true,
+          artifacts: true,
+          addedPermissions: [],
+          removedPermissions: [],
+          installedPermissionsKnown: false,
+        },
+      },
+    })
+    expect(screen.getByText(en.outdatedPermissionsUnknown)).toBeTruthy()
+    // The copy points at the pinned list, so the card must render it.
+    expect(view.container.querySelector('[data-update-permissions]')?.textContent)
+      .toBe(consent().extensionPermissions.join(', '))
+    expect(screen.getByText(en.hostPermissionsLabel)).toBeTruthy()
+    view.unmount()
+  })
+
   it('renders the disconnected-transport state and recovers through retry', async () => {
     const deferred = Promise.withResolvers<BrowserSkillStatus>()
     const status = vi.fn<BrowserSkillSettingsSectionInjected['status']>()
