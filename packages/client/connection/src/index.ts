@@ -160,6 +160,11 @@ const PRIVILEGED_METHODS = new Set([
   'browserSkill/close',
   'browserSkill/reset',
   'browserSkill/uninstall',
+  // Paired mode drives the browser the user is signed into, so the pairing
+  // verbs carry the same loopback-and-same-origin pin as the rest.
+  'browserSkill/pair',
+  'browserSkill/unpair',
+  'browserSkill/setMode',
 ])
 
 /**

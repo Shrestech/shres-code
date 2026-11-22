@@ -32,6 +32,13 @@ export type BrowserSkillOperationId = Branded<'BrowserSkillOperationId'>
 export type SessionOwner = SessionId
 
 /**
+ * Which browser a runtime drives. `managed` launches a Chrome the runtime
+ * owns; `paired` drives the browser the user already has, through the
+ * upstream extension and a one-use pairing link.
+ */
+export type BrowserSkillMode = 'managed' | 'paired'
+
+/**
  * Lifecycle state of the managed browser stack. `ready` requires the evidence
  * chain: our daemon answers on the persisted port, our extension instance is
  * listed by it, and the id matches the one read from extension storage.
@@ -47,6 +54,14 @@ export type BrowserSkillState = {
   step: 'download' | 'verify' | 'extract'
 } | {
   kind: 'provisioned'
+} | {
+  kind: 'pairing'
+  /** One-use local pairing link the user's browser extension consumes. Never logged or persisted. */
+  link: string
+  /** Device grant this link activates. */
+  deviceId: string
+  /** ISO 8601 deadline after which the link is dead. */
+  expiresAt?: string
 } | {
   kind: 'outdated'
   /** Versions recorded by the install on disk; a v1 record carries no permission receipt. */
@@ -122,6 +137,18 @@ export type BrowserSkillRefusal = {
   /** Present when the refusal carries a manual recovery step beyond the pid. */
   detail?: string
 } | {
+  kind: 'pairing-required'
+  detail: string
+} | {
+  kind: 'mode-conflict'
+  detail: string
+} | {
+  kind: 'extension-too-old'
+  detail: string
+} | {
+  kind: 'verification-disabled'
+  detail: string
+} | {
   kind: 'outdated'
   /** Versions recorded by the install on disk. */
   installed: { bsk: string; extension: string }
@@ -166,7 +193,7 @@ export interface BrowserSkillConsent {
 }
 
 /** The lifecycle verbs a start accepts; `uninstall` alone carries the keep-profile choice. */
-export type BrowserSkillVerb = 'provision' | 'open' | 'close' | 'reset' | 'uninstall'
+export type BrowserSkillVerb = 'provision' | 'open' | 'close' | 'reset' | 'uninstall' | 'pair' | 'unpair' | 'setMode'
 
 /** One lifecycle operation as the UI observes it through status polling. */
 export interface BrowserSkillOperation {
@@ -184,6 +211,8 @@ export interface BrowserSkillOperation {
 export interface BrowserSkillStatus {
   /** Current lifecycle state. */
   state: BrowserSkillState
+  /** Which browser this runtime drives. */
+  mode: BrowserSkillMode
   /** The installed Chrome the owned profile runs, when detected. */
   chrome?: {
     version: string
@@ -205,10 +234,12 @@ export interface BrowserSkillStatus {
   operation?: BrowserSkillOperation
 }
 
-/** The keep-profile choice only the uninstall start takes. */
+/** The choices the uninstall and setMode starts take. */
 export interface BrowserSkillStartOptions {
   /** Whether the owned profile and its sign-ins survive the uninstall. */
-  keepProfile: boolean
+  keepProfile?: boolean
+  /** Target mode the setMode start switches to. */
+  mode?: BrowserSkillMode | undefined
 }
 
 /**
@@ -238,9 +269,9 @@ export interface BrowserSkillControl {
   /** The fresh-page picture; never mutates anything. */
   status(): BrowserSkillStatus
   /** Start provision, open, close, or reset; provision runs provision-and-open. */
-  start(verb: 'provision' | 'open' | 'close' | 'reset'): BrowserSkillStartResult
+  start(verb: 'provision' | 'open' | 'close' | 'reset' | 'pair' | 'unpair'): BrowserSkillStartResult
   /** Start the uninstall; the keep-profile choice is bound at acceptance. */
-  start(verb: 'uninstall', options: BrowserSkillStartOptions): BrowserSkillStartResult
+  start(verb: 'uninstall' | 'setMode', options: BrowserSkillStartOptions): BrowserSkillStartResult
 }
 
 // ---- browserSkill wire namespace (the gesture-gated Remote surface) ----
@@ -272,6 +303,14 @@ export interface BrowserSkillBeginRequest {
 export interface BrowserSkillFlowRequest {
   /** Grant from begin with the matching verb. */
   token: BrowserSkillToken
+}
+
+/** Wire request for browserSkill/setMode. */
+export interface BrowserSkillModeRequest {
+  /** Grant from begin('setMode') bound to the same target mode. */
+  token: BrowserSkillToken
+  /** Mode the runtime switches to. */
+  mode: BrowserSkillMode
 }
 
 /** Wire request for browserSkill/uninstall. */

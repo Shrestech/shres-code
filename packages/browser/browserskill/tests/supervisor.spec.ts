@@ -605,16 +605,19 @@ function fixtureLaunchArtifacts(): NonNullable<BrowserSkillRuntimeInternals['ens
  * Start one verb and await its settlement. The settled promise never
  * rejects; a refusal verdict is a broken fixture, not an outcome.
  */
-async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'provision' | 'open' | 'close' | 'reset'): Promise<BrowserSkillOperation>
+async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'provision' | 'open' | 'close' | 'reset' | 'pair' | 'unpair'): Promise<BrowserSkillOperation>
 async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'uninstall', options: { keepProfile: boolean }): Promise<BrowserSkillOperation>
+async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'setMode', options: { mode: 'managed' | 'paired' }): Promise<BrowserSkillOperation>
 async function settle(
   runtime: ReturnType<typeof createBrowserSkillRuntime>,
   verb: BrowserSkillVerb,
-  options?: { keepProfile: boolean },
+  options?: { keepProfile?: boolean; mode?: 'managed' | 'paired' },
 ): Promise<BrowserSkillOperation> {
   const started: BrowserSkillStartResult = verb === 'uninstall'
-    ? runtime.start('uninstall', options ?? { keepProfile: false })
-    : runtime.start(verb)
+    ? runtime.start('uninstall', { keepProfile: options?.keepProfile ?? false })
+    : verb === 'setMode'
+      ? runtime.start('setMode', { mode: options?.mode })
+      : runtime.start(verb)
   if (!started.accepted) throw new Error('expected ' + verb + ' to be accepted, refused: ' + JSON.stringify(started.refusal))
   return started.settled
 }

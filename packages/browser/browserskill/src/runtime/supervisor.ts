@@ -51,6 +51,8 @@ import {
   artifactPaths, ensureLaunchArtifacts, preflight, ProvisionRefusedError, provisionArtifacts,
   readProvisionedRecord, type ProvisionedRecord, type StoredProvisionedState,
 } from './provision.ts'
+import { readRuntimeState, writeRuntimeState } from './mode.ts'
+import { listPairingDevices, mintPairingLink, revokeAllPairings } from './pairing.ts'
 import type { ResolvedBrowserSkillConfig } from '../config.ts'
 import { isJsonValue } from '@shres-code/shres-code-session'
 import type { JsonValue } from '@shres-code/shres-code-session/types'
@@ -58,6 +60,7 @@ import type {
   BrowserAction,
   BrowserInstanceId,
   BrowserSkillCommandResult,
+  BrowserSkillMode,
   BrowserSkillOperation,
   BrowserSkillOperationId,
   BrowserSkillRefusal,
@@ -211,6 +214,8 @@ export class BrowserSkillRuntime {
   private readonly listeners = new Set<(status: BrowserSkillStatus) => void>()
 
   private state: BrowserSkillState = { kind: 'absent' }
+  /** Which browser this runtime drives; loaded from the record at refresh. */
+  private mode: BrowserSkillMode = 'managed'
   private operation: BrowserSkillOperation | undefined
   private chromeVersion: string | undefined
   private provisioned: StoredProvisionedState | undefined
@@ -220,6 +225,8 @@ export class BrowserSkillRuntime {
   private defaultPortHold: PortReservation | undefined
   private runner: BskRunner | undefined
   private daemon: BskDaemonSeam | undefined
+  /** Whether our daemon child is running for this instance. */
+  private daemonStarted = false
   private chrome: OwnedChromeSeam | undefined
   private canonicalRoot: string | undefined
   private readyLifetime: ReadyLifetime | undefined
@@ -260,6 +267,7 @@ export class BrowserSkillRuntime {
     // the root. The record stores canonical paths, so classifying against a
     // raw symlinked path would report an exact install as outdated.
     const root = await realpath(this.root).catch(() => this.root)
+    this.mode = (await readRuntimeState(root))?.mode ?? 'managed'
     const record = await this.internals().readProvisionedRecord(root)
     if (record === undefined) return
     this.record = record
@@ -290,6 +298,7 @@ export class BrowserSkillRuntime {
   status(): BrowserSkillStatus {
     return {
       state: this.state,
+      mode: this.mode,
       ...(this.chromeVersion === undefined ? {} : { chrome: { version: this.chromeVersion } }),
       ...(this.provisioned === undefined ? {} : {
         artifacts: {
@@ -330,7 +339,7 @@ export class BrowserSkillRuntime {
    * @returns acceptance carrying the operation id and its settled promise, or
    * the refusal with no operation started.
    */
-  start(verb: 'provision' | 'open' | 'close' | 'reset'): BrowserSkillStartResult
+  start(verb: 'provision' | 'open' | 'close' | 'reset' | 'pair' | 'unpair'): BrowserSkillStartResult
   /**
    * Start the uninstall; the profile and its sign-ins survive only when kept.
    * @param verb - the uninstall verb.
@@ -338,7 +347,7 @@ export class BrowserSkillRuntime {
    * @returns acceptance carrying the operation id and its settled promise, or
    * the refusal with no operation started.
    */
-  start(verb: 'uninstall', options: BrowserSkillStartOptions): BrowserSkillStartResult
+  start(verb: 'uninstall' | 'setMode', options: BrowserSkillStartOptions): BrowserSkillStartResult
   start(verb: BrowserSkillVerb, options?: BrowserSkillStartOptions): BrowserSkillStartResult {
     if (this.disposed) {
       return { accepted: false, refusal: { kind: 'disposed', detail: 'the BrowserSkill runtime has been disposed' } }
@@ -417,10 +426,31 @@ export class BrowserSkillRuntime {
 
   /** Run one accepted verb's flow to its terminal state; every failure throws. */
   private async runVerb(verb: BrowserSkillVerb, options: BrowserSkillStartOptions | undefined, signal: AbortSignal): Promise<void> {
+    // Verbs that belong to one mode refuse in the other instead of silently
+    // inheriting the managed meaning.
+    if (verb === 'pair' || verb === 'unpair') {
+      if (this.mode !== 'paired') {
+        throw new ProvisionRefusedError({ kind: 'mode-conflict', detail: `${verb} needs the paired mode` })
+      }
+      if (verb === 'pair') await this.pairUnderLease(signal)
+      else await this.unpairUnderLease(signal)
+      return
+    }
+    if (verb === 'setMode') {
+      await this.setModeUnderLease(options?.mode, signal)
+      return
+    }
     switch (verb) {
       case 'provision':
         // Update runs the same consented flow as a first install: a record
         // that no longer equals the pins must install the pinned release.
+        if (this.mode === 'paired') {
+          // Paired provisioning installs the CLI, starts our daemon, and mints
+          // the link the user's own browser consumes. No Chrome is launched.
+          if (this.provisioned === undefined || this.state.kind === 'outdated') await this.provisionUnderLease(signal)
+          await this.pairUnderLease(signal)
+          return
+        }
         if (this.provisioned === undefined || this.state.kind === 'outdated') await this.provisionUnderLease(signal)
         // Already ready: the stack is up under the held lease, so reopen is a
         // no-op success — reacquiring our own lease would refuse and poison a
@@ -429,6 +459,11 @@ export class BrowserSkillRuntime {
         await this.openUnderLease(signal)
         return
       case 'open':
+        if (this.mode === 'paired') {
+          if (this.state.kind === 'ready') return
+          await this.attachPairedUnderLease(signal)
+          return
+        }
         // Outdated refuses before preflight and before any lease, so the
         // answer never depends on the installed Chrome and the UI can always
         // offer Update instead.
@@ -447,6 +482,10 @@ export class BrowserSkillRuntime {
         return
       }
       case 'reset': {
+        if (this.mode === 'paired') {
+          // There is no owned profile in paired mode; Unpair is the action.
+          throw new ProvisionRefusedError({ kind: 'mode-conflict', detail: 'reset needs the managed mode; unpair instead' })
+        }
         const retired = await this.retireCurrent()
         if (!retired.ok) throw retired.error
         const internals = this.internals()
@@ -886,6 +925,101 @@ export class BrowserSkillRuntime {
       await this.releaseLease(lease)
     }
     this.setState({ kind: 'provisioned' })
+  }
+
+  /**
+   * Start our daemon for a paired runtime and mint the one-use link the user's
+   * own browser consumes. No Chrome is launched and no CDP is used: the
+   * extension in the user's browser dials this daemon once it is paired.
+   */
+  private async pairUnderLease(signal: AbortSignal): Promise<void> {
+    const internals = this.internals()
+    const root = await this.canonicalRootPath()
+    const lease = await internals.acquireLease(root, this.leaseHooks(root, this.ensureRunner(root)))
+    this.lease = lease
+    try {
+      const runner = this.ensureRunner(root)
+      const stored = await readRuntimeState(root)
+      const port = stored?.daemonPort ?? await readDaemonPort(root) ?? await pickEphemeralDaemonPort(internals.pickDaemonPort)
+      await writeRuntimeState(root, { version: 2, mode: this.mode, daemonPort: port })
+      if (!this.daemonStarted) {
+        const daemon = this.ensureDaemon(runner)
+        await daemon.start(port, {
+          signal,
+          onSpawned: async (pid) => { await lease.update({ daemonPid: pid }) },
+        })
+        this.daemonStarted = true
+      }
+      const link = await mintPairingLink(runner, signal)
+      const grant = (await listPairingDevices(runner, signal)).find(device => device.deviceId === link.deviceId)
+      signal.throwIfAborted()
+      this.setState({
+        kind: 'pairing',
+        link: link.url,
+        deviceId: link.deviceId,
+        ...grant?.expiresAt === undefined ? {} : { expiresAt: grant.expiresAt },
+      })
+    } finally {
+      await this.releaseLease(lease)
+    }
+  }
+
+  /**
+   * Attach to the user's browser: require a verified pairing, then adopt the
+   * browser instance it activated. The runtime owns the daemon and the
+   * pairing, never the browser.
+   */
+  private async attachPairedUnderLease(signal: AbortSignal): Promise<void> {
+    const root = await this.canonicalRootPath()
+    const runner = this.ensureRunner(root)
+    if (!this.daemonStarted) {
+      await this.pairUnderLease(signal)
+      throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'pair the browser, then connect' })
+    }
+    const activated = (await listPairingDevices(runner, signal))
+      .find(device => device.status === 'activated' && device.browserId !== undefined)
+    if (activated?.browserId === undefined) {
+      throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'no verified browser is paired yet' })
+    }
+    this.setState({ kind: 'starting' })
+    const browsers = await runner.runJson(argv.browsers(), parseBrowsers, undefined, signal)
+    const mine = browsers.find(entry => entry.instanceId === activated.browserId)
+    if (mine === undefined) {
+      throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'the paired browser is not connected' })
+    }
+    this.readyLifetime = { instanceId: mine.instanceId, runner, controller: new AbortController(), pending: new Set() }
+    this.healthMisses = 0
+    this.setState({ kind: 'ready', instanceId: mine.instanceId })
+  }
+
+  /** Revoke every pairing and stop our daemon; the user's browser is untouched. */
+  private async unpairUnderLease(signal: AbortSignal): Promise<void> {
+    const root = await this.canonicalRootPath()
+    if (this.daemonStarted) {
+      try {
+        await revokeAllPairings(this.ensureRunner(root), signal)
+      } catch {
+        // A daemon that cannot confirm the revocation still has its pairing
+        // record purged by the teardown below; the failure must not hide it.
+      }
+    }
+    const retired = await this.retireCurrent()
+    if (!retired.ok) throw retired.error
+    this.setState(this.idleState())
+  }
+
+  /** Switch modes: retire whatever is running, persist the mode, then report the idle state. */
+  private async setModeUnderLease(mode: BrowserSkillMode | undefined, signal: AbortSignal): Promise<void> {
+    if (mode === undefined) throw new ProvisionRefusedError({ kind: 'mode-conflict', detail: 'setMode needs a target mode' })
+    if (mode === this.mode) return
+    const retired = await this.retireCurrent()
+    if (!retired.ok) throw retired.error
+    const root = await this.canonicalRootPath()
+    const stored = await readRuntimeState(root)
+    await writeRuntimeState(root, { version: 2, mode, ...stored?.daemonPort === undefined ? {} : { daemonPort: stored.daemonPort } })
+    signal.throwIfAborted()
+    this.mode = mode
+    this.setState(this.idleState())
   }
 
   /** Acquire ownership, verify artifacts, and pair only the owned browser instance. */

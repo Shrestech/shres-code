@@ -33,6 +33,8 @@ import type {
   BrowserSkillFlowRequest,
   BrowserSkillGestureGrant,
   BrowserSkillGestureVerb,
+  BrowserSkillMode,
+  BrowserSkillModeRequest,
   BrowserSkillStartOutcome,
   BrowserSkillStatus,
   BrowserSkillToken,
@@ -168,13 +170,48 @@ export class BrowserSkillGateway extends TypertRemoteService {
   }
 
   /**
+   * Mint (or re-mint) the one-use pairing link for the paired mode.
+   * @param request - the granted pair.
+   * @returns the accepted operation id, or the refusal.
+   */
+  @Remote('pair')
+  pair(request: BrowserSkillFlowRequest): BrowserSkillStartOutcome {
+    return this.accept('pair', request.token)
+  }
+
+  /**
+   * Revoke every pairing and stop our daemon; the user's browser is untouched.
+   * @param request - the granted unpair.
+   * @returns the accepted operation id, or the refusal.
+   */
+  @Remote('unpair')
+  unpair(request: BrowserSkillFlowRequest): BrowserSkillStartOutcome {
+    return this.accept('unpair', request.token)
+  }
+
+  /**
+   * Switch the runtime between the managed and paired browsers.
+   * @param request - the granted switch with its target mode.
+   * @returns the accepted operation id, or the refusal.
+   */
+  @Remote('setMode')
+  setMode(request: BrowserSkillModeRequest): BrowserSkillStartOutcome {
+    return this.accept('setMode', request.token, false, request.mode)
+  }
+
+  /**
    * Spend one gesture and start one runtime verb. The token is consumed
    * whatever the verdict, so a refused attempt cannot leave a reusable
    * authorization behind, and the verdict crosses the wire as-is: the
    * runtime refuses a start in-band, so no operation-in-progress or disposed
    * condition is an error here.
    */
-  private accept(verb: BrowserSkillGestureVerb, token: BrowserSkillToken, keepProfile?: boolean): BrowserSkillStartOutcome {
+  private accept(
+    verb: BrowserSkillGestureVerb,
+    token: BrowserSkillToken,
+    keepProfile?: boolean,
+    mode?: BrowserSkillMode,
+  ): BrowserSkillStartOutcome {
     const choice = keepProfile === true
     const alias = gestureAlias(verb, choice)
     if (!this.gestures.consume(token, verb, alias, Date.now())) {
@@ -185,13 +222,22 @@ export class BrowserSkillGateway extends TypertRemoteService {
     }
     const verdict = verb === 'uninstall'
       ? this.runtime.start('uninstall', { keepProfile: choice })
-      : this.runtime.start(verb)
+      : verb === 'setMode'
+        ? this.runtime.start('setMode', { mode })
+        : verb === 'provision' || verb === 'open' || verb === 'close' || verb === 'reset' || verb === 'pair' || verb === 'unpair'
+          ? this.runtime.start(verb)
+          : assertNeverVerb(verb)
     // Only the verdict serializes: the settled promise stays in-process, and
     // this method answers before the operation finishes.
     return verdict.accepted
       ? { accepted: true, operationId: verdict.operationId }
       : { accepted: false, refusal: verdict.refusal }
   }
+}
+
+/** Unreachable last arm: the verb union is closed, so the compiler rejects a new verb added without wiring it. */
+function assertNeverVerb(verb: never): never {
+  throw new BrowserSkillError('invalid-verb-profile', 'unwired browserSkill verb ' + String(verb))
 }
 
 /** The ledger alias encoding one verb's keepProfile choice: the full mutation identity a token is bound to. */
