@@ -36,8 +36,12 @@ Stay within the user's requested task. Actions affect accounts signed into this 
 `
 
 /**
- * Register browser guidance in the calling plugin's effect scope.
+ * Register browser guidance in the calling plugin's effect scope. The body
+ * names whose browser this is, because that is the fact the model cannot
+ * infer.
  * @param ctx - plugin context with the skills service injected.
+ * @param mode - browser this runtime drives.
+ * @returns the registration's disposer.
  */
 export function registerBrowserSkillGuide(ctx: Context, mode: 'managed' | 'paired' = 'managed'): () => void {
   return ctx.skills.register({
