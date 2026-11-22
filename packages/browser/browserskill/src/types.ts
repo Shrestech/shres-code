@@ -143,12 +143,6 @@ export type BrowserSkillRefusal = {
   kind: 'mode-conflict'
   detail: string
 } | {
-  kind: 'extension-too-old'
-  detail: string
-} | {
-  kind: 'verification-disabled'
-  detail: string
-} | {
   kind: 'outdated'
   /** Versions recorded by the install on disk. */
   installed: { bsk: string; extension: string }

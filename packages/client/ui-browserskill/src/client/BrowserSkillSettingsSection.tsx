@@ -105,6 +105,8 @@ interface TrackedOperation {
   readonly id: string
   readonly verb: SpendVerb
   readonly keepProfile: boolean
+  /** Mode the operation was started in, so its success copy matches. */
+  readonly mode: BrowserSkillMode
 }
 
 /** One settled operation rendered as a banner until the next operation replaces it. */
@@ -131,8 +133,6 @@ const REFUSAL_KEYS: Record<BrowserSkillRefusal['kind'], BrowserSkillLocaleKey> =
   'outdated': 'refuseOutdated',
   'pairing-required': 'refusePairingRequired',
   'mode-conflict': 'refuseModeConflict',
-  'extension-too-old': 'refuseExtensionTooOld',
-  'verification-disabled': 'refuseVerificationDisabled',
   'unsupported-platform': 'unsupportedPlatform',
   'chrome-missing': 'chromeMissing',
   'chrome-too-old': 'chromeTooOld',
@@ -153,7 +153,20 @@ const PROVISIONING_STEPS = [
 ] as const
 
 /** Copy key for a succeeded operation, by verb and uninstall keep choice. */
-function successKey(verb: SpendVerb, keepProfile: boolean): BrowserSkillLocaleKey {
+function successKey(verb: SpendVerb, keepProfile: boolean, mode: BrowserSkillMode): BrowserSkillLocaleKey {
+  // Paired mode never opens, closes, or provisions a browser of ours, so the
+  // managed sentences would be false there.
+  if (mode === 'paired') {
+    switch (verb) {
+      case 'provision': return 'pairingReadyNotice'
+      case 'open': return 'pairedConnectedNotice'
+      case 'close': return 'pairedClosedNotice'
+      case 'pair': return 'pairStartedNotice'
+      case 'unpair': return 'unpairDoneNotice'
+      case 'setMode': return keepProfile ? 'modeSwitchedPairedNotice' : 'modeSwitchedManagedNotice'
+      default: break
+    }
+  }
   switch (verb) {
     case 'provision': return 'provisionedNotice'
     case 'open': return 'openedNotice'
@@ -197,9 +210,8 @@ function refusalDetail(refusal: BrowserSkillRefusal): string | undefined {
         + '; this build pins bsk ' + refusal.pinned.bsk + ' / extension ' + refusal.pinned.extension + '.'
     case 'pairing-required':
     case 'mode-conflict':
-    case 'extension-too-old':
-    case 'verification-disabled':
       return refusal.detail
+
     /* v8 ignore next -- closed union; the compiler rejects an unhandled arm. */
     default:
       return unreachable(refusal)
@@ -238,7 +250,7 @@ function DownloadRow({ artifact, url, version, sha256 }: {
 
 /** Render the BrowserSkill Settings section. */
 export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionProps): ReactNode {
-  const { status, begin, provision, openBrowser, closeBrowser, reset, uninstall, t } = props
+  const { status, begin, provision, openBrowser, closeBrowser, reset, uninstall, pair, unpair, setMode, t } = props
   const [view, setView] = useState<
     | { phase: 'loading' }
     | { phase: 'error'; unavailable: boolean }
@@ -247,6 +259,8 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
   const [request, setRequest] = useState(0)
   const [pending, setPending] = useState<string | null>(null)
   const [tracked, setTracked] = useState<TrackedOperation | undefined>(undefined)
+  /** Latest reported mode; the settlement banner keys its copy off the mode it ran in. */
+  const modeRef = useRef<BrowserSkillMode | undefined>(undefined)
   const trackedRef = useRef<TrackedOperation | undefined>(undefined)
   const [banner, setBanner] = useState<OutcomeBanner | null>(null)
   const [confirming, setConfirming] = useState<'none' | 'reset' | 'uninstall'>('none')
@@ -264,6 +278,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
     void Promise.resolve().then(status).then(
       (result) => {
         if (!current) return
+        modeRef.current = result.mode
         setView({ phase: 'ready', result })
         // Settle the tracked operation ONLY on its own id: a Ready state that
         // predates the accepted operation, or another operation's terminal
@@ -281,7 +296,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
                 ? { tone: 'warn', key: 'opFailedNotice' }
                 : refusalBanner(operation.refusal))
             } else {
-              setBanner({ tone: 'ok', key: successKey(tracking.verb, tracking.keepProfile) })
+              setBanner({ tone: 'ok', key: successKey(tracking.verb, tracking.keepProfile, tracking.mode) })
             }
           }
         }
@@ -296,6 +311,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
   const polling = view.phase === 'ready'
     && (tracked !== undefined
       || view.result.state.kind === 'provisioning'
+      || view.result.state.kind === 'pairing'
       || view.result.state.kind === 'starting'
       || view.result.operation?.phase === 'running')
   useEffect(() => {
@@ -352,7 +368,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
         setBanner(refusalBanner(verdict.refusal))
         return
       }
-      const tracking: TrackedOperation = { id: verdict.operationId, verb, keepProfile: keep }
+      const tracking: TrackedOperation = { id: verdict.operationId, verb, keepProfile: keep, mode: modeRef.current ?? 'managed' }
       trackedRef.current = tracking
       setTracked(tracking)
       refresh()
@@ -385,7 +401,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
   const currentState = result.operation?.phase === 'running' ? result.operation : undefined
 
   return (
-    <div className={css.section} data-browserskill-state={state.kind}>
+    <div className={css.section} data-browserskill-state={state.kind} data-browserskill-mode={result.mode}>
       {banner === null ? null : banner.tone === 'ok' ? (
         <div className={css.notice} role="status">
           <p>{t(banner.key)}</p>
@@ -395,6 +411,75 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           <p>{t(banner.key)}{banner.detail === undefined ? null : <> <strong>{banner.detail}</strong></>}</p>
         </div>
       )}
+      <section className={css.card} data-mode-strip="">
+        <h3 className={css.heading}>{t('modeHeading')}</h3>
+        <dl className={css.details}>
+          {(['managed', 'paired'] as const).map((candidate) => {
+            const active = result.mode === candidate
+            const label = candidate === 'managed' ? t('modeManagedLabel') : t('modePairedLabel')
+            const note = candidate === 'managed' ? t('modeManagedNote') : t('modePairedNote')
+            return (
+              <div key={candidate} data-mode={candidate} aria-current={active ? 'true' : undefined}>
+                <dt>{label}</dt>
+                <dd>
+                  {note}
+                  {active ? null : (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className={css.secondaryButton}
+                        disabled={busyActions}
+                        onClick={() => {
+                          spendVerb('setMode', token => setMode(token, candidate), false, candidate)
+                        }}
+                      >
+                        {pending === 'setMode' ? t('modeSwitchingAction') : t('modeSwitchAction')}
+                      </button>
+                    </>
+                  )}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+      </section>
+      {state.kind === 'pairing' ? (
+        <section className={css.card} data-pairing="">
+          <h3 className={css.heading}>{t('pairingHeading')}</h3>
+          <p className={css.consent}>{t('pairingNote')}</p>
+          <label className={css.field}>
+            <span>{t('pairingLinkLabel')}</span>
+            <input type="text" className={css.textInput} readOnly value={state.link} data-pairing-link="" />
+          </label>
+          {state.expiresAt === undefined ? null : (
+            <p className={css.status} data-pairing-expiry="">
+              {t('pairingExpiryNote')} {new Date(state.expiresAt).toLocaleTimeString()}
+            </p>
+          )}
+          <p className={css.status} aria-live="polite">{t('pairingWaitNote')}</p>
+          <div className={css.teardownActions}>
+            <button
+              type="button"
+              className={css.primaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('open', token => openBrowser(token)) }}
+            >
+              {pending === 'open' ? t('openBusyAction') : t('pairingConnectAction')}
+            </button>
+            <button
+              type="button"
+              className={css.secondaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('pair', token => pair(token)) }}
+            >
+              {pending === 'pair' ? t('pairBusyAction') : t('pairAction')}
+            </button>
+          </div>
+          <p className={css.consent}>{t('pairingInstallNote')}</p>
+          <p className={css.consent}>{t('pairedPermissionsNote')}</p>
+        </section>
+      ) : null}
       {state.kind === 'unsupported' ? (
         <p className={css.unsupported} role="note">{t(UNSUPPORTED_KEYS[state.reason])}</p>
       ) : null}
@@ -429,7 +514,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           </ol>
         </section>
       ) : null}
-      {state.kind === 'outdated' ? (
+      {result.mode === 'managed' && state.kind === 'outdated' ? (
         <section className={css.card} data-consent="">
           <h3 className={css.heading}>{t('outdatedHeading')}</h3>
           <p className={css.consent}>{t('outdatedNote')}</p>
@@ -556,7 +641,7 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           </button>
         </section>
       ) : null}
-      {ownedState ? (
+      {ownedState && result.mode === 'managed' ? (
         <section className={css.card} data-runtime="">
           <div className={css.readyHead}>
             <h3 className={css.heading}>{t('nav')}</h3>
@@ -630,7 +715,41 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           ) : null}
         </section>
       ) : null}
-      {ownedState && state.kind !== 'disconnected' ? (
+      {result.mode === 'paired' && state.kind === 'ready' ? (
+        <section className={css.card} data-paired-ready="">
+          <div className={css.readyHead}>
+            <h3 className={css.heading}>{t('nav')}</h3>
+            <span className={css.readyTag} role="status">{t('readyBadge')}</span>
+          </div>
+          <p className={css.status}>{t('pairedNotice')}</p>
+          <dl className={css.details}>
+            <div>
+              <dt>{t('pairedBrowserLabel')}</dt>
+              <dd><code className={css.artifactFact}>{state.instanceId}</code></dd>
+            </div>
+          </dl>
+          <div className={css.teardownActions}>
+            <button
+              type="button"
+              className={css.secondaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('close', token => closeBrowser(token)) }}
+            >
+              {pending === 'close' ? t('closeBusyAction') : t('closeAction')}
+            </button>
+            <button
+              type="button"
+              className={css.secondaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('unpair', token => unpair(token)) }}
+            >
+              {pending === 'unpair' ? t('unpairBusyAction') : t('unpairAction')}
+            </button>
+          </div>
+          <p className={css.consent}>{t('pairedPermissionsNote')}</p>
+        </section>
+      ) : null}
+      {ownedState && state.kind !== 'disconnected' && result.mode === 'managed' ? (
         <section className={css.card} data-teardown="">
           <h3 className={css.heading}>{t('teardownHeading')}</h3>
           {confirming === 'none' ? (

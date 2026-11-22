@@ -1041,10 +1041,18 @@ export class BrowserSkillRuntime {
     if (mode === this.mode) return
     const retired = await this.retireCurrent()
     if (!retired.ok) throw retired.error
+    const internals = this.internals()
     const root = await this.canonicalRootPath()
-    const stored = await readRuntimeState(root)
-    await writeRuntimeState(root, { version: 2, mode, ...stored?.daemonPort === undefined ? {} : { daemonPort: stored.daemonPort } })
-    signal.throwIfAborted()
+    // The record has one writer at a time: the mode switch takes the same
+    // lease every other mutation takes before touching runtime.json.
+    const lease = await internals.acquireLease(root, this.leaseHooks(root, this.ensureRunner(root)))
+    try {
+      const stored = await readRuntimeState(root)
+      await writeRuntimeState(root, { version: 2, mode, ...stored?.daemonPort === undefined ? {} : { daemonPort: stored.daemonPort } })
+      signal.throwIfAborted()
+    } finally {
+      await this.releaseLease(lease)
+    }
     this.mode = mode
     this.setState(this.idleState())
   }

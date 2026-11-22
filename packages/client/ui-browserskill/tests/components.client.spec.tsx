@@ -104,6 +104,38 @@ describe('BrowserSkillSettingsSection', () => {
     expect(screen.queryByRole('button', { name: en.retry })).toBeNull()
   })
 
+  it('switches mode from the strip and names the target mode in the grant', async () => {
+    const begin = vi.fn().mockResolvedValue({ token: 'tok-1' as never, expiresAt: '2026-01-01T00:02:00Z' })
+    const setMode = vi.fn().mockResolvedValue(accepted('op-1'))
+    const { view } = await renderReady({ begin, setMode }, { mode: 'managed' })
+    fireEvent.click(screen.getAllByRole('button', { name: en.modeSwitchAction })[0]!)
+    await waitFor(() => { expect(setMode).toHaveBeenCalledWith('tok-1', 'paired') })
+    expect(begin).toHaveBeenCalledWith('setMode', false, 'paired')
+    view.unmount()
+  })
+
+  it('renders the pairing link and no managed controls while pairing', async () => {
+    const { view } = await renderReady({}, {
+      mode: 'paired',
+      state: { kind: 'pairing', link: 'ws://127.0.0.1:52902/#bsk-local.v1.dev.secret', deviceId: 'dev', expiresAt: '2030-01-01T00:05:00Z' },
+    })
+    expect(screen.getByText(en.pairingHeading)).toBeTruthy()
+    expect(view.container.querySelector('[data-pairing-link]')?.getAttribute('value')).toBe('ws://127.0.0.1:52902/#bsk-local.v1.dev.secret')
+    expect(view.container.querySelector('[data-browserskill-mode]')?.getAttribute('data-browserskill-mode')).toBe('paired')
+    expect(screen.queryByRole('button', { name: en.resetAction })).toBeNull()
+    expect(screen.queryByRole('button', { name: en.openAction })).toBeNull()
+    view.unmount()
+  })
+
+  it('offers Disconnect and Unpair for a connected paired browser', async () => {
+    const { view } = await renderReady({}, { mode: 'paired', state: { kind: 'ready', instanceId: 'abcd1234' as never } })
+    expect(screen.getByText(en.pairedNotice)).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.unpairAction })).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.closeAction })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.resetAction })).toBeNull()
+    view.unmount()
+  })
+
   it('offers Update with the version and permission delta for an outdated install', async () => {
     const { view } = await renderReady({}, {
       state: {
