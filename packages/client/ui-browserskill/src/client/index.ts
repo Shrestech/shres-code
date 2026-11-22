@@ -60,9 +60,11 @@ export function apply(ctx: ClientContext): void {
 
   const face = (): BrowserSkillSettingsSectionInjected => ({
     status: () => unwrap('status', ctx.remote.browserSkill.status()),
-    begin: (verb, keepProfile) => unwrap('begin', ctx.remote.browserSkill.begin(
-      keepProfile === undefined ? { verb } : { verb, keepProfile },
-    )),
+    begin: (verb, keepProfile, mode) => unwrap('begin', ctx.remote.browserSkill.begin({
+      verb,
+      ...keepProfile === undefined ? {} : { keepProfile },
+      ...mode === undefined ? {} : { mode },
+    })),
     provision: token => unwrap('provision', ctx.remote.browserSkill.provision({ token })),
     openBrowser: token => unwrap('open', ctx.remote.browserSkill.open({ token })),
     closeBrowser: token => unwrap('close', ctx.remote.browserSkill.close({ token })),

@@ -297,6 +297,11 @@ export interface BrowserSkillBeginRequest {
    * its sign-ins, and the UI warns before minting the token.
    */
   keepProfile?: boolean
+  /**
+   * Target mode bound to a setMode grant; required for setMode and refused for
+   * every other verb, so a token cannot be spent on the other direction.
+   */
+  mode?: BrowserSkillMode
 }
 
 /** Wire request for browserSkill/provision, open, close, and reset. */

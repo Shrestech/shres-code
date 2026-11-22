@@ -52,7 +52,7 @@ import {
   readProvisionedRecord, type ProvisionedRecord, type StoredProvisionedState,
 } from './provision.ts'
 import { readRuntimeState, writeRuntimeState } from './mode.ts'
-import { listPairingDevices, mintPairingLink, revokeAllPairings } from './pairing.ts'
+import { listPairingDevices, mintPairingLink, revokePairingDevice } from './pairing.ts'
 import type { ResolvedBrowserSkillConfig } from '../config.ts'
 import { isJsonValue } from '@shres-code/shres-code-session'
 import type { JsonValue } from '@shres-code/shres-code-session/types'
@@ -310,7 +310,11 @@ export class BrowserSkillRuntime {
         },
       }),
       consent: {
-        downloads: consentDownloads(this.config),
+        // Paired mode uses the store extension, so its disclosure lists only
+        // the CLI this build verifies; the store listing carries the rest.
+        downloads: this.mode === 'paired'
+          ? consentDownloads(this.config).filter(row => row.artifact === 'bsk')
+          : consentDownloads(this.config),
         extensionPermissions: EXTENSION_PERMISSIONS,
         extensionHostPermissions: EXTENSION_HOST_PERMISSIONS,
         installDir: this.canonicalRoot ?? this.root,
@@ -506,7 +510,7 @@ export class BrowserSkillRuntime {
           const port = await pickEphemeralDaemonPort(internals.pickDaemonPort)
           await writeFileAtomic(
             join(root, RUNTIME_STATE_FILE),
-            `${JSON.stringify({ version: 1, daemonPort: port }, null, 2)}\n`,
+            `${JSON.stringify({ version: 2, mode: this.mode, daemonPort: port }, null, 2)}\n`,
             { mode: 0o600, dirMode: 0o700 },
           )
           signal.throwIfAborted()
@@ -940,40 +944,52 @@ export class BrowserSkillRuntime {
    * extension in the user's browser dials this daemon once it is paired.
    */
   private async pairUnderLease(signal: AbortSignal): Promise<void> {
+    const runner = await this.startPairedDaemon(signal)
+    const link = await mintPairingLink(runner, signal)
+    const grant = (await listPairingDevices(runner, signal)).find(device => device.deviceId === link.deviceId)
+    signal.throwIfAborted()
+    this.setState({
+      kind: 'pairing',
+      link: link.url,
+      deviceId: link.deviceId,
+      // The five-minute window is measured upstream; a daemon that omits the
+      // deadline still gets one, so the card never shows a dead link.
+      expiresAt: grant?.expiresAt ?? new Date(this.internals().now() + PAIRING_LINK_TTL_MS).toISOString(),
+    })
+  }
+
+  /**
+   * Bring up the paired daemon and hold the root lease for its lifetime.
+   * @param signal - caller abort.
+   * @returns the runner bound to the owned daemon.
+   */
+  private async startPairedDaemon(signal: AbortSignal): Promise<BskRunner> {
     const internals = this.internals()
     const root = await this.canonicalRootPath()
-    const lease = await internals.acquireLease(root, this.leaseHooks(root, this.ensureRunner(root)))
+    const runner = this.ensureRunner(root)
+    if (this.daemonStarted) return runner
+    if (this.provisioned === undefined) {
+      throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'set up the runtime first, then pair your browser' })
+    }
+    const lease = await internals.acquireLease(root, this.leaseHooks(root, runner))
     this.lease = lease
-    // The paired lifetime holds the lease until close, unpair, a mode switch,
-    // or disposal: teardown paths key off it to stop the daemon and sessions.
-    let keepLease = false
+    const stored = await readRuntimeState(root)
+    const port = stored?.daemonPort ?? await readDaemonPort(root) ?? await pickEphemeralDaemonPort(internals.pickDaemonPort)
     try {
-      const runner = this.ensureRunner(root)
-      const stored = await readRuntimeState(root)
-      const port = stored?.daemonPort ?? await readDaemonPort(root) ?? await pickEphemeralDaemonPort(internals.pickDaemonPort)
       await writeRuntimeState(root, { version: 2, mode: this.mode, daemonPort: port })
-      if (!this.daemonStarted) {
-        const daemon = this.ensureDaemon(runner)
-        await daemon.start(port, {
-          signal,
-          onSpawned: async (pid) => { await lease.update({ daemonPid: pid }) },
-        })
-        this.daemonStarted = true
-      }
-      const link = await mintPairingLink(runner, signal)
-      const grant = (await listPairingDevices(runner, signal)).find(device => device.deviceId === link.deviceId)
-      signal.throwIfAborted()
-      this.setState({
-        kind: 'pairing',
-        link: link.url,
-        deviceId: link.deviceId,
-        // The five-minute window is measured upstream; a daemon that omits the
-        // deadline still gets one, so the card never shows a dead link.
-        expiresAt: grant?.expiresAt ?? new Date(this.internals().now() + PAIRING_LINK_TTL_MS).toISOString(),
+      const daemon = this.ensureDaemon(runner)
+      await daemon.start(port, {
+        signal,
+        onSpawned: async (pid) => { await lease.update({ daemonPid: pid }) },
       })
-      keepLease = true
-    } finally {
-      if (!keepLease) await this.releaseLease(lease)
+      this.daemonStarted = true
+      return runner
+    } catch (error) {
+      // A daemon that never started leaves no paired lifetime to own the lease.
+      this.daemonStarted = false
+      this.lease = undefined
+      await this.releaseLease(lease)
+      throw error
     }
   }
 
@@ -983,13 +999,9 @@ export class BrowserSkillRuntime {
    * pairing, never the browser.
    */
   private async attachPairedUnderLease(signal: AbortSignal): Promise<void> {
-    const root = await this.canonicalRootPath()
-    const runner = this.ensureRunner(root)
-    if (!this.daemonStarted) {
-      // Connect attaches to a browser the user already paired; minting a link
-      // is the explicit pair action, never a side effect of Connect.
-      throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'pair the browser, then connect' })
-    }
+    // A restart loses the process, not the pairing: Connect brings the daemon
+    // back and adopts the browser the surviving grant names.
+    const runner = await this.startPairedDaemon(signal)
     const activated = (await listPairingDevices(runner, signal))
       .find(device => device.status === 'activated' && device.browserId !== undefined)
     if (activated?.browserId === undefined) {
@@ -1010,11 +1022,12 @@ export class BrowserSkillRuntime {
   private async unpairUnderLease(signal: AbortSignal): Promise<void> {
     const root = await this.canonicalRootPath()
     if (this.daemonStarted) {
-      try {
-        await revokeAllPairings(this.ensureRunner(root), signal)
-      } catch {
-        // A daemon that cannot confirm the revocation still has its pairing
-        // record purged by the teardown below; the failure must not hide it.
+      const runner = this.ensureRunner(root)
+      // Revoke the grants this runtime paired; another browser the user also
+      // paired stays paired.
+      const devices = await listPairingDevices(runner, signal)
+      for (const device of devices) {
+        await revokePairingDevice(runner, device.deviceId, signal)
       }
     }
     const retired = await this.retireCurrent()

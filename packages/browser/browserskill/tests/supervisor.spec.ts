@@ -727,7 +727,9 @@ describe('BrowserSkillRuntime lifecycle', () => {
     await runtime.refreshProvisioned()
     await settle(runtime, 'provision')
     await expect(settle(runtime, 'unpair')).resolves.toMatchObject({ verb: 'unpair', phase: 'succeeded' })
-    expect(await readFakeInvocations(root)).toContainEqual({ command: 'daemon revoke', all: true })
+    // Only the grants this runtime paired are revoked, one by one.
+    expect((await readFakeInvocations(root)).filter(entry => entry.command === 'daemon revoke'))
+      .toEqual([{ command: 'daemon revoke', all: false }])
     expect(runtime.status().state).toMatchObject({ kind: 'provisioned' })
   })
 

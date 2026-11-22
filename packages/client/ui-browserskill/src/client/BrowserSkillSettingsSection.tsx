@@ -67,7 +67,7 @@ export interface BrowserSkillSettingsSectionInjected {
   /** Read the lifecycle picture: state, consent facts, artifacts, operation. */
   status: () => Promise<BrowserSkillStatus>
   /** Mint one one-shot gesture grant bound to the verb and keepProfile choice. */
-  begin: (verb: SpendVerb, keepProfile?: boolean) => Promise<{ token: BrowserSkillToken; expiresAt: string }>
+  begin: (verb: SpendVerb, keepProfile?: boolean, mode?: BrowserSkillMode) => Promise<{ token: BrowserSkillToken; expiresAt: string }>
   /** Start the disclosed provision flow; answers the operation id or the refusal. */
   provision: (token: BrowserSkillToken) => Promise<BrowserSkillStartVerdict>
   /** Open the provisioned stack again (also reconnects a disconnected browser). */
@@ -341,9 +341,10 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
     verb: SpendVerb,
     spend: (token: BrowserSkillToken, keep: boolean) => Promise<BrowserSkillStartVerdict>,
     keep = false,
+    mode?: BrowserSkillMode,
   ): void => {
     run(verb, async () => {
-      const grant = await begin(verb, keep)
+      const grant = mode === undefined ? await begin(verb, keep) : await begin(verb, keep, mode)
       const verdict = await spend(grant.token, keep)
       if (!live.current) return
       // A refused start never became an operation: render its refusal and stop.
