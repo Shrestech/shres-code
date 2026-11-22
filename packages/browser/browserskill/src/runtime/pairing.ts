@@ -104,9 +104,9 @@ export async function listPairingDevices(runner: BskRunner, signal?: AbortSignal
  * @throws Error when the daemon prints something that is not a local link.
  */
 export async function mintPairingLink(runner: BskRunner, signal?: AbortSignal): Promise<PairingLink> {
-  const line = await runner.runJson(['daemon', 'pair'], raw => raw, undefined, signal)
-  const text = typeof line === 'string' ? line : ''
-  const link = parsePairingLink(text)
+  // The daemon prints the link as plain text, not JSON, so this reads stdout.
+  const result = await runner.run(['daemon', 'pair'], undefined, signal)
+  const link = parsePairingLink(result.stdout)
   if (link === undefined) throw new Error('browserskill pairing: the daemon did not print a local pairing link')
   return link
 }

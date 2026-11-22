@@ -973,7 +973,8 @@ export class BrowserSkillRuntime {
     const root = await this.canonicalRootPath()
     const runner = this.ensureRunner(root)
     if (!this.daemonStarted) {
-      await this.pairUnderLease(signal)
+      // Connect attaches to a browser the user already paired; minting a link
+      // is the explicit pair action, never a side effect of Connect.
       throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'pair the browser, then connect' })
     }
     const activated = (await listPairingDevices(runner, signal))

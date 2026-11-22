@@ -63,6 +63,39 @@ if (command === 'daemon' && argv[1] === 'start') {
     rmSync(state('daemon.json'))
   }
   reply({})
+} else if (command === 'daemon' && argv[1] === 'pair') {
+  // One pending local grant, exactly as the daemon mints it: the device id
+  // rides the link fragment and the expiry sits beside it.
+  const daemon = readJson('daemon.json', undefined)
+  if (daemon === undefined) fail(1, 'no daemon')
+  const deviceId = 'dev-' + Math.random().toString(36).slice(2, 10)
+  const devices = readJson('devices.json', {})
+  devices[deviceId] = {
+    device_id: deviceId,
+    status: 'unactivated',
+    label: '',
+    gen: 0,
+    browser_id: null,
+    activated_at: null,
+    expires_at: new Date(Date.now() + 300000).toISOString(),
+  }
+  writeFileSync(state('devices.json'), JSON.stringify(devices))
+  record({ command: 'daemon pair', device: deviceId })
+  process.stdout.write('ws://127.0.0.1:' + String(daemon.port) + '/#bsk-local.v1.' + deviceId + '.secret.mac')
+  process.exit(0)
+} else if (command === 'daemon' && argv[1] === 'devices') {
+  record({ command: 'daemon devices' })
+  reply(Object.values(readJson('devices.json', {})))
+} else if (command === 'daemon' && argv[1] === 'revoke') {
+  const devices = readJson('devices.json', {})
+  if (argv.includes('--all')) writeFileSync(state('devices.json'), JSON.stringify({}))
+  else {
+    const target = argv[2]
+    if (target !== undefined) delete devices[target]
+    writeFileSync(state('devices.json'), JSON.stringify(devices))
+  }
+  record({ command: 'daemon revoke', all: argv.includes('--all') })
+  reply({})
 } else if (command === 'status') {
   record({ command: 'status' })
   const daemon = readJson('daemon.json', undefined)

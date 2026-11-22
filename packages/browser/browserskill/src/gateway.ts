@@ -224,20 +224,15 @@ export class BrowserSkillGateway extends TypertRemoteService {
       ? this.runtime.start('uninstall', { keepProfile: choice })
       : verb === 'setMode'
         ? this.runtime.start('setMode', { mode })
-        : verb === 'provision' || verb === 'open' || verb === 'close' || verb === 'reset' || verb === 'pair' || verb === 'unpair'
-          ? this.runtime.start(verb)
-          : assertNeverVerb(verb)
+        // The remaining verbs take no options, and the closed union leaves
+        // exactly the no-option overload.
+        : this.runtime.start(verb)
     // Only the verdict serializes: the settled promise stays in-process, and
     // this method answers before the operation finishes.
     return verdict.accepted
       ? { accepted: true, operationId: verdict.operationId }
       : { accepted: false, refusal: verdict.refusal }
   }
-}
-
-/** Unreachable last arm: the verb union is closed, so the compiler rejects a new verb added without wiring it. */
-function assertNeverVerb(verb: never): never {
-  throw new BrowserSkillError('invalid-verb-profile', 'unwired browserSkill verb ' + String(verb))
 }
 
 /** The ledger alias encoding one verb's keepProfile choice: the full mutation identity a token is bound to. */
