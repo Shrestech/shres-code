@@ -48,5 +48,5 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   await runtime.refreshProvisioned()
   new BrowserSkillGateway(ctx, runtime)
   registerBrowserTools(ctx, runtime)
-  registerBrowserSkillGuide(ctx)
+  registerBrowserSkillGuide(ctx, runtime.status().mode)
 }
