@@ -45,6 +45,7 @@ function consent() {
 function statusFixture(overrides: Partial<BrowserSkillStatus> = {}): BrowserSkillStatus {
   return {
     state: { kind: 'absent' },
+    mode: 'managed',
     consent: consent(),
     ...overrides,
   }
@@ -72,6 +73,9 @@ function face(overrides: Partial<BrowserSkillSettingsSectionInjected> = {}): Bro
     closeBrowser: () => Promise.resolve(accepted('op-1')),
     reset: () => Promise.resolve(accepted('op-1')),
     uninstall: () => Promise.resolve(accepted('op-1')),
+    pair: () => Promise.resolve(accepted('op-1')),
+    unpair: () => Promise.resolve(accepted('op-1')),
+    setMode: () => Promise.resolve(accepted('op-1')),
     ...overrides,
   }
 }

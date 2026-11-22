@@ -33,6 +33,8 @@ import css from './BrowserSkillSettingsSection.module.css'
 
 /** One lifecycle verb of the browserSkill namespace. */
 type SpendVerb = BrowserSkillOperation['verb']
+/** Which browser the runtime drives, as the status reports it. */
+type BrowserSkillMode = BrowserSkillStatus['mode']
 
 /**
  * Wire verdict of one spending method, minus the settled promise the RPC
@@ -76,6 +78,12 @@ export interface BrowserSkillSettingsSectionInjected {
   reset: (token: BrowserSkillToken) => Promise<BrowserSkillStartVerdict>
   /** Remove the provisioned artifacts; the profile survives only when kept. */
   uninstall: (token: BrowserSkillToken, keepProfile: boolean) => Promise<BrowserSkillStartVerdict>
+  /** Mint (or re-mint) the one-use pairing link for paired mode. */
+  pair: (token: BrowserSkillToken) => Promise<BrowserSkillStartVerdict>
+  /** Revoke every pairing and stop our daemon; the user's browser is untouched. */
+  unpair: (token: BrowserSkillToken) => Promise<BrowserSkillStartVerdict>
+  /** Switch between the managed and paired browsers. */
+  setMode: (token: BrowserSkillToken, mode: BrowserSkillMode) => Promise<BrowserSkillStartVerdict>
 }
 
 /** Full component props assembled by the Settings slot renderer. */
@@ -121,6 +129,10 @@ const REFUSAL_KEYS: Record<BrowserSkillRefusal['kind'], BrowserSkillLocaleKey> =
   'disposed': 'refuseDisposed',
   'shutdown-incomplete': 'refuseShutdownIncomplete',
   'outdated': 'refuseOutdated',
+  'pairing-required': 'refusePairingRequired',
+  'mode-conflict': 'refuseModeConflict',
+  'extension-too-old': 'refuseExtensionTooOld',
+  'verification-disabled': 'refuseVerificationDisabled',
   'unsupported-platform': 'unsupportedPlatform',
   'chrome-missing': 'chromeMissing',
   'chrome-too-old': 'chromeTooOld',
@@ -148,6 +160,9 @@ function successKey(verb: SpendVerb, keepProfile: boolean): BrowserSkillLocaleKe
     case 'close': return 'closedNotice'
     case 'reset': return 'resetDoneNotice'
     case 'uninstall': return keepProfile ? 'uninstallDoneKeptNotice' : 'uninstallDonePurgedNotice'
+    case 'pair': return 'pairStartedNotice'
+    case 'unpair': return 'unpairDoneNotice'
+    case 'setMode': return keepProfile ? 'modeSwitchedPairedNotice' : 'modeSwitchedManagedNotice'
   }
 }
 
@@ -180,6 +195,11 @@ function refusalDetail(refusal: BrowserSkillRefusal): string | undefined {
     case 'outdated':
       return 'Installed bsk ' + refusal.installed.bsk + ' / extension ' + refusal.installed.extension
         + '; this build pins bsk ' + refusal.pinned.bsk + ' / extension ' + refusal.pinned.extension + '.'
+    case 'pairing-required':
+    case 'mode-conflict':
+    case 'extension-too-old':
+    case 'verification-disabled':
+      return refusal.detail
     /* v8 ignore next -- closed union; the compiler rejects an unhandled arm. */
     default:
       return unreachable(refusal)
