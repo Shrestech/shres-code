@@ -1,5 +1,5 @@
 /** Native BrowserSkill model output through the real example, Loader, tools, and guide. */
-import { access } from 'node:fs/promises'
+import { access, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -243,5 +243,26 @@ describe('BrowserSkill native headless snapshot', () => {
         },
       ]
     `)
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('loads the paired guide body when the runtime record says paired', async () => {
+    const result = await runLoaderSmoke({
+      label: 'BrowserSkill paired guide snapshot', tempDirPrefix: 'browserskill-paired-snapshot-',
+      binScript, libBinScript: binScript, configPath: join(fixture, 'cordis.yml'), tsconfigPath,
+      env: { SHRES_SNAPSHOT: 'refresh' },
+      // The runtime reads its mode from the record at mount, so staging the
+      // record is the whole fixture: the browser mode is durable app state.
+      prepare: async (cwd) => {
+        const root = join(cwd, '.shres', 'browserskill')
+        await mkdir(root, { recursive: true })
+        await writeFile(join(root, 'runtime.json'), JSON.stringify({ version: 2, mode: 'paired' }))
+      },
+    })
+    expect(result.stderr).toBe('')
+    const body = result.stdout.split(String.fromCharCode(10)).find(line => line.includes("the user's own browser"))
+    expect(body).toBeDefined()
+    expect(body).toContain("the user's own browser")
+    expect(body).toContain('not yours to touch')
+    expect(body).not.toContain('separate Chrome profile')
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })
