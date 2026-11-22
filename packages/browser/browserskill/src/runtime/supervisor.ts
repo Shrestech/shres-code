@@ -77,6 +77,9 @@ import type {
 /** Profile directory name inside the root. */
 const PROFILE_DIR_NAME = 'profile'
 
+/** Measured lifetime of a one-use local pairing link. */
+const PAIRING_LINK_TTL_MS = 5 * 60_000
+
 /** Chrome or daemon close could not confirm exit; the lease and recorded pids stay retained. */
 class ShutdownIncompleteError extends Error {
   constructor(readonly causes: readonly string[]) {
@@ -367,7 +370,11 @@ export class BrowserSkillRuntime {
     // A retained lease with no ready lifetime is an unfinished shutdown: the
     // recorded pids may still run, so reopening would self-refuse as a peer
     // and poison a recoverable state. Close finishes the teardown first.
-    if ((verb === 'open' || verb === 'provision') && retained === undefined && this.lease !== undefined) {
+    // A healthy paired lifetime holds its lease on purpose, so its own daemon
+    // is not a leftover from an interrupted shutdown.
+    const ownedPairedLifetime = this.mode === 'paired' && this.daemonStarted
+    if ((verb === 'open' || verb === 'provision') && retained === undefined && this.lease !== undefined
+      && !ownedPairedLifetime) {
       const content = this.lease.content()
       const recorded = [
         ...(content.browserPid === undefined ? [] : [`browser pid ${content.browserPid}`]),
@@ -937,6 +944,9 @@ export class BrowserSkillRuntime {
     const root = await this.canonicalRootPath()
     const lease = await internals.acquireLease(root, this.leaseHooks(root, this.ensureRunner(root)))
     this.lease = lease
+    // The paired lifetime holds the lease until close, unpair, a mode switch,
+    // or disposal: teardown paths key off it to stop the daemon and sessions.
+    let keepLease = false
     try {
       const runner = this.ensureRunner(root)
       const stored = await readRuntimeState(root)
@@ -957,10 +967,13 @@ export class BrowserSkillRuntime {
         kind: 'pairing',
         link: link.url,
         deviceId: link.deviceId,
-        ...grant?.expiresAt === undefined ? {} : { expiresAt: grant.expiresAt },
+        // The five-minute window is measured upstream; a daemon that omits the
+        // deadline still gets one, so the card never shows a dead link.
+        expiresAt: grant?.expiresAt ?? new Date(this.internals().now() + PAIRING_LINK_TTL_MS).toISOString(),
       })
+      keepLease = true
     } finally {
-      await this.releaseLease(lease)
+      if (!keepLease) await this.releaseLease(lease)
     }
   }
 
@@ -1148,6 +1161,7 @@ export class BrowserSkillRuntime {
    */
   private async closeInternal(): Promise<void> {
     this.stopHealthLoop()
+    this.daemonStarted = false
     const lease = this.lease
     if (lease === undefined) return
     // Every acquisition constructs this runner before it can store the lease.
@@ -1305,7 +1319,8 @@ export class BrowserSkillRuntime {
         // Recheck the captured lifetime after the await: a stale, aborted, or
         // retiring probe never acts, and its outcome is not a health miss.
         if (!this.isCurrent(lt)) return
-        const present = browsers.some(entry => entry.instanceId === instanceId && entry.label === BSK_OWNED_LABEL)
+        const present = browsers.some(entry => entry.instanceId === instanceId
+          && (this.mode === 'paired' || entry.label === BSK_OWNED_LABEL))
         if (present) {
           this.healthMisses = 0
           return
