@@ -2,6 +2,19 @@
 
 Reference for the managed BrowserSkill host plugin. The function-plugin entry mounts the browser tools, runtime guide, and management gateway without downloading assets or opening Chrome. The Web settings consumer is [ui-browserskill](../../client/ui-browserskill/README.md); this first-party integration does not change the generic npm plugin installer.
 
+## Modes
+
+Two modes drive two different browsers. `managed` launches a Chrome this runtime owns; `paired` drives the browser the user is already signed into, through the store extension and a pairing this runtime holds. The mode is durable state in the runtime record, and a pre-mode record reads as `managed`.
+
+| | Managed | Paired |
+| --- | --- | --- |
+| What we execute | hash-pinned CLI and hash-pinned extension tree | the hash-pinned CLI only |
+| What proves the peer | our own extension, loaded by us, instance id read from its storage | a one-use pairing link, the daemon's device grant, and the browser that activated it |
+| What "owned" means | browser process, profile, daemon, lease | the daemon and the pairing, never the browser |
+| What we refuse | unverified bytes, unowned endpoints | an unpaired peer; `reset` |
+
+Chrome from 136 ignores both remote-debugging switches on its default data directory, so attached-to-the-running-browser control over CDP is unavailable by browser policy. Pairing is the only route that keeps the user's own sign-ins.
+
 ## Ownership
 
 Artifacts, the separate Chrome profile, daemon state, and child home directories live under `join(resolveShresHome(), 'browserskill')`. Ordinary browser profiles are not launched or modified. A process-wide reservation keyed by the canonical root prevents duplicate ownership across module reloads. The durable `runtime.lock` lease and a short writer mutex serialize cross-process acquisition, updates, and release. A live owner is refused; stale cleanup touches only recorded, verified-owned PIDs. An orphan writer mutex fails closed rather than being stolen.
@@ -119,5 +132,7 @@ Tool results append to history. Dynamic page content affects the new suffix, not
 
 - Explicit Close waits for verified teardown. Host disposal cancels work and requests forced termination; pending launch, command-drain, and exit checks can outlast the CLI's five-second shutdown budget. Synchronous host-exit handlers attempt to kill the still-unreaped Chrome and daemon children. SIGKILL bypasses those handlers and can leave processes and lease files behind. Recovery remains subject to the recorded-identity and writer-mutex rules in [Ownership](#ownership).
 
+- **Pairing uses the store extension** — in paired mode the extension's version and permissions are set by its Chrome Web Store listing and by the user's auto-update, not by this build's pins. The compatibility contract there is a protocol floor, measured and refused rather than assumed.
+- **Paired tabs are not borrowed** — the agent opens its own window in the user's browser; taking over an existing tab is a separate, later capability.
 - **The pinned release moves only with a Shres release** — the build runs the newest release its source pins and never resolves `releases/latest` at download time, because the trust anchor is the compiled hash rather than whatever upstream published most recently. An install from an earlier pin stays on disk and shows Update until the user re-provisions.
-- Only the host and installed browser described in [Assets and endpoints](#assets-and-endpoints) are supported. External BrowserSkill daemons and ordinary Chrome profiles are not adopted. Upstream's local WebSocket protocol has no authentication; identity checks do not defend against a malicious same-user process impersonating or modifying owned components.
+- Managed mode only adopts the host and the installed Chrome described in [Assets and endpoints](#assets-and-endpoints): an external daemon or an ordinary Chrome profile is never adopted there. Paired mode is the deliberate, consented opposite — it drives the user's browser through the store extension — and it never adopts a daemon it did not start. Upstream's local WebSocket protocol has no authentication; identity checks do not defend against a malicious same-user process impersonating or modifying owned components.

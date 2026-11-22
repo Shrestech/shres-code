@@ -10,6 +10,7 @@ import type {
   BrowserSkillOperationId,
   BrowserSkillRefusal,
   BrowserSkillStartResult,
+  BrowserSkillStartOptions,
   BrowserSkillStatus,
   BrowserSkillToken,
   BrowserSkillVerb,
@@ -40,6 +41,7 @@ function consent() {
 function statusFixture(overrides: Partial<BrowserSkillStatus> = {}): BrowserSkillStatus {
   return {
     state: { kind: 'absent' },
+    mode: 'managed',
     consent: consent(),
     ...overrides,
   }
@@ -69,7 +71,7 @@ function fabricatedControl(script: { startVerdict?: BrowserSkillStartResult } = 
       control.statusCalls++
       return status
     },
-    start(verb: BrowserSkillVerb, options?: { keepProfile: boolean }): BrowserSkillStartResult {
+    start(verb: BrowserSkillVerb, options?: BrowserSkillStartOptions): BrowserSkillStartResult {
       control.calls.push({ verb, ...options })
       return current.startVerdict ?? {
         accepted: true,
@@ -120,11 +122,11 @@ describe('BrowserSkillGateway', () => {
     expect(new BrowserSkillError('gesture-refused', 'm').code).toBe('gesture-refused')
   })
 
-  it('exposes exactly the seven ratified methods the connection pin names', () => {
+  it('exposes exactly the ratified methods the connection pin names', () => {
     const gateway = harness(fabricatedControl())
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'browserSkill', namespace: 'browserSkill' })
     expect(remoteMethods(gateway).map(marker => marker.method)).toEqual([
-      'status', 'begin', 'provision', 'open', 'close', 'reset', 'uninstall',
+      'status', 'begin', 'provision', 'open', 'close', 'reset', 'uninstall', 'pair', 'unpair', 'setMode',
     ])
   })
 

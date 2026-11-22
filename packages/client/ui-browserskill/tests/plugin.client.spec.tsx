@@ -25,6 +25,7 @@ afterEach(async () => {
 /** The status value the fake namespace answers. */
 const STATUS: BrowserSkillStatus = {
   state: { kind: 'absent' },
+  mode: 'managed',
   consent: {
     downloads: [],
     extensionPermissions: [],

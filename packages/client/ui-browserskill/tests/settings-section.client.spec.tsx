@@ -27,6 +27,7 @@ afterEach(cleanup)
 function readyStatus(): BrowserSkillStatus {
   return {
     state: { kind: 'ready', instanceId: 'inst-1' as never },
+    mode: 'managed',
     consent: {
       downloads: [],
       extensionPermissions: [],

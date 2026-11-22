@@ -248,6 +248,8 @@ async function makeRuntime(options: {
   chromeLauncherError?: string
   daemonStopError?: string
   seedProvisioned?: boolean
+  /** Runtime mode written before the runtime is constructed. */
+  mode?: 'managed' | 'paired'
   chromeGate?: { wait: Promise<void>; open(): void }
   /** Wrap the runner so whole commands can be parked before spawn. */
   gateCommands?: boolean
@@ -326,6 +328,9 @@ async function makeRuntime(options: {
   })
   if (options.seedProvisioned === true) {
     await writeFakeProvisionState(root, fakeScript)
+  }
+  if (options.mode !== undefined) {
+    await writeFile(join(root, 'runtime.json'), JSON.stringify({ version: 2, mode: options.mode }))
   }
   // The real daemon behind a seam whose stop can be refused or held, so tests
   // can gate an owned daemon alive across a gated close or retirement.
@@ -605,16 +610,19 @@ function fixtureLaunchArtifacts(): NonNullable<BrowserSkillRuntimeInternals['ens
  * Start one verb and await its settlement. The settled promise never
  * rejects; a refusal verdict is a broken fixture, not an outcome.
  */
-async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'provision' | 'open' | 'close' | 'reset'): Promise<BrowserSkillOperation>
+async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'provision' | 'open' | 'close' | 'reset' | 'pair' | 'unpair'): Promise<BrowserSkillOperation>
 async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'uninstall', options: { keepProfile: boolean }): Promise<BrowserSkillOperation>
+async function settle(runtime: ReturnType<typeof createBrowserSkillRuntime>, verb: 'setMode', options: { mode: 'managed' | 'paired' }): Promise<BrowserSkillOperation>
 async function settle(
   runtime: ReturnType<typeof createBrowserSkillRuntime>,
   verb: BrowserSkillVerb,
-  options?: { keepProfile: boolean },
+  options?: { keepProfile?: boolean; mode?: 'managed' | 'paired' },
 ): Promise<BrowserSkillOperation> {
   const started: BrowserSkillStartResult = verb === 'uninstall'
-    ? runtime.start('uninstall', options ?? { keepProfile: false })
-    : runtime.start(verb)
+    ? runtime.start('uninstall', { keepProfile: options?.keepProfile ?? false })
+    : verb === 'setMode'
+      ? runtime.start('setMode', { mode: options?.mode })
+      : runtime.start(verb)
   if (!started.accepted) throw new Error('expected ' + verb + ' to be accepted, refused: ' + JSON.stringify(started.refusal))
   return started.settled
 }
@@ -674,6 +682,64 @@ describe('BrowserSkillRuntime lifecycle', () => {
     expect(fake.launches).toBe(0)
     expect(await daemonAlive(root)).toBe(false)
     await expect(readFile(join(root, 'runtime.lock'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('pairs the user browser and attaches without launching Chrome', async () => {
+    const { runtime, root, fake } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
+    await runtime.refreshProvisioned()
+    expect(runtime.status().mode).toBe('paired')
+    await expect(settle(runtime, 'provision')).resolves.toMatchObject({ verb: 'provision', phase: 'succeeded' })
+    const pairing = runtime.status().state
+    expect(pairing).toMatchObject({ kind: 'pairing' })
+    const link = pairing.kind === 'pairing' ? pairing.link : ''
+    expect(link).toContain('#bsk-local.v1.')
+    // The extension consumes the link; the daemon then reports it activated.
+    const stateDir = fakeBskStateDir(root)
+    const devices = JSON.parse(await readFile(join(stateDir, 'devices.json'), 'utf8')) as Record<string, Record<string, unknown>>
+    const deviceId = Object.keys(devices)[0]!
+    devices[deviceId] = { ...devices[deviceId], status: 'activated', browser_id: 'abcd1234', activated_at: new Date().toISOString() }
+    await writeFile(join(stateDir, 'devices.json'), JSON.stringify(devices))
+    await writeFile(join(stateDir, 'instances.json'), JSON.stringify([{ instance_id: 'abcd1234', label: 'Chrome' }]))
+    await expect(settle(runtime, 'open')).resolves.toMatchObject({ verb: 'open', phase: 'succeeded' })
+    expect(runtime.status().state).toMatchObject({ kind: 'ready', instanceId: 'abcd1234' })
+    // Paired mode never launches a browser of its own.
+    expect(fake.launches).toBe(0)
+  })
+
+  it('refuses open in paired mode while nothing is paired', async () => {
+    const { runtime } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
+    await runtime.refreshProvisioned()
+    await expect(settle(runtime, 'open')).resolves.toMatchObject({
+      verb: 'open', phase: 'failed', refusal: { kind: 'pairing-required' },
+    })
+  })
+
+  it('refuses reset in paired mode, where there is no owned profile', async () => {
+    const { runtime } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
+    await runtime.refreshProvisioned()
+    await expect(settle(runtime, 'reset')).resolves.toMatchObject({
+      verb: 'reset', phase: 'failed', refusal: { kind: 'mode-conflict' },
+    })
+  })
+
+  it('unpair revokes every grant and leaves the runtime idle', async () => {
+    const { runtime, root } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
+    await runtime.refreshProvisioned()
+    await settle(runtime, 'provision')
+    await expect(settle(runtime, 'unpair')).resolves.toMatchObject({ verb: 'unpair', phase: 'succeeded' })
+    // Only the grants this runtime paired are revoked, one by one.
+    expect((await readFakeInvocations(root)).filter(entry => entry.command === 'daemon revoke'))
+      .toEqual([{ command: 'daemon revoke', all: false }])
+    expect(runtime.status().state).toMatchObject({ kind: 'provisioned' })
+  })
+
+  it('setMode retires the running stack and persists the target mode', async () => {
+    const { runtime, root } = await makeRuntime({ seedProvisioned: true })
+    await runtime.refreshProvisioned()
+    expect(runtime.status().mode).toBe('managed')
+    await expect(settle(runtime, 'setMode', { mode: 'paired' })).resolves.toMatchObject({ verb: 'setMode', phase: 'succeeded' })
+    expect(runtime.status().mode).toBe('paired')
+    expect(JSON.parse(await readFile(join(root, 'runtime.json'), 'utf8'))).toMatchObject({ mode: 'paired' })
   })
 
   it('reports an install that does not match the compiled pins as outdated, and refuses open before any spawn', async () => {

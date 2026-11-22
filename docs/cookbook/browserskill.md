@@ -45,6 +45,18 @@ A disconnected browser requires an explicit Open; Shres does not silently relaun
 
 **Uninstall…** removes the managed runtime after teardown. It defaults to keeping the profile; uncheck **Keep the owned browser profile and its sign-ins** only if you also want that data deleted. Review the warning and choose **Confirm uninstall**.
 
+## Use your own Chrome instead
+
+Paired mode drives the browser you are signed into instead of one Shres launches.
+
+1. Open **Plugins → BrowserSkill** and choose **My Chrome** under **Which browser BrowserSkill uses**.
+2. Install the BrowserSkill extension from the Chrome Web Store in your own Chrome, and enable it.
+3. Choose **Set up runtime** if the runtime is not installed yet; the card then shows a one-use **pairing link** and its deadline.
+4. Open that link in your browser. The extension consumes it, and the card turns Ready on its own. The link expires after five minutes; **New link** mints another.
+5. Ask the agent for a task. It works in a window it opens inside your browser, with your existing sign-ins, and leaves the tabs you already have alone.
+
+**Disconnect** stops the agent's daemon; your browser stays open. **Unpair browser** revokes the pairing — the extension stays installed, and pairing again restores access. Switching back to **Separate browser** returns to the managed profile described above.
+
 ## Other installation routes
 
 The native integration is separate from **Customize → Plugins → Manage**. Installing a filesystem skill there copies instructions; it does not provision this managed browser. BrowserSkill's DeepSeek Harness npm adapter is not a Shres bundle. If you intentionally manage the upstream CLI, extension, browser, and permissions yourself, follow the [external CLI tutorial](browserskill-manual.md) instead.

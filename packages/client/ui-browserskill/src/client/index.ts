@@ -60,14 +60,19 @@ export function apply(ctx: ClientContext): void {
 
   const face = (): BrowserSkillSettingsSectionInjected => ({
     status: () => unwrap('status', ctx.remote.browserSkill.status()),
-    begin: (verb, keepProfile) => unwrap('begin', ctx.remote.browserSkill.begin(
-      keepProfile === undefined ? { verb } : { verb, keepProfile },
-    )),
+    begin: (verb, keepProfile, mode) => unwrap('begin', ctx.remote.browserSkill.begin({
+      verb,
+      ...keepProfile === undefined ? {} : { keepProfile },
+      ...mode === undefined ? {} : { mode },
+    })),
     provision: token => unwrap('provision', ctx.remote.browserSkill.provision({ token })),
     openBrowser: token => unwrap('open', ctx.remote.browserSkill.open({ token })),
     closeBrowser: token => unwrap('close', ctx.remote.browserSkill.close({ token })),
     reset: token => unwrap('reset', ctx.remote.browserSkill.reset({ token })),
     uninstall: (token, keepProfile) => unwrap('uninstall', ctx.remote.browserSkill.uninstall({ token, keepProfile })),
+    pair: token => unwrap('pair', ctx.remote.browserSkill.pair({ token })),
+    unpair: token => unwrap('unpair', ctx.remote.browserSkill.unpair({ token })),
+    setMode: (token, mode) => unwrap('setMode', ctx.remote.browserSkill.setMode({ token, mode })),
   })
 
   ctx.slots.inject('settings.plugins.bundle', () => ctx.slots.register({

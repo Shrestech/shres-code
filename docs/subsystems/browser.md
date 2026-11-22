@@ -4,6 +4,12 @@ Reference for the lifecycle and tool data declared by [shres-browserskill](../..
 
 Source: [shared types](../../packages/browser/browserskill/src/types.ts). Provisioning, supported platforms, process ownership, configuration, and failure recovery belong to the [package reference](../../packages/browser/browserskill/README.md).
 
+## Modes
+
+`managed` launches a Chrome this runtime owns and verifies; `paired` drives the browser the user is already signed into through the store extension and a one-use pairing link. The mode is durable state in the runtime record, and a record written before modes existed reads as `managed`.
+
+Chrome 136 and later ignore both remote-debugging switches on its default data directory, so control of the running everyday browser over CDP is unavailable by browser policy; pairing is the only route that keeps the user's own sign-ins. In paired mode the runtime owns the daemon and the pairing, never the browser: `provision` starts the daemon and mints the link, `open` attaches to the browser an activated grant names, `close` stops the daemon only, `reset` is refused, `unpair` revokes the grants, and `setMode` retires then persists. The link is a secret: only `status()` carries it, never an event or the session log.
+
 ## Identities
 
 ```ts type-equiv
@@ -42,6 +48,15 @@ The provisioning record names the release it published and the permission set co
 
 ```ts type-equiv
 /**
+ * Which browser a runtime drives. `managed` launches a Chrome the runtime
+ * owns; `paired` drives the browser the user already has, through the
+ * upstream extension and a one-use pairing link.
+ */
+type BrowserSkillMode = 'managed' | 'paired'
+```
+
+```ts type-equiv
+/**
  * Lifecycle state of the managed browser stack. `ready` requires the evidence
  * chain: our daemon answers on the persisted port, our extension instance is
  * listed by it, and the id matches the one read from extension storage.
@@ -57,6 +72,14 @@ type BrowserSkillState = {
   step: 'download' | 'verify' | 'extract'
 } | {
   kind: 'provisioned'
+} | {
+  kind: 'pairing'
+  /** One-use local pairing link the user's browser extension consumes. Never logged or persisted. */
+  link: string
+  /** Device grant this link activates. */
+  deviceId: string
+  /** ISO 8601 deadline after which the link is dead. */
+  expiresAt?: string
 } | {
   kind: 'outdated'
   /** Versions recorded by the install on disk; a v1 record carries no permission receipt. */
@@ -116,6 +139,12 @@ type BrowserSkillRefusal = {
   pid: number
   /** Present when the refusal carries a manual recovery step beyond the pid. */
   detail?: string
+} | {
+  kind: 'pairing-required'
+  detail: string
+} | {
+  kind: 'mode-conflict'
+  detail: string
 } | {
   kind: 'outdated'
   /** Versions recorded by the install on disk. */
@@ -186,7 +215,7 @@ interface BrowserSkillConsent {
 
 ```ts type-equiv
 /** The lifecycle verbs a start accepts; `uninstall` alone carries the keep-profile choice. */
-type BrowserSkillVerb = 'provision' | 'open' | 'close' | 'reset' | 'uninstall'
+type BrowserSkillVerb = 'provision' | 'open' | 'close' | 'reset' | 'uninstall' | 'pair' | 'unpair' | 'setMode'
 ```
 
 ```ts type-equiv
@@ -208,6 +237,8 @@ interface BrowserSkillOperation {
 interface BrowserSkillStatus {
   /** Current lifecycle state. */
   state: BrowserSkillState
+  /** Which browser this runtime drives. */
+  mode: BrowserSkillMode
   /** The installed Chrome the owned profile runs, when detected. */
   chrome?: {
     version: string
@@ -235,10 +266,12 @@ interface BrowserSkillStatus {
 Acceptance reserves an operation synchronously. The gateway serializes the verdict and operation id, never the settlement promise; clients match the id against the terminal status record.
 
 ```ts type-equiv
-/** The keep-profile choice only the uninstall start takes. */
+/** The choices the uninstall and setMode starts take. */
 interface BrowserSkillStartOptions {
   /** Whether the owned profile and its sign-ins survive the uninstall. */
-  keepProfile: boolean
+  keepProfile?: boolean
+  /** Target mode the setMode start switches to. */
+  mode?: BrowserSkillMode | undefined
 }
 ```
 
@@ -272,9 +305,9 @@ interface BrowserSkillControl {
   /** The fresh-page picture; never mutates anything. */
   status(): BrowserSkillStatus
   /** Start provision, open, close, or reset; provision runs provision-and-open. */
-  start(verb: 'provision' | 'open' | 'close' | 'reset'): BrowserSkillStartResult
+  start(verb: 'provision' | 'open' | 'close' | 'reset' | 'pair' | 'unpair'): BrowserSkillStartResult
   /** Start the uninstall; the keep-profile choice is bound at acceptance. */
-  start(verb: 'uninstall', options: BrowserSkillStartOptions): BrowserSkillStartResult
+  start(verb: 'uninstall' | 'setMode', options: BrowserSkillStartOptions): BrowserSkillStartResult
 }
 ```
 
@@ -341,6 +374,11 @@ interface BrowserSkillBeginRequest {
    * its sign-ins, and the UI warns before minting the token.
    */
   keepProfile?: boolean
+  /**
+   * Target mode bound to a setMode grant; required for setMode and refused for
+   * every other verb, so a token cannot be spent on the other direction.
+   */
+  mode?: BrowserSkillMode
 }
 ```
 
@@ -349,6 +387,16 @@ interface BrowserSkillBeginRequest {
 interface BrowserSkillFlowRequest {
   /** Grant from begin with the matching verb. */
   token: BrowserSkillToken
+}
+```
+
+```ts type-equiv
+/** Wire request for browserSkill/setMode. */
+interface BrowserSkillModeRequest {
+  /** Grant from begin('setMode') bound to the same target mode. */
+  token: BrowserSkillToken
+  /** Mode the runtime switches to. */
+  mode: BrowserSkillMode
 }
 ```
 

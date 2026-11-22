@@ -2757,6 +2757,16 @@
     },
     {
       "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillMode",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserSkillModeRequest",
+      "source": "packages/browser/browserskill/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
       "symbol": "BrowserSkillUpgradeChanges",
       "source": "packages/browser/browserskill/src/types.ts"
     },
