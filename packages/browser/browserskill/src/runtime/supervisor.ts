@@ -615,8 +615,9 @@ export class BrowserSkillRuntime {
    * command-failed, aborted, or instance-mismatch. Never rejects.
    */
   async startSession(owner: SessionOwner, signal: AbortSignal): Promise<BrowserSkillCommandResult<{ session: BskSessionId }>> {
-    const lt = this.captureReadyLifetime()
-    if (lt === undefined) return notReady(this.state)
+    let lt = this.captureReadyLifetime()
+    if (lt === undefined && this.mode === 'paired') lt = await this.attachPairedForTool(signal)
+    if (lt === undefined) return notReady(this.state, this.mode)
     const runner = lt.runner
     const tracked = (async (): Promise<BrowserSkillCommandResult<{ session: BskSessionId }>> => {
       try {
@@ -630,7 +631,7 @@ export class BrowserSkillRuntime {
           await runner.runJson(
             argv.sessionStop(started.sessionId), requireJsonObject, undefined, new AbortController().signal,
           ).catch(() => undefined)
-          return notReady(this.state)
+          return notReady(this.state, this.mode)
         }
         if (started.browserInstanceId !== lt.instanceId) {
           await this.stopForeignSession(lt, started.sessionId)
@@ -657,7 +658,7 @@ export class BrowserSkillRuntime {
    */
   async stopSession(owner: SessionOwner, session: BskSessionId, signal: AbortSignal): Promise<BrowserSkillCommandResult<void>> {
     const lt = this.captureReadyLifetime()
-    if (lt === undefined) return notReady(this.state)
+    if (lt === undefined) return notReady(this.state, this.mode)
     if (!this.sessions.isOwnedBy(owner, session)) return unknownSession()
     const tracked = (async (): Promise<BrowserSkillCommandResult<void>> => {
       try {
@@ -696,7 +697,7 @@ export class BrowserSkillRuntime {
    */
   async navigate(owner: SessionOwner, session: BskSessionId, url: URL, signal: AbortSignal): Promise<BrowserSkillCommandResult<BskOutput>> {
     const lt = this.captureReadyLifetime()
-    if (lt === undefined) return notReady(this.state)
+    if (lt === undefined) return notReady(this.state, this.mode)
     if (!this.sessions.isOwnedBy(owner, session)) return unknownSession()
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       return { ok: false, reason: 'invalid-argument', detail: `only http and https URLs navigate; got ${url.protocol}` }
@@ -714,7 +715,7 @@ export class BrowserSkillRuntime {
    */
   async observe(owner: SessionOwner, session: BskSessionId, signal: AbortSignal): Promise<BrowserSkillCommandResult<BskOutput>> {
     const lt = this.captureReadyLifetime()
-    if (lt === undefined) return notReady(this.state)
+    if (lt === undefined) return notReady(this.state, this.mode)
     if (!this.sessions.isOwnedBy(owner, session)) return unknownSession()
     return this.runSessionCommand(lt, argv.observe(session), signal, 'observe')
   }
@@ -736,7 +737,7 @@ export class BrowserSkillRuntime {
     owner: SessionOwner, session: BskSessionId, action: BrowserAction, signal: AbortSignal,
   ): Promise<BrowserSkillCommandResult<BskOutput>> {
     const lt = this.captureReadyLifetime()
-    if (lt === undefined) return notReady(this.state)
+    if (lt === undefined) return notReady(this.state, this.mode)
     if (!this.sessions.isOwnedBy(owner, session)) return unknownSession()
     switch (action.kind) {
       case 'click': {
@@ -786,6 +787,29 @@ export class BrowserSkillRuntime {
     if (lt === undefined || lt.controller.signal.aborted || lt.retiring !== undefined) return undefined
     if (this.inFlight !== undefined) return undefined
     return lt
+  }
+
+  /**
+   * Bring a paired browser up for a tool call. Pairing is the user's own
+   * consented, verified grant, so attaching to it adds no authority: no link
+   * is minted, no mode changes, and the same open verb runs. A start that
+   * collides with a user-initiated operation waits for that operation's
+   * settlement instead of failing the tool call.
+   * @param signal - the caller's abort.
+   * @returns the captured lifetime, or undefined when the attach did not land.
+   */
+  private async attachPairedForTool(signal: AbortSignal): Promise<ReadyLifetime | undefined> {
+    const inFlight = this.inFlight
+    const attempt = this.start('open')
+    if (!attempt.accepted && attempt.refusal.kind === 'operation-in-progress' && inFlight !== undefined) {
+      await inFlight.settled.catch(() => undefined)
+    } else if (attempt.accepted) {
+      await attempt.settled.catch(() => undefined)
+    } else {
+      return undefined
+    }
+    signal.throwIfAborted()
+    return this.captureReadyLifetime()
   }
 
   /** Track one command against the lifetime it captured; the chain is rejection-contained. */
@@ -1401,7 +1425,7 @@ export class BrowserSkillRuntime {
     const tracked = (async (): Promise<BrowserSkillCommandResult<BskOutput>> => {
       try {
         const json = await lt.runner.runJson(args, requireJsonObject, undefined, AbortSignal.any([signal, lt.controller.signal]))
-        if (!this.isCurrent(lt)) return notReady(this.state)
+        if (!this.isCurrent(lt)) return notReady(this.state, this.mode)
         return { ok: true, value: { json } }
       } catch (error) {
         return lostCommandOutcome(error, label)
@@ -1482,13 +1506,15 @@ function requireJsonObject(raw: unknown): { [key: string]: JsonValue } {
   return raw
 }
 
-function notReady(state: BrowserSkillState): BrowserSkillCommandResult<never> {
+function notReady(state: BrowserSkillState, mode: BrowserSkillMode): BrowserSkillCommandResult<never> {
   return {
     ok: false,
     reason: 'not-ready',
     detail: state.kind === 'outdated'
       ? 'BrowserSkill browser is not ready (state outdated); update it from Plugins → BrowserSkill'
-      : `BrowserSkill browser is not ready (state ${state.kind}); open it from Plugins → BrowserSkill`,
+      : mode === 'paired'
+        ? 'The user\'s browser is not connected. Ask the user to open Plugins → BrowserSkill and connect it.'
+        : `BrowserSkill browser is not ready (state ${state.kind}); open it from Plugins → BrowserSkill`,
   }
 }
 

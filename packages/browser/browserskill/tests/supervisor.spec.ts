@@ -684,6 +684,25 @@ describe('BrowserSkillRuntime lifecycle', () => {
     await expect(readFile(join(root, 'runtime.lock'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('a tool start attaches to an active pairing without a click', async () => {
+    const { runtime, root } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
+    await runtime.refreshProvisioned()
+    // The user paired earlier: the grant is active and the browser is connected.
+    const stateDir = fakeBskStateDir(root)
+    await mkdir(stateDir, { recursive: true })
+    await writeFile(join(stateDir, 'devices.json'), JSON.stringify({
+      'dev-1': {
+        device_id: 'dev-1', status: 'active', label: '', gen: 1,
+        browser_id: 'abcd1234', activated_at: '2026-11-23T02:01:49Z', expires_at: null,
+      },
+    }))
+    await writeFile(join(stateDir, 'instances.json'), JSON.stringify([{ instance_id: 'abcd1234', label: 'Chrome' }]))
+    // No Connect click: the tool path brings the daemon up and adopts the grant.
+    const started = await runtime.startSession('agent-a' as never, new AbortController().signal)
+    expect(started).toMatchObject({ ok: true })
+    expect(runtime.status().state).toMatchObject({ kind: 'ready', instanceId: 'abcd1234' })
+  })
+
   it('pairs the user browser and attaches without launching Chrome', async () => {
     const { runtime, root, fake } = await makeRuntime({ seedProvisioned: true, mode: 'paired' })
     await runtime.refreshProvisioned()
