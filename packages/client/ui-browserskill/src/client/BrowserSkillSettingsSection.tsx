@@ -444,6 +444,32 @@ export function BrowserSkillSettingsSection(props: BrowserSkillSettingsSectionPr
           })}
         </dl>
       </section>
+      {result.mode === 'paired' && (state.kind === 'provisioned' || state.kind === 'disconnected' || state.kind === 'failed') ? (
+        <section className={css.card} data-pairing-start="">
+          <h3 className={css.heading}>{t('pairingStartHeading')}</h3>
+          <p className={css.consent}>{t('pairingStartNote')}</p>
+          <div className={css.teardownActions}>
+            <button
+              type="button"
+              className={css.primaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('pair', token => pair(token)) }}
+            >
+              {pending === 'pair' ? t('pairingStartBusyAction') : t('pairingStartAction')}
+            </button>
+            <button
+              type="button"
+              className={css.secondaryButton}
+              disabled={busyActions}
+              onClick={() => { spendVerb('open', token => openBrowser(token)) }}
+            >
+              {pending === 'open' ? t('openBusyAction') : t('pairingConnectAction')}
+            </button>
+          </div>
+          <p className={css.consent}>{t('pairingInstallNote')}</p>
+          <p className={css.consent}>{t('pairedPermissionsNote')}</p>
+        </section>
+      ) : null}
       {state.kind === 'pairing' ? (
         <section className={css.card} data-pairing="">
           <h3 className={css.heading}>{t('pairingHeading')}</h3>
