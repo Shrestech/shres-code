@@ -697,7 +697,7 @@ describe('BrowserSkillRuntime lifecycle', () => {
     const stateDir = fakeBskStateDir(root)
     const devices = JSON.parse(await readFile(join(stateDir, 'devices.json'), 'utf8')) as Record<string, Record<string, unknown>>
     const deviceId = Object.keys(devices)[0]!
-    devices[deviceId] = { ...devices[deviceId], status: 'activated', browser_id: 'abcd1234', activated_at: new Date().toISOString() }
+    devices[deviceId] = { ...devices[deviceId], status: 'active', browser_id: 'abcd1234', activated_at: new Date().toISOString() }
     await writeFile(join(stateDir, 'devices.json'), JSON.stringify(devices))
     await writeFile(join(stateDir, 'instances.json'), JSON.stringify([{ instance_id: 'abcd1234', label: 'Chrome' }]))
     await expect(settle(runtime, 'open')).resolves.toMatchObject({ verb: 'open', phase: 'succeeded' })
