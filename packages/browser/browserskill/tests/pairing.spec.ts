@@ -36,16 +36,16 @@ describe('device grants', () => {
   it('parses the daemon reply and keeps activation facts', () => {
     expect(parseDevices([
       { device_id: 'd1', status: 'unactivated', label: '', gen: 0, expires_at: '2026-11-22T00:48:16Z' },
-      { device_id: 'd2', status: 'activated', label: 'Chrome', gen: 1, browser_id: 'b1', activated_at: '2026-11-22T00:40:00Z' },
+      { device_id: 'd2', status: 'active', label: 'Chrome', gen: 1, browser_id: 'b1', activated_at: '2026-11-22T00:40:00Z' },
     ])).toEqual([
       { deviceId: 'd1', status: 'unactivated', label: '', gen: 0, expiresAt: '2026-11-22T00:48:16Z' },
-      { deviceId: 'd2', status: 'activated', label: 'Chrome', gen: 1, browserId: 'b1', activatedAt: '2026-11-22T00:40:00Z' },
+      { deviceId: 'd2', status: 'active', label: 'Chrome', gen: 1, browserId: 'b1', activatedAt: '2026-11-22T00:40:00Z' },
     ])
   })
 
   it('fails loud on a malformed record instead of reading it as no devices', () => {
     expect(() => parseDevices({ devices: [] })).toThrow('not an array')
-    expect(() => parseDevices([{ status: 'activated' }])).toThrow('lacks an id')
+    expect(() => parseDevices([{ status: 'active' }])).toThrow('lacks an id')
     expect(() => parseDevices([{ device_id: 'd', status: 'pairing' }])).toThrow('known status')
   })
 })

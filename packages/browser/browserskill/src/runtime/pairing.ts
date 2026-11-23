@@ -12,8 +12,8 @@ import { BskCommandError, type BskRunner } from './runner.ts'
 export interface PairingDevice {
   /** Opaque device id the daemon minted for this pairing. */
   deviceId: string
-  /** `unactivated` until the extension consumes its link, then `activated`. */
-  status: 'unactivated' | 'activated' | 'revoked'
+  /** `unactivated` until the extension consumes its link, then `active`. */
+  status: 'unactivated' | 'active' | 'revoked'
   /** Browser that activated the grant, when one did. */
   browserId?: string
   /** ISO 8601 time the grant was activated. */
@@ -47,7 +47,7 @@ export function parseDevices(raw: unknown): PairingDevice[] {
     const wire = item as Record<string, unknown>
     const deviceId = wire.device_id
     const status = wire.status
-    if (typeof deviceId !== 'string' || (status !== 'unactivated' && status !== 'activated' && status !== 'revoked')) {
+    if (typeof deviceId !== 'string' || (status !== 'unactivated' && status !== 'active' && status !== 'revoked')) {
       throw new Error('browserskill pairing: device record lacks an id or a known status')
     }
     return {

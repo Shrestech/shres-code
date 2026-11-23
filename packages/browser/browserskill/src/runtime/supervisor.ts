@@ -1003,7 +1003,7 @@ export class BrowserSkillRuntime {
     // back and adopts the browser the surviving grant names.
     const runner = await this.startPairedDaemon(signal)
     const activated = (await listPairingDevices(runner, signal))
-      .find(device => device.status === 'activated' && device.browserId !== undefined)
+      .find(device => device.status === 'active' && device.browserId !== undefined)
     if (activated?.browserId === undefined) {
       throw new ProvisionRefusedError({ kind: 'pairing-required', detail: 'no verified browser is paired yet' })
     }
